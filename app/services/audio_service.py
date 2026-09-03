@@ -54,6 +54,47 @@ class AudioService:
 
         return None
 
+    def get_track_metadata(self, entry_id: str, drive_file_id: Optional[str], canonical_name: str) -> dict:
+        cache_path = self.ensure_local_cache(entry_id, drive_file_id)
+        if not cache_path or not os.path.isfile(cache_path):
+            return {"exists": False}
+
+        size_bytes = os.path.getsize(cache_path)
+        duration_sec = None
+
+        try:
+            from mutagen import File as MutagenFile
+            audio = MutagenFile(cache_path)
+            if audio and audio.info and hasattr(audio.info, "length"):
+                duration_sec = round(audio.info.length, 1)
+        except Exception as e:
+            logger.warning("Could not read audio duration for %s: %s", entry_id, e)
+
+        def fmt_duration(sec: Optional[float]) -> str:
+            if not sec:
+                return "Unknown"
+            m = int(sec // 60)
+            s = int(sec % 60)
+            return f"{m}:{s:02d}"
+
+        def fmt_size(b: int) -> str:
+            val = float(b)
+            for unit in ['B', 'KB', 'MB', 'GB']:
+                if val < 1024.0:
+                    return f"{val:.1f} {unit}"
+                val /= 1024.0
+            return f"{val:.1f} GB"
+
+        return {
+            "exists": True,
+            "filename": canonical_name,
+            "size_bytes": size_bytes,
+            "size_formatted": fmt_size(size_bytes),
+            "duration_seconds": duration_sec,
+            "duration_formatted": fmt_duration(duration_sec),
+            "stream_url": f"/api/stream/{entry_id}"
+        }
+
     def _create_mock_mp3(self, path: str):
         # 1-second silent MP3 binary frame for mock mode playback testing
         silent_mp3_header = bytes([

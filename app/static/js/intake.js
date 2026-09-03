@@ -3,6 +3,8 @@ let performances = [];
 let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
+let sheetUrl = 'https://docs.google.com';
+let maxUploadSizeMb = 200;
 
 document.addEventListener('DOMContentLoaded', async () => {
   await initEventInfo();
@@ -20,6 +22,16 @@ async function initEventInfo() {
       }
       if (data.mock_mode) {
         document.getElementById('mock-banner').classList.remove('hidden');
+      }
+      if (data.sheet_url) {
+        sheetUrl = data.sheet_url;
+        const sheetLink = document.getElementById('open-sheet-link');
+        if (sheetLink) sheetLink.href = sheetUrl;
+      }
+      if (data.max_upload_size_mb) {
+        maxUploadSizeMb = data.max_upload_size_mb;
+        const hint = document.getElementById('max-size-hint');
+        if (hint) hint.textContent = `Supports MP3, M4A, WAV (Max ${maxUploadSizeMb}MB)`;
       }
     }
   } catch (e) {
@@ -43,12 +55,14 @@ async function loadPerformances() {
 
     const sortedPerformers = Array.from(performerSet).sort((a, b) => a.localeCompare(b));
     const select = document.getElementById('performer-select');
+    const currentSelected = select.value;
     select.innerHTML = '<option value="">-- Choose your name from the sign-up list --</option>';
 
     sortedPerformers.forEach(name => {
       const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
+      if (name === currentSelected) opt.selected = true;
       select.appendChild(opt);
     });
 
@@ -66,6 +80,13 @@ function setupEventListeners() {
     handlePerformerSelected(selectedPerformer);
   });
 
+  // Refresh Data buttons
+  const refreshBtn = document.getElementById('refresh-data-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshClick);
+
+  const alertRefreshBtn = document.getElementById('alert-refresh-btn');
+  if (alertRefreshBtn) alertRefreshBtn.addEventListener('click', handleRefreshClick);
+
   // Tab switching
   const tabFile = document.getElementById('tab-file');
   const tabYoutube = document.getElementById('tab-youtube');
@@ -79,7 +100,7 @@ function setupEventListeners() {
     tabYoutube.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition';
     filePane.classList.remove('hidden');
     ytPane.classList.add('hidden');
-    submitText.textContent = 'Upload Track to Google Drive';
+    updateSubmitButtonText();
     if (window.lucide) lucide.createIcons();
   });
 
@@ -89,7 +110,7 @@ function setupEventListeners() {
     tabFile.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition';
     ytPane.classList.remove('hidden');
     filePane.classList.add('hidden');
-    submitText.textContent = 'Extract & Upload to Google Drive';
+    updateSubmitButtonText();
     if (window.lucide) lucide.createIcons();
   });
 
@@ -129,7 +150,35 @@ function setupEventListeners() {
     document.getElementById('audio-file-input').value = '';
     document.getElementById('youtube-url-input').value = '';
     document.getElementById('file-info-bar').classList.add('hidden');
+    if (selectedPerformer) {
+      handlePerformerSelected(selectedPerformer);
+    }
   });
+}
+
+async function handleRefreshClick() {
+  const btns = [document.getElementById('refresh-data-btn'), document.getElementById('alert-refresh-btn')];
+  btns.forEach(b => {
+    if (b) {
+      b.classList.add('opacity-50', 'pointer-events-none');
+      const icon = b.querySelector('i');
+      if (icon) icon.classList.add('animate-spin');
+    }
+  });
+
+  await loadPerformances();
+  if (selectedPerformer) {
+    handlePerformerSelected(selectedPerformer);
+  }
+
+  btns.forEach(b => {
+    if (b) {
+      b.classList.remove('opacity-50', 'pointer-events-none');
+      const icon = b.querySelector('i');
+      if (icon) icon.classList.remove('animate-spin');
+    }
+  });
+  if (window.lucide) lucide.createIcons();
 }
 
 function handlePerformerSelected(name) {
@@ -160,9 +209,10 @@ function handlePerformerSelected(name) {
   songContainer.innerHTML = '';
   userSongs.forEach((song, idx) => {
     const isChecked = idx === 0;
-    if (isChecked) selectedEntry = song;
+    if (isChecked) {
+      updateSelectedSong(song);
+    }
 
-    const isDuet = song.performance_type.toLowerCase().includes('duet');
     const partnerText = song.partner_name ? ` (with ${song.partner_name})` : '';
     
     let statusClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
@@ -173,6 +223,9 @@ function handlePerformerSelected(name) {
     } else if (song.track_status === 'Acoustic') {
       statusClass = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
       statusLabel = 'Acoustic / No Track';
+    } else if (song.is_song_name_missing) {
+      statusClass = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+      statusLabel = 'Song Name Missing';
     }
 
     const card = document.createElement('label');
@@ -183,11 +236,13 @@ function handlePerformerSelected(name) {
       <div class="flex items-center gap-3">
         <input type="radio" name="selected_song" value="${song.entry_id}" ${isChecked ? 'checked' : ''} class="text-orange-500 focus:ring-orange-500 accent-orange-500">
         <div>
-          <div class="font-semibold text-sm text-white">${escapeHtml(song.song_title)}</div>
+          <div class="font-semibold text-sm ${song.is_song_name_missing ? 'text-amber-300 italic' : 'text-white'}">
+            ${escapeHtml(song.song_title)}
+          </div>
           <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
             <span class="text-orange-400 font-medium">${escapeHtml(song.performance_type)}${escapeHtml(partnerText)}</span>
             <span>•</span>
-            <span>ID: ${song.entry_id}</span>
+            <span>Seq #${song.sequence_order || 'TBD'}</span>
           </div>
         </div>
       </div>
@@ -201,32 +256,107 @@ function handlePerformerSelected(name) {
         l.className = 'block p-3.5 rounded-xl border cursor-pointer transition flex items-center justify-between border-slate-800 bg-slate-950/60 hover:border-slate-700';
       });
       card.className = 'block p-3.5 rounded-xl border cursor-pointer transition flex items-center justify-between border-orange-500 bg-orange-500/10';
-      selectedEntry = song;
-      if (selectedEntry.youtube_url) {
-        document.getElementById('youtube-url-input').value = selectedEntry.youtube_url;
-      }
-      updateActiveTrackBadge();
+      updateSelectedSong(song);
     });
 
     songContainer.appendChild(card);
   });
 
-  if (selectedEntry && selectedEntry.youtube_url) {
-    document.getElementById('youtube-url-input').value = selectedEntry.youtube_url;
-  }
-
   songSection.classList.remove('hidden');
   uploadSection.classList.remove('hidden');
-  updateActiveTrackBadge();
   if (window.lucide) lucide.createIcons();
+}
+
+function updateSelectedSong(song) {
+  selectedEntry = song;
+  const missingAlert = document.getElementById('missing-song-alert');
+  const submitBtn = document.getElementById('submit-btn');
+
+  if (song.is_song_name_missing) {
+    missingAlert.classList.remove('hidden');
+    submitBtn.disabled = true;
+  } else {
+    missingAlert.classList.add('hidden');
+    submitBtn.disabled = false;
+  }
+
+  updateSubmitButtonText();
+
+  if (song.youtube_url) {
+    document.getElementById('youtube-url-input').value = song.youtube_url;
+  }
+
+  updateActiveTrackBadge();
+  updateActiveTrackPreview(song);
+}
+
+function updateSubmitButtonText() {
+  const submitBtn = document.getElementById('submit-btn');
+  const submitText = document.getElementById('submit-text');
+
+  if (!selectedEntry) return;
+
+  if (selectedEntry.is_song_name_missing) {
+    submitBtn.disabled = true;
+    submitText.textContent = 'Add song title in sheet to upload';
+    return;
+  }
+
+  submitBtn.disabled = false;
+  const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id;
+
+  if (currentMethod === 'youtube') {
+    submitText.textContent = isReplacing ? 'Extract & Replace Track on Google Drive' : 'Extract & Upload to Google Drive';
+  } else {
+    submitText.textContent = isReplacing ? 'Replace Track on Google Drive' : 'Upload Track to Google Drive';
+  }
+}
+
+async function updateActiveTrackPreview(song) {
+  const existingCard = document.getElementById('existing-track-card');
+  const audioPlayer = document.getElementById('track-audio-player');
+  const actionTitle = document.getElementById('upload-action-title');
+
+  // If no track uploaded yet
+  if (song.track_status !== 'Uploaded' && !song.drive_file_id) {
+    existingCard.classList.add('hidden');
+    audioPlayer.src = '';
+    actionTitle.textContent = 'Provide Backing Track';
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/track-info/${song.entry_id}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.exists) {
+        document.getElementById('track-filename-display').textContent = data.filename;
+        document.getElementById('track-size-badge').textContent = data.size_formatted;
+        document.getElementById('track-duration-display').textContent = data.duration_formatted;
+        audioPlayer.src = data.stream_url;
+        existingCard.classList.remove('hidden');
+        actionTitle.textContent = 'Replace Existing Track (Optional)';
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch track metadata:', e);
+  }
+
+  existingCard.classList.add('hidden');
+  audioPlayer.src = '';
+  actionTitle.textContent = 'Provide Backing Track';
 }
 
 function updateActiveTrackBadge() {
   const badge = document.getElementById('active-track-badge');
   if (!selectedEntry) return;
 
-  if (selectedEntry.track_status === 'Uploaded') {
-    badge.innerHTML = '<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Existing track on file</span>';
+  if (selectedEntry.is_song_name_missing) {
+    badge.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Title Missing</span>';
+  } else if (selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id) {
+    badge.innerHTML = '<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Track on file</span>';
   } else {
     badge.innerHTML = '<span class="text-amber-400 flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> No track yet</span>';
   }
@@ -253,6 +383,11 @@ async function handleFormSubmit(e) {
 
   if (!selectedEntry) {
     showError('Please select a song from the list first.');
+    return;
+  }
+
+  if (selectedEntry.is_song_name_missing) {
+    showError('Song title is missing in Google Sheet. Please add your song name to the sign-up sheet first.');
     return;
   }
 

@@ -30,7 +30,7 @@ columns:
 
 storage:
   cache_dir: "/data/cache"
-  max_upload_size_mb: 50
+  max_upload_size_mb: 200
 
 downloader:
   service_url: "http://downloader:8001"

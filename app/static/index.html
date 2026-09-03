@@ -22,10 +22,16 @@
           <p class="text-xs text-orange-400 font-medium">Musical Night • Track Submission</p>
         </div>
       </div>
-      <a href="/admin" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
-        <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-        <span>Stage Console</span>
-      </a>
+      <div class="flex items-center gap-2">
+        <button id="refresh-data-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Refresh sign-up list from Google Sheet">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Refresh Data</span>
+        </button>
+        <a href="/admin" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+          <span>Stage Console</span>
+        </a>
+      </div>
     </div>
   </header>
 
@@ -83,14 +89,57 @@
         <div id="song-options-container" class="space-y-2.5 pt-1">
           <!-- Populated dynamically -->
         </div>
+
+        <!-- Missing Song Name Alert Box -->
+        <div id="missing-song-alert" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-2.5">
+          <div class="flex items-start gap-2.5 text-amber-300 text-xs">
+            <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+            <div>
+              <strong class="font-bold text-amber-200 block">Song title is missing for this entry!</strong>
+              <span>Please add your song name in the Google Sheet so your performance can be properly sequenced. After adding it in the sheet, click <strong>"Refresh Data"</strong> below.</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 pt-1">
+            <a id="open-sheet-link" href="#" target="_blank" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition shadow">
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              <span>Open Google Sheet</span>
+            </a>
+            <button type="button" id="alert-refresh-btn" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+              <span>Refresh Data</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Step 3: Track Upload Tabs (appears once song selected) -->
       <div id="upload-methods-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-4">
-        <label class="block text-sm font-semibold text-slate-200 flex items-center justify-between">
+        
+        <!-- Existing Track Audio Preview Card -->
+        <div id="existing-track-card" class="hidden p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+              <span>Active Backing Track on File</span>
+            </div>
+            <span class="text-[11px] text-slate-400 font-mono" id="track-size-badge">-- MB</span>
+          </div>
+          <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-300">
+              <span id="track-filename-display" class="truncate font-mono text-slate-200 font-medium">song.mp3</span>
+              <span id="track-duration-display" class="shrink-0 text-slate-400 font-mono ml-2">--:--</span>
+            </div>
+            <audio id="track-audio-player" controls class="w-full h-8 rounded mt-1" preload="none"></audio>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-normal">
+            Listen above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.
+          </p>
+        </div>
+
+        <label class="block text-sm font-semibold text-slate-200 flex items-center justify-between pt-1">
           <span class="flex items-center gap-2">
             <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">3</span>
-            Provide Backing Track
+            <span id="upload-action-title">Provide Backing Track</span>
           </span>
           <span id="active-track-badge" class="text-xs"></span>
         </label>
@@ -115,7 +164,7 @@
               <i data-lucide="cloud-upload" class="w-6 h-6"></i>
             </div>
             <p class="text-sm font-semibold text-slate-200" id="file-select-label">Tap to select or drag audio file here</p>
-            <p class="text-xs text-slate-400 mt-1">Supports MP3, M4A, WAV (Max 50MB)</p>
+            <p class="text-xs text-slate-400 mt-1" id="max-size-hint">Supports MP3, M4A, WAV (Max 200MB)</p>
           </div>
           <div id="file-info-bar" class="hidden p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
             <div class="flex items-center gap-2 overflow-hidden text-slate-300">

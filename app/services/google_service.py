@@ -22,6 +22,7 @@ class PerformanceEntry(BaseModel):
     drive_file_id: Optional[str] = None
     last_updated: Optional[str] = None
     row_index: int = 0
+    is_song_name_missing: bool = False
 
 class GoogleService:
     def __init__(self):
@@ -155,13 +156,16 @@ class GoogleService:
                         seq_val = None
 
                 # Song title with fallback to movie or generic
-                song_title = get_col(cols.song_title)
+                raw_song_title = get_col(cols.song_title)
                 movie_name = get_col(cols.movie_name)
-                if not song_title:
-                    if movie_name:
-                        song_title = f"{movie_name} (Track)"
-                    else:
-                        song_title = f"Performance #{seq_val or row_index}"
+                is_missing = not bool(raw_song_title)
+
+                if raw_song_title:
+                    song_title = raw_song_title
+                elif movie_name:
+                    song_title = f"{movie_name} (Song title missing)"
+                else:
+                    song_title = f"Performance #{seq_val or row_index} (Song title missing)"
 
                 # Normalize status
                 raw_status = get_col(cols.track_status)
@@ -194,7 +198,8 @@ class GoogleService:
                     track_status=status,
                     drive_file_id=drive_id,
                     last_updated=last_up,
-                    row_index=row_index
+                    row_index=row_index,
+                    is_song_name_missing=is_missing
                 ))
             return entries
         except Exception as e:

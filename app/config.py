@@ -72,6 +72,12 @@ def load_config() -> AppConfig:
     else:
         config.mock_google_api = False
 
+    if os.getenv("MAX_UPLOAD_SIZE_MB"):
+        try:
+            config.storage.max_upload_size_mb = int(os.getenv("MAX_UPLOAD_SIZE_MB"))
+        except ValueError:
+            pass
+
     if os.getenv("DOWNLOADER_SERVICE_URL"):
         config.downloader.service_url = os.getenv("DOWNLOADER_SERVICE_URL")
 

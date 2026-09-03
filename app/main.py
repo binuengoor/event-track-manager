@@ -61,8 +61,27 @@ async def get_event_info():
         "event_id": settings.event.id,
         "event_name": settings.event.name,
         "mock_mode": settings.mock_google_api,
-        "max_upload_size_mb": settings.storage.max_upload_size_mb
+        "max_upload_size_mb": settings.storage.max_upload_size_mb,
+        "sheet_url": f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
     }
+
+@app.get("/api/track-info/{entry_id}")
+async def get_track_info(entry_id: str):
+    performances = google_service.get_performances()
+    target = next((p for p in performances if p.entry_id == entry_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Performance entry not found")
+
+    safe_performer = sanitize_filename(target.performer_name)
+    safe_song = sanitize_filename(target.song_title)
+    canonical_filename = f"{entry_id}_{safe_performer}_{safe_song}.mp3"
+
+    meta = audio_service.get_track_metadata(entry_id, target.drive_file_id, canonical_filename)
+    meta["entry_id"] = entry_id
+    meta["performer_name"] = target.performer_name
+    meta["song_title"] = target.song_title
+    meta["last_updated"] = target.last_updated
+    return meta
 
 @app.post("/api/auth/login")
 async def admin_login(login: LoginRequest):
