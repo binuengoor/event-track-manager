@@ -1,0 +1,35 @@
+# EMA Paattukoottam Event & Track Manager Configuration
+event:
+  id: "ema-paattukoottam-q3-2026"
+  name: "EMA Paattukoottam - Musical Night"
+
+google:
+  # Path to Google Cloud Service Account JSON Key
+  service_account_json_path: "/secrets/credentials.json"
+  # Target Google Sheet ID (from the sheet URL: https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit)
+  sheet_id: "REPLACE_WITH_YOUR_GOOGLE_SHEET_ID"
+  sheet_range: "Signups!A2:I"
+  # Google Shared Drive Folder IDs (from folder URL: https://drive.google.com/drive/folders/<FOLDER_ID>)
+  drive_folders:
+    active_folder_id: "REPLACE_WITH_ACTIVE_FOLDER_ID"
+    archive_folder_id: "REPLACE_WITH_ARCHIVE_FOLDER_ID"
+
+# 0-indexed column mappings for the Google Sheet
+columns:
+  entry_id: 0         # Col A: Unique identifier (e.g. PK-001)
+  performer_name: 1   # Col B: Primary singer name
+  performance_type: 2 # Col C: Solo, Duet, Acoustic, Group
+  partner_name: 3     # Col D: Duet / partner name if applicable
+  song_title: 4       # Col E: Name of the song
+  sequence_order: 5   # Col F: Stage sequence number (1, 2, 3...)
+  track_status: 6     # Col G: Pending, Uploaded, Acoustic, Performed, Skipped
+  drive_file_id: 7    # Col H: Google Drive File ID of active track
+  last_updated: 8     # Col I: Timestamp of last upload
+
+storage:
+  cache_dir: "/data/cache"
+  max_upload_size_mb: 50
+
+downloader:
+  service_url: "http://downloader:8001"
+  timeout_seconds: 120

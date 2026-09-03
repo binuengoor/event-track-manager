@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  # 1. Main Web Application: Google Sheets Sync, Drive Archival, Stage Console & Intake Portal
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: event_track_manager_app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - ADMIN_PIN=${ADMIN_PIN:-2026}
+      - DOWNLOADER_SERVICE_URL=http://downloader:8001
+      - CACHE_DIR=/data/cache
+      - GOOGLE_CREDENTIALS_PATH=/secrets/credentials.json
+      - MOCK_GOOGLE_API=${MOCK_GOOGLE_API:-false}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./secrets:/secrets:ro
+      - audio_cache:/data/cache
+    depends_on:
+      - downloader
+
+  # 2. Dedicated Downloader Microservice: yt-dlp + ffmpeg audio extractor
+  downloader:
+    build:
+      context: ./downloader
+      dockerfile: Dockerfile
+    container_name: event_track_manager_downloader
+    restart: unless-stopped
+    environment:
+      - CACHE_DIR=/data/cache
+      - COOKIES_PATH=/secrets/cookies.txt
+    volumes:
+      - ./secrets:/secrets:ro
+      - audio_cache:/data/cache
+
+volumes:
+  audio_cache:
+    driver: local

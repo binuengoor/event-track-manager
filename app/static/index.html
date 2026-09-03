@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EMA Paattukoottam - Track Intake</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white">
+
+  <!-- Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+          <i data-lucide="music" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 id="event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <p class="text-xs text-orange-400 font-medium">Musical Night • Track Submission</p>
+        </div>
+      </div>
+      <a href="/admin" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+        <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+        <span>Stage Console</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Intake Content -->
+  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10">
+
+    <!-- Notification Banner for Mock Mode -->
+    <div id="mock-banner" class="hidden mb-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+      <i data-lucide="info" class="w-4 h-4 shrink-0 text-amber-400"></i>
+      <span><strong>Preview Mode:</strong> Running with sample performances. Uploads and statuses are simulated in-memory.</span>
+    </div>
+
+    <!-- Intro Card -->
+    <div class="mb-6 bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
+      <h2 class="text-xl font-bold text-white mb-1.5 flex items-center gap-2">
+        <span>Upload Your Backing Track</span>
+        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">Karaoke / Audio</span>
+      </h2>
+      <p class="text-sm text-slate-400 leading-relaxed">
+        Select your registered name from the sign-up list. You can upload an audio file directly (<span class="text-slate-300 font-medium">.mp3, .m4a, .wav</span>) or paste a YouTube karaoke link.
+      </p>
+    </div>
+
+    <!-- Intake Form -->
+    <form id="intake-form" class="space-y-6">
+
+      <!-- Step 1: Select Performer -->
+      <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
+        <label for="performer-select" class="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
+            Select Performer
+          </span>
+          <span id="performer-count-badge" class="text-xs text-slate-400 font-normal">Loading participants...</span>
+        </label>
+        
+        <div class="relative">
+          <select id="performer-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none cursor-pointer">
+            <option value="">-- Choose your name from the sign-up list --</option>
+          </select>
+          <div class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+            <i data-lucide="chevron-down" class="w-4 h-4"></i>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Select Song / Performance (appears once performer selected) -->
+      <div id="song-selection-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-3">
+        <label class="block text-sm font-semibold text-slate-200 flex items-center gap-2">
+          <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">2</span>
+          Choose Song to Upload For
+        </label>
+        <p class="text-xs text-slate-400">If you have registered for multiple performances, select which track you are providing:</p>
+        
+        <div id="song-options-container" class="space-y-2.5 pt-1">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Step 3: Track Upload Tabs (appears once song selected) -->
+      <div id="upload-methods-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-4">
+        <label class="block text-sm font-semibold text-slate-200 flex items-center justify-between">
+          <span class="flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">3</span>
+            Provide Backing Track
+          </span>
+          <span id="active-track-badge" class="text-xs"></span>
+        </label>
+
+        <!-- Method Tabs -->
+        <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-sm font-medium">
+          <button type="button" id="tab-file" class="py-2 rounded-lg bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 transition shadow">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>Upload File</span>
+          </button>
+          <button type="button" id="tab-youtube" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition">
+            <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
+            <span>YouTube Link</span>
+          </button>
+        </div>
+
+        <!-- Tab Content 1: Direct File Upload -->
+        <div id="file-upload-pane" class="space-y-3">
+          <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-orange-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-slate-950/40 group">
+            <input type="file" id="audio-file-input" accept="audio/*,.mp3,.m4a,.wav,.aac" class="hidden">
+            <div class="w-12 h-12 mx-auto rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mb-3 group-hover:scale-110 transition">
+              <i data-lucide="cloud-upload" class="w-6 h-6"></i>
+            </div>
+            <p class="text-sm font-semibold text-slate-200" id="file-select-label">Tap to select or drag audio file here</p>
+            <p class="text-xs text-slate-400 mt-1">Supports MP3, M4A, WAV (Max 50MB)</p>
+          </div>
+          <div id="file-info-bar" class="hidden p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+            <div class="flex items-center gap-2 overflow-hidden text-slate-300">
+              <i data-lucide="file-audio" class="w-4 h-4 shrink-0 text-orange-400"></i>
+              <span id="file-name-display" class="truncate font-medium">filename.mp3</span>
+            </div>
+            <span id="file-size-display" class="text-slate-400 shrink-0 ml-2">4.2 MB</span>
+          </div>
+        </div>
+
+        <!-- Tab Content 2: YouTube Link -->
+        <div id="youtube-upload-pane" class="hidden space-y-3">
+          <div>
+            <label for="youtube-url-input" class="block text-xs font-medium text-slate-300 mb-1.5">Paste YouTube Video / Karaoke URL</label>
+            <div class="relative">
+              <input type="url" id="youtube-url-input" placeholder="https://www.youtube.com/watch?v=... or https://youtu.be/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10">
+              <div class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+                <i data-lucide="link" class="w-4 h-4"></i>
+              </div>
+            </div>
+          </div>
+          <p class="text-xs text-slate-400 flex items-center gap-1.5 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
+            <i data-lucide="sparkles" class="w-4 h-4 text-orange-400 shrink-0"></i>
+            <span>Our dedicated audio worker will extract the high-quality MP3 directly and store it in Google Drive.</span>
+          </p>
+        </div>
+
+        <!-- Archival Note -->
+        <div id="archival-notice" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-start gap-2">
+          <i data-lucide="archive" class="w-4 h-4 text-slate-400 shrink-0 mt-0.5"></i>
+          <span><strong>Version Safety:</strong> If you upload a track again, the existing file is automatically moved to the <code class="text-orange-300">Archive/</code> folder in Google Shared Drive, keeping only your latest version active for the stage show.</span>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" id="submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
+          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+          <span id="submit-text">Upload Track to Google Drive</span>
+        </button>
+
+        <!-- Progress Indicator -->
+        <div id="progress-container" class="hidden space-y-2">
+          <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+            <div id="progress-bar" class="bg-gradient-to-r from-orange-500 to-amber-400 h-full w-0 transition-all duration-300"></div>
+          </div>
+          <p id="progress-text" class="text-xs text-center text-slate-400">Processing upload...</p>
+        </div>
+
+      </div>
+
+    </form>
+
+    <!-- Success Modal / Toast -->
+    <div id="success-card" class="hidden mt-6 bg-emerald-950/40 border border-emerald-500/40 p-5 rounded-2xl space-y-3 animate-fade-in">
+      <div class="flex items-center gap-3 text-emerald-400">
+        <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+          <i data-lucide="check-circle" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <h3 class="font-bold text-base text-emerald-200">Track Uploaded Successfully!</h3>
+          <p id="success-summary" class="text-xs text-emerald-400/90">Your track has been safely saved in the Google Shared Drive.</p>
+        </div>
+      </div>
+      <div id="success-details" class="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-300 space-y-1 border border-emerald-500/20">
+        <!-- Details injected via JS -->
+      </div>
+      <button type="button" id="upload-another-btn" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+        <span>Upload track for another performance</span>
+        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+      </button>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="error-card" class="hidden mt-6 bg-rose-950/40 border border-rose-500/40 p-4 rounded-2xl flex items-start gap-3 text-rose-300 text-xs">
+      <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 shrink-0 mt-0.5"></i>
+      <div class="flex-1">
+        <strong class="font-semibold text-rose-200 block mb-0.5">Submission Failed</strong>
+        <span id="error-message">Something went wrong.</span>
+      </div>
+      <button type="button" onclick="document.getElementById('error-card').classList.add('hidden')" class="text-rose-400 hover:text-rose-200">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-400">
+    <p>EMA Paattukoottam • Exton Malayali Association</p>
+  </footer>
+
+  <script src="/static/js/intake.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

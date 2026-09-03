@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage Playback Console - EMA Paattukoottam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-32">
+
+  <!-- PIN Entry Modal (shown if unauthorized) -->
+  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 text-orange-400 flex items-center justify-center">
+        <i data-lucide="lock" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-bold text-white">Stage Sound Booth</h2>
+        <p class="text-xs text-slate-400 mt-1">Enter sound coordinator PIN to access playback console</p>
+      </div>
+      <form id="pin-form" class="space-y-4">
+        <input type="password" id="pin-input" maxlength="10" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-widest font-mono py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <p id="pin-error" class="hidden text-xs text-rose-400"></p>
+        <button type="submit" class="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition">
+          Unlock Console
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Stage Console Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow">
+          <i data-lucide="disc-3" class="w-5 h-5 animate-spin" style="animation-duration: 6s;"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-bold text-base text-white">EMA Paattukoottam</h1>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 font-semibold border border-slate-700">STAGE CONSOLE</span>
+          </div>
+          <p id="stats-summary" class="text-xs text-slate-400">Loading stage queue...</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2.5">
+        <button id="refresh-queue-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Sync latest sequence from Google Sheet">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Sync Sheet</span>
+        </button>
+        <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
+          <i data-lucide="archive" class="w-3.5 h-3.5"></i>
+          <span>Offline ZIP</span>
+        </button>
+        <a href="/" target="_blank" class="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition">
+          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+          <span>Intake Form</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stage Queue Section -->
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+
+    <!-- Queue Table / Cards -->
+    <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
+      <div class="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/90">
+        <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <i data-lucide="list-ordered" class="w-4 h-4 text-orange-400"></i>
+          <span>Live Chronological Queue</span>
+        </h2>
+        <span class="text-xs text-slate-400 font-mono" id="queue-count-pill">0 items</span>
+      </div>
+
+      <!-- Queue List Container -->
+      <div id="queue-container" class="divide-y divide-slate-800/60">
+        <div class="p-8 text-center text-slate-500 text-sm">
+          Loading performances from Google Sheet...
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Persistent Live Audio Playback Controller -->
+  <div id="player-bar" class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 shadow-2xl p-3 sm:p-4">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
+      
+      <!-- Current Track Info -->
+      <div class="flex items-center gap-3 w-full md:w-1/4 overflow-hidden">
+        <div id="player-badge" class="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
+          <i data-lucide="music-2" class="w-5 h-5"></i>
+        </div>
+        <div class="overflow-hidden">
+          <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Selected</h4>
+          <p id="player-performer" class="text-xs text-orange-400 truncate">Select an item from the queue</p>
+        </div>
+      </div>
+
+      <!-- Playback Controls & Scrubber -->
+      <div class="flex flex-col items-center gap-1.5 w-full md:w-2/4">
+        <!-- Buttons -->
+        <div class="flex items-center gap-4">
+          <button id="btn-seek-back" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Back 5s [←]">
+            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+          </button>
+          <button id="btn-play-pause" class="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transition transform active:scale-95 disabled:opacity-40 disabled:pointer-events-none" disabled title="Play / Pause [Space]">
+            <i data-lucide="play" class="w-6 h-6 ml-0.5" id="play-icon"></i>
+          </button>
+          <button id="btn-seek-fwd" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Forward 5s [→]">
+            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+          </button>
+          <button id="btn-cue-next" class="p-2 text-slate-400 hover:text-orange-400 rounded-lg hover:bg-slate-800 transition ml-2" title="Cue Next Sequenced Track [↓]">
+            <i data-lucide="skip-forward" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <!-- Scrubber & Time -->
+        <div class="flex items-center gap-3 w-full max-w-lg text-xs font-mono text-slate-400">
+          <span id="player-current-time">0:00</span>
+          <input type="range" id="player-seekbar" min="0" max="100" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
+          <span id="player-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Stage Quick Actions & Hotkeys -->
+      <div class="flex items-center justify-end gap-3 w-full md:w-1/4">
+        <button id="btn-mark-done" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-semibold text-xs border border-slate-700/80 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Mark as Performed and Cue Next [Enter]">
+          <i data-lucide="check-check" class="w-4 h-4"></i>
+          <span>Mark Performed</span>
+        </button>
+        <div class="hidden lg:flex flex-col text-[10px] text-slate-500 font-mono text-right leading-tight">
+          <span>[Space]: Play/Pause</span>
+          <span>[←/→]: Seek ±5s</span>
+          <span>[↓]: Cue Next</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="/static/js/admin.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

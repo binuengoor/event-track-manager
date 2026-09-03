@@ -1,0 +1,100 @@
+import io
+import pytest
+from fastapi.testclient import TestClient
+from app.main import app
+from app.config import settings
+
+def test_health_check():
+    client = TestClient(app)
+    res = client.get("/api/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "healthy"
+    assert data["app"] == "event-track-manager"
+
+def test_event_info():
+    client = TestClient(app)
+    res = client.get("/api/event-info")
+    assert res.status_code == 200
+    data = res.json()
+    assert "event_name" in data
+    assert "event_id" in data
+
+def test_list_performances():
+    client = TestClient(app)
+    res = client.get("/api/performances")
+    assert res.status_code == 200
+    items = res.json()
+    assert isinstance(items, list)
+    assert len(items) > 0
+    first = items[0]
+    assert "entry_id" in first
+    assert "performer_name" in first
+    assert "song_title" in first
+
+def test_stage_queue():
+    client = TestClient(app)
+    res = client.get("/api/stage-queue")
+    assert res.status_code == 200
+    items = res.json()
+    assert isinstance(items, list)
+    assert len(items) > 0
+    seq_orders = [x["sequence_order"] for x in items]
+    assert seq_orders == sorted(seq_orders)
+
+def test_admin_auth():
+    client = TestClient(app)
+    # Invalid PIN
+    res_fail = client.post("/api/auth/login", json={"pin": "wrong_pin"})
+    assert res_fail.status_code == 401
+
+    # Valid PIN
+    res_ok = client.post("/api/auth/login", json={"pin": settings.admin_pin})
+    assert res_ok.status_code == 200
+    assert res_ok.json()["status"] == "success"
+
+def test_upload_and_stream():
+    client = TestClient(app)
+    # Direct audio file upload for PK-001
+    file_content = b"ID3" + b"\x00" * 200
+    res = client.post(
+        "/api/upload",
+        data={"entry_id": "PK-001", "submission_type": "file"},
+        files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["entry_id"] == "PK-001"
+
+    # Now stream the track
+    stream_res = client.get("/api/stream/PK-001")
+    assert stream_res.status_code == 200
+    assert stream_res.headers["Content-Type"] == "audio/mpeg"
+
+def test_status_update_with_auth():
+    client = TestClient(app)
+    # Unauthorized request without PIN header or cookie
+    res_unauth = client.patch("/api/status/PK-001", json={"status": "Performed"})
+    assert res_unauth.status_code == 401
+
+    # Authorized via header
+    res_auth = client.patch(
+        "/api/status/PK-001",
+        json={"status": "Performed"},
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert res_auth.status_code == 200
+    assert res_auth.json()["new_status"] == "Performed"
+
+def test_export_zip_with_auth():
+    client = TestClient(app)
+    # Unauthorized
+    res_unauth = client.get("/api/export-zip")
+    assert res_unauth.status_code == 401
+
+    # Authorized
+    res = client.get("/api/export-zip", headers={"X-Admin-PIN": settings.admin_pin})
+    assert res.status_code == 200
+    assert res.headers["Content-Type"] == "application/zip"
+    assert len(res.content) > 0
