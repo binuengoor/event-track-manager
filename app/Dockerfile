@@ -11,11 +11,11 @@ RUN apt-get update && \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY app/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . /app/app
-WORKDIR /app
+COPY app app
+COPY config.yaml .
 
 EXPOSE 8000
 
