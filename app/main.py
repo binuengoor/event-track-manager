@@ -2,7 +2,7 @@ import os
 import logging
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -250,6 +250,46 @@ async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):
     except Exception as e:
         logger.exception("Failed to export offline ZIP: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to generate offline ZIP: {str(e)}")
+
+@app.get("/api/download-track/{entry_id}")
+async def download_track(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+    performances = google_service.get_performances()
+    target = next((p for p in performances if p.entry_id == entry_id), None)
+    if not target:
+        raise HTTPException(status_code=404, detail="Performance entry not found")
+
+    cache_path = audio_service.ensure_local_cache(entry_id, target.drive_file_id)
+    if not cache_path or not os.path.isfile(cache_path):
+        raise HTTPException(status_code=404, detail="No audio track file available")
+
+    canonical_filename = sanitize_filename(
+        entry_id,
+        target.performer_name,
+        target.song_title,
+        target.partner_name,
+        os.path.splitext(cache_path)[1] or ".mp3"
+    )
+    return FileResponse(
+        cache_path,
+        media_type="audio/mpeg",
+        filename=canonical_filename
+    )
+
+class SequenceItem(BaseModel):
+    entry_id: str
+    sequence_order: int
+
+class ReorderRequest(BaseModel):
+    items: List[SequenceItem]
+
+@app.post("/api/reorder-queue")
+async def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        updated = google_service.update_sequence_orders([i.model_dump() for i in payload.items])
+        return {"status": "success", "updated_count": updated}
+    except Exception as e:
+        logger.exception("Failed to reorder queue: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/health")
 async def health():

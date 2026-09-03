@@ -8,8 +8,23 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/wavesurfer.js@7"></script>
   <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    .drag-ghost {
+      opacity: 0.35;
+      background: #1e293b !important;
+    }
+    .drag-over {
+      border-top: 2px solid #f97316 !important;
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-36">
+
+  <!-- Floating Toast Notification -->
+  <div id="toast" class="fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs pointer-events-none">
+    <div id="toast-icon"></div>
+    <span id="toast-message"></span>
+  </div>
 
   <!-- PIN Entry Modal (shown if unauthorized) -->
   <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
@@ -43,14 +58,22 @@
             <h1 class="font-bold text-base text-white">EMA Paattukoottam</h1>
             <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 font-semibold border border-slate-700">STAGE CONSOLE</span>
           </div>
-          <p id="stats-summary" class="text-xs text-slate-400">Loading stage queue...</p>
+          <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+            <span id="stats-summary">Loading stage queue...</span>
+          </div>
         </div>
       </div>
 
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2.5">
-        <button id="refresh-queue-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Sync latest sequence from Google Sheet">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+      <!-- Action Buttons & Sync Indicator -->
+      <div class="flex items-center gap-2.5 flex-wrap">
+        <!-- Live Sync Indicator -->
+        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sync-status-text">Connected</span>
+        </div>
+
+        <button id="refresh-queue-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Sync latest sequence and track updates from Google Sheet">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
           <span>Sync Sheet</span>
         </button>
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
@@ -66,7 +89,26 @@
   </header>
 
   <!-- Stage Queue Section -->
-  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6">
+  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-4">
+
+    <!-- Search & Reorder Bar -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+      <!-- Fuzzy Search Input -->
+      <div class="relative flex-1">
+        <input type="text" id="queue-search-input" placeholder="🔍 Search singer, partner, song title, movie, sequence #..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition pr-10">
+        <button id="search-clear-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Quick Info / Mode Badge -->
+      <div class="flex items-center gap-2 text-xs text-slate-400 shrink-0">
+        <span class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center gap-1.5">
+          <i data-lucide="move" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Drag rows to re-order sequence</span>
+        </span>
+      </div>
+    </div>
 
     <!-- Queue Table / Cards -->
     <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
@@ -75,10 +117,13 @@
           <i data-lucide="list-ordered" class="w-4 h-4 text-orange-400"></i>
           <span>Live Chronological Queue</span>
         </h2>
-        <span class="text-xs text-slate-400 font-mono" id="queue-count-pill">0 items</span>
+        <div class="flex items-center gap-2">
+          <span id="search-match-count" class="hidden text-xs text-orange-400 font-mono"></span>
+          <span class="text-xs text-slate-400 font-mono" id="queue-count-pill">0 items</span>
+        </div>
       </div>
 
-      <!-- Queue List Container -->
+      <!-- Queue List Container (Draggable) -->
       <div id="queue-container" class="divide-y divide-slate-800/60">
         <div class="p-8 text-center text-slate-500 text-sm">
           Loading performances from Google Sheet...
@@ -102,7 +147,7 @@
           </div>
           <div class="overflow-hidden">
             <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
-            <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue" on any song to load waveform</p>
+            <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue Track" on any song to inspect & play</p>
           </div>
         </div>
 
@@ -122,15 +167,20 @@
           </button>
         </div>
 
-        <!-- Stage Actions & Hotkeys -->
-        <div class="flex items-center justify-end gap-2.5 w-full md:w-1/3">
+        <!-- Stage Actions: Download MP3, Mark Done, Skip/Hold -->
+        <div class="flex items-center justify-end gap-2 w-full md:w-1/3 flex-wrap">
+          <!-- 1-Click Track Download for Local Playback -->
+          <a id="btn-download-cued" href="#" download class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition opacity-40 pointer-events-none" title="Download track file locally for emergency VLC/QuickTime playback">
+            <i data-lucide="download" class="w-4 h-4 text-orange-400"></i>
+            <span class="hidden sm:inline">Download</span>
+          </a>
           <button id="btn-mark-done" class="px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Mark as Performed [Enter]">
             <i data-lucide="check-check" class="w-4 h-4"></i>
-            <span>Mark Performed</span>
+            <span>Done</span>
           </button>
           <button id="btn-hold-skip" class="px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="No-Show / Put On Hold">
             <i data-lucide="pause-circle" class="w-4 h-4"></i>
-            <span>Skip/Hold</span>
+            <span>Hold</span>
           </button>
         </div>
 

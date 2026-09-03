@@ -370,6 +370,56 @@ class GoogleService:
             logger.info("Updated status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
             return True
 
+    def update_sequence_orders(self, items: List[Dict[str, Any]]) -> int:
+        item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
+        if self.mock_mode:
+            for p in self._mock_data:
+                if p.entry_id in item_map:
+                    p.sequence_order = item_map[p.entry_id]
+            return len(item_map)
+
+        performances = self.get_performances()
+        cols = settings.columns
+        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+
+        if self.is_xlsx:
+            import openpyxl
+            from googleapiclient.http import MediaIoBaseUpload
+
+            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
+            wb = openpyxl.load_workbook(io.BytesIO(content))
+            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
+
+            for p in performances:
+                if p.entry_id in item_map:
+                    ws.cell(row=p.row_index, column=cols.sequence_order + 1, value=item_map[p.entry_id])
+
+            out_buf = io.BytesIO()
+            wb.save(out_buf)
+            out_buf.seek(0)
+
+            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
+            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
+            logger.info("Updated sequence order for %d items in Excel sheet", len(item_map))
+            return len(item_map)
+        else:
+            def col_letter(col_idx: int) -> str:
+                return chr(ord('A') + col_idx)
+
+            updates = []
+            for p in performances:
+                if p.entry_id in item_map:
+                    cell = f"{tab_name}!{col_letter(cols.sequence_order)}{p.row_index}"
+                    updates.append({"range": cell, "values": [[item_map[p.entry_id]]]})
+
+            if updates:
+                self.sheets.spreadsheets().values().batchUpdate(
+                    spreadsheetId=settings.google.sheet_id,
+                    body={"valueInputOption": "USER_ENTERED", "data": updates}
+                ).execute()
+            logger.info("Updated sequence order for %d items in Google Sheet", len(item_map))
+            return len(item_map)
+
     def upload_file_to_active(self, file_path: str, filename: str, mime_type: str = "audio/mpeg") -> str:
         if self.mock_mode:
             mock_id = f"mock_drive_{os.path.basename(file_path)}"
