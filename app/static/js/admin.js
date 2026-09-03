@@ -301,14 +301,7 @@ function renderQueueList() {
     const durationInfo = item.duration ? `<span class="text-[11px] font-mono text-slate-400 ml-1">(${item.duration})</span>` : '';
 
     const extraTagsPills = (item.extra_tags || []).map(tag => {
-      const lower = tag.toLowerCase();
-      let colorClass = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
-      if (lower.includes('junior')) {
-        colorClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
-      } else if (lower.includes('senior')) {
-        colorClass = 'bg-blue-500/15 text-blue-300 border-blue-500/30';
-      }
-      return `<span class="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${colorClass} tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
+      return `<span class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
     }).join(' ');
 
     row.innerHTML = `
