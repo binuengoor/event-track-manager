@@ -19,6 +19,7 @@ class PerformanceEntry(BaseModel):
     youtube_url: Optional[str] = None
     sequence_order: Optional[int] = None
     track_status: str = "Pending"
+    duration: Optional[str] = None
     drive_file_id: Optional[str] = None
     last_updated: Optional[str] = None
     row_index: int = 0
@@ -29,6 +30,7 @@ class GoogleService:
         self.mock_mode = settings.mock_google_api
         self.sheets = None
         self.drive = None
+        self.is_xlsx = False
         self._mock_data: List[PerformanceEntry] = []
 
         if self.mock_mode:
@@ -49,9 +51,11 @@ class GoogleService:
                 youtube_url="https://www.youtube.com/watch?v=SNwHuc-4pao",
                 sequence_order=1,
                 track_status="Uploaded",
+                duration="04:12",
                 drive_file_id="mock_drive_file_001",
                 last_updated="2026-09-01T14:30:00",
-                row_index=2
+                row_index=2,
+                is_song_name_missing=False
             ),
             PerformanceEntry(
                 entry_id="PK-003",
@@ -63,23 +67,27 @@ class GoogleService:
                 youtube_url=None,
                 sequence_order=2,
                 track_status="Pending",
+                duration=None,
                 drive_file_id=None,
                 last_updated=None,
-                row_index=3
+                row_index=3,
+                is_song_name_missing=False
             ),
             PerformanceEntry(
                 entry_id="PK-004",
                 performer_name="Ishaan Anoop (Anoop M)",
                 performance_type="Solo",
                 partner_name=None,
-                song_title="Malayalam Song",
+                song_title="Performance #3 (Song title missing)",
                 movie_name=None,
                 youtube_url=None,
                 sequence_order=3,
                 track_status="Pending",
+                duration=None,
                 drive_file_id=None,
                 last_updated=None,
-                row_index=4
+                row_index=4,
+                is_song_name_missing=True
             ),
             PerformanceEntry(
                 entry_id="PK-020",
@@ -91,9 +99,11 @@ class GoogleService:
                 youtube_url=None,
                 sequence_order=19,
                 track_status="Acoustic",
+                duration=None,
                 drive_file_id=None,
                 last_updated=None,
-                row_index=20
+                row_index=20,
+                is_song_name_missing=False
             )
         ]
 
@@ -113,7 +123,16 @@ class GoogleService:
             creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
             self.sheets = build("sheets", "v4", credentials=creds)
             self.drive = build("drive", "v3", credentials=creds)
-            logger.info("Successfully connected to live Google Sheets and Google Drive via Service Account.")
+
+            # Check if target document is an Excel file or native Google Sheet
+            meta = self.drive.files().get(
+                fileId=settings.google.sheet_id,
+                supportsAllDrives=True,
+                fields="id, name, mimeType"
+            ).execute()
+            mime = meta.get("mimeType", "")
+            self.is_xlsx = ("spreadsheetml.sheet" in mime or meta.get("name", "").endswith(".xlsx"))
+            logger.info("Connected to target sheet: %s (Type: %s, is_xlsx=%s)", meta.get("name"), mime, self.is_xlsx)
         except Exception as e:
             logger.error("Failed to initialize Google clients (%s). Falling back to MOCK MODE.", e)
             self.mock_mode = True
@@ -124,15 +143,28 @@ class GoogleService:
             return self._mock_data
 
         cols = settings.columns
-        try:
-            result = self.sheets.spreadsheets().values().get(
-                spreadsheetId=settings.google.sheet_id,
-                range=settings.google.sheet_range
-            ).execute()
-            rows = result.get("values", [])
-            entries: List[PerformanceEntry] = []
+        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
 
-            for idx, row in enumerate(rows):
+        try:
+            raw_rows = []
+            if self.is_xlsx:
+                # Read via openpyxl from Drive media stream
+                import openpyxl
+                content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
+                for r in ws.iter_rows(min_row=2, values_only=True):
+                    raw_rows.append([str(c).strip() if c is not None else "" for c in r])
+            else:
+                # Read via Sheets API
+                result = self.sheets.spreadsheets().values().get(
+                    spreadsheetId=settings.google.sheet_id,
+                    range=settings.google.sheet_range
+                ).execute()
+                raw_rows = result.get("values", [])
+
+            entries: List[PerformanceEntry] = []
+            for idx, row in enumerate(raw_rows):
                 row_index = idx + 2  # Row 1 is header
 
                 def get_col(col_idx: int) -> str:
@@ -155,7 +187,7 @@ class GoogleService:
                     except ValueError:
                         seq_val = None
 
-                # Song title with fallback to movie or generic
+                # Song title & check if missing
                 raw_song_title = get_col(cols.song_title)
                 movie_name = get_col(cols.movie_name)
                 is_missing = not bool(raw_song_title)
@@ -173,8 +205,10 @@ class GoogleService:
 
                 if raw_status.lower() in ("yes", "uploaded", "true"):
                     status = "Uploaded"
-                elif raw_status.lower() in ("performed", "done"):
+                elif raw_status.lower() in ("performed", "done", "completed"):
                     status = "Performed"
+                elif raw_status.lower() in ("skipped", "skip", "on hold", "hold"):
+                    status = "Skipped"
                 elif "acoustic" in perf_type.lower() or "live" in song_title.lower():
                     status = "Acoustic"
                 elif raw_status:
@@ -182,6 +216,7 @@ class GoogleService:
                 else:
                     status = "Pending"
 
+                duration_val = get_col(cols.duration) or None
                 drive_id = get_col(cols.drive_file_id) or None
                 last_up = get_col(cols.last_updated) or None
                 yt_link = get_col(cols.youtube_url) or None
@@ -196,6 +231,7 @@ class GoogleService:
                     youtube_url=yt_link,
                     sequence_order=seq_val,
                     track_status=status,
+                    duration=duration_val,
                     drive_file_id=drive_id,
                     last_updated=last_up,
                     row_index=row_index,
@@ -212,13 +248,14 @@ class GoogleService:
         sequenced.sort(key=lambda x: x.sequence_order)
         return sequenced
 
-    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded") -> bool:
-        now_iso = datetime.now().isoformat(timespec="seconds")
+    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if self.mock_mode:
             for item in self._mock_data:
                 if item.entry_id == entry_id:
                     item.drive_file_id = file_id
                     item.track_status = status
+                    item.duration = duration_str or item.duration
                     item.last_updated = now_iso
                     return True
             return False
@@ -229,37 +266,50 @@ class GoogleService:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
 
         cols = settings.columns
-        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
 
-        def col_letter(col_idx: int) -> str:
-            return chr(ord('A') + col_idx)
+        if self.is_xlsx:
+            import openpyxl
+            from googleapiclient.http import MediaIoBaseUpload
 
-        updates = []
-        # Update Track Uploaded column
-        updates.append({
-            "range": f"{sheet_tab}!{col_letter(cols.track_status)}{target.row_index}",
-            "values": [["Yes"]]
-        })
-        # Update Drive File ID
-        updates.append({
-            "range": f"{sheet_tab}!{col_letter(cols.drive_file_id)}{target.row_index}",
-            "values": [[file_id]]
-        })
-        # Update Last Updated
-        updates.append({
-            "range": f"{sheet_tab}!{col_letter(cols.last_updated)}{target.row_index}",
-            "values": [[now_iso]]
-        })
+            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
+            wb = openpyxl.load_workbook(io.BytesIO(content))
+            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
 
-        self.sheets.spreadsheets().values().batchUpdate(
-            spreadsheetId=settings.google.sheet_id,
-            body={
-                "valueInputOption": "USER_ENTERED",
-                "data": updates
-            }
-        ).execute()
-        logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, target.row_index, file_id)
-        return True
+            row = target.row_index
+            # 1-based indexing for openpyxl
+            ws.cell(row=row, column=cols.track_status + 1, value="Yes")
+            if duration_str:
+                ws.cell(row=row, column=cols.duration + 1, value=duration_str)
+            ws.cell(row=row, column=cols.drive_file_id + 1, value=file_id)
+            ws.cell(row=row, column=cols.last_updated + 1, value=now_iso)
+
+            out_buf = io.BytesIO()
+            wb.save(out_buf)
+            out_buf.seek(0)
+
+            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
+            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
+            logger.info("Updated Excel sheet for %s (Row %d) with file_id: %s, duration: %s", entry_id, row, file_id, duration_str)
+            return True
+        else:
+            def col_letter(col_idx: int) -> str:
+                return chr(ord('A') + col_idx)
+
+            updates = [
+                {"range": f"{tab_name}!{col_letter(cols.track_status)}{target.row_index}", "values": [["Yes"]]},
+                {"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{target.row_index}", "values": [[file_id]]},
+                {"range": f"{tab_name}!{col_letter(cols.last_updated)}{target.row_index}", "values": [[now_iso]]}
+            ]
+            if duration_str:
+                updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{target.row_index}", "values": [[duration_str]]})
+
+            self.sheets.spreadsheets().values().batchUpdate(
+                spreadsheetId=settings.google.sheet_id,
+                body={"valueInputOption": "USER_ENTERED", "data": updates}
+            ).execute()
+            logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, target.row_index, file_id)
+            return True
 
     def update_status(self, entry_id: str, status: str) -> bool:
         if self.mock_mode:
@@ -275,22 +325,50 @@ class GoogleService:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
 
         cols = settings.columns
-        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
 
-        def col_letter(col_idx: int) -> str:
-            return chr(ord('A') + col_idx)
+        # Determine value to record
+        if status == "Performed":
+            val_to_write = "Performed"
+        elif status == "Skipped":
+            val_to_write = "Skipped"
+        elif status == "Uploaded":
+            val_to_write = "Yes"
+        elif status == "Pending":
+            val_to_write = ""
+        else:
+            val_to_write = status
 
-        val_to_write = "Performed" if status == "Performed" else ("Yes" if status == "Uploaded" else status)
-        cell = f"{sheet_tab}!{col_letter(cols.track_status)}{target.row_index}"
+        if self.is_xlsx:
+            import openpyxl
+            from googleapiclient.http import MediaIoBaseUpload
 
-        self.sheets.spreadsheets().values().update(
-            spreadsheetId=settings.google.sheet_id,
-            range=cell,
-            valueInputOption="USER_ENTERED",
-            body={"values": [[val_to_write]]}
-        ).execute()
-        logger.info("Updated status for %s (Row %d) to %s", entry_id, target.row_index, val_to_write)
-        return True
+            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
+            wb = openpyxl.load_workbook(io.BytesIO(content))
+            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
+
+            ws.cell(row=target.row_index, column=cols.track_status + 1, value=val_to_write)
+            out_buf = io.BytesIO()
+            wb.save(out_buf)
+            out_buf.seek(0)
+
+            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
+            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
+            logger.info("Updated status for %s (Row %d) to %s in Excel sheet", entry_id, target.row_index, val_to_write)
+            return True
+        else:
+            def col_letter(col_idx: int) -> str:
+                return chr(ord('A') + col_idx)
+
+            cell = f"{tab_name}!{col_letter(cols.track_status)}{target.row_index}"
+            self.sheets.spreadsheets().values().update(
+                spreadsheetId=settings.google.sheet_id,
+                range=cell,
+                valueInputOption="USER_ENTERED",
+                body={"values": [[val_to_write]]}
+            ).execute()
+            logger.info("Updated status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
+            return True
 
     def upload_file_to_active(self, file_path: str, filename: str, mime_type: str = "audio/mpeg") -> str:
         if self.mock_mode:

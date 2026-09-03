@@ -27,6 +27,7 @@ class ColumnsConfig(BaseModel):
     youtube_url: int = 10      # Col K: Karaoke Youtube URL
     sequence_order: int = 6    # Col G: Sequence
     track_status: int = 11     # Col L: Track Uploaded
+    duration: int = 12         # Col M: Duration (Minutes)
     drive_file_id: int = 13    # Col N: Drive File ID
     last_updated: int = 14     # Col O: Last Updated
 

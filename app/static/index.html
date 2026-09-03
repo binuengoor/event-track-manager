@@ -6,6 +6,7 @@
   <title>EMA Paattukoottam - Track Intake</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white">
@@ -27,7 +28,7 @@
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
           <span>Refresh Data</span>
         </button>
-        <a href="/admin" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
+        <a href="/console" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
           <i data-lucide="shield" class="w-3.5 h-3.5"></i>
           <span>Stage Console</span>
         </a>
@@ -124,12 +125,19 @@
             </div>
             <span class="text-[11px] text-slate-400 font-mono" id="track-size-badge">-- MB</span>
           </div>
-          <div class="p-3 bg-slate-900 rounded-lg border border-slate-800 space-y-2">
+          <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
             <div class="flex items-center justify-between text-xs text-slate-300">
               <span id="track-filename-display" class="truncate font-mono text-slate-200 font-medium">song.mp3</span>
               <span id="track-duration-display" class="shrink-0 text-slate-400 font-mono ml-2">--:--</span>
             </div>
-            <audio id="track-audio-player" controls class="w-full h-8 rounded mt-1" preload="none"></audio>
+            <div class="flex items-center gap-3 pt-1">
+              <button type="button" id="preview-play-btn" class="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shrink-0 shadow shadow-orange-500/30 transition active:scale-95">
+                <i data-lucide="play" class="w-4 h-4 ml-0.5" id="preview-play-icon"></i>
+              </button>
+              <div id="preview-waveform" class="flex-1 h-10 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 cursor-pointer flex items-center">
+                <div id="preview-waveform-inner" class="w-full h-full"></div>
+              </div>
+            </div>
           </div>
           <p class="text-[11px] text-slate-400 leading-normal">
             Listen above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.

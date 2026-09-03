@@ -213,7 +213,10 @@ function handlePerformerSelected(name) {
       updateSelectedSong(song);
     }
 
-    const partnerText = song.partner_name ? ` (with ${song.partner_name})` : '';
+    let typeLabel = escapeHtml(song.performance_type);
+    if (song.partner_name) {
+      typeLabel = `Duet: ${escapeHtml(song.performer_name)} & ${escapeHtml(song.partner_name)}`;
+    }
     
     let statusClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
     let statusLabel = 'Track Pending';
@@ -240,7 +243,7 @@ function handlePerformerSelected(name) {
             ${escapeHtml(song.song_title)}
           </div>
           <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-            <span class="text-orange-400 font-medium">${escapeHtml(song.performance_type)}${escapeHtml(partnerText)}</span>
+            <span class="text-orange-400 font-medium">${typeLabel}</span>
             <span>•</span>
             <span>Seq #${song.sequence_order || 'TBD'}</span>
           </div>
@@ -312,15 +315,63 @@ function updateSubmitButtonText() {
   }
 }
 
+let previewWavesurfer = null;
+
+function initPreviewWaveSurfer() {
+  const container = document.getElementById('preview-waveform-inner');
+  if (!container || typeof WaveSurfer === 'undefined') return;
+
+  if (previewWavesurfer) {
+    try { previewWavesurfer.destroy(); } catch (e) {}
+  }
+
+  container.innerHTML = '';
+  previewWavesurfer = WaveSurfer.create({
+    container: container,
+    waveColor: '#64748b',
+    progressColor: '#f97316',
+    cursorColor: '#fb923c',
+    cursorWidth: 2,
+    barWidth: 2,
+    barGap: 1,
+    barRadius: 2,
+    height: 38,
+    normalize: true
+  });
+
+  const playIcon = document.getElementById('preview-play-icon');
+  previewWavesurfer.on('play', () => {
+    if (playIcon) playIcon.setAttribute('data-lucide', 'pause');
+    if (window.lucide) lucide.createIcons();
+  });
+
+  previewWavesurfer.on('pause', () => {
+    if (playIcon) playIcon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
+  });
+
+  previewWavesurfer.on('finish', () => {
+    if (playIcon) playIcon.setAttribute('data-lucide', 'play');
+    if (window.lucide) lucide.createIcons();
+  });
+
+  const playBtn = document.getElementById('preview-play-btn');
+  if (playBtn) {
+    playBtn.onclick = () => {
+      if (previewWavesurfer) previewWavesurfer.playPause();
+    };
+  }
+}
+
 async function updateActiveTrackPreview(song) {
   const existingCard = document.getElementById('existing-track-card');
-  const audioPlayer = document.getElementById('track-audio-player');
   const actionTitle = document.getElementById('upload-action-title');
 
-  // If no track uploaded yet
   if (song.track_status !== 'Uploaded' && !song.drive_file_id) {
     existingCard.classList.add('hidden');
-    audioPlayer.src = '';
+    if (previewWavesurfer) {
+      try { previewWavesurfer.stop(); } catch (e) {}
+    }
     actionTitle.textContent = 'Provide Backing Track';
     return;
   }
@@ -333,9 +384,14 @@ async function updateActiveTrackPreview(song) {
         document.getElementById('track-filename-display').textContent = data.filename;
         document.getElementById('track-size-badge').textContent = data.size_formatted;
         document.getElementById('track-duration-display').textContent = data.duration_formatted;
-        audioPlayer.src = data.stream_url;
         existingCard.classList.remove('hidden');
         actionTitle.textContent = 'Replace Existing Track (Optional)';
+
+        initPreviewWaveSurfer();
+        if (previewWavesurfer) {
+          previewWavesurfer.load(data.stream_url);
+        }
+
         if (window.lucide) lucide.createIcons();
         return;
       }
@@ -345,7 +401,6 @@ async function updateActiveTrackPreview(song) {
   }
 
   existingCard.classList.add('hidden');
-  audioPlayer.src = '';
   actionTitle.textContent = 'Provide Backing Track';
 }
 

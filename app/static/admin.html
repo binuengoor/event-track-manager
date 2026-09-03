@@ -6,9 +6,10 @@
   <title>Stage Playback Console - EMA Paattukoottam</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://unpkg.com/wavesurfer.js@7"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-32">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-36">
 
   <!-- PIN Entry Modal (shown if unauthorized) -->
   <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
@@ -17,7 +18,7 @@
         <i data-lucide="lock" class="w-7 h-7"></i>
       </div>
       <div>
-        <h2 class="text-xl font-bold text-white">Stage Sound Booth</h2>
+        <h2 class="text-xl font-bold text-white">Stage Sound Console</h2>
         <p class="text-xs text-slate-400 mt-1">Enter sound coordinator PIN to access playback console</p>
       </div>
       <form id="pin-form" class="space-y-4">
@@ -58,7 +59,7 @@
         </button>
         <a href="/" target="_blank" class="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition">
           <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          <span>Intake Form</span>
+          <span>Intake Portal</span>
         </a>
       </div>
     </div>
@@ -89,23 +90,24 @@
 
   <!-- Persistent Live Audio Playback Controller -->
   <div id="player-bar" class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 shadow-2xl p-3 sm:p-4">
-    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-3">
-      
-      <!-- Current Track Info -->
-      <div class="flex items-center gap-3 w-full md:w-1/4 overflow-hidden">
-        <div id="player-badge" class="w-11 h-11 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
-          <i data-lucide="music-2" class="w-5 h-5"></i>
-        </div>
-        <div class="overflow-hidden">
-          <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Selected</h4>
-          <p id="player-performer" class="text-xs text-orange-400 truncate">Select an item from the queue</p>
-        </div>
-      </div>
+    <div class="max-w-6xl mx-auto flex flex-col gap-2.5">
 
-      <!-- Playback Controls & Scrubber -->
-      <div class="flex flex-col items-center gap-1.5 w-full md:w-2/4">
-        <!-- Buttons -->
-        <div class="flex items-center gap-4">
+      <!-- Top Row: Track details, controls, quick actions -->
+      <div class="flex flex-col md:flex-row items-center justify-between gap-3">
+        
+        <!-- Current Track Info -->
+        <div class="flex items-center gap-3 w-full md:w-1/3 overflow-hidden">
+          <div id="player-badge" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
+            <i data-lucide="music-2" class="w-5 h-5"></i>
+          </div>
+          <div class="overflow-hidden">
+            <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
+            <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue" on any song to load waveform</p>
+          </div>
+        </div>
+
+        <!-- Central Playback Controls -->
+        <div class="flex items-center gap-3">
           <button id="btn-seek-back" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Back 5s [←]">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
           </button>
@@ -120,25 +122,30 @@
           </button>
         </div>
 
-        <!-- Scrubber & Time -->
-        <div class="flex items-center gap-3 w-full max-w-lg text-xs font-mono text-slate-400">
-          <span id="player-current-time">0:00</span>
-          <input type="range" id="player-seekbar" min="0" max="100" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer">
-          <span id="player-duration">0:00</span>
+        <!-- Stage Actions & Hotkeys -->
+        <div class="flex items-center justify-end gap-2.5 w-full md:w-1/3">
+          <button id="btn-mark-done" class="px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Mark as Performed [Enter]">
+            <i data-lucide="check-check" class="w-4 h-4"></i>
+            <span>Mark Performed</span>
+          </button>
+          <button id="btn-hold-skip" class="px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="No-Show / Put On Hold">
+            <i data-lucide="pause-circle" class="w-4 h-4"></i>
+            <span>Skip/Hold</span>
+          </button>
         </div>
+
       </div>
 
-      <!-- Stage Quick Actions & Hotkeys -->
-      <div class="flex items-center justify-end gap-3 w-full md:w-1/4">
-        <button id="btn-mark-done" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 font-semibold text-xs border border-slate-700/80 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Mark as Performed and Cue Next [Enter]">
-          <i data-lucide="check-check" class="w-4 h-4"></i>
-          <span>Mark Performed</span>
-        </button>
-        <div class="hidden lg:flex flex-col text-[10px] text-slate-500 font-mono text-right leading-tight">
-          <span>[Space]: Play/Pause</span>
-          <span>[←/→]: Seek ±5s</span>
-          <span>[↓]: Cue Next</span>
+      <!-- Waveform Visualizer & Scrubber -->
+      <div class="w-full flex items-center gap-3">
+        <span id="player-current-time" class="text-xs font-mono text-slate-400 w-10 text-right shrink-0">0:00</span>
+        <div id="player-waveform-container" class="flex-1 h-11 bg-slate-950/80 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer flex items-center">
+          <div id="player-waveform" class="w-full h-full"></div>
+          <div id="waveform-placeholder" class="absolute inset-0 flex items-center justify-center text-[11px] text-slate-600 font-mono pointer-events-none">
+            Waveform visualizer ready
+          </div>
         </div>
+        <span id="player-duration" class="text-xs font-mono text-slate-400 w-10 shrink-0">0:00</span>
       </div>
 
     </div>

@@ -2,7 +2,7 @@ import os
 import logging
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -48,11 +48,15 @@ async def serve_intake_page():
     with open(index_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/admin", response_class=HTMLResponse)
-async def serve_admin_page():
+@app.get("/console", response_class=HTMLResponse)
+async def serve_console_page():
     admin_path = os.path.join(STATIC_DIR, "admin.html")
     with open(admin_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+@app.get("/admin")
+async def redirect_admin_to_console():
+    return RedirectResponse(url="/console")
 
 # API Endpoints
 @app.get("/api/event-info")
@@ -176,9 +180,21 @@ async def upload_track(
         logger.error("Failed to upload track to Google Drive Active/ folder: %s", e)
         raise HTTPException(status_code=500, detail="Failed to upload track to Google Drive")
 
-    # 4. Update Google Sheet
+    # 4. Update Google Sheet with Track Uploaded and Duration
+    duration_str = None
     try:
-        google_service.update_track_metadata(entry_id, drive_file_id, status="Uploaded")
+        from mutagen import File as MutagenFile
+        audio = MutagenFile(cache_path)
+        if audio and audio.info and hasattr(audio.info, "length"):
+            sec = audio.info.length
+            m = int(sec // 60)
+            s = int(sec % 60)
+            duration_str = f"{m:02d}:{s:02d}"
+    except Exception as e:
+        logger.warning("Could not compute duration for %s: %s", entry_id, e)
+
+    try:
+        google_service.update_track_metadata(entry_id, drive_file_id, status="Uploaded", duration_str=duration_str)
     except Exception as e:
         logger.error("Failed to update Google Sheet for %s: %s", entry_id, e)
         raise HTTPException(status_code=500, detail="Track uploaded to Drive, but failed to update Google Sheet row")
@@ -189,6 +205,7 @@ async def upload_track(
         "performer_name": target_entry.performer_name,
         "song_title": target_entry.song_title,
         "filename": canonical_filename,
+        "duration": duration_str,
         "drive_file_id": drive_file_id,
         "message": f"Successfully updated backing track for {target_entry.performer_name} - {target_entry.song_title}"
     }
