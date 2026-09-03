@@ -22,9 +22,9 @@ columns:
   partner_name: 2     # Col C: Singer (2)
   song_title: 8       # Col I: Song Name
   movie_name: 9       # Col J: Movie/Album Name
-  youtube_url: 10     # Col K: Karaoke Youtube URL
+  performance_status: 10 # Col K: Performance Status
+  track_status: 11    # Col L: Track Uploaded / Status
   sequence_order: 6   # Col G: Sequence
-  track_status: 11    # Col L: Track Uploaded
   duration: 12        # Col M: Duration (Minutes)
   drive_file_id: 13   # Col N: Drive File ID
   last_updated: 14    # Col O: Last Updated

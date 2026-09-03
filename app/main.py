@@ -58,7 +58,21 @@ async def serve_console_page():
 async def redirect_admin_to_console():
     return RedirectResponse(url="/console")
 
+@app.get("/live", response_class=HTMLResponse)
+async def serve_live_page():
+    live_path = os.path.join(STATIC_DIR, "live.html")
+    with open(live_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
 # API Endpoints
+@app.get("/api/live-status")
+async def get_live_status():
+    return google_service.get_live_status()
+
+@app.post("/api/set-active/{entry_id}")
+async def set_active_performance(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+    google_service.set_active_performance(entry_id)
+    return {"status": "success", "active_entry_id": entry_id}
 @app.get("/api/event-info")
 async def get_event_info():
     return {

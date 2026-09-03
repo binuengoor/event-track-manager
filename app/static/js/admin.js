@@ -532,6 +532,12 @@ function cueTrack(item, autoPlay = false) {
   isPlaying = false;
   updatePlayPauseButton();
   renderQueueList();
+
+  // Notify Live View of currently cued / active performer
+  fetch(`/api/set-active/${item.entry_id}`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  }).catch(() => {});
 }
 
 function updatePlayPauseButton() {

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Stage Program - EMA Paattukoottam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-16">
+
+  <!-- Header with Live Status Pulse -->
+  <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30 shadow-lg">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow shadow-orange-500/20">
+          <i data-lucide="music" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 id="live-event-title" class="font-bold text-base text-white">EMA Paattukoottam</h1>
+          <p class="text-xs text-orange-400 font-medium">Musical Night • Live Stage Schedule</p>
+        </div>
+      </div>
+
+      <!-- Live Broadcast Badge -->
+      <div class="flex items-center gap-2">
+        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          <span>LIVE PROGRAM</span>
+        </div>
+        <a href="/" class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition hidden sm:inline-flex items-center gap-1">
+          <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+          <span>Submit Track</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
+
+    <!-- Section 1: NOW ON STAGE -->
+    <div class="space-y-2">
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <span class="font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+          <i data-lucide="radio" class="w-4 h-4 text-orange-400"></i>
+          <span>Now on Stage</span>
+        </span>
+        <span id="live-sync-timestamp" class="font-mono text-[11px]">Syncing live...</span>
+      </div>
+
+      <!-- Hero Card for Current Performance -->
+      <div id="now-performing-card" class="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-orange-950/30 border-2 border-orange-500/50 shadow-2xl shadow-orange-500/10">
+        <div class="absolute -right-10 -bottom-10 opacity-10 text-white pointer-events-none">
+          <i data-lucide="mic" class="w-64 h-64"></i>
+        </div>
+
+        <div class="relative z-10 space-y-4">
+          <div class="flex items-center gap-3">
+            <span id="now-seq-badge" class="px-3.5 py-1.5 rounded-xl bg-orange-500 text-white font-mono font-bold text-sm shadow">
+              #01
+            </span>
+            <span class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>CURRENT PERFORMANCE</span>
+            </span>
+          </div>
+
+          <div>
+            <h2 id="now-performer-name" class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Loading program...
+            </h2>
+            <p id="now-song-title" class="text-base sm:text-lg text-orange-400 font-semibold mt-1">
+              Please wait...
+            </p>
+            <p id="now-movie-name" class="text-xs text-slate-400 mt-0.5"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: UP NEXT (Prepare Backstage) -->
+    <div class="space-y-3">
+      <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1 flex items-center gap-1.5">
+        <i data-lucide="fast-forward" class="w-4 h-4 text-amber-400"></i>
+        <span>Up Next (Please Be Ready Backstage)</span>
+      </h3>
+
+      <div id="up-next-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- Dynamic Up Next Cards -->
+      </div>
+    </div>
+
+    <!-- Section 3: FULL UPCOMING SCHEDULE -->
+    <div class="space-y-3 pt-2">
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <h3 class="font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="list-ordered" class="w-4 h-4 text-slate-400"></i>
+          <span>Upcoming Performances</span>
+        </h3>
+        <span id="upcoming-count" class="font-mono">0 scheduled</span>
+      </div>
+
+      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+        <div id="upcoming-list" class="divide-y divide-slate-800/60">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: COMPLETED PERFORMANCES (Collapsible) -->
+    <div id="completed-section" class="hidden space-y-3 pt-2">
+      <button id="toggle-completed-btn" class="w-full p-4 rounded-2xl bg-slate-900/40 hover:bg-slate-900 border border-slate-800/80 flex items-center justify-between text-xs font-semibold text-slate-400 transition">
+        <span class="flex items-center gap-2 text-slate-300">
+          <i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i>
+          <span id="completed-header-text">Completed Performances (0)</span>
+        </span>
+        <i data-lucide="chevron-down" id="completed-chevron" class="w-4 h-4 transition-transform"></i>
+      </button>
+
+      <div id="completed-list-container" class="hidden bg-slate-900/40 border border-slate-800/60 rounded-2xl overflow-hidden divide-y divide-slate-800/40">
+        <!-- Dynamically populated -->
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    let showCompleted = false;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchLiveStatus();
+      setInterval(fetchLiveStatus, 5000); // 5-second real-time poll
+
+      document.getElementById('toggle-completed-btn').addEventListener('click', () => {
+        showCompleted = !showCompleted;
+        const container = document.getElementById('completed-list-container');
+        const chevron = document.getElementById('completed-chevron');
+        if (showCompleted) {
+          container.classList.remove('hidden');
+          chevron.classList.add('rotate-180');
+        } else {
+          container.classList.add('hidden');
+          chevron.classList.remove('rotate-180');
+        }
+      });
+    });
+
+    async function fetchLiveStatus() {
+      try {
+        const res = await fetch('/api/live-status');
+        if (!res.ok) return;
+        const data = await res.json();
+        renderLiveStatus(data);
+      } catch (e) {
+        console.warn('Live status fetch error:', e);
+      }
+    }
+
+    function renderLiveStatus(data) {
+      if (data.event_name) {
+        document.getElementById('live-event-title').textContent = data.event_name;
+      }
+
+      const now = new Date();
+      document.getElementById('live-sync-timestamp').textContent = `Live: ${now.toLocaleTimeString()}`;
+
+      // 1. Now Performing
+      const nowCard = document.getElementById('now-performing-card');
+      const nowSeq = document.getElementById('now-seq-badge');
+      const nowPerformer = document.getElementById('now-performer-name');
+      const nowSong = document.getElementById('now-song-title');
+      const nowMovie = document.getElementById('now-movie-name');
+
+      if (data.now_performing) {
+        const item = data.now_performing;
+        nowSeq.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')}`;
+        
+        let nameText = escapeHtml(item.performer_name);
+        if (item.partner_name) {
+          nameText = `Duet: <span class="text-orange-400 font-bold">${escapeHtml(item.performer_name)}</span> & <span class="text-amber-300 font-bold">${escapeHtml(item.partner_name)}</span>`;
+        }
+        nowPerformer.innerHTML = nameText;
+        nowSong.textContent = `"${item.song_title}"`;
+        nowMovie.textContent = item.movie_name ? `Movie / Album: ${item.movie_name}` : '';
+      } else {
+        nowSeq.textContent = '#--';
+        nowPerformer.textContent = 'Musical Night in Progress';
+        nowSong.textContent = 'Next performance will begin shortly';
+        nowMovie.textContent = '';
+      }
+
+      // 2. Up Next
+      const upNextContainer = document.getElementById('up-next-container');
+      if (!data.up_next || data.up_next.length === 0) {
+        upNextContainer.innerHTML = '<div class="col-span-2 p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-500 text-center">No immediate upcoming items</div>';
+      } else {
+        upNextContainer.innerHTML = '';
+        data.up_next.forEach((item, idx) => {
+          let nameText = escapeHtml(item.performer_name);
+          if (item.partner_name) {
+            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
+          }
+
+          const card = document.createElement('div');
+          card.className = 'p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-1.5 shadow-lg';
+          card.innerHTML = `
+            <div class="flex items-center justify-between text-xs">
+              <span class="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-bold">
+                #${String(item.sequence_order || 0).padStart(2, '0')}
+              </span>
+              <span class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
+                ${idx === 0 ? '⏭️ Immediate Next' : '⏳ In 2 Songs'}
+              </span>
+            </div>
+            <h4 class="font-bold text-white text-base truncate">${nameText}</h4>
+            <p class="text-xs text-orange-400 truncate">"${escapeHtml(item.song_title)}"</p>
+          `;
+          upNextContainer.appendChild(card);
+        });
+      }
+
+      // 3. Upcoming List
+      const upcomingList = document.getElementById('upcoming-list');
+      const upcomingCount = document.getElementById('upcoming-count');
+      const allUpcoming = data.upcoming || [];
+      upcomingCount.textContent = `${allUpcoming.length} scheduled`;
+
+      if (allUpcoming.length === 0) {
+        upcomingList.innerHTML = '<div class="p-6 text-center text-xs text-slate-500">No further performances scheduled</div>';
+      } else {
+        upcomingList.innerHTML = '';
+        allUpcoming.forEach(item => {
+          let nameText = escapeHtml(item.performer_name);
+          if (item.partner_name) {
+            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
+          }
+
+          const row = document.createElement('div');
+          row.className = 'p-3.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-800/30 transition';
+          row.innerHTML = `
+            <div class="flex items-center gap-3 overflow-hidden">
+              <span class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center shrink-0 border border-slate-700">
+                #${String(item.sequence_order || 0).padStart(2, '0')}
+              </span>
+              <div class="overflow-hidden">
+                <div class="font-bold text-white truncate">${nameText}</div>
+                <div class="text-orange-400 font-medium truncate">"${escapeHtml(item.song_title)}"</div>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
+              ${escapeHtml(item.performance_type)}
+            </span>
+          `;
+          upcomingList.appendChild(row);
+        });
+      }
+
+      // 4. Completed List
+      const completedSection = document.getElementById('completed-section');
+      const completedHeader = document.getElementById('completed-header-text');
+      const completedList = document.getElementById('completed-list-container');
+      const performed = data.performed || [];
+
+      if (performed.length > 0) {
+        completedSection.classList.remove('hidden');
+        completedHeader.textContent = `Completed Performances (${performed.length})`;
+        completedList.innerHTML = '';
+        performed.forEach(item => {
+          let nameText = escapeHtml(item.performer_name);
+          if (item.partner_name) {
+            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
+          }
+
+          const row = document.createElement('div');
+          row.className = 'p-3 flex items-center justify-between gap-3 text-xs text-slate-400 opacity-60';
+          row.innerHTML = `
+            <div class="flex items-center gap-2.5 truncate">
+              <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
+              <span class="font-mono">#${String(item.sequence_order || 0).padStart(2, '0')}</span>
+              <span class="line-through truncate">${nameText} - "${escapeHtml(item.song_title)}"</span>
+            </div>
+          `;
+          completedList.appendChild(row);
+        });
+      } else {
+        completedSection.classList.add('hidden');
+      }
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/[&<>"']/g, (m) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[m]);
+    }
+  </script>
+</body>
+</html>

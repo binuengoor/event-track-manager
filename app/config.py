@@ -24,9 +24,9 @@ class ColumnsConfig(BaseModel):
     partner_name: int = 2      # Col C: Singer (2)
     song_title: int = 8        # Col I: Song Name
     movie_name: int = 9        # Col J: Movie/Album Name
-    youtube_url: int = 10      # Col K: Karaoke Youtube URL
+    performance_status: int = 10 # Col K: Performance Status
+    track_status: int = 11     # Col L: Track Uploaded / Status
     sequence_order: int = 6    # Col G: Sequence
-    track_status: int = 11     # Col L: Track Uploaded
     duration: int = 12         # Col M: Duration (Minutes)
     drive_file_id: int = 13    # Col N: Drive File ID
     last_updated: int = 14     # Col O: Last Updated

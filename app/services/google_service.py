@@ -16,12 +16,12 @@ class PerformanceEntry(BaseModel):
     partner_name: Optional[str] = None
     song_title: str
     movie_name: Optional[str] = None
-    youtube_url: Optional[str] = None
     sequence_order: Optional[int] = None
-    track_status: str = "Pending"
-    duration: Optional[str] = None
-    drive_file_id: Optional[str] = None
-    last_updated: Optional[str] = None
+    performance_status: str = "Upcoming" # Col K: Upcoming, On Stage, Performed, On Hold
+    track_status: str = "Pending"        # Col L: Uploaded, Pending, Acoustic
+    duration: Optional[str] = None      # Col M: Duration (Minutes)
+    drive_file_id: Optional[str] = None # Col N: Drive File ID
+    last_updated: Optional[str] = None  # Col O: Last Updated
     row_index: int = 0
     is_song_name_missing: bool = False
 
@@ -32,6 +32,7 @@ class GoogleService:
         self.drive = None
         self.is_xlsx = False
         self._mock_data: List[PerformanceEntry] = []
+        self.active_entry_id: Optional[str] = None
 
         if self.mock_mode:
             logger.info("Initializing GoogleService in MOCK MODE (No external API calls)")
@@ -48,10 +49,10 @@ class GoogleService:
                 partner_name=None,
                 song_title="Puthumazha",
                 movie_name="Sarvam Maya",
-                youtube_url="https://www.youtube.com/watch?v=SNwHuc-4pao",
                 sequence_order=1,
+                performance_status="On Stage",
                 track_status="Uploaded",
-                duration="04:12",
+                duration="04:28",
                 drive_file_id="mock_drive_file_001",
                 last_updated="2026-09-01T14:30:00",
                 row_index=2,
@@ -64,8 +65,8 @@ class GoogleService:
                 partner_name=None,
                 song_title="Attuthottil",
                 movie_name="Athiran",
-                youtube_url=None,
                 sequence_order=2,
+                performance_status="Upcoming",
                 track_status="Pending",
                 duration=None,
                 drive_file_id=None,
@@ -80,8 +81,8 @@ class GoogleService:
                 partner_name=None,
                 song_title="Performance #3 (Song title missing)",
                 movie_name=None,
-                youtube_url=None,
                 sequence_order=3,
+                performance_status="Upcoming",
                 track_status="Pending",
                 duration=None,
                 drive_file_id=None,
@@ -96,8 +97,8 @@ class GoogleService:
                 partner_name=None,
                 song_title="Live Music",
                 movie_name=None,
-                youtube_url=None,
-                sequence_order=19,
+                sequence_order=4,
+                performance_status="Upcoming",
                 track_status="Acoustic",
                 duration=None,
                 drive_file_id=None,
@@ -106,6 +107,7 @@ class GoogleService:
                 is_song_name_missing=False
             )
         ]
+        self.active_entry_id = "PK-002"
 
     def _init_real_clients(self):
         try:
@@ -124,7 +126,6 @@ class GoogleService:
             self.sheets = build("sheets", "v4", credentials=creds)
             self.drive = build("drive", "v3", credentials=creds)
 
-            # Check if target document is an Excel file or native Google Sheet
             meta = self.drive.files().get(
                 fileId=settings.google.sheet_id,
                 supportsAllDrives=True,
@@ -148,7 +149,6 @@ class GoogleService:
         try:
             raw_rows = []
             if self.is_xlsx:
-                # Read via openpyxl from Drive media stream
                 import openpyxl
                 content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
                 wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
@@ -156,7 +156,6 @@ class GoogleService:
                 for r in ws.iter_rows(min_row=2, values_only=True):
                     raw_rows.append([str(c).strip() if c is not None else "" for c in r])
             else:
-                # Read via Sheets API
                 result = self.sheets.spreadsheets().values().get(
                     spreadsheetId=settings.google.sheet_id,
                     range=settings.google.sheet_range
@@ -165,20 +164,20 @@ class GoogleService:
 
             entries: List[PerformanceEntry] = []
             for idx, row in enumerate(raw_rows):
-                row_index = idx + 2  # Row 1 is header
+                row_index = idx + 2
 
                 def get_col(col_idx: int) -> str:
                     return str(row[col_idx]).strip() if 0 <= col_idx < len(row) else ""
 
                 performer_name = get_col(cols.performer_name)
-                if not performer_name:
+                if not performer_name or performer_name.lower().startswith("singer"):
                     continue
 
                 entry_id = get_col(cols.entry_id) if cols.entry_id >= 0 else ""
                 if not entry_id:
                     entry_id = f"PK-{row_index:03d}"
 
-                # Parse sequence order
+                # Parse sequence order if already set
                 seq_str = get_col(cols.sequence_order)
                 seq_val = None
                 if seq_str:
@@ -187,7 +186,7 @@ class GoogleService:
                     except ValueError:
                         seq_val = None
 
-                # Song title & check if missing
+                # Song title
                 raw_song_title = get_col(cols.song_title)
                 movie_name = get_col(cols.movie_name)
                 is_missing = not bool(raw_song_title)
@@ -197,29 +196,40 @@ class GoogleService:
                 elif movie_name:
                     song_title = f"{movie_name} (Song title missing)"
                 else:
-                    song_title = f"Performance #{seq_val or row_index} (Song title missing)"
+                    song_title = f"Performance (Song title missing)"
 
-                # Normalize status
-                raw_status = get_col(cols.track_status)
                 perf_type = get_col(cols.performance_type) or "Solo"
 
-                if raw_status.lower() in ("yes", "uploaded", "true"):
-                    status = "Uploaded"
-                elif raw_status.lower() in ("performed", "done", "completed"):
-                    status = "Performed"
-                elif raw_status.lower() in ("skipped", "skip", "on hold", "hold"):
-                    status = "Skipped"
-                elif "acoustic" in perf_type.lower() or "live" in song_title.lower():
-                    status = "Acoustic"
-                elif raw_status:
-                    status = raw_status
+                # Performance Status (Col K)
+                raw_perf_status = get_col(cols.performance_status)
+                if not raw_perf_status or raw_perf_status.startswith("http"):
+                    perf_status = "Upcoming"
+                elif raw_perf_status.lower() in ("performed", "done", "completed"):
+                    perf_status = "Performed"
+                elif raw_perf_status.lower() in ("on stage", "live", "playing"):
+                    perf_status = "On Stage"
+                elif raw_perf_status.lower() in ("skipped", "hold", "on hold"):
+                    perf_status = "On Hold"
                 else:
-                    status = "Pending"
+                    perf_status = "Upcoming"
+
+                # Track Status (Col L)
+                raw_track_status = get_col(cols.track_status)
+                if raw_track_status.lower() in ("yes", "uploaded", "true"):
+                    track_status = "Uploaded"
+                elif "acoustic" in perf_type.lower() or "live" in song_title.lower() or raw_track_status.lower() == "acoustic":
+                    track_status = "Acoustic"
+                elif raw_track_status.lower() in ("performed", "done"):
+                    # fallback if track uploaded col had performed
+                    track_status = "Uploaded"
+                elif raw_track_status:
+                    track_status = raw_track_status
+                else:
+                    track_status = "Pending"
 
                 duration_val = get_col(cols.duration) or None
                 drive_id = get_col(cols.drive_file_id) or None
                 last_up = get_col(cols.last_updated) or None
-                yt_link = get_col(cols.youtube_url) or None
 
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
@@ -228,15 +238,34 @@ class GoogleService:
                     partner_name=get_col(cols.partner_name) or None,
                     song_title=song_title,
                     movie_name=movie_name or None,
-                    youtube_url=yt_link,
                     sequence_order=seq_val,
-                    track_status=status,
+                    performance_status=perf_status,
+                    track_status=track_status,
                     duration=duration_val,
                     drive_file_id=drive_id,
                     last_updated=last_up,
                     row_index=row_index,
                     is_song_name_missing=is_missing
                 ))
+
+            # Sequence backfill logic:
+            # If any rows are missing sequence numbers, fill them from top to bottom
+            used_seqs = set(p.sequence_order for p in entries if p.sequence_order is not None)
+            missing_items = []
+            next_seq = 1
+            for p in entries:
+                if p.sequence_order is None:
+                    while next_seq in used_seqs:
+                        next_seq += 1
+                    p.sequence_order = next_seq
+                    used_seqs.add(next_seq)
+                    missing_items.append({"entry_id": p.entry_id, "sequence_order": next_seq})
+
+            # Fix song titles for missing titles with their sequence
+            for p in entries:
+                if p.is_song_name_missing and "Performance (Song" in p.song_title:
+                    p.song_title = f"Performance #{p.sequence_order} (Song title missing)"
+
             return entries
         except Exception as e:
             logger.error("Error fetching performances from Google Sheet: %s", e)
@@ -244,9 +273,57 @@ class GoogleService:
 
     def get_stage_queue(self) -> List[PerformanceEntry]:
         performances = self.get_performances()
-        sequenced = [p for p in performances if p.sequence_order is not None]
-        sequenced.sort(key=lambda x: x.sequence_order)
-        return sequenced
+        # Sort all entries by sequence_order
+        performances.sort(key=lambda x: x.sequence_order if x.sequence_order is not None else 9999)
+        return performances
+
+    def get_live_status(self) -> Dict[str, Any]:
+        queue = self.get_stage_queue()
+        now_performing = None
+        up_next = []
+        upcoming = []
+        performed = []
+        on_hold = []
+
+        # Find active performance
+        if self.active_entry_id:
+            now_performing = next((p for p in queue if p.entry_id == self.active_entry_id), None)
+
+        if not now_performing:
+            # Pick first non-performed and non-skipped item
+            now_performing = next((p for p in queue if p.performance_status not in ("Performed", "On Hold")), None)
+
+        now_id = now_performing.entry_id if now_performing else None
+
+        for p in queue:
+            if p.entry_id == now_id:
+                continue
+            if p.performance_status == "Performed":
+                performed.append(p)
+            elif p.performance_status == "On Hold":
+                on_hold.append(p)
+            else:
+                if len(up_next) < 2:
+                    up_next.append(p)
+                else:
+                    upcoming.append(p)
+
+        return {
+            "event_name": settings.event.name,
+            "now_performing": now_performing,
+            "up_next": up_next,
+            "upcoming": upcoming,
+            "performed": performed,
+            "on_hold": on_hold,
+            "total_count": len(queue),
+            "completed_count": len(performed)
+        }
+
+    def set_active_performance(self, entry_id: str) -> bool:
+        self.active_entry_id = entry_id
+        # Optionally update performance_status in sheet
+        self.update_status(entry_id, "On Stage")
+        return True
 
     def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:
         now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -277,7 +354,7 @@ class GoogleService:
             ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
 
             row = target.row_index
-            # 1-based indexing for openpyxl
+            # Col L: Track Uploaded = "Yes"
             ws.cell(row=row, column=cols.track_status + 1, value="Yes")
             if duration_str:
                 ws.cell(row=row, column=cols.duration + 1, value=duration_str)
@@ -312,10 +389,11 @@ class GoogleService:
             return True
 
     def update_status(self, entry_id: str, status: str) -> bool:
+        """Updates Performance Status (Col K) and optionally Track Status (Col L)."""
         if self.mock_mode:
             for item in self._mock_data:
                 if item.entry_id == entry_id:
-                    item.track_status = status
+                    item.performance_status = status
                     return True
             return False
 
@@ -327,17 +405,16 @@ class GoogleService:
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
 
-        # Determine value to record
-        if status == "Performed":
+        # Determine value to write to Col K (Performance Status)
+        val_to_write = status
+        if status in ("Uploaded", "Upcoming", "Reset"):
+            val_to_write = "Upcoming"
+        elif status == "Performed":
             val_to_write = "Performed"
-        elif status == "Skipped":
-            val_to_write = "Skipped"
-        elif status == "Uploaded":
-            val_to_write = "Yes"
-        elif status == "Pending":
-            val_to_write = ""
-        else:
-            val_to_write = status
+        elif status in ("Skipped", "On Hold"):
+            val_to_write = "On Hold"
+        elif status in ("On Stage", "Live"):
+            val_to_write = "On Stage"
 
         if self.is_xlsx:
             import openpyxl
@@ -347,30 +424,30 @@ class GoogleService:
             wb = openpyxl.load_workbook(io.BytesIO(content))
             ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
 
-            ws.cell(row=target.row_index, column=cols.track_status + 1, value=val_to_write)
+            ws.cell(row=target.row_index, column=cols.performance_status + 1, value=val_to_write)
             out_buf = io.BytesIO()
             wb.save(out_buf)
             out_buf.seek(0)
 
             media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
             self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
-            logger.info("Updated status for %s (Row %d) to %s in Excel sheet", entry_id, target.row_index, val_to_write)
+            logger.info("Updated performance status for %s (Row %d) to %s in Excel sheet", entry_id, target.row_index, val_to_write)
             return True
         else:
             def col_letter(col_idx: int) -> str:
                 return chr(ord('A') + col_idx)
 
-            cell = f"{tab_name}!{col_letter(cols.track_status)}{target.row_index}"
+            cell = f"{tab_name}!{col_letter(cols.performance_status)}{target.row_index}"
             self.sheets.spreadsheets().values().update(
                 spreadsheetId=settings.google.sheet_id,
                 range=cell,
                 valueInputOption="USER_ENTERED",
                 body={"values": [[val_to_write]]}
             ).execute()
-            logger.info("Updated status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
+            logger.info("Updated performance status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
             return True
 
-    def update_sequence_orders(self, items: List[Dict[str, Any]]) -> int:
+    def update_sequence_orders(self, items: List[Dict[str, Any]], sync_only: bool = False) -> int:
         item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
         if self.mock_mode:
             for p in self._mock_data:
