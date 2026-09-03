@@ -186,9 +186,9 @@
         nowMovie.textContent = item.movie_name ? `Movie / Album: ${item.movie_name}` : '';
       } else {
         nowSeq.textContent = '#--';
-        nowPerformer.textContent = 'Musical Night in Progress';
-        nowSong.textContent = 'Next performance will begin shortly';
-        nowMovie.textContent = '';
+        nowPerformer.innerHTML = '<span class="text-slate-400 font-normal italic">Waiting for next performance to cue...</span>';
+        nowSong.textContent = 'Stage in preparation';
+        nowMovie.textContent = 'Please check Up Next below to see who is coming up';
       }
 
       // 2. Up Next

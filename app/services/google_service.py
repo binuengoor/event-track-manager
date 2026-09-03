@@ -107,7 +107,7 @@ class GoogleService:
                 is_song_name_missing=False
             )
         ]
-        self.active_entry_id = "PK-002"
+        self.active_entry_id = None
 
     def _init_real_clients(self):
         try:
@@ -285,13 +285,9 @@ class GoogleService:
         performed = []
         on_hold = []
 
-        # Find active performance
+        # Find active performance only if explicitly cued
         if self.active_entry_id:
             now_performing = next((p for p in queue if p.entry_id == self.active_entry_id), None)
-
-        if not now_performing:
-            # Pick first non-performed and non-skipped item
-            now_performing = next((p for p in queue if p.performance_status not in ("Performed", "On Hold")), None)
 
         now_id = now_performing.entry_id if now_performing else None
 

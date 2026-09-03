@@ -6,8 +6,8 @@ event:
 google:
   # Path to Google Cloud Service Account JSON Key
   service_account_json_path: "./secrets/credentials.json"
-  # Target Google Sheet / Workbook ID
-  sheet_id: "1DOeoZJ4v6ixW1TjaKTOv2dmgXggfYkuA"
+  # Target Google Sheet ID (Native Google Sheet for live concurrent multi-user editing)
+  sheet_id: "1bRvoj4ZlAmSRz972uhTDMfXlYgksH-BOH-zmygp5YRQ"
   sheet_range: "Song Sign-Up!A2:O"
   # Google Shared Drive Folder IDs
   drive_folders:
