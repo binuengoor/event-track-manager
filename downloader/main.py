@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 from typing import Optional
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, HttpUrl
@@ -11,8 +12,29 @@ logger = logging.getLogger("downloader-service")
 app = FastAPI(title="Paattukoottam Downloader Microservice")
 
 CACHE_DIR = os.getenv("CACHE_DIR", "/data/cache")
-COOKIES_PATH = os.getenv("COOKIES_PATH", "/secrets/cookies.txt")
+COOKIES_PATH = os.getenv("COOKIES_PATH", "/secrets/yt_cookies.txt")
 os.makedirs(CACHE_DIR, exist_ok=True)
+
+def get_writable_cookies_file() -> Optional[str]:
+    """Finds available cookie file and copies it to a writable location in /tmp."""
+    candidates = [
+        COOKIES_PATH,
+        os.getenv("COOKIES_PATH", ""),
+        "/secrets/yt_cookies.txt",
+        "/secrets/cookies.txt",
+        "./secrets/yt_cookies.txt",
+        "./secrets/cookies.txt",
+    ]
+    for c in candidates:
+        if c and os.path.isfile(c) and os.path.getsize(c) > 0:
+            target = "/tmp/active_yt_cookies.txt"
+            try:
+                shutil.copyfile(c, target)
+                return target
+            except Exception as ex:
+                logger.warning("Could not copy cookies to /tmp: %s", ex)
+                return c
+    return None
 
 class ExtractRequest(BaseModel):
     url: str
@@ -28,12 +50,13 @@ class ExtractResponse(BaseModel):
 
 @app.get("/health")
 def health_check():
-    has_cookies = os.path.isfile(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 0
+    cookies_file = get_writable_cookies_file()
     return {
         "status": "healthy",
         "service": "paattukoottam-downloader",
         "ytdlp_version": yt_dlp.version.__version__,
-        "cookies_mounted": has_cookies
+        "cookies_mounted": bool(cookies_file),
+        "cookies_path": cookies_file
     }
 
 @app.post("/api/extract", response_model=ExtractResponse)
@@ -60,9 +83,10 @@ def extract_audio(request: ExtractRequest):
         "socket_timeout": 30,
     }
 
-    if os.path.isfile(COOKIES_PATH) and os.path.getsize(COOKIES_PATH) > 0:
-        logger.info("Using mounted cookies file: %s", COOKIES_PATH)
-        ydl_opts["cookiefile"] = COOKIES_PATH
+    cookies_file = get_writable_cookies_file()
+    if cookies_file:
+        logger.info("Using active writable cookies file: %s", cookies_file)
+        ydl_opts["cookiefile"] = cookies_file
 
     logger.info("Starting audio extraction for %s (URL: %s)", entry_id, request.url)
 

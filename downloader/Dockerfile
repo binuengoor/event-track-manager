@@ -5,12 +5,15 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install system dependencies: ffmpeg for audio transcoding, curl & ca-certificates
+# Install system dependencies: ffmpeg for audio transcoding, curl, unzip & ca-certificates, and install Deno
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
+        unzip \
         ca-certificates && \
+    curl -fsSL https://deno.land/install.sh | sh && \
+    ln -s /root/.deno/bin/deno /usr/local/bin/deno && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

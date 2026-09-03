@@ -23,20 +23,24 @@
           <p id="event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night • Track Submission</p>
         </div>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="/live" target="_blank" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-white transition" title="View live stage program">
+      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <a href="/" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Track Intake & Submission">
+          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Upload Tracks</span>
+        </a>
+        <a href="/live" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
           <span>Live Program</span>
         </a>
-        <button id="refresh-data-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Refresh sign-up list from Google Sheet">
+        <a href="/console" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span>Console</span>
+        </a>
+        <button id="refresh-data-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh data from Google Sheet & Drive">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
           <span>Refresh Data</span>
         </button>
-        <a href="/console" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition">
-          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
-          <span>Stage Console</span>
-        </a>
-      </div>
+      </nav>
     </div>
   </header>
 

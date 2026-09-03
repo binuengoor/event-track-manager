@@ -64,31 +64,39 @@
         </div>
       </div>
 
-      <!-- Action Buttons & Sync Indicator -->
-      <div class="flex items-center gap-2.5 flex-wrap">
+      <!-- Navigation & Action Buttons -->
+      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
         <!-- Live Sync Indicator -->
-        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span id="sync-status-text">Connected</span>
         </div>
 
-        <button id="refresh-queue-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition" title="Refresh latest data from Google Sheet">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
-          <span>Refresh Data</span>
-        </button>
-        <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-500/20 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
+        <a href="/" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Track Intake & Submission">
+          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Upload Tracks</span>
+        </a>
+
+        <a href="/live" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
+          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Live Program</span>
+        </a>
+
+        <a href="/console" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Console</span>
+        </a>
+
+        <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
           <i data-lucide="archive" class="w-3.5 h-3.5"></i>
           <span>Offline ZIP</span>
         </button>
-        <a href="/live" target="_blank" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition" title="Open Public Live Program view for audience or projector">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span>Live View</span>
-        </a>
-        <a href="/" target="_blank" class="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-800 transition">
-          <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-          <span>Intake Portal</span>
-        </a>
-      </div>
+
+        <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Google Sheet & Drive">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
+          <span>Refresh Data</span>
+        </button>
+      </nav>
     </div>
   </header>
 

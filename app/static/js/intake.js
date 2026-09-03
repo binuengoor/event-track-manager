@@ -248,10 +248,10 @@ function handlePerformerSelected(name) {
           <div class="font-semibold text-sm ${song.is_song_name_missing ? 'text-amber-300 italic' : 'text-white'}">
             ${escapeHtml(song.song_title)}
           </div>
-          <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-0.5">
-            <span class="text-orange-400 font-medium">${typeLabel}</span>
-            <span>•</span>
-            <span>Seq #${song.sequence_order || 'TBD'}</span>
+          <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-1">
+            ${renderTypePill(song.performance_type)}
+            <span class="text-slate-500">•</span>
+            <span class="font-mono text-slate-400">Seq #${song.sequence_order || 'TBD'}</span>
           </div>
         </div>
       </div>
@@ -559,4 +559,18 @@ function escapeHtml(str) {
     '"': '&quot;',
     "'": '&#39;'
   })[m]);
+}
+
+function renderTypePill(perfType) {
+  const raw = (perfType || 'Solo').trim();
+  const lower = raw.toLowerCase();
+  let colorClasses = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+  if (lower.includes('duet')) {
+    colorClasses = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+  } else if (lower.includes('group')) {
+    colorClasses = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+  } else if (lower.includes('acoustic') || lower.includes('live')) {
+    colorClasses = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+  }
+  return `<span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
 }

@@ -97,7 +97,9 @@ async def get_track_info(entry_id: str):
 
     safe_performer = sanitize_filename(target.performer_name)
     safe_song = sanitize_filename(target.song_title)
-    canonical_filename = f"{entry_id}_{safe_performer}_{safe_song}.mp3"
+    seq = target.sequence_order
+    seq_prefix = f"{seq:02d}_" if seq else ""
+    canonical_filename = target.drive_file_name or f"{seq_prefix}{entry_id}_{safe_performer}_{safe_song}.mp3"
 
     meta = audio_service.get_track_metadata(entry_id, target.drive_file_id, canonical_filename)
     meta["entry_id"] = entry_id

@@ -21,6 +21,7 @@ class PerformanceEntry(BaseModel):
     track_status: str = "Pending"        # Col L: Uploaded, Pending, Acoustic
     duration: Optional[str] = None      # Col M: Duration (Minutes)
     drive_file_id: Optional[str] = None # Col N: Drive File ID
+    drive_file_name: Optional[str] = None # Actual file name in Google Drive
     last_updated: Optional[str] = None  # Col O: Last Updated
     row_index: int = 0
     is_song_name_missing: bool = False
@@ -303,9 +304,11 @@ class GoogleService:
                         drive_id = matched_file["id"]
 
                     if matched_file:
+                        drive_file_name = matched_file.get("name")
                         if track_status != "Acoustic":
                             track_status = "Uploaded"
                     else:
+                        drive_file_name = None
                         # If a file was recorded in the sheet but is missing from Drive Active/ folder
                         if drive_id or track_status == "Uploaded":
                             stale_sheet_clears.append(row_index)
@@ -326,6 +329,7 @@ class GoogleService:
                     track_status=track_status,
                     duration=duration_val,
                     drive_file_id=drive_id,
+                    drive_file_name=drive_file_name,
                     last_updated=last_up,
                     row_index=row_index,
                     is_song_name_missing=is_missing

@@ -77,6 +77,20 @@ function showToast(message, type = 'success') {
   }, 3500);
 }
 
+function renderTypePill(perfType) {
+  const raw = (perfType || 'Solo').trim();
+  const lower = raw.toLowerCase();
+  let colorClasses = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+  if (lower.includes('duet')) {
+    colorClasses = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
+  } else if (lower.includes('group')) {
+    colorClasses = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
+  } else if (lower.includes('acoustic') || lower.includes('live')) {
+    colorClasses = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
+  }
+  return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
+}
+
 function setupAuth() {
   const form = document.getElementById('pin-form');
   const input = document.getElementById('pin-input');
@@ -306,9 +320,7 @@ function renderQueueList() {
             <h3 class="font-bold text-sm text-white ${isDone ? 'line-through text-slate-400' : ''}">
               ${performerDisplay}
             </h3>
-            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-medium border border-slate-700">
-              ${escapeHtml(item.performance_type)}
-            </span>
+            ${renderTypePill(item.performance_type)}
           </div>
           <p class="text-xs text-orange-400 font-medium mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}">
             "${escapeHtml(item.song_title)}" ${durationInfo}

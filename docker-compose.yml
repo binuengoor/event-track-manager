@@ -33,7 +33,7 @@ services:
     restart: unless-stopped
     environment:
       - CACHE_DIR=/data/cache
-      - COOKIES_PATH=/secrets/cookies.txt
+      - COOKIES_PATH=/secrets/yt_cookies.txt
     volumes:
       - ./secrets:/secrets:ro
       - audio_cache:/data/cache
