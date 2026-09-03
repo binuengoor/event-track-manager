@@ -482,8 +482,24 @@ class GoogleService:
             updates = []
             for p in performances:
                 if p.entry_id in item_map:
+                    new_seq = item_map[p.entry_id]
                     cell = f"{tab_name}!{col_letter(cols.sequence_order)}{p.row_index}"
-                    updates.append({"range": cell, "values": [[item_map[p.entry_id]]]})
+                    updates.append({"range": cell, "values": [[new_seq]]})
+
+                    # If this performance has a backing track in Drive, rename it with the new sequence prefix
+                    if p.drive_file_id:
+                        try:
+                            clean_p = "".join(c for c in p.performer_name.split("(")[0].strip() if c.isalnum() or c in (" ", "_", "-")).replace(" ", "_")
+                            clean_s = "".join(c for c in p.song_title if c.isalnum() or c in (" ", "_", "-")).replace(" ", "_")
+                            new_name = f"{new_seq:02d}_{p.entry_id}_{clean_p}_{clean_s}.mp3"
+                            self.drive.files().update(
+                                fileId=p.drive_file_id,
+                                body={"name": new_name},
+                                supportsAllDrives=True
+                            ).execute()
+                            logger.info("Renamed Drive file %s -> %s for sequence #%d", p.drive_file_id, new_name, new_seq)
+                        except Exception as ex:
+                            logger.warning("Could not rename Drive file %s for sequence update: %s", p.drive_file_id, ex)
 
             if updates:
                 self.sheets.spreadsheets().values().batchUpdate(
@@ -493,11 +509,53 @@ class GoogleService:
             logger.info("Updated sequence order for %d items in Google Sheet", len(item_map))
             return len(item_map)
 
-    def upload_file_to_active(self, file_path: str, filename: str, mime_type: str = "audio/mpeg") -> str:
+    def archive_all_active_files_for_entry(self, entry_id: str) -> List[str]:
+        """Finds any active file in the Active/ folder matching this entry and moves it to Archive/."""
+        if self.mock_mode:
+            return []
+
+        active_id = settings.google.drive_folders.active_folder_id
+        archive_id = settings.google.drive_folders.archive_folder_id
+
+        try:
+            q = f"'{active_id}' in parents and trashed = false and name contains '{entry_id}'"
+            res = self.drive.files().list(
+                q=q,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                fields="files(id, name)"
+            ).execute()
+
+            archived = []
+            timestamp_str = datetime.now().strftime("%Y%m%d-%H%M%S")
+            for f in res.get("files", []):
+                fid = f["id"]
+                old_name = f["name"]
+                base, ext = os.path.splitext(old_name)
+                new_name = f"{base}_archived_{timestamp_str}{ext}" if "_archived_" not in old_name else old_name
+                self.drive.files().update(
+                    fileId=fid,
+                    addParents=archive_id,
+                    removeParents=active_id,
+                    body={"name": new_name},
+                    supportsAllDrives=True
+                ).execute()
+                archived.append(fid)
+                logger.info("Archived active file %s (%s -> %s) to Archive/ folder", fid, old_name, new_name)
+            return archived
+        except Exception as e:
+            logger.warning("Error during archive_all_active_files_for_entry for %s: %s", entry_id, e)
+            return []
+
+    def upload_file_to_active(self, file_path: str, filename: str, entry_id: Optional[str] = None, mime_type: str = "audio/mpeg") -> str:
         if self.mock_mode:
             mock_id = f"mock_drive_{os.path.basename(file_path)}"
             logger.info("MOCK DRIVE: Uploaded %s to Active folder (mock ID: %s)", filename, mock_id)
             return mock_id
+
+        # Guarantee at any given point in time, there is ONLY ONE file in Active/ for this performance
+        if entry_id:
+            self.archive_all_active_files_for_entry(entry_id)
 
         from googleapiclient.http import MediaFileUpload
 
@@ -529,15 +587,19 @@ class GoogleService:
         active_id = settings.google.drive_folders.active_folder_id
         archive_id = settings.google.drive_folders.archive_folder_id
 
-        self.drive.files().update(
-            fileId=file_id,
-            addParents=archive_id,
-            removeParents=active_id,
-            body={"name": archived_name},
-            supportsAllDrives=True
-        ).execute()
-        logger.info("Archived file %s -> %s in Archive/ folder", file_id, archived_name)
-        return True
+        try:
+            self.drive.files().update(
+                fileId=file_id,
+                addParents=archive_id,
+                removeParents=active_id,
+                body={"name": archived_name},
+                supportsAllDrives=True
+            ).execute()
+            logger.info("Archived file %s -> %s in Archive/ folder", file_id, archived_name)
+            return True
+        except Exception as e:
+            logger.warning("Could not archive file %s: %s", file_id, e)
+            return False
 
     def download_file_bytes(self, file_id: str) -> Optional[bytes]:
         if self.mock_mode:

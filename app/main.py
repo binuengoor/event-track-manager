@@ -36,7 +36,8 @@ class StatusUpdateRequest(BaseModel):
 def verify_admin_pin(request: Request):
     auth_header = request.headers.get("X-Admin-PIN")
     cookie_pin = request.cookies.get("admin_pin")
-    pin = auth_header or cookie_pin
+    query_pin = request.query_params.get("pin")
+    pin = auth_header or cookie_pin or query_pin
     if pin != settings.admin_pin:
         raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin PIN")
     return True
@@ -145,7 +146,9 @@ async def upload_track(
 
     safe_performer = sanitize_filename(target_entry.performer_name)
     safe_song = sanitize_filename(target_entry.song_title)
-    canonical_filename = f"{entry_id}_{safe_performer}_{safe_song}.mp3"
+    seq = target_entry.sequence_order
+    seq_prefix = f"{seq:02d}_" if seq else ""
+    canonical_filename = f"{seq_prefix}{entry_id}_{safe_performer}_{safe_song}.mp3"
 
     cache_path = audio_service.get_cache_path(entry_id)
 
@@ -157,7 +160,6 @@ async def upload_track(
         logger.info("Extracting YouTube audio for %s: %s", entry_id, youtube_url)
         try:
             extract_res = await downloader_client.extract_audio(youtube_url.strip(), entry_id)
-            track_title = extract_res.get("title", canonical_filename)
         except Exception as e:
             logger.error("Downloader extraction failed for %s: %s", entry_id, e)
             raise HTTPException(status_code=422, detail=str(e))
@@ -174,39 +176,52 @@ async def upload_track(
 
         # Write to local cache
         audio_service.save_upload_to_cache(entry_id, content)
-        track_title = file.filename or canonical_filename
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported submission_type: {submission_type}")
 
-    # 2. Archival: Check if existing track should be moved to Archive folder
-    if target_entry.drive_file_id:
-        try:
-            logger.info("Archiving previous file for entry %s (file_id: %s)", entry_id, target_entry.drive_file_id)
-            google_service.archive_previous_file(target_entry.drive_file_id, canonical_filename)
-        except Exception as e:
-            logger.warning("Could not archive existing file %s: %s", target_entry.drive_file_id, e)
+    # Audio integrity and playability verification
+    try:
+        from mutagen import File as MutagenFile
+        audio = MutagenFile(cache_path)
+        if audio is None or audio.info is None:
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid audio file: Unable to decode playable audio track. Please upload a standard MP3, M4A, or WAV file."
+            )
+        length = getattr(audio.info, "length", 0)
+        if not length or length <= 0:
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+            raise HTTPException(
+                status_code=400,
+                detail="Unplayable audio file: Audio duration is 0 seconds or corrupted. Please verify the track plays on your computer before uploading."
+            )
+        sec = int(length)
+        m = sec // 60
+        s = sec % 60
+        duration_str = f"{m:02d}:{s:02d}"
+    except HTTPException:
+        raise
+    except Exception as e:
+        if os.path.exists(cache_path):
+            os.remove(cache_path)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Audio verification failed: {str(e)}. Please provide a valid, playable audio track."
+        )
 
-    # 3. Upload new active track to Google Drive Active/ folder
+    # 2. Upload new active track to Google Drive Active/ folder
+    # Note: upload_file_to_active automatically archives ANY previous file for this entry in Active/!
     drive_file_id = None
     try:
-        drive_file_id = google_service.upload_file_to_active(cache_path, canonical_filename)
+        drive_file_id = google_service.upload_file_to_active(cache_path, canonical_filename, entry_id=entry_id)
     except Exception as e:
         logger.error("Failed to upload track to Google Drive Active/ folder: %s", e)
         raise HTTPException(status_code=500, detail="Failed to upload track to Google Drive")
 
-    # 4. Update Google Sheet with Track Uploaded and Duration
-    duration_str = None
-    try:
-        from mutagen import File as MutagenFile
-        audio = MutagenFile(cache_path)
-        if audio and audio.info and hasattr(audio.info, "length"):
-            sec = audio.info.length
-            m = int(sec // 60)
-            s = int(sec % 60)
-            duration_str = f"{m:02d}:{s:02d}"
-    except Exception as e:
-        logger.warning("Could not compute duration for %s: %s", entry_id, e)
-
+    # 3. Update Google Sheet with Track Uploaded and Duration
     try:
         google_service.update_track_metadata(entry_id, drive_file_id, status="Uploaded", duration_str=duration_str)
     except Exception as e:
@@ -235,7 +250,36 @@ async def stream_audio(entry_id: str, range: Optional[str] = Header(None)):
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio track available for this performance")
 
-    return audio_service.stream_file_range(cache_path, range)
+    file_size = os.path.getsize(cache_path)
+    
+    if range:
+        range_match = re.match(r"bytes=(\d+)-(\d*)", range)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+            length = end - start + 1
+
+            def iter_file():
+                with open(cache_path, "rb") as f:
+                    f.seek(start)
+                    bytes_left = length
+                    while bytes_left > 0:
+                        chunk_size = min(bytes_left, 64 * 1024)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        bytes_left -= len(data)
+                        yield data
+
+            headers = {
+                "Content-Range": f"bytes {start}-{end}/{file_size}",
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(length),
+                "Content-Type": "audio/mpeg",
+            }
+            return StreamingResponse(iter_file(), status_code=206, headers=headers)
+
+    return FileResponse(cache_path, media_type="audio/mpeg")
 
 @app.patch("/api/status/{entry_id}")
 async def update_performance_status(
@@ -253,10 +297,15 @@ async def update_performance_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/export-zip")
-async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):
+async def export_zip(_authorized: bool = Depends(verify_admin_pin)):
     try:
-        zip_buffer, filename = audio_service.export_sequenced_zip()
-        return StreamingResponse(
+        performances = google_service.get_performances()
+        zip_buffer = audio_service.create_sequenced_zip(performances)
+        
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{settings.event.id}_sequenced_tracks_{timestamp}.zip"
+        
+        return Response(
             zip_buffer,
             media_type="application/zip",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
@@ -276,13 +325,12 @@ async def download_track(entry_id: str, _authorized: bool = Depends(verify_admin
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio track file available")
 
-    canonical_filename = sanitize_filename(
-        entry_id,
-        target.performer_name,
-        target.song_title,
-        target.partner_name,
-        os.path.splitext(cache_path)[1] or ".mp3"
-    )
+    safe_p = sanitize_filename(target.performer_name)
+    safe_s = sanitize_filename(target.song_title)
+    ext = os.path.splitext(cache_path)[1] or ".mp3"
+    seq_str = f"{target.sequence_order:02d}_" if target.sequence_order else ""
+    canonical_filename = f"{seq_str}{entry_id}_{safe_p}_{safe_s}{ext}"
+
     return FileResponse(
         cache_path,
         media_type="audio/mpeg",

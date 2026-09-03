@@ -512,7 +512,38 @@ function cueTrack(item, autoPlay = false) {
 
   // Configure 1-Click Track Download for Local Playback
   if (downloadBtn) {
-    downloadBtn.href = `/api/download-track/${item.entry_id}`;
+    downloadBtn.onclick = async (e) => {
+      e.preventDefault();
+      if (!currentCuedItem) return;
+      downloadBtn.classList.add('opacity-50', 'pointer-events-none');
+      showToast('Downloading track...');
+      try {
+        const pin = localStorage.getItem('paattukoottam_pin') || '2026';
+        const res = await fetch(`/api/download-track/${currentCuedItem.entry_id}?pin=${encodeURIComponent(pin)}`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('Download failed from server');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const disp = res.headers.get('Content-Disposition');
+        let filename = `${currentCuedItem.entry_id}_track.mp3`;
+        if (disp && disp.includes('filename=')) {
+          filename = disp.split('filename=')[1].replace(/["']/g, '').trim();
+        }
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('✓ Track downloaded for local playback!');
+      } catch (err) {
+        showToast(`Download error: ${err.message}`, 'error');
+      } finally {
+        downloadBtn.classList.remove('opacity-50', 'pointer-events-none');
+      }
+    };
     downloadBtn.classList.remove('opacity-40', 'pointer-events-none');
   }
 
