@@ -345,23 +345,33 @@ function initPreviewWaveSurfer() {
     normalize: true
   });
 
-  const playIcon = document.getElementById('preview-play-icon');
-  previewWavesurfer.on('play', () => {
-    if (playIcon) playIcon.setAttribute('data-lucide', 'pause');
+  const playBtn = document.getElementById('preview-play-btn');
+  if (playBtn) {
+    playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 ml-0.5"></i>';
     if (window.lucide) lucide.createIcons();
+  }
+
+  previewWavesurfer.on('play', () => {
+    if (playBtn) {
+      playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4 text-white fill-current"></i>';
+      if (window.lucide) lucide.createIcons();
+    }
   });
 
   previewWavesurfer.on('pause', () => {
-    if (playIcon) playIcon.setAttribute('data-lucide', 'play');
-    if (window.lucide) lucide.createIcons();
+    if (playBtn) {
+      playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
+      if (window.lucide) lucide.createIcons();
+    }
   });
 
   previewWavesurfer.on('finish', () => {
-    if (playIcon) playIcon.setAttribute('data-lucide', 'play');
-    if (window.lucide) lucide.createIcons();
+    if (playBtn) {
+      playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
+      if (window.lucide) lucide.createIcons();
+    }
   });
 
-  const playBtn = document.getElementById('preview-play-btn');
   if (playBtn) {
     playBtn.onclick = () => {
       if (previewWavesurfer) previewWavesurfer.playPause();

@@ -300,6 +300,17 @@ function renderQueueList() {
 
     const durationInfo = item.duration ? `<span class="text-[11px] font-mono text-slate-400 ml-1">(${item.duration})</span>` : '';
 
+    const extraTagsPills = (item.extra_tags || []).map(tag => {
+      const lower = tag.toLowerCase();
+      let colorClass = 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30';
+      if (lower.includes('junior')) {
+        colorClass = 'bg-sky-500/15 text-sky-300 border-sky-500/30';
+      } else if (lower.includes('senior')) {
+        colorClass = 'bg-blue-500/15 text-blue-300 border-blue-500/30';
+      }
+      return `<span class="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${colorClass} tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
+    }).join(' ');
+
     row.innerHTML = `
       <div class="flex items-center gap-3">
         <!-- Drag Handle (hidden during search) -->
@@ -321,6 +332,7 @@ function renderQueueList() {
               ${performerDisplay}
             </h3>
             ${renderTypePill(item.performance_type)}
+            ${extraTagsPills}
           </div>
           <p class="text-xs text-orange-400 font-medium mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}">
             "${escapeHtml(item.song_title)}" ${durationInfo}
@@ -617,6 +629,14 @@ function togglePlayPause() {
   wavesurfer.playPause();
 }
 
+function isEligibleForStage(item) {
+  const ptype = (item.performance_type || '').toLowerCase();
+  if (ptype.includes('acoustic') || ptype.includes('live')) return true;
+  if (ptype.includes('group')) return true;
+  if (item.track_status === 'Uploaded' || item.drive_file_id) return true;
+  return false;
+}
+
 function cueNextTrack(autoPlay = false) {
   if (queue.length === 0) return;
 
@@ -626,14 +646,25 @@ function cueNextTrack(autoPlay = false) {
   }
 
   for (let i = currentIndex + 1; i < queue.length; i++) {
-    if (queue[i].track_status !== 'Performed' && queue[i].track_status !== 'Skipped' && (queue[i].track_status === 'Uploaded' || queue[i].drive_file_id)) {
-      cueTrack(queue[i], autoPlay);
+    const item = queue[i];
+    const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
+    const isSkipped = item.performance_status === 'On Hold' || item.track_status === 'Skipped';
+    if (!isDone && !isSkipped && isEligibleForStage(item)) {
+      cueTrack(item, autoPlay);
       return;
     }
   }
 
-  if (currentIndex + 1 < queue.length) {
-    cueTrack(queue[currentIndex + 1], autoPlay);
+  if (currentIndex > 0) {
+    for (let i = 0; i < currentIndex; i++) {
+      const item = queue[i];
+      const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
+      const isSkipped = item.performance_status === 'On Hold' || item.track_status === 'Skipped';
+      if (!isDone && !isSkipped && isEligibleForStage(item)) {
+        cueTrack(item, autoPlay);
+        return;
+      }
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import os
 import logging
+import shutil
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, FileResponse
@@ -157,6 +158,8 @@ async def upload_track(
     canonical_filename = f"{seq_prefix}{entry_id}_{safe_performer}_{safe_song}.mp3"
 
     cache_path = audio_service.get_cache_path(entry_id)
+    # Always purge existing local cache for this entry before processing a new track
+    audio_service.purge_cache(entry_id)
 
     # 1. Process Audio Input
     if submission_type == "youtube":
@@ -169,6 +172,15 @@ async def upload_track(
         except Exception as e:
             logger.error("Downloader extraction failed for %s: %s", entry_id, e)
             raise HTTPException(status_code=422, detail=str(e))
+
+        dl_path = extract_res.get("file_path")
+        if dl_path and os.path.isfile(dl_path) and dl_path != cache_path:
+            shutil.copyfile(dl_path, cache_path)
+        elif not os.path.isfile(cache_path):
+            alt_name = entry_id.replace("-", "_") if "-" in entry_id else entry_id.replace("_", "-")
+            alt_path = os.path.join(audio_service.cache_dir, f"{alt_name}.mp3")
+            if os.path.isfile(alt_path):
+                shutil.copyfile(alt_path, cache_path)
 
     elif submission_type == "file":
         if not file:

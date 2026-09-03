@@ -1,7 +1,7 @@
 import os
 import re
 import yaml
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 
 def extract_google_id(url_or_id: Optional[str]) -> str:
@@ -142,6 +142,7 @@ class AppConfig(BaseModel):
     columns: ColumnsConfig = Field(default_factory=ColumnsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     downloader: DownloaderConfig = Field(default_factory=DownloaderConfig)
+    console_extra_columns: List[str] = Field(default_factory=lambda: ["Age Group (Junior/Senior)"])
 
     admin_pin: str = "2026"
     mock_google_api: bool = False
@@ -241,6 +242,10 @@ def load_config() -> AppConfig:
 
     if os.getenv("DOWNLOADER_SERVICE_URL"):
         config.downloader.service_url = os.getenv("DOWNLOADER_SERVICE_URL")
+
+    if os.getenv("CONSOLE_EXTRA_COLUMNS"):
+        raw_cols = os.getenv("CONSOLE_EXTRA_COLUMNS", "")
+        config.console_extra_columns = [c.strip() for c in raw_cols.split(",") if c.strip()]
 
     if os.getenv("CACHE_DIR"):
         config.storage.cache_dir = os.getenv("CACHE_DIR")

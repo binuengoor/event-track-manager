@@ -23,7 +23,7 @@ class AudioService:
         os.makedirs(self.cache_dir, exist_ok=True)
 
     def get_cache_path(self, entry_id: str) -> str:
-        safe_id = sanitize_filename(entry_id)
+        safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
         return os.path.join(self.cache_dir, f"{safe_id}.mp3")
 
     def save_upload_to_cache(self, entry_id: str, content: bytes) -> str:
@@ -33,15 +33,23 @@ class AudioService:
         return cache_path
 
     def purge_cache(self, entry_id: str) -> bool:
-        cache_path = self.get_cache_path(entry_id)
-        if os.path.isfile(cache_path):
-            try:
-                os.remove(cache_path)
-                logger.info("Purged local audio cache for %s", entry_id)
-                return True
-            except Exception as e:
-                logger.warning("Error purging cache for %s: %s", entry_id, e)
-        return False
+        safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
+        variations = {
+            f"{safe_id}.mp3",
+            f"{safe_id.replace('-', '_')}.mp3",
+            f"{safe_id.replace('_', '-')}.mp3",
+        }
+        purged = False
+        for v in variations:
+            p = os.path.join(self.cache_dir, v)
+            if os.path.isfile(p):
+                try:
+                    os.remove(p)
+                    logger.info("Purged local audio cache: %s", p)
+                    purged = True
+                except Exception as e:
+                    logger.warning("Error purging cache %s: %s", p, e)
+        return purged
 
     def ensure_local_cache(self, entry_id: str, drive_file_id: Optional[str] = None) -> Optional[str]:
         cache_path = self.get_cache_path(entry_id)

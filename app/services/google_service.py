@@ -25,6 +25,7 @@ class PerformanceEntry(BaseModel):
     last_updated: Optional[str] = None  # Col O: Last Updated
     row_index: int = 0
     is_song_name_missing: bool = False
+    extra_tags: List[str] = []
 
 class GoogleService:
     def __init__(self):
@@ -201,6 +202,15 @@ class GoogleService:
                 cols.drive_file_id = find_col_idx(names.drive_file_id, cols.drive_file_id)
                 cols.last_updated = find_col_idx(names.last_updated, cols.last_updated)
 
+            # Find column indices for extra generic console columns (e.g. Age Group, Category)
+            extra_col_indices: List[int] = []
+            if raw_header and getattr(settings, "console_extra_columns", None):
+                target_names = [n.strip().lower() for n in settings.console_extra_columns if n.strip()]
+                for h_idx, h_name in enumerate(raw_header):
+                    clean_h = str(h_name).strip().lower()
+                    if any(t in clean_h for t in target_names):
+                        extra_col_indices.append(h_idx)
+
             # Query Google Drive Active/ folder as the ground truth for backing tracks
             active_files = []
             if not self.mock_mode and self.drive:
@@ -317,6 +327,12 @@ class GoogleService:
                             track_status = "Pending"
                             duration_val = None
 
+                extra_tags = []
+                for c_idx in extra_col_indices:
+                    val = get_col(c_idx)
+                    if val and val not in extra_tags:
+                        extra_tags.append(val)
+
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
                     performer_name=performer_name,
@@ -332,7 +348,8 @@ class GoogleService:
                     drive_file_name=drive_file_name,
                     last_updated=last_up,
                     row_index=row_index,
-                    is_song_name_missing=is_missing
+                    is_song_name_missing=is_missing,
+                    extra_tags=extra_tags
                 ))
 
             # Invalidate local audio caches for performances with no active Drive file
@@ -405,15 +422,25 @@ class GoogleService:
 
         now_id = now_performing.entry_id if now_performing else None
 
+        def is_eligible_for_stage(p: PerformanceEntry) -> bool:
+            ptype = (p.performance_type or "").strip().lower()
+            if "acoustic" in ptype or "live" in ptype:
+                return True
+            if "group" in ptype:
+                return True
+            if p.track_status == "Uploaded" or bool(p.drive_file_id):
+                return True
+            return False
+
         for p in queue:
             if p.entry_id == now_id:
                 continue
-            if p.performance_status == "Performed":
+            if p.performance_status in ("Performed", "Done"):
                 performed.append(p)
-            elif p.performance_status == "On Hold":
+            elif p.performance_status in ("On Hold", "Skipped"):
                 on_hold.append(p)
             else:
-                if len(up_next) < 2:
+                if is_eligible_for_stage(p) and len(up_next) < 2:
                     up_next.append(p)
                 else:
                     upcoming.append(p)
