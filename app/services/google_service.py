@@ -162,6 +162,31 @@ class GoogleService:
                 ).execute()
                 raw_rows = result.get("values", [])
 
+            # Query Google Drive Active/ folder as the ground truth for backing tracks
+            active_files = []
+            if not self.mock_mode and self.drive:
+                try:
+                    q = f"'{settings.google.drive_folders.active_folder_id}' in parents and trashed = false"
+                    res = self.drive.files().list(
+                        q=q,
+                        supportsAllDrives=True,
+                        includeItemsFromAllDrives=True,
+                        fields="files(id, name, size)"
+                    ).execute()
+                    active_files = res.get("files", [])
+                except Exception as ex:
+                    logger.warning("Could not list files in Active/ folder: %s", ex)
+
+            active_file_ids = {f["id"] for f in active_files}
+            active_by_entry = {}
+            for f in active_files:
+                fname = f.get("name", "")
+                for part in fname.split("_"):
+                    if part.startswith("PK-"):
+                        active_by_entry[part] = f
+                        break
+
+            stale_sheet_clears = []
             entries: List[PerformanceEntry] = []
             for idx, row in enumerate(raw_rows):
                 row_index = idx + 2
@@ -220,7 +245,6 @@ class GoogleService:
                 elif "acoustic" in perf_type.lower() or "live" in song_title.lower() or raw_track_status.lower() == "acoustic":
                     track_status = "Acoustic"
                 elif raw_track_status.lower() in ("performed", "done"):
-                    # fallback if track uploaded col had performed
                     track_status = "Uploaded"
                 elif raw_track_status:
                     track_status = raw_track_status
@@ -230,6 +254,27 @@ class GoogleService:
                 duration_val = get_col(cols.duration) or None
                 drive_id = get_col(cols.drive_file_id) or None
                 last_up = get_col(cols.last_updated) or None
+
+                # Reconcile with Google Drive Active/ folder ground truth
+                if not self.mock_mode and self.drive:
+                    matched_file = None
+                    if drive_id and drive_id in active_file_ids:
+                        matched_file = next((f for f in active_files if f["id"] == drive_id), None)
+                    elif entry_id in active_by_entry:
+                        matched_file = active_by_entry[entry_id]
+                        drive_id = matched_file["id"]
+
+                    if matched_file:
+                        if track_status != "Acoustic":
+                            track_status = "Uploaded"
+                    else:
+                        # If a file was recorded in the sheet but is missing from Drive Active/ folder
+                        if drive_id or track_status == "Uploaded":
+                            stale_sheet_clears.append(row_index)
+                        drive_id = None
+                        if track_status == "Uploaded":
+                            track_status = "Pending"
+                            duration_val = None
 
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
@@ -247,6 +292,33 @@ class GoogleService:
                     row_index=row_index,
                     is_song_name_missing=is_missing
                 ))
+
+            # Invalidate local audio caches for performances with no active Drive file
+            try:
+                from app.services.audio_service import audio_service
+                for p in entries:
+                    if not p.drive_file_id:
+                        audio_service.purge_cache(p.entry_id)
+            except Exception as ex:
+                logger.warning("Error purging audio caches: %s", ex)
+
+            # Sync back cleared status to Google Sheet if files were deleted from Drive
+            if stale_sheet_clears and not self.mock_mode and self.sheets:
+                try:
+                    tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+                    def col_letter(col_idx: int) -> str:
+                        return chr(ord('A') + col_idx)
+                    sheet_updates = []
+                    for r_idx in stale_sheet_clears:
+                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.track_status)}{r_idx}", "values": [["Pending"]]})
+                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{r_idx}", "values": [[""]]})
+                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{r_idx}", "values": [[""]]})
+                    self.sheets.spreadsheets().values().batchUpdate(
+                        spreadsheetId=settings.google.sheet_id,
+                        body={"valueInputOption": "USER_ENTERED", "data": sheet_updates}
+                    ).execute()
+                except Exception as ex:
+                    logger.warning("Could not clear stale file rows in Google Sheet: %s", ex)
 
             # Sequence backfill logic:
             # If any rows are missing sequence numbers, fill them from top to bottom

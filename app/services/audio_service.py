@@ -32,8 +32,25 @@ class AudioService:
             f.write(content)
         return cache_path
 
+    def purge_cache(self, entry_id: str) -> bool:
+        cache_path = self.get_cache_path(entry_id)
+        if os.path.isfile(cache_path):
+            try:
+                os.remove(cache_path)
+                logger.info("Purged local audio cache for %s", entry_id)
+                return True
+            except Exception as e:
+                logger.warning("Error purging cache for %s: %s", entry_id, e)
+        return False
+
     def ensure_local_cache(self, entry_id: str, drive_file_id: Optional[str] = None) -> Optional[str]:
         cache_path = self.get_cache_path(entry_id)
+
+        # If no drive_file_id and not mock mode, the file was deleted from Drive: purge cache!
+        if not drive_file_id and not settings.mock_google_api:
+            self.purge_cache(entry_id)
+            return None
+
         if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
             return cache_path
 
