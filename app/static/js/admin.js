@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupKeyboardHotkeys();
   setupActionButtons();
   setupSearch();
+  fetchEventInfo();
 
   if (userAdminPin) {
     await testAuthAndLoad();
@@ -29,6 +30,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 45000);
 });
+
+async function fetchEventInfo() {
+  try {
+    const res = await fetch('/api/event-info');
+    if (res.ok) {
+      const data = await res.json();
+      const title = data.app_title || data.event_name;
+      if (title) {
+        const titleEl = document.getElementById('admin-event-title');
+        if (titleEl) titleEl.textContent = title;
+        document.title = `${title} - Stage Console`;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not fetch event info:', e);
+  }
+}
 
 function getAuthHeaders() {
   const headers = {};

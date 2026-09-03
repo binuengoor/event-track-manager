@@ -17,8 +17,14 @@ async function initEventInfo() {
     const res = await fetch('/api/event-info');
     if (res.ok) {
       const data = await res.json();
-      if (data.event_name) {
-        document.getElementById('event-title').textContent = data.event_name;
+      if (data.app_title || data.event_name) {
+        const titleEl = document.getElementById('event-title');
+        if (titleEl) titleEl.textContent = data.app_title || data.event_name;
+        document.title = `${data.app_title || data.event_name} - Track Submission`;
+      }
+      if (data.app_subtitle) {
+        const subEl = document.getElementById('event-subtitle');
+        if (subEl) subEl.textContent = data.app_subtitle;
       }
       if (data.mock_mode) {
         document.getElementById('mock-banner').classList.remove('hidden');

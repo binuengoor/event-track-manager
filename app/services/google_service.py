@@ -114,15 +114,21 @@ class GoogleService:
             from google.oauth2 import service_account
             from googleapiclient.discovery import build
 
-            creds_path = settings.google.service_account_json_path
-            if not os.path.isfile(creds_path):
-                raise FileNotFoundError(f"Service account file not found at {creds_path}")
-
             scopes = [
                 "https://www.googleapis.com/auth/spreadsheets",
                 "https://www.googleapis.com/auth/drive"
             ]
-            creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
+
+            if settings.google.service_account_json:
+                import json
+                info = json.loads(settings.google.service_account_json)
+                creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
+            else:
+                creds_path = settings.google.service_account_json_path
+                if not os.path.isfile(creds_path):
+                    raise FileNotFoundError(f"Service account file not found at {creds_path}")
+                creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
+
             self.sheets = build("sheets", "v4", credentials=creds)
             self.drive = build("drive", "v3", credentials=creds)
 
@@ -144,23 +150,55 @@ class GoogleService:
             return self._mock_data
 
         cols = settings.columns
-        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+        names = settings.column_names
+        tab_name = settings.google.sheet_tab_name or "Song Sign-Up"
 
         try:
+            raw_header = []
             raw_rows = []
             if self.is_xlsx:
                 import openpyxl
                 content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
                 wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
                 ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-                for r in ws.iter_rows(min_row=2, values_only=True):
-                    raw_rows.append([str(c).strip() if c is not None else "" for c in r])
+                all_rows = []
+                for r in ws.iter_rows(values_only=True):
+                    all_rows.append([str(c).strip() if c is not None else "" for c in r])
+                if all_rows:
+                    raw_header = all_rows[0]
+                    raw_rows = all_rows[1:]
             else:
                 result = self.sheets.spreadsheets().values().get(
                     spreadsheetId=settings.google.sheet_id,
-                    range=settings.google.sheet_range
+                    range=f"{tab_name}!A1:Z"
                 ).execute()
-                raw_rows = result.get("values", [])
+                all_rows = result.get("values", [])
+                if all_rows:
+                    raw_header = all_rows[0]
+                    raw_rows = all_rows[1:]
+
+            # Dynamically resolve column indices by matching column header names
+            if raw_header:
+                import re
+                def find_col_idx(expected_name: str, fallback: int) -> int:
+                    exp_clean = re.sub(r'[^a-zA-Z0-9]', '', expected_name.lower())
+                    for idx, h in enumerate(raw_header):
+                        h_clean = re.sub(r'[^a-zA-Z0-9]', '', str(h).lower())
+                        if exp_clean and (exp_clean in h_clean or h_clean in exp_clean):
+                            return idx
+                    return fallback
+
+                cols.performer_name = find_col_idx(names.performer_name, cols.performer_name)
+                cols.partner_name = find_col_idx(names.partner_name, cols.partner_name)
+                cols.performance_type = find_col_idx(names.performance_type, cols.performance_type)
+                cols.sequence_order = find_col_idx(names.sequence_order, cols.sequence_order)
+                cols.song_title = find_col_idx(names.song_title, cols.song_title)
+                cols.movie_name = find_col_idx(names.movie_name, cols.movie_name)
+                cols.performance_status = find_col_idx(names.performance_status, cols.performance_status)
+                cols.track_status = find_col_idx(names.track_status, cols.track_status)
+                cols.duration = find_col_idx(names.duration, cols.duration)
+                cols.drive_file_id = find_col_idx(names.drive_file_id, cols.drive_file_id)
+                cols.last_updated = find_col_idx(names.last_updated, cols.last_updated)
 
             # Query Google Drive Active/ folder as the ground truth for backing tracks
             active_files = []
