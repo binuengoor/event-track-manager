@@ -81,6 +81,8 @@ async def get_event_info():
         "event_name": settings.event.name,
         "app_title": settings.event.name,
         "app_subtitle": settings.event.subtitle,
+        "event_start_time": settings.event.start_time,
+        "event_start_time_iso": settings.event.start_time_iso,
         "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
         "sheet_url": f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"

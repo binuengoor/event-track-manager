@@ -56,10 +56,37 @@ def load_dotenv_file(filepath: str = ".env") -> None:
 load_dotenv_file(".env")
 load_dotenv_file(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
+from datetime import datetime
+
+def parse_event_datetime(dt_str: Optional[str]) -> Optional[str]:
+    """Parses flexible date-time strings (e.g. 09-28-2026 06:30PM) to ISO format."""
+    if not dt_str:
+        return None
+    val = dt_str.strip()
+    formats = [
+        "%m-%d-%Y %I:%M%p",    # 09-28-2026 06:30PM
+        "%m-%d-%Y %I:%M %p",   # 09-28-2026 06:30 PM
+        "%m/%d/%Y %I:%M%p",    # 09/28/2026 06:30PM
+        "%m/%d/%Y %I:%M %p",   # 09/28/2026 06:30 PM
+        "%Y-%m-%d %H:%M:%S",   # 2026-09-28 18:30:00
+        "%Y-%m-%d %H:%M",      # 2026-09-28 18:30
+        "%Y-%m-%dT%H:%M:%S",   # 2026-09-28T18:30:00
+        "%Y-%m-%dT%H:%M",      # 2026-09-28T18:30
+    ]
+    for fmt in formats:
+        try:
+            dt = datetime.strptime(val, fmt)
+            return dt.isoformat()
+        except ValueError:
+            continue
+    return val
+
 class EventConfig(BaseModel):
     id: str = "paattukoottam-2026"
     name: str = "EMA Paattukoottam"
     subtitle: str = "Musical Night • Track Submission"
+    start_time: Optional[str] = None
+    start_time_iso: Optional[str] = None
 
 class DriveFoldersConfig(BaseModel):
     active_folder_id: str = "1FQ1goCkaSajLjGv8Yt_vrWTS6krmZufW"
@@ -136,6 +163,9 @@ def load_config() -> AppConfig:
         config.event.subtitle = os.getenv("APP_SUBTITLE")
     if os.getenv("EVENT_ID"):
         config.event.id = os.getenv("EVENT_ID")
+    if os.getenv("EVENT_START_TIME"):
+        config.event.start_time = os.getenv("EVENT_START_TIME")
+        config.event.start_time_iso = parse_event_datetime(config.event.start_time)
 
     # 2. Google Workspace & Drive URLs / IDs
     sheet_url_env = os.getenv("GOOGLE_SHEET_URL") or os.getenv("SHEET_ID")

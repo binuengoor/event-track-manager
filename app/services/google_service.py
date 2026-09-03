@@ -416,6 +416,9 @@ class GoogleService:
 
         return {
             "event_name": settings.event.name,
+            "event_subtitle": settings.event.subtitle,
+            "event_start_time": settings.event.start_time,
+            "event_start_time_iso": settings.event.start_time_iso,
             "now_performing": now_performing,
             "up_next": up_next,
             "upcoming": upcoming,

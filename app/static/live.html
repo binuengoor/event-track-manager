@@ -25,9 +25,9 @@
 
       <!-- Live Broadcast Badge -->
       <div class="flex items-center gap-2">
-        <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
-          <span class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-          <span>LIVE PROGRAM</span>
+        <div id="live-badge" class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
+          <span id="live-badge-dot" class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+          <span id="live-badge-text">LIVE PROGRAM</span>
         </div>
         <a href="/" class="text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 transition hidden sm:inline-flex items-center gap-1">
           <i data-lucide="upload" class="w-3.5 h-3.5"></i>
@@ -40,14 +40,57 @@
   <!-- Main Container -->
   <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
 
-    <!-- Section 1: NOW ON STAGE -->
+    <!-- Section 1: COUNTDOWN (Pre-Show) or NOW ON STAGE (Live) -->
     <div class="space-y-2">
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <span class="font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
+        <span id="section-status-label" class="font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
           <i data-lucide="radio" class="w-4 h-4 text-orange-400"></i>
-          <span>Now on Stage</span>
+          <span id="section-status-text">Now on Stage</span>
         </span>
         <span id="live-sync-timestamp" class="font-mono text-[11px]">Syncing live...</span>
+      </div>
+
+      <!-- Pre-Show Countdown Card -->
+      <div id="countdown-card" class="hidden relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/50 shadow-2xl shadow-amber-500/10">
+        <div class="absolute -right-8 -bottom-8 opacity-10 text-white pointer-events-none">
+          <i data-lucide="clock" class="w-64 h-64"></i>
+        </div>
+
+        <div class="relative z-10 space-y-5 text-center">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold uppercase tracking-wider">
+            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+            <span>Stage Countdown</span>
+          </div>
+
+          <div>
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">The Program Begins Soon</h2>
+            <p id="countdown-datetime-display" class="text-xs sm:text-sm text-amber-400/90 font-medium mt-1">Starting soon</p>
+          </div>
+
+          <!-- 4 Countdown Tiles -->
+          <div class="grid grid-cols-4 gap-2 sm:gap-4 max-w-lg mx-auto">
+            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+              <span id="cd-days" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Days</span>
+            </div>
+            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+              <span id="cd-hours" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Hours</span>
+            </div>
+            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+              <span id="cd-mins" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Minutes</span>
+            </div>
+            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+              <span id="cd-secs" class="text-2xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">00</span>
+              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Seconds</span>
+            </div>
+          </div>
+
+          <p class="text-xs text-slate-400 max-w-md mx-auto">
+            Explore the official performance lineup and sequence below. The stage program will automatically go live when performances begin!
+          </p>
+        </div>
       </div>
 
       <!-- Hero Card for Current Performance -->
@@ -128,10 +171,13 @@
 
   <script>
     let showCompleted = false;
+    let latestData = null;
+    let targetStartTime = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       fetchLiveStatus();
       setInterval(fetchLiveStatus, 5000); // 5-second real-time poll
+      setInterval(updateCountdown, 1000);  // 1-second countdown tick
 
       document.getElementById('toggle-completed-btn').addEventListener('click', () => {
         showCompleted = !showCompleted;
@@ -147,6 +193,52 @@
       });
     });
 
+    function updateCountdown() {
+      if (!targetStartTime) return;
+      const now = new Date();
+      const diff = targetStartTime - now;
+      const countdownCard = document.getElementById('countdown-card');
+      const nowCard = document.getElementById('now-performing-card');
+      const liveBadge = document.getElementById('live-badge');
+      const liveBadgeDot = document.getElementById('live-badge-dot');
+      const liveBadgeText = document.getElementById('live-badge-text');
+      const sectionLabel = document.getElementById('section-status-text');
+
+      // Pre-show is active if start time is in future AND no performance is cued/on stage
+      const hasActivePerformance = latestData && latestData.now_performing;
+      if (diff > 0 && !hasActivePerformance) {
+        countdownCard.classList.remove('hidden');
+        nowCard.classList.add('hidden');
+        if (sectionLabel) sectionLabel.textContent = 'Stage Countdown';
+
+        if (liveBadge) {
+          liveBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold';
+          if (liveBadgeDot) liveBadgeDot.className = 'w-2 h-2 rounded-full bg-amber-400';
+          if (liveBadgeText) liveBadgeText.textContent = 'COUNTDOWN';
+        }
+
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+        const mins = Math.floor((diff / (1000 * 60)) % 60);
+        const secs = Math.floor((diff / 1000) % 60);
+
+        document.getElementById('cd-days').textContent = String(days).padStart(2, '0');
+        document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
+        document.getElementById('cd-mins').textContent = String(mins).padStart(2, '0');
+        document.getElementById('cd-secs').textContent = String(secs).padStart(2, '0');
+      } else {
+        countdownCard.classList.add('hidden');
+        nowCard.classList.remove('hidden');
+        if (sectionLabel) sectionLabel.textContent = 'Now on Stage';
+
+        if (liveBadge) {
+          liveBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
+          if (liveBadgeDot) liveBadgeDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
+          if (liveBadgeText) liveBadgeText.textContent = 'LIVE PROGRAM';
+        }
+      }
+    }
+
     async function fetchLiveStatus() {
       try {
         const res = await fetch('/api/live-status');
@@ -159,12 +251,30 @@
     }
 
     function renderLiveStatus(data) {
+      latestData = data;
+
       if (data.event_name) {
         document.getElementById('live-event-title').textContent = data.event_name;
+        document.title = `${data.event_name} - Live Stage Schedule`;
+      }
+      if (data.event_subtitle) {
+        const sub = document.getElementById('live-event-subtitle');
+        if (sub) sub.textContent = data.event_subtitle;
+      }
+      if (data.event_start_time_iso) {
+        targetStartTime = new Date(data.event_start_time_iso);
+        const displayEl = document.getElementById('countdown-datetime-display');
+        if (displayEl && data.event_start_time) {
+          displayEl.textContent = `Scheduled Start: ${data.event_start_time}`;
+        }
+      } else {
+        targetStartTime = null;
       }
 
+      updateCountdown();
+
       const now = new Date();
-      document.getElementById('live-sync-timestamp').textContent = `Live: ${now.toLocaleTimeString()}`;
+      document.getElementById('live-sync-timestamp').textContent = `Sync: ${now.toLocaleTimeString()}`;
 
       // 1. Now Performing
       const nowCard = document.getElementById('now-performing-card');
