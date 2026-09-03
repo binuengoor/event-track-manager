@@ -55,32 +55,39 @@ def test_admin_auth():
 
 def test_upload_and_stream():
     client = TestClient(app)
-    # Direct audio file upload for PK-001
+    # Get first available entry
+    perf_res = client.get("/api/performances")
+    first_id = perf_res.json()[0]["entry_id"]
+
+    # Direct audio file upload
     file_content = b"ID3" + b"\x00" * 200
     res = client.post(
         "/api/upload",
-        data={"entry_id": "PK-001", "submission_type": "file"},
+        data={"entry_id": first_id, "submission_type": "file"},
         files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
     )
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
-    assert data["entry_id"] == "PK-001"
+    assert data["entry_id"] == first_id
 
     # Now stream the track
-    stream_res = client.get("/api/stream/PK-001")
+    stream_res = client.get(f"/api/stream/{first_id}")
     assert stream_res.status_code == 200
     assert stream_res.headers["Content-Type"] == "audio/mpeg"
 
 def test_status_update_with_auth():
     client = TestClient(app)
+    perf_res = client.get("/api/performances")
+    first_id = perf_res.json()[0]["entry_id"]
+
     # Unauthorized request without PIN header or cookie
-    res_unauth = client.patch("/api/status/PK-001", json={"status": "Performed"})
+    res_unauth = client.patch(f"/api/status/{first_id}", json={"status": "Performed"})
     assert res_unauth.status_code == 401
 
     # Authorized via header
     res_auth = client.patch(
-        "/api/status/PK-001",
+        f"/api/status/{first_id}",
         json={"status": "Performed"},
         headers={"X-Admin-PIN": settings.admin_pin}
     )

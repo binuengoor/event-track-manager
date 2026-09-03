@@ -202,11 +202,18 @@ function handlePerformerSelected(name) {
       });
       card.className = 'block p-3.5 rounded-xl border cursor-pointer transition flex items-center justify-between border-orange-500 bg-orange-500/10';
       selectedEntry = song;
+      if (selectedEntry.youtube_url) {
+        document.getElementById('youtube-url-input').value = selectedEntry.youtube_url;
+      }
       updateActiveTrackBadge();
     });
 
     songContainer.appendChild(card);
   });
+
+  if (selectedEntry && selectedEntry.youtube_url) {
+    document.getElementById('youtube-url-input').value = selectedEntry.youtube_url;
+  }
 
   songSection.classList.remove('hidden');
   uploadSection.classList.remove('hidden');

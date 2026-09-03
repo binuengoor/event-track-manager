@@ -15,6 +15,8 @@ class PerformanceEntry(BaseModel):
     performance_type: str = "Solo"
     partner_name: Optional[str] = None
     song_title: str
+    movie_name: Optional[str] = None
+    youtube_url: Optional[str] = None
     sequence_order: Optional[int] = None
     track_status: str = "Pending"
     drive_file_id: Optional[str] = None
@@ -37,11 +39,13 @@ class GoogleService:
     def _init_mock_data(self):
         self._mock_data = [
             PerformanceEntry(
-                entry_id="PK-001",
-                performer_name="Rahul Nair",
+                entry_id="PK-002",
+                performer_name="Joshua Sohan (Neeta Philip)",
                 performance_type="Solo",
                 partner_name=None,
-                song_title="Tum Hi Ho",
+                song_title="Puthumazha",
+                movie_name="Sarvam Maya",
+                youtube_url="https://www.youtube.com/watch?v=SNwHuc-4pao",
                 sequence_order=1,
                 track_status="Uploaded",
                 drive_file_id="mock_drive_file_001",
@@ -49,11 +53,13 @@ class GoogleService:
                 row_index=2
             ),
             PerformanceEntry(
-                entry_id="PK-002",
-                performer_name="Ananya Menon",
-                performance_type="Duet",
-                partner_name="Vivek Krishna",
-                song_title="Vaseegara",
+                entry_id="PK-003",
+                performer_name="Nandhini Sankar (Anu Sankar S)",
+                performance_type="Solo",
+                partner_name=None,
+                song_title="Attuthottil",
+                movie_name="Athiran",
+                youtube_url=None,
                 sequence_order=2,
                 track_status="Pending",
                 drive_file_id=None,
@@ -61,52 +67,32 @@ class GoogleService:
                 row_index=3
             ),
             PerformanceEntry(
-                entry_id="PK-003",
-                performer_name="Manoj Varma",
-                performance_type="Acoustic",
+                entry_id="PK-004",
+                performer_name="Ishaan Anoop (Anoop M)",
+                performance_type="Solo",
                 partner_name=None,
-                song_title="Hotel California (Acoustic)",
+                song_title="Malayalam Song",
+                movie_name=None,
+                youtube_url=None,
                 sequence_order=3,
-                track_status="Acoustic",
+                track_status="Pending",
                 drive_file_id=None,
                 last_updated=None,
                 row_index=4
             ),
             PerformanceEntry(
-                entry_id="PK-004",
-                performer_name="Deepa Pillai",
-                performance_type="Solo",
+                entry_id="PK-020",
+                performer_name="Akshara Jaikumar",
+                performance_type="Acoustic",
                 partner_name=None,
-                song_title="Aayiram Kannumai",
-                sequence_order=4,
-                track_status="Uploaded",
-                drive_file_id="mock_drive_file_004",
-                last_updated="2026-09-02T10:15:00",
-                row_index=5
-            ),
-            PerformanceEntry(
-                entry_id="PK-005",
-                performer_name="Vivek Krishna",
-                performance_type="Solo",
-                partner_name=None,
-                song_title="Pichai Paathiram",
-                sequence_order=5,
-                track_status="Pending",
+                song_title="Live Music",
+                movie_name=None,
+                youtube_url=None,
+                sequence_order=19,
+                track_status="Acoustic",
                 drive_file_id=None,
                 last_updated=None,
-                row_index=6
-            ),
-            PerformanceEntry(
-                entry_id="PK-006",
-                performer_name="Priya Thomas",
-                performance_type="Duet",
-                partner_name="Rahul Nair",
-                song_title="Nenjukkul Peidhidum",
-                sequence_order=6,
-                track_status="Pending",
-                drive_file_id=None,
-                last_updated=None,
-                row_index=7
+                row_index=20
             )
         ]
 
@@ -126,7 +112,7 @@ class GoogleService:
             creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
             self.sheets = build("sheets", "v4", credentials=creds)
             self.drive = build("drive", "v3", credentials=creds)
-            logger.info("Successfully authenticated with Google Sheets & Drive APIs via Service Account.")
+            logger.info("Successfully connected to live Google Sheets and Google Drive via Service Account.")
         except Exception as e:
             logger.error("Failed to initialize Google clients (%s). Falling back to MOCK MODE.", e)
             self.mock_mode = True
@@ -146,28 +132,69 @@ class GoogleService:
             entries: List[PerformanceEntry] = []
 
             for idx, row in enumerate(rows):
-                def get_col(col_idx: int) -> str:
-                    return str(row[col_idx]).strip() if col_idx < len(row) else ""
+                row_index = idx + 2  # Row 1 is header
 
-                entry_id = get_col(cols.entry_id)
+                def get_col(col_idx: int) -> str:
+                    return str(row[col_idx]).strip() if 0 <= col_idx < len(row) else ""
+
                 performer_name = get_col(cols.performer_name)
-                if not entry_id or not performer_name:
+                if not performer_name:
                     continue
 
+                entry_id = get_col(cols.entry_id) if cols.entry_id >= 0 else ""
+                if not entry_id:
+                    entry_id = f"PK-{row_index:03d}"
+
+                # Parse sequence order
                 seq_str = get_col(cols.sequence_order)
-                seq_val = int(seq_str) if seq_str.isdigit() else None
+                seq_val = None
+                if seq_str:
+                    try:
+                        seq_val = int(float(seq_str))
+                    except ValueError:
+                        seq_val = None
+
+                # Song title with fallback to movie or generic
+                song_title = get_col(cols.song_title)
+                movie_name = get_col(cols.movie_name)
+                if not song_title:
+                    if movie_name:
+                        song_title = f"{movie_name} (Track)"
+                    else:
+                        song_title = f"Performance #{seq_val or row_index}"
+
+                # Normalize status
+                raw_status = get_col(cols.track_status)
+                perf_type = get_col(cols.performance_type) or "Solo"
+
+                if raw_status.lower() in ("yes", "uploaded", "true"):
+                    status = "Uploaded"
+                elif raw_status.lower() in ("performed", "done"):
+                    status = "Performed"
+                elif "acoustic" in perf_type.lower() or "live" in song_title.lower():
+                    status = "Acoustic"
+                elif raw_status:
+                    status = raw_status
+                else:
+                    status = "Pending"
+
+                drive_id = get_col(cols.drive_file_id) or None
+                last_up = get_col(cols.last_updated) or None
+                yt_link = get_col(cols.youtube_url) or None
 
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
                     performer_name=performer_name,
-                    performance_type=get_col(cols.performance_type) or "Solo",
+                    performance_type=perf_type,
                     partner_name=get_col(cols.partner_name) or None,
-                    song_title=get_col(cols.song_title) or "Untitled Song",
+                    song_title=song_title,
+                    movie_name=movie_name or None,
+                    youtube_url=yt_link,
                     sequence_order=seq_val,
-                    track_status=get_col(cols.track_status) or "Pending",
-                    drive_file_id=get_col(cols.drive_file_id) or None,
-                    last_updated=get_col(cols.last_updated) or None,
-                    row_index=idx + 2  # Assuming 1-based indexing and headers in row 1
+                    track_status=status,
+                    drive_file_id=drive_id,
+                    last_updated=last_up,
+                    row_index=row_index
                 ))
             return entries
         except Exception as e:
@@ -191,37 +218,42 @@ class GoogleService:
                     return True
             return False
 
-        cols = settings.columns
         performances = self.get_performances()
         target = next((p for p in performances if p.entry_id == entry_id), None)
         if not target:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
 
+        cols = settings.columns
+        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+
         def col_letter(col_idx: int) -> str:
             return chr(ord('A') + col_idx)
 
-        # Update columns G (status), H (file_id), I (last_updated)
-        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Signups"
-        start_col = col_letter(min(cols.track_status, cols.drive_file_id, cols.last_updated))
-        end_col = col_letter(max(cols.track_status, cols.drive_file_id, cols.last_updated))
-        update_range = f"{sheet_tab}!{start_col}{target.row_index}:{end_col}{target.row_index}"
+        updates = []
+        # Update Track Uploaded column
+        updates.append({
+            "range": f"{sheet_tab}!{col_letter(cols.track_status)}{target.row_index}",
+            "values": [["Yes"]]
+        })
+        # Update Drive File ID
+        updates.append({
+            "range": f"{sheet_tab}!{col_letter(cols.drive_file_id)}{target.row_index}",
+            "values": [[file_id]]
+        })
+        # Update Last Updated
+        updates.append({
+            "range": f"{sheet_tab}!{col_letter(cols.last_updated)}{target.row_index}",
+            "values": [[now_iso]]
+        })
 
-        # Build values mapping row width
-        max_idx = max(cols.track_status, cols.drive_file_id, cols.last_updated)
-        min_idx = min(cols.track_status, cols.drive_file_id, cols.last_updated)
-        width = max_idx - min_idx + 1
-        row_vals = [""] * width
-        row_vals[cols.track_status - min_idx] = status
-        row_vals[cols.drive_file_id - min_idx] = file_id
-        row_vals[cols.last_updated - min_idx] = now_iso
-
-        body = {"values": [row_vals]}
-        self.sheets.spreadsheets().values().update(
+        self.sheets.spreadsheets().values().batchUpdate(
             spreadsheetId=settings.google.sheet_id,
-            range=update_range,
-            valueInputOption="USER_ENTERED",
-            body=body
+            body={
+                "valueInputOption": "USER_ENTERED",
+                "data": updates
+            }
         ).execute()
+        logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, target.row_index, file_id)
         return True
 
     def update_status(self, entry_id: str, status: str) -> bool:
@@ -232,24 +264,27 @@ class GoogleService:
                     return True
             return False
 
-        cols = settings.columns
         performances = self.get_performances()
         target = next((p for p in performances if p.entry_id == entry_id), None)
         if not target:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
 
+        cols = settings.columns
+        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+
         def col_letter(col_idx: int) -> str:
             return chr(ord('A') + col_idx)
 
-        sheet_tab = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Signups"
+        val_to_write = "Performed" if status == "Performed" else ("Yes" if status == "Uploaded" else status)
         cell = f"{sheet_tab}!{col_letter(cols.track_status)}{target.row_index}"
 
         self.sheets.spreadsheets().values().update(
             spreadsheetId=settings.google.sheet_id,
             range=cell,
             valueInputOption="USER_ENTERED",
-            body={"values": [[status]]}
+            body={"values": [[val_to_write]]}
         ).execute()
+        logger.info("Updated status for %s (Row %d) to %s", entry_id, target.row_index, val_to_write)
         return True
 
     def upload_file_to_active(self, file_path: str, filename: str, mime_type: str = "audio/mpeg") -> str:
