@@ -14,6 +14,8 @@ class PerformanceEntry(BaseModel):
     performer_name: str
     performance_type: str = "Solo"
     partner_name: Optional[str] = None
+    contact_info: Optional[str] = None
+    age_group: Optional[str] = None
     song_title: str
     movie_name: Optional[str] = None
     sequence_order: Optional[int] = None
@@ -147,10 +149,22 @@ class GoogleService:
             self.mock_mode = True
             self._init_mock_data()
 
-    def get_performances(self) -> List[PerformanceEntry]:
+    def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
             return self._mock_data
 
+        if not force_sync:
+            try:
+                from app.services.db_service import db_service
+                cached = db_service.get_all_performances()
+                if cached:
+                    return [PerformanceEntry(**row) for row in cached]
+            except Exception as ex:
+                logger.warning("Error reading from SQLite cache: %s", ex)
+
+        return self._fetch_and_cache_from_google()
+
+    def _fetch_and_cache_from_google(self) -> List[PerformanceEntry]:
         cols = settings.columns
         names = settings.column_names
         tab_name = settings.google.sheet_tab_name or "Song Sign-Up"
@@ -191,8 +205,10 @@ class GoogleService:
                     return fallback
 
                 cols.performer_name = find_col_idx(names.performer_name, cols.performer_name)
+                cols.age_group = find_col_idx(names.age_group, getattr(cols, "age_group", -1))
                 cols.partner_name = find_col_idx(names.partner_name, cols.partner_name)
                 cols.performance_type = find_col_idx(names.performance_type, cols.performance_type)
+                cols.contact_info = find_col_idx(names.contact_info, getattr(cols, "contact_info", -1))
                 cols.sequence_order = find_col_idx(names.sequence_order, cols.sequence_order)
                 cols.song_title = find_col_idx(names.song_title, cols.song_title)
                 cols.movie_name = find_col_idx(names.movie_name, cols.movie_name)
@@ -333,11 +349,16 @@ class GoogleService:
                     if val and val not in extra_tags:
                         extra_tags.append(val)
 
+                age_group_val = get_col(cols.age_group) if hasattr(cols, "age_group") and cols.age_group >= 0 else None
+                contact_val = get_col(cols.contact_info) if hasattr(cols, "contact_info") and cols.contact_info >= 0 else None
+
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
                     performer_name=performer_name,
                     performance_type=perf_type,
                     partner_name=get_col(cols.partner_name) or None,
+                    contact_info=contact_val,
+                    age_group=age_group_val,
                     song_title=song_title,
                     movie_name=movie_name or None,
                     sequence_order=seq_val,
@@ -397,6 +418,13 @@ class GoogleService:
                 if p.is_song_name_missing and "Performance (Song" in p.song_title:
                     p.song_title = f"Performance #{p.sequence_order} (Song title missing)"
 
+            # Save to SQLite database cache
+            try:
+                from app.services.db_service import db_service
+                db_service.save_performances(entries)
+            except Exception as ex:
+                logger.warning("Could not save performances to SQLite: %s", ex)
+
             return entries
         except Exception as e:
             logger.error("Error fetching performances from Google Sheet: %s", e)
@@ -409,6 +437,30 @@ class GoogleService:
         return performances
 
     def get_live_status(self) -> Dict[str, Any]:
+        from app.services.db_service import db_service
+        last_sync = db_service.get_last_sync_time()
+
+        # Background sync for live view if cache is stale (> 30 seconds)
+        if not self.mock_mode:
+            should_sync = False
+            if not last_sync:
+                should_sync = True
+            else:
+                try:
+                    dt = datetime.fromisoformat(last_sync)
+                    diff = (datetime.now(timezone.utc) - dt).total_seconds()
+                    if diff > 30:
+                        should_sync = True
+                except Exception:
+                    pass
+
+            if should_sync:
+                try:
+                    self.get_performances(force_sync=True)
+                    last_sync = db_service.get_last_sync_time()
+                except Exception as ex:
+                    logger.warning("Background live sync failed: %s", ex)
+
         queue = self.get_stage_queue()
         now_performing = None
         up_next = []
@@ -424,10 +476,14 @@ class GoogleService:
 
         def is_eligible_for_stage(p: PerformanceEntry) -> bool:
             ptype = (p.performance_type or "").strip().lower()
+            # Any performance explicitly designated as without backing track
+            if "no-track" in ptype or "notrack" in ptype or "no track" in ptype:
+                return True
             if "acoustic" in ptype or "live" in ptype:
                 return True
-            if "group" in ptype:
+            if "group" in ptype and "karaoke" not in ptype:
                 return True
+            # Backing track uploaded or present in active Drive
             if p.track_status == "Uploaded" or bool(p.drive_file_id):
                 return True
             return False
@@ -445,6 +501,49 @@ class GoogleService:
                 else:
                     upcoming.append(p)
 
+        # Multi-tier sorting for upcoming performances based on LIVE_ORDER_BY
+        def get_sort_key(p: PerformanceEntry):
+            strategy_fields = [f.strip().lower() for f in settings.live_order_by.split(",") if f.strip()]
+            key = []
+            for f in strategy_fields:
+                if f in ("readiness", "ready", "download_status", "no_track_status"):
+                    key.append(0 if is_eligible_for_stage(p) else 1)
+                elif f in ("age_group", "age"):
+                    ag = (p.age_group or "").lower()
+                    if not ag:
+                        for t in (p.extra_tags or []):
+                            if "junior" in t.lower():
+                                ag = "junior"
+                                break
+                            elif "senior" in t.lower():
+                                ag = "senior"
+                                break
+                    if "junior" in ag:
+                        key.append(0)
+                    elif "senior" in ag:
+                        key.append(1)
+                    else:
+                        key.append(2)
+                elif f in ("sequence", "sequence_order", "seq"):
+                    seq = p.sequence_order if p.sequence_order is not None and p.sequence_order > 0 else 9999
+                    key.append(seq)
+                elif f in ("performance_type", "type"):
+                    pt = (p.performance_type or "").lower()
+                    if "solo" in pt:
+                        key.append(0)
+                    elif "duet" in pt:
+                        key.append(1)
+                    elif "group" in pt:
+                        key.append(2)
+                    else:
+                        key.append(3)
+            seq = p.sequence_order if p.sequence_order is not None and p.sequence_order > 0 else 9999
+            key.append(seq)
+            key.append(p.row_index)
+            return tuple(key)
+
+        upcoming.sort(key=get_sort_key)
+
         return {
             "event_name": settings.event.name,
             "event_subtitle": settings.event.subtitle,
@@ -456,7 +555,8 @@ class GoogleService:
             "performed": performed,
             "on_hold": on_hold,
             "total_count": len(queue),
-            "completed_count": len(performed)
+            "completed_count": len(performed),
+            "last_synced_at": last_sync
         }
 
     def set_active_performance(self, entry_id: str) -> bool:
@@ -481,6 +581,18 @@ class GoogleService:
         target = next((p for p in performances if p.entry_id == entry_id), None)
         if not target:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
+
+        # Update SQLite database immediately
+        try:
+            from app.services.db_service import db_service
+            db_service.update_performance_field(entry_id, "track_status", status)
+            if file_id:
+                db_service.update_performance_field(entry_id, "drive_file_id", file_id)
+            if duration_str:
+                db_service.update_performance_field(entry_id, "duration", duration_str)
+            db_service.update_performance_field(entry_id, "last_updated", now_iso)
+        except Exception as ex:
+            logger.warning("Error updating track metadata in SQLite: %s", ex)
 
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
@@ -556,6 +668,13 @@ class GoogleService:
         elif status in ("On Stage", "Live"):
             val_to_write = "On Stage"
 
+        # Update SQLite database immediately
+        try:
+            from app.services.db_service import db_service
+            db_service.update_performance_field(entry_id, "performance_status", val_to_write)
+        except Exception as ex:
+            logger.warning("Error updating status in SQLite: %s", ex)
+
         if self.is_xlsx:
             import openpyxl
             from googleapiclient.http import MediaIoBaseUpload
@@ -589,6 +708,14 @@ class GoogleService:
 
     def update_sequence_orders(self, items: List[Dict[str, Any]], sync_only: bool = False) -> int:
         item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
+        # Update SQLite database immediately
+        try:
+            from app.services.db_service import db_service
+            for eid, seq in item_map.items():
+                db_service.update_performance_field(eid, "sequence_order", seq)
+        except Exception as ex:
+            logger.warning("Error updating sequence orders in SQLite: %s", ex)
+
         if self.mock_mode:
             for p in self._mock_data:
                 if p.entry_id in item_map:

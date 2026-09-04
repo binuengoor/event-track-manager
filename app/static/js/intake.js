@@ -172,6 +172,12 @@ async function handleRefreshClick() {
     }
   });
 
+  try {
+    await fetch('/api/sync', { method: 'POST' });
+  } catch (e) {
+    console.warn("Sync error:", e);
+  }
+
   await loadPerformances();
   if (selectedPerformer) {
     handlePerformerSelected(selectedPerformer);

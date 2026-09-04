@@ -32,6 +32,39 @@ class AudioService:
             f.write(content)
         return cache_path
 
+    def transcode_to_standard_mp3(self, input_path: str, output_path: str, bitrate: str = "320k") -> bool:
+        """
+        Uses ffmpeg to transcode any audio format (.m4a, .aac, .wav, .caf, .ogg, etc.)
+        into a pristine, high-fidelity 320kbps MP3 (44100Hz stereo).
+        """
+        import subprocess
+        tmp_output = output_path + ".transcode.mp3"
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-i", input_path,
+                "-vn", "-acodec", "libmp3lame",
+                "-b:a", bitrate, "-ar", "44100",
+                tmp_output
+            ]
+            res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=45)
+            if res.returncode == 0 and os.path.isfile(tmp_output) and os.path.getsize(tmp_output) > 0:
+                if os.path.isfile(output_path):
+                    os.remove(output_path)
+                os.rename(tmp_output, output_path)
+                logger.info("Successfully transcoded %s to %s MP3 (%s)", input_path, bitrate, output_path)
+                return True
+            else:
+                logger.warning("FFmpeg transcode non-zero exit: %s", res.stderr.decode(errors="ignore"))
+        except Exception as e:
+            logger.warning("FFmpeg transcoding exception: %s", e)
+        finally:
+            if os.path.isfile(tmp_output):
+                try:
+                    os.remove(tmp_output)
+                except Exception:
+                    pass
+        return False
+
     def purge_cache(self, entry_id: str) -> bool:
         safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
         variations = {

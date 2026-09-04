@@ -744,8 +744,16 @@ function setupActionButtons() {
   const refreshBtn = document.getElementById('refresh-queue-btn');
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.classList.add('opacity-50', 'pointer-events-none');
+    const icon = document.getElementById('refresh-icon');
+    if (icon) icon.classList.add('animate-spin');
+    try {
+      await fetch('/api/sync', { method: 'POST', headers: getAuthHeaders() });
+    } catch (e) {
+      console.warn("Sync error:", e);
+    }
     await loadQueue(false);
     refreshBtn.classList.remove('opacity-50', 'pointer-events-none');
+    if (icon) icon.classList.remove('animate-spin');
   });
 
   // Offline ZIP Download button

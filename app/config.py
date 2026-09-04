@@ -101,31 +101,35 @@ class GoogleConfig(BaseModel):
     drive_folders: DriveFoldersConfig = Field(default_factory=DriveFoldersConfig)
 
 class ColumnNamesConfig(BaseModel):
-    performer_name: str = "Singer (1)"
-    partner_name: str = "Singer (2)"
-    performance_type: str = "Solo/Duet/Group"
-    sequence_order: str = "Sequence"
+    performer_name: str = "Performer Name"
+    age_group: str = "Age Group"
+    performance_type: str = "Performance Type"
+    partner_name: str = "Duet Partner"
+    contact_info: str = "Contact Name and Phone"
     song_title: str = "Song Name"
-    movie_name: str = "Movie/Album Name"
+    sequence_order: str = "Sequence"
     performance_status: str = "Performance Status"
-    track_status: str = "Track Uploaded"
-    duration: str = "Duration (Minutes)"
+    track_status: str = "Track Status"
+    duration: str = "Duration"
+    movie_name: str = "Movie/Album Name"
     drive_file_id: str = "Drive File ID"
     last_updated: str = "Last Updated"
 
 class ColumnsConfig(BaseModel):
     entry_id: int = -1
     performer_name: int = 0
-    performance_type: int = 5
-    partner_name: int = 2
-    song_title: int = 8
-    movie_name: int = 9
-    performance_status: int = 10
-    track_status: int = 11
+    age_group: int = 1
+    performance_type: int = 2
+    partner_name: int = 3
+    contact_info: int = 4
+    song_title: int = 5
     sequence_order: int = 6
-    duration: int = 12
-    drive_file_id: int = 13
-    last_updated: int = 14
+    performance_status: int = 7
+    track_status: int = 8
+    duration: int = 9
+    movie_name: int = -1
+    drive_file_id: int = 10
+    last_updated: int = 11
 
 class StorageConfig(BaseModel):
     cache_dir: str = "/data/cache"
@@ -142,7 +146,9 @@ class AppConfig(BaseModel):
     columns: ColumnsConfig = Field(default_factory=ColumnsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     downloader: DownloaderConfig = Field(default_factory=DownloaderConfig)
-    console_extra_columns: List[str] = Field(default_factory=lambda: ["Age Group (Junior/Senior)"])
+    console_extra_columns: List[str] = Field(default_factory=lambda: ["Age Group"])
+    live_order_by: str = "readiness,sequence"
+    audio_bitrate: str = "320k"
 
     admin_pin: str = "2026"
     mock_google_api: bool = False
@@ -209,8 +215,10 @@ def load_config() -> AppConfig:
     # 3. Dynamic Column Names
     col_mapping = {
         "COL_PERFORMER_NAME": "performer_name",
+        "COL_AGE_GROUP": "age_group",
         "COL_PARTNER_NAME": "partner_name",
         "COL_PERFORMANCE_TYPE": "performance_type",
+        "COL_CONTACT_INFO": "contact_info",
         "COL_SEQUENCE": "sequence_order",
         "COL_SONG_TITLE": "song_title",
         "COL_MOVIE_NAME": "movie_name",
@@ -223,6 +231,12 @@ def load_config() -> AppConfig:
     for env_k, field_name in col_mapping.items():
         if os.getenv(env_k):
             setattr(config.column_names, field_name, os.getenv(env_k))
+
+    if os.getenv("LIVE_ORDER_BY"):
+        config.live_order_by = os.getenv("LIVE_ORDER_BY")
+
+    if os.getenv("AUDIO_BITRATE"):
+        config.audio_bitrate = os.getenv("AUDIO_BITRATE")
 
     # 4. Security, Storage & Networking
     if os.getenv("ADMIN_PIN"):

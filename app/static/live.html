@@ -207,12 +207,30 @@
       const refreshBtn = document.getElementById('refresh-data-btn');
       if (refreshBtn) {
         refreshBtn.addEventListener('click', async () => {
-          refreshBtn.classList.add('opacity-75');
+          refreshBtn.classList.add('opacity-75', 'pointer-events-none');
+          try {
+            await fetch('/api/sync', { method: 'POST' });
+          } catch (e) {
+            console.warn('Sync error:', e);
+          }
           await fetchLiveStatus();
-          setTimeout(() => refreshBtn.classList.remove('opacity-75'), 500);
+          setTimeout(() => refreshBtn.classList.remove('opacity-75', 'pointer-events-none'), 500);
         });
       }
     });
+
+    function formatTimeAgo(isoString) {
+      if (!isoString) return 'Live';
+      const date = new Date(isoString);
+      const now = new Date();
+      const diffSec = Math.floor((now - date) / 1000);
+      if (diffSec < 15) return 'Just now';
+      if (diffSec < 60) return `${diffSec}s ago`;
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHr = Math.floor(diffMin / 60);
+      return `${diffHr}h ago`;
+    }
 
     function renderTypePill(perfType) {
       const raw = (perfType || 'Solo').trim();
@@ -308,8 +326,13 @@
 
       updateCountdown();
 
-      const now = new Date();
-      document.getElementById('live-sync-timestamp').textContent = `Sync: ${now.toLocaleTimeString()}`;
+      const syncEl = document.getElementById('live-sync-timestamp');
+      if (syncEl) {
+        syncEl.textContent = `● Synced ${formatTimeAgo(data.last_synced_at)}`;
+        if (data.last_synced_at) {
+          syncEl.title = `Last synchronized with Google Sheets: ${new Date(data.last_synced_at).toLocaleString()}`;
+        }
+      }
 
       // 1. Now Performing
       const nowCard = document.getElementById('now-performing-card');

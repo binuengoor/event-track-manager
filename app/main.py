@@ -131,6 +131,20 @@ async def list_performances():
         logger.exception("Failed to fetch performances: %s", e)
         raise HTTPException(status_code=500, detail="Failed to read performances from Google Sheet")
 
+@app.post("/api/sync")
+async def sync_data():
+    try:
+        entries = google_service.get_performances(force_sync=True)
+        from app.services.db_service import db_service
+        return {
+            "status": "success",
+            "count": len(entries),
+            "last_synced_at": db_service.get_last_sync_time()
+        }
+    except Exception as e:
+        logger.exception("Failed to sync data: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/stage-queue", response_model=List[PerformanceEntry])
 async def stage_queue():
     try:
@@ -192,8 +206,23 @@ async def upload_track(
         if len(content) > max_bytes:
             raise HTTPException(status_code=413, detail=f"File exceeds maximum allowed size of {settings.storage.max_upload_size_mb}MB")
 
-        # Write to local cache
-        audio_service.save_upload_to_cache(entry_id, content)
+        # Save to temporary path and transcode to pristine 320kbps MP3
+        raw_upload_path = cache_path + ".upload"
+        with open(raw_upload_path, "wb") as f:
+            f.write(content)
+
+        # Transcode to 320k standard MP3
+        bitrate = getattr(settings, "audio_bitrate", "320k")
+        transcoded = audio_service.transcode_to_standard_mp3(raw_upload_path, cache_path, bitrate=bitrate)
+        if not transcoded and not os.path.exists(cache_path):
+            with open(cache_path, "wb") as f:
+                f.write(content)
+
+        if os.path.exists(raw_upload_path):
+            try:
+                os.remove(raw_upload_path)
+            except Exception:
+                pass
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported submission_type: {submission_type}")
 
