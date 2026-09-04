@@ -1,9 +1,12 @@
 services:
   # 1. Main Web Application: Google Sheets Sync, Drive Archival, Stage Console & Intake Portal
   app:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
+    # Reference pre-built multi-architecture image from GitHub Container Registry
+    image: ghcr.io/binuengoor/event-track-manager-app:latest
+    # To build locally from source instead of pulling from GHCR, uncomment the build block below:
+    # build:
+    #   context: .
+    #   dockerfile: app/Dockerfile
     container_name: event_track_manager_app
     restart: unless-stopped
     env_file:
@@ -26,9 +29,12 @@ services:
 
   # 2. Dedicated Downloader Microservice: yt-dlp + ffmpeg audio extractor
   downloader:
-    build:
-      context: ./downloader
-      dockerfile: Dockerfile
+    # Reference pre-built multi-architecture image from GitHub Container Registry
+    image: ghcr.io/binuengoor/event-track-manager-downloader:latest
+    # To build locally from source instead of pulling from GHCR, uncomment the build block below:
+    # build:
+    #   context: ./downloader
+    #   dockerfile: Dockerfile
     container_name: event_track_manager_downloader
     restart: unless-stopped
     environment:

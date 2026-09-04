@@ -8,6 +8,8 @@ let userAdminPin = localStorage.getItem('paattukoottam_pin') || '';
 let searchQuery = '';
 let draggedItemIndex = null;
 let autoSyncInterval = null;
+let isSequenceDirty = false;
+let lastSyncedAt = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   setupAuth();
@@ -23,12 +25,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     showAuthModal();
   }
 
-  // Periodic background sync every 45s so operator is always up to date
+  // Periodic background sync every 45s (only if sequence is not dirty, so operator's unsaved reorder isn't overwritten)
   autoSyncInterval = setInterval(() => {
-    if (userAdminPin && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
+    if (userAdminPin && !isSequenceDirty && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
       loadQueue(true); // silent background sync
     }
   }, 45000);
+
+  // Update time-ago badge every 10 seconds
+  setInterval(updateSyncStatusBadge, 10000);
 });
 
 async function fetchEventInfo() {
@@ -174,14 +179,23 @@ async function loadQueue(silent = false) {
     statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
     countPill.textContent = `${performed}/${total} completed`;
 
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    syncText.textContent = `Synced (${timeStr})`;
+    // Fetch live status for dirty state and last sync timestamp
+    try {
+      const liveRes = await fetch('/api/live-status');
+      if (liveRes.ok) {
+        const liveData = await liveRes.json();
+        lastSyncedAt = liveData.last_synced_at;
+        setDirtyState(Boolean(liveData.is_dirty));
+      }
+    } catch (e) {
+      console.warn("Could not check dirty status:", e);
+    }
 
+    updateSyncStatusBadge();
     applyFilter();
 
     if (!silent) {
-      showToast(`Synced ${total} performances from Google Sheet (${timeStr})`);
+      showToast(`Synced ${total} performances from Google Sheet`);
     }
   } catch (err) {
     syncText.textContent = 'Sync Error';
@@ -450,9 +464,6 @@ function renderQueueList() {
 }
 
 async function saveReorderedSequence() {
-  const syncText = document.getElementById('sync-status-text');
-  syncText.textContent = 'Saving sequence...';
-
   const payload = queue.map(it => ({
     entry_id: it.entry_id,
     sequence_order: it.sequence_order
@@ -465,14 +476,15 @@ async function saveReorderedSequence() {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ items: payload })
+      body: JSON.stringify({ items: payload, push_to_sheet: false })
     });
 
-    if (!res.ok) throw new Error('Failed to save sequence to Google Sheet');
-    showToast('✓ Sequence updated and saved to Google Sheet!');
-    syncText.textContent = 'Saved to Sheet';
+    if (!res.ok) throw new Error('Failed to update stage queue');
+    const data = await res.json();
+    setDirtyState(true);
+    showToast('Sequence staged locally. Click "Sync to Sheet" to push to Google Sheet & Drive.', 'info');
   } catch (err) {
-    showToast(`Sequence save failed: ${err.message}`, 'error');
+    showToast(`Sequence staging failed: ${err.message}`, 'error');
   }
 }
 
@@ -740,21 +752,19 @@ function setupActionButtons() {
     }
   });
 
-  // Sync Sheet button
+  // Sync / Refresh button
   const refreshBtn = document.getElementById('refresh-queue-btn');
   refreshBtn.addEventListener('click', async () => {
-    refreshBtn.classList.add('opacity-50', 'pointer-events-none');
-    const icon = document.getElementById('refresh-icon');
-    if (icon) icon.classList.add('animate-spin');
-    try {
-      await fetch('/api/sync', { method: 'POST', headers: getAuthHeaders() });
-    } catch (e) {
-      console.warn("Sync error:", e);
-    }
-    await loadQueue(false);
-    refreshBtn.classList.remove('opacity-50', 'pointer-events-none');
-    if (icon) icon.classList.remove('animate-spin');
+    await handleSyncButtonClick();
   });
+
+  // Banner sync button
+  const bannerSyncBtn = document.getElementById('banner-sync-btn');
+  if (bannerSyncBtn) {
+    bannerSyncBtn.addEventListener('click', async () => {
+      await handleSyncButtonClick();
+    });
+  }
 
   // Offline ZIP Download button
   const zipBtn = document.getElementById('download-zip-btn');
@@ -786,6 +796,113 @@ function setupActionButtons() {
       if (window.lucide) lucide.createIcons();
     }
   });
+}
+
+async function handleSyncButtonClick() {
+  const refreshBtn = document.getElementById('refresh-queue-btn');
+  const icon = document.getElementById('refresh-icon');
+  refreshBtn.classList.add('opacity-50', 'pointer-events-none');
+  if (icon) icon.classList.add('animate-spin');
+
+  try {
+    if (isSequenceDirty) {
+      // Operator has uncommitted sequence order changes: push them now!
+      const pushRes = await fetch('/api/push-sequence', {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+      if (!pushRes.ok) throw new Error('Failed to push sequence to Google Sheet');
+      const pushData = await pushRes.json();
+      lastSyncedAt = pushData.last_synced_at;
+      setDirtyState(false);
+      showToast(`✓ Successfully synced ${pushData.synced_count} acts to Google Sheet & renamed Drive tracks!`);
+    } else {
+      // Normal refresh from Google Sheet
+      const syncRes = await fetch('/api/sync', { method: 'POST', headers: getAuthHeaders() });
+      if (syncRes.ok) {
+        const syncData = await syncRes.json();
+        lastSyncedAt = syncData.last_synced_at;
+      }
+    }
+  } catch (e) {
+    console.warn("Sync error:", e);
+    showToast(`Sync failed: ${e.message}`, 'error');
+  }
+
+  await loadQueue(false);
+  refreshBtn.classList.remove('opacity-50', 'pointer-events-none');
+  if (icon) icon.classList.remove('animate-spin');
+}
+
+function setDirtyState(dirty) {
+  isSequenceDirty = dirty;
+  const banner = document.getElementById('unsynced-sequence-banner');
+  const refreshBtn = document.getElementById('refresh-queue-btn');
+  const syncBadge = document.getElementById('sync-status-indicator');
+  const syncText = document.getElementById('sync-status-text');
+
+  if (banner) {
+    if (dirty) {
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
+
+  if (refreshBtn) {
+    if (dirty) {
+      // Glowing Amber state to indicate pending push
+      refreshBtn.className = "px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/40 flex items-center gap-1.5 transition active:scale-95 border border-amber-300 ring-2 ring-amber-400/80 animate-pulse";
+      refreshBtn.title = "Local stage sequence is modified! Click to push to Google Sheet and rename Drive files.";
+      const span = refreshBtn.querySelector('span');
+      if (span) span.textContent = "Sync to Sheet";
+    } else {
+      // Normal Orange state
+      refreshBtn.className = "px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40";
+      refreshBtn.title = "Refresh latest data from Google Sheet & Drive";
+      const span = refreshBtn.querySelector('span');
+      if (span) span.textContent = "Refresh Data";
+    }
+  }
+
+  updateSyncStatusBadge();
+  if (window.lucide) lucide.createIcons();
+}
+
+function updateSyncStatusBadge() {
+  const syncBadge = document.getElementById('sync-status-indicator');
+  const syncText = document.getElementById('sync-status-text');
+  if (!syncBadge || !syncText) return;
+
+  if (isSequenceDirty) {
+    syncBadge.className = 'flex items-center gap-1.5 text-xs text-amber-300 font-medium px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30';
+    syncBadge.title = 'Local sequence has unsaved edits';
+    syncText.textContent = 'Unsynced Edits';
+    const dot = syncBadge.querySelector('span:first-child');
+    if (dot) dot.className = 'w-2 h-2 rounded-full bg-amber-400 animate-ping';
+  } else {
+    syncBadge.className = 'flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20';
+    const ago = formatTimeAgo(lastSyncedAt);
+    syncText.textContent = `● Synced ${ago}`;
+    if (lastSyncedAt) {
+      syncBadge.title = `Last synchronized with Google Sheet: ${new Date(lastSyncedAt).toLocaleString()}`;
+    }
+    const dot = syncBadge.querySelector('span:first-child');
+    if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
+  }
+}
+
+function formatTimeAgo(isoString) {
+  if (!isoString) return 'Just now';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 15) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  return `${diffHr}h ago`;
 }
 
 function formatTime(seconds) {

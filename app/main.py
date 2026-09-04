@@ -397,14 +397,39 @@ class SequenceItem(BaseModel):
 
 class ReorderRequest(BaseModel):
     items: List[SequenceItem]
+    push_to_sheet: bool = False
 
 @app.post("/api/reorder-queue")
 async def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
     try:
-        updated = google_service.update_sequence_orders([i.model_dump() for i in payload.items])
-        return {"status": "success", "updated_count": updated}
+        updated = google_service.update_sequence_orders(
+            [i.model_dump() for i in payload.items],
+            push_to_sheet=payload.push_to_sheet
+        )
+        from app.services.db_service import db_service
+        return {
+            "status": "success",
+            "updated_count": updated,
+            "is_dirty": db_service.is_sequence_dirty(),
+            "pushed_to_sheet": payload.push_to_sheet
+        }
     except Exception as e:
         logger.exception("Failed to reorder queue: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/push-sequence")
+async def push_sequence(_authorized: bool = Depends(verify_admin_pin)):
+    """Explicitly commits staged SQLite sequence orders to Google Sheet & renames Drive files."""
+    try:
+        updated = google_service.sync_sequence_to_google()
+        from app.services.db_service import db_service
+        return {
+            "status": "success",
+            "synced_count": updated,
+            "last_synced_at": db_service.get_last_sync_time()
+        }
+    except Exception as e:
+        logger.exception("Failed to push sequence to Google Sheet: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/health")

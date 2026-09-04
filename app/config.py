@@ -149,6 +149,7 @@ class AppConfig(BaseModel):
     console_extra_columns: List[str] = Field(default_factory=lambda: ["Age Group"])
     live_order_by: str = "readiness,sequence"
     audio_bitrate: str = "320k"
+    entry_id_prefix: str = "PK"
 
     admin_pin: str = "2026"
     mock_google_api: bool = False
@@ -237,6 +238,10 @@ def load_config() -> AppConfig:
 
     if os.getenv("AUDIO_BITRATE"):
         config.audio_bitrate = os.getenv("AUDIO_BITRATE")
+
+    prefix_env = os.getenv("ENTRY_ID_PREFIX") or os.getenv("EVENT_PREFIX")
+    if prefix_env:
+        config.entry_id_prefix = prefix_env.strip().upper()
 
     # 4. Security, Storage & Networking
     if os.getenv("ADMIN_PIN"):

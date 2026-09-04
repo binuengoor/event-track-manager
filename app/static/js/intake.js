@@ -39,6 +39,17 @@ async function initEventInfo() {
         const hint = document.getElementById('max-size-hint');
         if (hint) hint.textContent = `Supports MP3, M4A, WAV (Max ${maxUploadSizeMb}MB)`;
       }
+
+      // Fetch last sync timestamp
+      try {
+        const liveRes = await fetch('/api/live-status');
+        if (liveRes.ok) {
+          const liveData = await liveRes.json();
+          updateIntakeSyncBadge(liveData.last_synced_at);
+        }
+      } catch (e) {
+        console.warn('Could not fetch live sync status:', e);
+      }
     }
   } catch (e) {
     console.warn('Could not load event info:', e);
@@ -173,7 +184,11 @@ async function handleRefreshClick() {
   });
 
   try {
-    await fetch('/api/sync', { method: 'POST' });
+    const res = await fetch('/api/sync', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      updateIntakeSyncBadge(data.last_synced_at);
+    }
   } catch (e) {
     console.warn("Sync error:", e);
   }
@@ -191,6 +206,29 @@ async function handleRefreshClick() {
     }
   });
   if (window.lucide) lucide.createIcons();
+}
+
+function updateIntakeSyncBadge(isoString) {
+  const badge = document.getElementById('sync-status-indicator');
+  const text = document.getElementById('sync-status-text');
+  if (!badge || !text) return;
+  text.textContent = `● Synced ${formatTimeAgo(isoString)}`;
+  if (isoString) {
+    badge.title = `Last synchronized with Google Sheet: ${new Date(isoString).toLocaleString()}`;
+  }
+}
+
+function formatTimeAgo(isoString) {
+  if (!isoString) return 'Just now';
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 15) return 'Just now';
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  return `${diffHr}h ago`;
 }
 
 function handlePerformerSelected(name) {

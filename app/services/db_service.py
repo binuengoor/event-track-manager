@@ -19,9 +19,8 @@ class DBService:
         if not self._db_path:
             cache_dir = settings.storage.cache_dir
             os.makedirs(cache_dir, exist_ok=True)
-            # Event-specific DB file ensures changing EVENT_ID in .env automatically starts a clean event!
-            safe_event_id = "".join(c for c in settings.event.id if c.isalnum() or c in ("-", "_")).strip() or "event"
-            self._db_path = os.path.join(cache_dir, f"{safe_event_id}.db")
+            # Use stable database file
+            self._db_path = os.path.join(cache_dir, "event_data.db")
         return self._db_path
 
     def _get_connection(self) -> sqlite3.Connection:
@@ -184,5 +183,29 @@ class DBService:
                 return row["value"] if row else None
         except Exception:
             return None
+
+    def set_dirty_sequence(self, is_dirty: bool = True):
+        with self._get_connection() as conn:
+            conn.execute("""
+            INSERT INTO sync_meta (key, value) VALUES ('sequence_dirty', ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """, ("1" if is_dirty else "0",))
+            conn.commit()
+
+    def is_sequence_dirty(self) -> bool:
+        try:
+            with self._get_connection() as conn:
+                row = conn.execute("SELECT value FROM sync_meta WHERE key='sequence_dirty'").fetchone()
+                return bool(row and row["value"] == "1")
+        except Exception:
+            return False
+
+    def reset_database(self):
+        """Drops and re-creates tables cleanly on user request."""
+        with self._get_connection() as conn:
+            conn.execute("DROP TABLE IF EXISTS performances")
+            conn.execute("DROP TABLE IF EXISTS sync_meta")
+            conn.commit()
+        self._ensure_db()
 
 db_service = DBService()

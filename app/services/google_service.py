@@ -1,7 +1,7 @@
 import os
 import io
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -242,12 +242,13 @@ class GoogleService:
                 except Exception as ex:
                     logger.warning("Could not list files in Active/ folder: %s", ex)
 
+            prefix = getattr(settings, "entry_id_prefix", "PK").strip().upper()
             active_file_ids = {f["id"] for f in active_files}
             active_by_entry = {}
             for f in active_files:
                 fname = f.get("name", "")
                 for part in fname.split("_"):
-                    if part.startswith("PK-"):
+                    if part.startswith(f"{prefix}-") or part.startswith("PK-"):
                         active_by_entry[part] = f
                         break
 
@@ -265,7 +266,7 @@ class GoogleService:
 
                 entry_id = get_col(cols.entry_id) if cols.entry_id >= 0 else ""
                 if not entry_id:
-                    entry_id = f"PK-{row_index:03d}"
+                    entry_id = f"{prefix}-{row_index:03d}"
 
                 # Parse sequence order if already set
                 seq_str = get_col(cols.sequence_order)
@@ -556,7 +557,8 @@ class GoogleService:
             "on_hold": on_hold,
             "total_count": len(queue),
             "completed_count": len(performed),
-            "last_synced_at": last_sync
+            "last_synced_at": last_sync,
+            "is_dirty": db_service.is_sequence_dirty()
         }
 
     def set_active_performance(self, entry_id: str) -> bool:
@@ -706,11 +708,13 @@ class GoogleService:
             logger.info("Updated performance status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
             return True
 
-    def update_sequence_orders(self, items: List[Dict[str, Any]], sync_only: bool = False) -> int:
+    def update_sequence_orders(self, items: List[Dict[str, Any]], push_to_sheet: bool = True) -> int:
+        """Updates sequence numbers in local SQLite database, and optionally pushes to Google Sheet & Drive."""
+        from app.services.db_service import db_service
         item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
-        # Update SQLite database immediately
+        
+        # 1. Always update SQLite database immediately
         try:
-            from app.services.db_service import db_service
             for eid, seq in item_map.items():
                 db_service.update_performance_field(eid, "sequence_order", seq)
         except Exception as ex:
@@ -720,9 +724,31 @@ class GoogleService:
             for p in self._mock_data:
                 if p.entry_id in item_map:
                     p.sequence_order = item_map[p.entry_id]
+            db_service.set_dirty_sequence(False)
             return len(item_map)
 
+        if not push_to_sheet:
+            # Mark SQLite sequence order as ahead/dirty compared to Google Sheet
+            db_service.set_dirty_sequence(True)
+            logger.info("Updated sequence order for %d items in local database (sync pending)", len(item_map))
+            return len(item_map)
+
+        # Full sync to Google Sheet & Drive
+        return self.sync_sequence_to_google(item_map=item_map)
+
+    def sync_sequence_to_google(self, item_map: Optional[Dict[str, int]] = None) -> int:
+        """Pushes current SQLite sequence order to Google Sheet and renames Drive files."""
+        from app.services.db_service import db_service
+        if self.mock_mode:
+            db_service.set_dirty_sequence(False)
+            db_service.set_last_sync_time()
+            return len(self._mock_data)
+
         performances = self.get_performances()
+        if not item_map:
+            # Read from SQLite to get current sequence orders
+            item_map = {p.entry_id: p.sequence_order for p in performances if p.sequence_order is not None}
+
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
 
@@ -745,6 +771,8 @@ class GoogleService:
             media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
             self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
             logger.info("Updated sequence order for %d items in Excel sheet", len(item_map))
+            db_service.set_dirty_sequence(False)
+            db_service.set_last_sync_time()
             return len(item_map)
         else:
             def col_letter(col_idx: int) -> str:
@@ -777,7 +805,10 @@ class GoogleService:
                     spreadsheetId=settings.google.sheet_id,
                     body={"valueInputOption": "USER_ENTERED", "data": updates}
                 ).execute()
-            logger.info("Updated sequence order for %d items in Google Sheet", len(item_map))
+
+            db_service.set_dirty_sequence(False)
+            db_service.set_last_sync_time()
+            logger.info("Synced sequence order for %d items to Google Sheet & Drive", len(item_map))
             return len(item_map)
 
     def archive_all_active_files_for_entry(self, entry_id: str) -> List[str]:

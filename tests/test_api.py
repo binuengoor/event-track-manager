@@ -105,3 +105,49 @@ def test_export_zip_with_auth():
     assert res.status_code == 200
     assert res.headers["Content-Type"] == "application/zip"
     assert len(res.content) > 0
+
+def test_staged_reorder_and_push_sequence():
+    client = TestClient(app)
+    perf_res = client.get("/api/performances")
+    items = perf_res.json()
+    assert len(items) >= 2
+    
+    first_id = items[0]["entry_id"]
+    second_id = items[1]["entry_id"]
+
+    # Reorder staged locally (push_to_sheet=False)
+    reorder_payload = {
+        "items": [
+            {"entry_id": first_id, "sequence_order": 2},
+            {"entry_id": second_id, "sequence_order": 1}
+        ],
+        "push_to_sheet": False
+    }
+    res_reorder = client.post(
+        "/api/reorder-queue",
+        json=reorder_payload,
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert res_reorder.status_code == 200
+    data = res_reorder.json()
+    assert data["status"] == "success"
+    assert data["pushed_to_sheet"] is False
+
+    # Check live status returns is_dirty=True
+    live_res = client.get("/api/live-status")
+    assert live_res.status_code == 200
+    assert live_res.json()["is_dirty"] is True
+
+    # Now explicitly push sequence to sheet
+    push_res = client.post(
+        "/api/push-sequence",
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert push_res.status_code == 200
+    push_data = push_res.json()
+    assert push_data["status"] == "success"
+
+    # Dirty flag should now be False
+    live_res2 = client.get("/api/live-status")
+    assert live_res2.status_code == 200
+    assert live_res2.json()["is_dirty"] is False

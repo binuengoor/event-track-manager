@@ -24,6 +24,11 @@
         </div>
       </div>
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <!-- Live Sync Timestamp Indicator -->
+        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sync-status-text">Synced</span>
+        </div>
         <a href="/" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Track Intake & Submission">
           <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
           <span>Upload Tracks</span>
