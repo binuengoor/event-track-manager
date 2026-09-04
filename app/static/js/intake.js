@@ -3,7 +3,7 @@ let performances = [];
 let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
-let sheetUrl = 'https://docs.google.com';
+let sheetUrl = 'https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit';
 let maxUploadSizeMb = 200;
 
 document.addEventListener('DOMContentLoaded', async () => {

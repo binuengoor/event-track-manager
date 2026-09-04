@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import logging
 import shutil
@@ -71,11 +72,13 @@ async def serve_tracks_page():
     payment_url = settings.event.payment_url
 
     if payment_url:
-        html = html.replace('id="payment-page-link" href="#" target="_blank" class="hidden', f'id="payment-page-link" href="{payment_url}" target="_blank" class="')
-        html = html.replace('id="payment-page-placeholder" class="inline-flex', 'id="payment-page-placeholder" class="hidden inline-flex')
+        html = re.sub(r'(id="payment-page-link"[^>]*href=")[^"]*(")', rf'\g<1>{payment_url}\2', html)
+        html = re.sub(r'(id="payment-page-link"[^>]*class="[^"]*)\bhidden\b\s*', r'\1', html)
+        html = re.sub(r'(id="payment-page-placeholder"[^>]*class=")', r'\1hidden ', html)
 
     if sheet_url:
-        html = html.replace('id="signup-sheet-link" href="https://docs.google.com"', f'id="signup-sheet-link" href="{sheet_url}"')
+        html = re.sub(r'(id="signup-sheet-link"[^>]*href=")[^"]*(")', rf'\g<1>{sheet_url}\2', html)
+        html = re.sub(r'(id="open-sheet-link"[^>]*href=")[^"]*(")', rf'\g<1>{sheet_url}\2', html)
 
     # Cache bust script
     version = int(datetime.utcnow().timestamp())
