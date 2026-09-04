@@ -50,7 +50,7 @@
   </header>
 
   <!-- Main Container -->
-  <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 space-y-6">
+  <main class="flex-1 max-w-5xl lg:max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
 
     <!-- Section 1: COUNTDOWN (Pre-Show) or NOW ON STAGE (Live) -->
     <div class="space-y-2">
@@ -62,81 +62,109 @@
         <span id="live-sync-timestamp" class="font-mono text-[11px]">Syncing live...</span>
       </div>
 
-      <!-- Pre-Show Countdown Card -->
-      <div id="countdown-card" class="hidden relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/50 shadow-2xl shadow-amber-500/10">
-        <div class="absolute -right-8 -bottom-8 opacity-10 text-white pointer-events-none">
-          <i data-lucide="clock" class="w-64 h-64"></i>
-        </div>
+      <!-- Hero Section Grid (Adaptive: full width by default, 70/30 split when gallery images exist) -->
+      <div id="hero-section-grid" class="grid grid-cols-1 gap-4 items-stretch">
+        
+        <!-- Main Column (Countdown Card OR Now Performing Card) -->
+        <div id="hero-main-column" class="w-full">
+          <!-- Pre-Show Countdown Card -->
+          <div id="countdown-card" class="hidden relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/50 shadow-2xl shadow-amber-500/10 h-full flex flex-col justify-center">
+            <div class="absolute -right-8 -bottom-8 opacity-10 text-white pointer-events-none">
+              <i data-lucide="clock" class="w-64 h-64"></i>
+            </div>
 
-        <div class="relative z-10 space-y-5 text-center">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold uppercase tracking-wider">
-            <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-            <span>Stage Countdown</span>
+            <div class="relative z-10 space-y-5 text-center">
+              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold uppercase tracking-wider">
+                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                <span>Stage Countdown</span>
+              </div>
+
+              <div>
+                <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">The Program Begins Soon</h2>
+                <p id="countdown-datetime-display" class="text-xs sm:text-sm text-amber-400/90 font-medium mt-1">Starting soon</p>
+              </div>
+
+              <!-- 4 Countdown Tiles -->
+              <div class="grid grid-cols-4 gap-2 sm:gap-4 max-w-lg mx-auto w-full">
+                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+                  <span id="cd-days" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Days</span>
+                </div>
+                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+                  <span id="cd-hours" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Hours</span>
+                </div>
+                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+                  <span id="cd-mins" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
+                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Minutes</span>
+                </div>
+                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
+                  <span id="cd-secs" class="text-2xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">00</span>
+                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Seconds</span>
+                </div>
+              </div>
+
+              <p class="text-xs text-slate-400 max-w-md mx-auto">
+                Explore the official performance lineup and sequence below. The stage program will automatically go live when performances begin!
+              </p>
+            </div>
           </div>
 
-          <div>
-            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">The Program Begins Soon</h2>
-            <p id="countdown-datetime-display" class="text-xs sm:text-sm text-amber-400/90 font-medium mt-1">Starting soon</p>
+          <!-- Hero Card for Current Performance -->
+          <div id="now-performing-card" class="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-orange-950/30 border-2 border-orange-500/50 shadow-2xl shadow-orange-500/10 h-full flex flex-col justify-center">
+            <div class="absolute -right-10 -bottom-10 opacity-10 text-white pointer-events-none">
+              <i data-lucide="mic" class="w-64 h-64"></i>
+            </div>
+
+            <div class="relative z-10 space-y-4">
+              <div class="flex items-center gap-3">
+                <span id="now-seq-badge" class="px-3.5 py-1.5 rounded-xl bg-orange-500 text-white font-mono font-bold text-sm shadow">
+                  #01
+                </span>
+                <span class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                  <span>CURRENT PERFORMANCE</span>
+                </span>
+              </div>
+
+              <div>
+                <h2 id="now-performer-name" class="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  Loading program...
+                </h2>
+                <p id="now-song-title" class="text-base sm:text-lg text-orange-400 font-semibold mt-1">
+                  Please wait...
+                </p>
+                <div id="now-stage-notes-container" class="hidden mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium w-fit max-w-full">
+                  <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+                  <span id="now-stage-notes" class="truncate"></span>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <!-- 4 Countdown Tiles -->
-          <div class="grid grid-cols-4 gap-2 sm:gap-4 max-w-lg mx-auto">
-            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-              <span id="cd-days" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Days</span>
-            </div>
-            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-              <span id="cd-hours" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Hours</span>
-            </div>
-            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-              <span id="cd-mins" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Minutes</span>
-            </div>
-            <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-              <span id="cd-secs" class="text-2xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">00</span>
-              <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Seconds</span>
-            </div>
-          </div>
-
-          <p class="text-xs text-slate-400 max-w-md mx-auto">
-            Explore the official performance lineup and sequence below. The stage program will automatically go live when performances begin!
-          </p>
-        </div>
-      </div>
-
-      <!-- Hero Card for Current Performance -->
-      <div id="now-performing-card" class="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-orange-950/30 border-2 border-orange-500/50 shadow-2xl shadow-orange-500/10">
-        <div class="absolute -right-10 -bottom-10 opacity-10 text-white pointer-events-none">
-          <i data-lucide="mic" class="w-64 h-64"></i>
         </div>
 
-        <div class="relative z-10 space-y-4">
-          <div class="flex items-center gap-3">
-            <span id="now-seq-badge" class="px-3.5 py-1.5 rounded-xl bg-orange-500 text-white font-mono font-bold text-sm shadow">
-              #01
+        <!-- Gallery / Sponsor Carousel Column (30% width on desktop, hidden when no images) -->
+        <div id="hero-gallery-container" class="hidden relative overflow-hidden rounded-3xl bg-slate-900/80 border-2 border-slate-800 shadow-xl flex flex-col items-center justify-center p-3 sm:p-4 min-h-[220px] sm:min-h-[260px]">
+          <!-- Carousel Image Viewer -->
+          <div class="relative w-full h-full min-h-[200px] flex items-center justify-center overflow-hidden rounded-2xl bg-slate-950/60">
+            <img id="carousel-img" src="" alt="Event Highlight" class="max-w-full max-h-full object-contain transition-opacity duration-700 opacity-0 rounded-xl" />
+          </div>
+
+          <!-- Carousel Indicators & Badge -->
+          <div class="mt-2.5 flex items-center justify-between w-full px-1 text-[10px] text-slate-400">
+            <span class="flex items-center gap-1 text-slate-400 font-medium">
+              <i data-lucide="image" class="w-3 h-3 text-orange-400"></i>
+              <span>Event Highlights</span>
             </span>
-            <span class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-              <span>CURRENT PERFORMANCE</span>
-            </span>
-          </div>
-
-          <div>
-            <h2 id="now-performer-name" class="text-2xl sm:text-3xl font-black text-white tracking-tight">
-              Loading program...
-            </h2>
-            <p id="now-song-title" class="text-base sm:text-lg text-orange-400 font-semibold mt-1">
-              Please wait...
-            </p>
-            <div id="now-stage-notes-container" class="hidden mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium w-fit max-w-full">
-              <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
-              <span id="now-stage-notes" class="truncate"></span>
+            <div id="carousel-dots" class="flex items-center gap-1.5">
+              <!-- Dynamically populated dots -->
             </div>
           </div>
         </div>
+
       </div>
     </div>
+
 
     <!-- Section 2: UP NEXT (Prepare Backstage) -->
     <div class="space-y-3">
@@ -188,6 +216,9 @@
     let showCompleted = false;
     let latestData = null;
     let targetStartTime = new Date("2026-09-19T17:00:00-04:00");
+    let galleryImages = [];
+    let currentGalleryIndex = 0;
+    let galleryInterval = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       fetchLiveStatus();
@@ -467,8 +498,98 @@
         completedSection.classList.add('hidden');
       }
 
+      // 5. Gallery Carousel & Adaptive 70/30 Grid
+      updateGalleryCarousel(data.gallery_images || []);
+
       if (window.lucide) lucide.createIcons();
     }
+
+    function updateGalleryCarousel(images) {
+      const grid = document.getElementById('hero-section-grid');
+      const mainCol = document.getElementById('hero-main-column');
+      const galleryContainer = document.getElementById('hero-gallery-container');
+      const carouselImg = document.getElementById('carousel-img');
+      const dotsContainer = document.getElementById('carousel-dots');
+
+      if (!grid || !galleryContainer || !carouselImg) return;
+
+      if (!images || images.length === 0) {
+        // Fall back to 100% full width
+        grid.className = 'grid grid-cols-1 gap-4 items-stretch';
+        mainCol.className = 'w-full';
+        galleryContainer.classList.add('hidden');
+        if (galleryInterval) {
+          clearInterval(galleryInterval);
+          galleryInterval = null;
+        }
+        galleryImages = [];
+        return;
+      }
+
+      // Check if image list changed
+      const imagesChanged = JSON.stringify(galleryImages) !== JSON.stringify(images);
+      galleryImages = images;
+
+      // Enable 70/30 adaptive split (approx 70% / 30% on lg screens)
+      grid.className = 'grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch';
+      mainCol.className = 'w-full lg:col-span-8 xl:col-span-8 flex flex-col';
+      galleryContainer.className = 'relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 min-h-[260px] lg:col-span-4 xl:col-span-4';
+      galleryContainer.classList.remove('hidden');
+
+      // Setup dots
+      if (dotsContainer) {
+        dotsContainer.innerHTML = '';
+        if (galleryImages.length > 1) {
+          galleryImages.forEach((_, idx) => {
+            const dot = document.createElement('button');
+            dot.className = `w-2 h-2 rounded-full transition-all ${idx === currentGalleryIndex ? 'bg-orange-500 w-4' : 'bg-slate-700 hover:bg-slate-500'}`;
+            dot.title = `Slide ${idx + 1}`;
+            dot.onclick = () => showGallerySlide(idx);
+            dotsContainer.appendChild(dot);
+          });
+        }
+      }
+
+      if (imagesChanged || !galleryInterval) {
+        currentGalleryIndex = currentGalleryIndex % galleryImages.length;
+        showGallerySlide(currentGalleryIndex);
+
+        if (galleryInterval) clearInterval(galleryInterval);
+        if (galleryImages.length > 1) {
+          // Rotate every 6 seconds
+          galleryInterval = setInterval(() => {
+            currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
+            showGallerySlide(currentGalleryIndex);
+          }, 6000);
+        }
+      }
+    }
+
+    function showGallerySlide(index) {
+      if (!galleryImages || galleryImages.length === 0) return;
+      currentGalleryIndex = index;
+      const carouselImg = document.getElementById('carousel-img');
+      const dotsContainer = document.getElementById('carousel-dots');
+      if (!carouselImg) return;
+
+      // Smooth crossfade
+      carouselImg.classList.add('opacity-0');
+      setTimeout(() => {
+        carouselImg.src = galleryImages[currentGalleryIndex];
+        carouselImg.onload = () => {
+          carouselImg.classList.remove('opacity-0');
+        };
+      }, 300);
+
+      // Update dots indicator
+      if (dotsContainer) {
+        const dots = dotsContainer.querySelectorAll('button');
+        dots.forEach((d, idx) => {
+          d.className = `w-2 h-2 rounded-full transition-all ${idx === currentGalleryIndex ? 'bg-orange-500 w-4' : 'bg-slate-700 hover:bg-slate-500'}`;
+        });
+      }
+    }
+
 
     function escapeHtml(str) {
       if (!str) return '';

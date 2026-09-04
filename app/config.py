@@ -141,6 +141,7 @@ class ColumnsConfig(BaseModel):
 
 class StorageConfig(BaseModel):
     cache_dir: str = "/data/cache"
+    gallery_dir: str = "/data/gallery"
     max_upload_size_mb: int = 200
 
 class DownloaderConfig(BaseModel):
@@ -302,12 +303,24 @@ def load_config() -> AppConfig:
     elif not os.path.exists("/.dockerenv") and config.storage.cache_dir.startswith("/data"):
         config.storage.cache_dir = "./data/cache"
 
+    if os.getenv("GALLERY_DIR"):
+        config.storage.gallery_dir = os.getenv("GALLERY_DIR")
+    elif not os.path.exists("/.dockerenv") and config.storage.gallery_dir.startswith("/data"):
+        config.storage.gallery_dir = "./data/gallery"
+
     try:
         os.makedirs(config.storage.cache_dir, exist_ok=True)
     except OSError:
         config.storage.cache_dir = "./data/cache"
         os.makedirs(config.storage.cache_dir, exist_ok=True)
 
+    try:
+        os.makedirs(config.storage.gallery_dir, exist_ok=True)
+    except OSError:
+        config.storage.gallery_dir = "./data/gallery"
+        os.makedirs(config.storage.gallery_dir, exist_ok=True)
+
     return config
+
 
 settings = load_config()

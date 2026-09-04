@@ -446,6 +446,27 @@ class GoogleService:
         performances.sort(key=lambda x: x.sequence_order if x.sequence_order is not None else 9999)
         return performances
 
+    def get_gallery_images(self) -> List[str]:
+        """Scans the configured gallery directory and returns web-accessible URLs."""
+        gallery_dir = settings.storage.gallery_dir
+        if not gallery_dir or not os.path.isdir(gallery_dir):
+            return []
+
+        valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
+        images = []
+        try:
+            for fname in sorted(os.listdir(gallery_dir)):
+                if fname.startswith("."):
+                    continue
+                ext = os.path.splitext(fname)[1].lower()
+                if ext in valid_exts:
+                    import urllib.parse
+                    safe_name = urllib.parse.quote(fname)
+                    images.append(f"/data/gallery/{safe_name}")
+        except Exception as ex:
+            logger.warning("Error scanning gallery directory %s: %s", gallery_dir, ex)
+        return images
+
     def get_live_status(self) -> Dict[str, Any]:
         from app.services.db_service import db_service
         last_sync = db_service.get_last_sync_time()
@@ -568,8 +589,10 @@ class GoogleService:
             "completed_count": len(performed),
             "last_synced_at": last_sync,
             "is_dirty": db_service.is_sequence_dirty(),
-            "active_entry_id": self.active_entry_id
+            "active_entry_id": self.active_entry_id,
+            "gallery_images": self.get_gallery_images()
         }
+
 
     def set_active_performance(self, entry_id: str) -> bool:
         self.active_entry_id = entry_id
