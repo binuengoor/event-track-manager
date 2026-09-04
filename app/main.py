@@ -26,6 +26,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Data files directory (for event poster, assets, cache)
+DATA_DIR = os.getenv("DATA_DIR", "/data" if os.path.exists("/data") else os.path.join(os.path.dirname(BASE_DIR), "data"))
+os.makedirs(DATA_DIR, exist_ok=True)
+app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
+
 # Models
 class LoginRequest(BaseModel):
     pin: str
@@ -45,10 +50,27 @@ def verify_admin_pin(request: Request):
 
 # HTML Pages
 @app.get("/", response_class=HTMLResponse)
-async def serve_intake_page():
+async def serve_landing_page():
+    landing_path = os.path.join(STATIC_DIR, "landing.html")
+    if not os.path.isfile(landing_path):
+        # Fallback to index if landing page is not yet present
+        landing_path = os.path.join(STATIC_DIR, "index.html")
+    with open(landing_path, "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
+
+@app.get("/tracks", response_class=HTMLResponse)
+async def serve_tracks_page():
     index_path = os.path.join(STATIC_DIR, "index.html")
     with open(index_path, "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
+
+@app.get("/upload")
+async def redirect_upload_to_tracks():
+    return RedirectResponse(url="/tracks")
+
+@app.get("/intake")
+async def redirect_intake_to_tracks():
+    return RedirectResponse(url="/tracks")
 
 @app.get("/console", response_class=HTMLResponse)
 async def serve_console_page():
@@ -75,6 +97,7 @@ async def get_live_status():
 async def set_active_performance(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
     google_service.set_active_performance(entry_id)
     return {"status": "success", "active_entry_id": entry_id}
+
 @app.get("/api/event-info")
 async def get_event_info():
     return {
@@ -84,6 +107,9 @@ async def get_event_info():
         "app_subtitle": settings.event.subtitle,
         "event_start_time": settings.event.start_time,
         "event_start_time_iso": settings.event.start_time_iso,
+        "poster_url": settings.event.poster_url,
+        "venue": settings.event.venue,
+        "time_range": settings.event.time_range,
         "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
         "sheet_url": f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"

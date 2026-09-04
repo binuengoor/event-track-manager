@@ -23,6 +23,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./secrets:/secrets:ro
+      - ./data:/data
       - audio_cache:/data/cache
     depends_on:
       - downloader

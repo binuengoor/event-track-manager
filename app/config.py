@@ -59,34 +59,40 @@ load_dotenv_file(os.path.join(os.path.dirname(__file__), "..", ".env"))
 from datetime import datetime
 
 def parse_event_datetime(dt_str: Optional[str]) -> Optional[str]:
-    """Parses flexible date-time strings (e.g. 09-28-2026 06:30PM) to ISO format."""
+    """Parses flexible date-time strings (e.g. 09-19-2026 05:00PM) to ISO format with EDT offset."""
     if not dt_str:
         return None
     val = dt_str.strip()
+    if "T" in val and ("+" in val or "-" in val[10:] or val.endswith("Z")):
+        return val
     formats = [
-        "%m-%d-%Y %I:%M%p",    # 09-28-2026 06:30PM
-        "%m-%d-%Y %I:%M %p",   # 09-28-2026 06:30 PM
-        "%m/%d/%Y %I:%M%p",    # 09/28/2026 06:30PM
-        "%m/%d/%Y %I:%M %p",   # 09/28/2026 06:30 PM
-        "%Y-%m-%d %H:%M:%S",   # 2026-09-28 18:30:00
-        "%Y-%m-%d %H:%M",      # 2026-09-28 18:30
-        "%Y-%m-%dT%H:%M:%S",   # 2026-09-28T18:30:00
-        "%Y-%m-%dT%H:%M",      # 2026-09-28T18:30
+        "%m-%d-%Y %I:%M%p",    # 09-19-2026 05:00PM
+        "%m-%d-%Y %I:%M %p",   # 09-19-2026 05:00 PM
+        "%m/%d/%Y %I:%M%p",    # 09/19/2026 05:00PM
+        "%m/%d/%Y %I:%M %p",   # 09/19/2026 05:00 PM
+        "%Y-%m-%d %H:%M:%S",   # 2026-09-19 17:00:00
+        "%Y-%m-%d %H:%M",      # 2026-09-19 17:00
+        "%Y-%m-%dT%H:%M:%S",   # 2026-09-19T17:00:00
+        "%Y-%m-%dT%H:%M",      # 2026-09-19T17:00
     ]
     for fmt in formats:
         try:
             dt = datetime.strptime(val, fmt)
-            return dt.isoformat()
+            # Default to EDT (-04:00) since event is in Exton, PA (EDT in September)
+            return dt.strftime("%Y-%m-%dT%H:%M:%S-04:00")
         except ValueError:
             continue
     return val
 
 class EventConfig(BaseModel):
     id: str = "paattukoottam-2026"
-    name: str = "EMA Paattukoottam"
-    subtitle: str = "Musical Night • Track Submission"
-    start_time: Optional[str] = None
-    start_time_iso: Optional[str] = None
+    name: str = "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
+    subtitle: str = "Musical Night • September 19, 2026"
+    start_time: Optional[str] = "09-19-2026 05:00PM"
+    start_time_iso: Optional[str] = "2026-09-19T17:00:00-04:00"
+    poster_url: Optional[str] = "/data/paattukoottam_animated.gif"
+    venue: Optional[str] = "1 Scouting Wy, Exton, PA 19341, USA"
+    time_range: Optional[str] = "5:00 PM - 9:00 PM EDT"
 
 class DriveFoldersConfig(BaseModel):
     active_folder_id: str = "1FQ1goCkaSajLjGv8Yt_vrWTS6krmZufW"
@@ -174,6 +180,19 @@ def load_config() -> AppConfig:
     if os.getenv("EVENT_START_TIME"):
         config.event.start_time = os.getenv("EVENT_START_TIME")
         config.event.start_time_iso = parse_event_datetime(config.event.start_time)
+    elif config.event.start_time and not config.event.start_time_iso:
+        config.event.start_time_iso = parse_event_datetime(config.event.start_time)
+
+    if os.getenv("EVENT_POSTER_URL"):
+        config.event.poster_url = os.getenv("EVENT_POSTER_URL")
+    elif os.getenv("POSTER_URL"):
+        config.event.poster_url = os.getenv("POSTER_URL")
+
+    if os.getenv("EVENT_VENUE"):
+        config.event.venue = os.getenv("EVENT_VENUE")
+
+    if os.getenv("EVENT_TIME_RANGE"):
+        config.event.time_range = os.getenv("EVENT_TIME_RANGE")
 
     # 2. Google Workspace & Drive URLs / IDs
     sheet_url_env = os.getenv("GOOGLE_SHEET_URL") or os.getenv("SHEET_ID")

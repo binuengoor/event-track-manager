@@ -1,7 +1,12 @@
 # EMA Paattukoottam Event & Track Manager Configuration
 event:
   id: "paattukoottam-2026"
-  name: "EMA Paattukoottam Musical Evening"
+  name: "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
+  subtitle: "Musical Night • September 19, 2026"
+  start_time: "09-19-2026 05:00PM"
+  poster_url: "/data/paattukoottam_animated.gif"
+  venue: "1 Scouting Wy, Exton, PA 19341, USA"
+  time_range: "5:00 PM - 9:00 PM EDT"
 
 google:
   # Path to Google Cloud Service Account JSON Key

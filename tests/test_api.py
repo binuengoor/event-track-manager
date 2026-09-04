@@ -19,6 +19,49 @@ def test_event_info():
     data = res.json()
     assert "event_name" in data
     assert "event_id" in data
+    assert "poster_url" in data
+    assert "venue" in data
+    assert "event_start_time_iso" in data
+    assert data["poster_url"] == "/data/paattukoottam_animated.gif"
+
+def test_landing_and_tracks_pages():
+    client = TestClient(app)
+    # Landing page at root /
+    res_root = client.get("/")
+    assert res_root.status_code == 200
+    assert "Sing & Serenade" in res_root.text
+    assert "Upload Tracks" in res_root.text
+    assert "Live Program" in res_root.text
+    assert "Console" in res_root.text
+
+    # Tracks page at /tracks
+    res_tracks = client.get("/tracks")
+    assert res_tracks.status_code == 200
+    assert "Upload Your Backing Track" in res_tracks.text
+
+    # Redirects for /upload and /intake
+    res_up = client.get("/upload", follow_redirects=False)
+    assert res_up.status_code in (302, 307)
+    assert res_up.headers["location"] == "/tracks"
+
+    res_in = client.get("/intake", follow_redirects=False)
+    assert res_in.status_code in (302, 307)
+    assert res_in.headers["location"] == "/tracks"
+
+def test_data_static_serving():
+    import os
+    from app.main import DATA_DIR
+    test_file = os.path.join(DATA_DIR, "test_banner.txt")
+    with open(test_file, "w") as f:
+        f.write("banner content")
+    try:
+        client = TestClient(app)
+        res = client.get("/data/test_banner.txt")
+        assert res.status_code == 200
+        assert res.text == "banner content"
+    finally:
+        if os.path.exists(test_file):
+            os.remove(test_file)
 
 def test_list_performances():
     client = TestClient(app)

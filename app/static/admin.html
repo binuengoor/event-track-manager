@@ -49,8 +49,8 @@
   <!-- Main Stage Console Header -->
   <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow">
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow group-hover:scale-105 transition">
           <i data-lucide="disc-3" class="w-5 h-5 animate-spin" style="animation-duration: 6s;"></i>
         </div>
         <div>
@@ -62,7 +62,7 @@
             <span id="stats-summary">Loading stage queue...</span>
           </div>
         </div>
-      </div>
+      </a>
 
       <!-- Navigation & Action Buttons -->
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
@@ -72,17 +72,17 @@
           <span id="sync-status-text">Connected</span>
         </div>
 
-        <a href="/" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Track Intake & Submission">
+        <a href="/tracks" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Track Intake & Submission">
           <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
           <span>Upload Tracks</span>
         </a>
 
-        <a href="/live" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
           <span>Live Program</span>
         </a>
 
-        <a href="/console" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Stage Sound & Playback Console">
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Stage Sound & Playback Console">
           <i data-lucide="shield" class="w-3.5 h-3.5 text-orange-400"></i>
           <span>Console</span>
         </a>

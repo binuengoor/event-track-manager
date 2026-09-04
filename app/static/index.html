@@ -14,30 +14,30 @@
   <!-- Navigation Bar -->
   <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
     <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
           <h1 id="event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
           <p id="event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night • Track Submission</p>
         </div>
-      </div>
+      </a>
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
         <!-- Live Sync Timestamp Indicator -->
         <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span id="sync-status-text">Synced</span>
         </div>
-        <a href="/" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Track Intake & Submission">
+        <a href="/tracks" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Track Intake & Submission">
           <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
           <span>Upload Tracks</span>
         </a>
-        <a href="/live" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
           <span>Live Program</span>
         </a>
-        <a href="/console" target="_blank" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Stage Sound & Playback Console">
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Stage Sound & Playback Console">
           <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
           <span>Console</span>
         </a>
