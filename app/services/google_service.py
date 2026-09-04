@@ -36,14 +36,22 @@ class GoogleService:
         self.drive = None
         self.is_xlsx = False
         self._mock_data: List[PerformanceEntry] = []
-        from app.services.db_service import db_service
-        self.active_entry_id: Optional[str] = db_service.get_active_entry_id()
 
         if self.mock_mode:
             logger.info("Initializing GoogleService in MOCK MODE (No external API calls)")
             self._init_mock_data()
         else:
             self._init_real_clients()
+
+    @property
+    def active_entry_id(self) -> Optional[str]:
+        from app.services.db_service import db_service
+        return db_service.get_active_entry_id()
+
+    @active_entry_id.setter
+    def active_entry_id(self, val: Optional[str]):
+        from app.services.db_service import db_service
+        db_service.set_active_entry_id(val)
 
     def _init_mock_data(self):
         self._mock_data = [
@@ -112,7 +120,6 @@ class GoogleService:
                 is_song_name_missing=False
             )
         ]
-        self.active_entry_id = None
 
     def _init_real_clients(self):
         try:
@@ -564,18 +571,14 @@ class GoogleService:
         }
 
     def set_active_performance(self, entry_id: str) -> bool:
-        from app.services.db_service import db_service
         self.active_entry_id = entry_id
-        db_service.set_active_entry_id(entry_id)
         # Update performance_status in sheet & db
         self.update_status(entry_id, "On Stage")
         return True
 
     def clear_active_performance(self) -> bool:
-        from app.services.db_service import db_service
-        prev_id = self.active_entry_id or db_service.get_active_entry_id()
+        prev_id = self.active_entry_id
         self.active_entry_id = None
-        db_service.set_active_entry_id(None)
         if prev_id:
             try:
                 self.update_status(prev_id, "Upcoming")

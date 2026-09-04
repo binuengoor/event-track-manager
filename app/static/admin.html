@@ -199,7 +199,7 @@
         </div>
 
         <!-- Central Playback Controls -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 sm:gap-3">
           <button id="btn-seek-back" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Back 5s [←]">
             <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
           </button>
@@ -209,7 +209,10 @@
           <button id="btn-seek-fwd" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Forward 5s [→]">
             <i data-lucide="rotate-cw" class="w-4 h-4"></i>
           </button>
-          <button id="btn-cue-next" class="p-2 text-slate-400 hover:text-orange-400 rounded-lg hover:bg-slate-800 transition ml-2" title="Cue Next Sequenced Track [↓]">
+          <button id="btn-mute" class="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition" title="Mute / Unmute Audio [M]">
+            <i data-lucide="volume-2" id="mute-icon" class="w-4 h-4"></i>
+          </button>
+          <button id="btn-cue-next" class="p-2 text-slate-400 hover:text-orange-400 rounded-lg hover:bg-slate-800 transition ml-1" title="Cue Next Sequenced Track [↓]">
             <i data-lucide="skip-forward" class="w-4 h-4"></i>
           </button>
         </div>

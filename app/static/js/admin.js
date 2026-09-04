@@ -4,6 +4,7 @@ let filteredQueue = [];
 let currentCuedItem = null;
 let wavesurfer = null;
 let isPlaying = false;
+let isMuted = false;
 let userAdminPin = localStorage.getItem('paattukoottam_pin') || '';
 let searchQuery = '';
 let draggedItemIndex = null;
@@ -180,11 +181,12 @@ async function loadQueue(silent = false) {
     statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
     countPill.textContent = `${performed}/${total} completed`;
 
-    // Fetch live status for dirty state and last sync timestamp
+    // Fetch live status for dirty state, active performer, and sync timestamp
+    let liveData = null;
     try {
       const liveRes = await fetch('/api/live-status');
       if (liveRes.ok) {
-        const liveData = await liveRes.json();
+        liveData = await liveRes.json();
         lastSyncedAt = liveData.last_synced_at;
         setDirtyState(Boolean(liveData.is_dirty));
       }
@@ -197,24 +199,20 @@ async function loadQueue(silent = false) {
 
     // Auto-restore active / cued track on load if not already cued
     if (!currentCuedItem && queue.length > 0) {
-      let candidateId = null;
-      try {
-        const liveRes = await fetch('/api/live-status');
-        if (liveRes.ok) {
-          const liveData = await liveRes.json();
-          candidateId = liveData.active_entry_id;
-        }
-      } catch (e) {}
-
-      if (!candidateId) {
-        candidateId = localStorage.getItem('paattukoottam_cued_entry_id');
-      }
+      const serverActiveId = liveData ? liveData.active_entry_id : null;
+      const candidateId = serverActiveId || localStorage.getItem('paattukoottam_cued_entry_id');
 
       if (candidateId) {
         const matchItem = queue.find(q => q.entry_id === candidateId);
-        if (matchItem && isEligibleForStage(matchItem)) {
-          cueTrack(matchItem, false);
+        if (matchItem) {
+          cueTrack(matchItem, false, true);
         }
+      }
+
+      // If server has an active entry, ensure Uncue button is enabled so operator can uncue
+      if (serverActiveId) {
+        const uncueBtn = document.getElementById('btn-uncue');
+        if (uncueBtn) uncueBtn.disabled = false;
       }
     }
 
@@ -410,8 +408,19 @@ function renderQueueList() {
     `;
 
     // Row event listeners
-    row.querySelector('.btn-cue-row').addEventListener('click', () => {
-      cueTrack(item, false);
+    const cueBtn = row.querySelector('.btn-cue-row');
+    if (cueBtn) {
+      cueBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cueTrack(item, false);
+      });
+    }
+
+    row.addEventListener('click', (e) => {
+      if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+      if (isUploaded || item.drive_file_id) {
+        cueTrack(item, false);
+      }
     });
 
     const holdBtn = row.querySelector('.btn-hold-row');
@@ -575,10 +584,58 @@ function initWaveSurfer() {
   }
 }
 
+function isAudioPlaying() {
+  if (wavesurfer) {
+    try {
+      if (typeof wavesurfer.isPlaying === 'function' && wavesurfer.isPlaying()) return true;
+    } catch (e) {}
+  }
+  return Boolean(isPlaying);
+}
+
+function toggleMute() {
+  if (!wavesurfer) return;
+  try {
+    const nextMute = !isMuted;
+    wavesurfer.setMuted(nextMute);
+    isMuted = nextMute;
+    updateMuteButton();
+    showToast(isMuted ? 'Audio muted' : 'Audio unmuted', isMuted ? 'info' : 'success');
+  } catch (e) {
+    console.warn('Mute error:', e);
+  }
+}
+
+function handleMuteClick() {
+  if (isMuted) {
+    toggleMute();
+  } else {
+    confirmIfPlaying('Muting live stage audio', () => {
+      toggleMute();
+    });
+  }
+}
+
+function updateMuteButton() {
+  const icon = document.getElementById('mute-icon');
+  const btn = document.getElementById('btn-mute');
+  if (!icon || !btn) return;
+  if (isMuted) {
+    icon.setAttribute('data-lucide', 'volume-x');
+    btn.className = 'p-2 text-rose-400 bg-rose-500/20 rounded-lg transition border border-rose-500/40';
+    btn.title = 'Unmute Audio [M]';
+  } else {
+    icon.setAttribute('data-lucide', 'volume-2');
+    btn.className = 'p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition';
+    btn.title = 'Mute Audio [M]';
+  }
+  if (window.lucide) lucide.createIcons();
+}
+
 let disruptionPendingCallback = null;
 
 function confirmIfPlaying(actionDescription, onProceed) {
-  if (!isPlaying) {
+  if (!isAudioPlaying()) {
     onProceed();
     return;
   }
@@ -586,7 +643,7 @@ function confirmIfPlaying(actionDescription, onProceed) {
   const modal = document.getElementById('disruption-modal');
   const msgEl = document.getElementById('disruption-modal-msg');
   if (msgEl) {
-    msgEl.innerHTML = `A track is currently playing live on stage.<br><span class="text-amber-300 font-semibold">${escapeHtml(actionDescription)}</span> will stop the music.`;
+    msgEl.innerHTML = `A track is currently playing live on stage.<br><span class="text-amber-300 font-semibold">${escapeHtml(actionDescription)}</span> will stop or silence the music.`;
   }
 
   disruptionPendingCallback = onProceed;
@@ -608,8 +665,8 @@ function setupDisruptionModal() {
   if (confirmBtn) {
     confirmBtn.addEventListener('click', () => {
       if (modal) modal.classList.add('hidden');
-      if (wavesurfer && isPlaying) {
-        wavesurfer.stop();
+      if (wavesurfer && isAudioPlaying()) {
+        try { wavesurfer.stop(); } catch (e) {}
         isPlaying = false;
         updatePlayPauseButton();
       }
@@ -624,7 +681,7 @@ function setupDisruptionModal() {
   // Intercept navigation links
   document.querySelectorAll('header a[href]').forEach(link => {
     link.addEventListener('click', (e) => {
-      if (isPlaying) {
+      if (isAudioPlaying()) {
         e.preventDefault();
         const targetHref = link.getAttribute('href');
         confirmIfPlaying('Leaving this console page', () => {
@@ -636,7 +693,7 @@ function setupDisruptionModal() {
 
   // Browser reload / tab close guard
   window.addEventListener('beforeunload', (e) => {
-    if (isPlaying) {
+    if (isAudioPlaying()) {
       e.preventDefault();
       e.returnValue = 'Audio is currently playing live on stage. Are you sure you want to leave?';
       return e.returnValue;
@@ -691,10 +748,10 @@ function resetPlayerBar() {
 }
 
 async function uncueTrack() {
-  if (!currentCuedItem) return;
   const itemToUncue = currentCuedItem;
+  const songName = itemToUncue ? itemToUncue.song_title : 'Active Track';
 
-  confirmIfPlaying(`Uncueing "${itemToUncue.song_title}"`, async () => {
+  confirmIfPlaying(`Uncueing "${songName}"`, async () => {
     try {
       const res = await fetch('/api/clear-active', {
         method: 'POST',
@@ -702,26 +759,33 @@ async function uncueTrack() {
       });
       if (!res.ok) throw new Error('Failed to uncue track on server');
 
-      const target = queue.find(q => q.entry_id === itemToUncue.entry_id);
-      if (target && target.track_status === 'On Stage') {
-        target.track_status = 'Uploaded';
+      if (itemToUncue) {
+        const target = queue.find(q => q.entry_id === itemToUncue.entry_id);
+        if (target && target.performance_status === 'On Stage') {
+          target.performance_status = 'Upcoming';
+        }
+      } else {
+        queue.forEach(q => {
+          if (q.performance_status === 'On Stage') q.performance_status = 'Upcoming';
+        });
       }
 
+      localStorage.removeItem('paattukoottam_cued_entry_id');
       resetPlayerBar();
-      showToast(`✓ Uncued "${itemToUncue.song_title}". Live Program restored to countdown.`);
+      showToast(`✓ Uncued "${songName}". Live Program restored to countdown.`);
     } catch (err) {
       showToast(`Uncue failed: ${err.message}`, 'error');
     }
   });
 }
 
-function cueTrack(item, autoPlay = false) {
+function cueTrack(item, autoPlay = false, isRestoration = false) {
   if (currentCuedItem && currentCuedItem.entry_id === item.entry_id) {
     if (autoPlay && wavesurfer) wavesurfer.play();
     return;
   }
 
-  confirmIfPlaying(`Cueing new track "${item.song_title}"`, () => {
+  const applyCue = () => {
     currentCuedItem = item;
     localStorage.setItem('paattukoottam_cued_entry_id', item.entry_id);
 
@@ -734,16 +798,16 @@ function cueTrack(item, autoPlay = false) {
     const downloadBtn = document.getElementById('btn-download-cued');
     const playerBadge = document.getElementById('player-badge');
 
-    playerTitle.textContent = item.song_title;
+    if (playerTitle) playerTitle.textContent = item.song_title;
     let singerText = item.performer_name;
     if (item.partner_name) singerText = `Duet: ${item.performer_name} & ${item.partner_name}`;
-    playerPerformer.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')} • ${singerText}`;
+    if (playerPerformer) playerPerformer.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')} • ${singerText}`;
 
-    playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
+    if (playerBadge) playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
 
-    playBtn.disabled = false;
-    markDoneBtn.disabled = false;
-    holdBtn.disabled = false;
+    if (playBtn) playBtn.disabled = false;
+    if (markDoneBtn) markDoneBtn.disabled = false;
+    if (holdBtn) holdBtn.disabled = false;
     if (uncueBtn) uncueBtn.disabled = false;
 
     // Configure 1-Click Track Download for Local Playback
@@ -784,15 +848,21 @@ function cueTrack(item, autoPlay = false) {
     }
 
     const placeholder = document.getElementById('waveform-placeholder');
-    placeholder.textContent = 'Loading audio waveform...';
-    placeholder.classList.remove('hidden');
+    if (placeholder) {
+      placeholder.textContent = 'Loading audio waveform...';
+      placeholder.classList.remove('hidden');
+    }
 
     if (wavesurfer) {
-      wavesurfer.load(`/api/stream/${item.entry_id}`);
-      if (autoPlay) {
-        wavesurfer.once('ready', () => {
-          wavesurfer.play();
-        });
+      try {
+        wavesurfer.load(`/api/stream/${item.entry_id}`);
+        if (autoPlay) {
+          wavesurfer.once('ready', () => {
+            wavesurfer.play();
+          });
+        }
+      } catch (err) {
+        console.warn('WaveSurfer load error:', err);
       }
     }
 
@@ -800,12 +870,20 @@ function cueTrack(item, autoPlay = false) {
     updatePlayPauseButton();
     renderQueueList();
 
-    // Notify Live View of currently cued / active performer
-    fetch(`/api/set-active/${item.entry_id}`, {
-      method: 'POST',
-      headers: getAuthHeaders()
-    }).catch(() => {});
-  });
+    // Notify Live View of currently cued / active performer (skip during page reload restoration)
+    if (!isRestoration) {
+      fetch(`/api/set-active/${item.entry_id}`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      }).catch(() => {});
+    }
+  };
+
+  if (isRestoration) {
+    applyCue();
+  } else {
+    confirmIfPlaying(`Cueing new track "${item.song_title}"`, applyCue);
+  }
 }
 
 function updatePlayPauseButton() {
@@ -900,6 +978,9 @@ function setupKeyboardHotkeys() {
     } else if (e.code === 'ArrowRight') {
       e.preventDefault();
       if (wavesurfer) wavesurfer.seekTo(Math.min(1, (wavesurfer.getCurrentTime() + 5) / wavesurfer.getDuration()));
+    } else if (e.code === 'KeyM') {
+      e.preventDefault();
+      handleMuteClick();
     } else if (e.code === 'ArrowDown') {
       e.preventDefault();
       confirmIfPlaying('Skipping to next track', () => {
@@ -927,6 +1008,11 @@ function setupActionButtons() {
   document.getElementById('btn-seek-fwd').addEventListener('click', () => {
     if (wavesurfer) wavesurfer.seekTo(Math.min(1, (wavesurfer.getCurrentTime() + 5) / wavesurfer.getDuration()));
   });
+
+  const muteBtn = document.getElementById('btn-mute');
+  if (muteBtn) {
+    muteBtn.addEventListener('click', handleMuteClick);
+  }
 
   document.getElementById('btn-cue-next').addEventListener('click', () => {
     confirmIfPlaying('Cueing next track', () => {

@@ -59,7 +59,12 @@ async def serve_landing_page():
         # Fallback to index if landing page is not yet present
         landing_path = os.path.join(STATIC_DIR, "index.html")
     with open(landing_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html = f.read()
+    response = HTMLResponse(content=html)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/tracks", response_class=HTMLResponse)
 async def serve_tracks_page():
@@ -102,7 +107,17 @@ async def redirect_intake_to_tracks():
 async def serve_console_page():
     admin_path = os.path.join(STATIC_DIR, "admin.html")
     with open(admin_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html = f.read()
+
+    # Cache bust console script
+    version = int(datetime.utcnow().timestamp())
+    html = html.replace('/static/js/admin.js', f'/static/js/admin.js?v={version}')
+
+    response = HTMLResponse(content=html)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/admin")
 async def redirect_admin_to_console():
@@ -112,7 +127,13 @@ async def redirect_admin_to_console():
 async def serve_live_page():
     live_path = os.path.join(STATIC_DIR, "live.html")
     with open(live_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html = f.read()
+
+    response = HTMLResponse(content=html)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # API Endpoints
 @app.get("/api/live-status")
@@ -357,8 +378,8 @@ async def upload_track(
         "message": f"Successfully updated backing track for {target_entry.performer_name} - {target_entry.song_title}"
     }
 
-@app.get("/api/stream/{entry_id}")
-async def stream_audio(entry_id: str, range: Optional[str] = Header(None)):
+@app.api_route("/api/stream/{entry_id}", methods=["GET", "HEAD"])
+async def stream_audio(entry_id: str, request: Request, range: Optional[str] = Header(None)):
     performances = google_service.get_performances()
     target = next((p for p in performances if p.entry_id == entry_id), None)
     if not target:
@@ -369,6 +390,16 @@ async def stream_audio(entry_id: str, range: Optional[str] = Header(None)):
         raise HTTPException(status_code=404, detail="No audio track available for this performance")
 
     file_size = os.path.getsize(cache_path)
+
+    if request.method == "HEAD":
+        return Response(
+            status_code=200,
+            headers={
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(file_size),
+                "Content-Type": "audio/mpeg",
+            }
+        )
     
     if range:
         range_match = re.match(r"bytes=(\d+)-(\d*)", range)

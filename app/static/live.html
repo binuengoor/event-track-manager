@@ -184,7 +184,7 @@
   <script>
     let showCompleted = false;
     let latestData = null;
-    let targetStartTime = null;
+    let targetStartTime = new Date("2026-09-19T17:00:00-04:00");
 
     document.addEventListener('DOMContentLoaded', () => {
       fetchLiveStatus();
@@ -258,7 +258,7 @@
       const sectionLabel = document.getElementById('section-status-text');
 
       // Pre-show is active if start time is in future AND no performance is cued/on stage
-      const hasActivePerformance = latestData && latestData.now_performing;
+      const hasActivePerformance = Boolean(latestData && latestData.now_performing && latestData.now_performing.entry_id);
       if (diff > 0 && !hasActivePerformance) {
         countdownCard.classList.remove('hidden');
         nowCard.classList.add('hidden');
@@ -315,13 +315,14 @@
         if (sub) sub.textContent = data.event_subtitle;
       }
       if (data.event_start_time_iso) {
-        targetStartTime = new Date(data.event_start_time_iso);
+        const parsed = new Date(data.event_start_time_iso);
+        if (!isNaN(parsed.getTime())) {
+          targetStartTime = parsed;
+        }
         const displayEl = document.getElementById('countdown-datetime-display');
         if (displayEl && data.event_start_time) {
           displayEl.textContent = `Scheduled Start: ${data.event_start_time}`;
         }
-      } else {
-        targetStartTime = null;
       }
 
       updateCountdown();
