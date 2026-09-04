@@ -8,8 +8,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  APP_IMAGE_NAME: ${{ github.repository }}-app
-  DOWNLOADER_IMAGE_NAME: ${{ github.repository }}-downloader
 
 jobs:
   build-and-push:
@@ -17,6 +15,20 @@ jobs:
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: app
+            image: ${{ github.repository }}-app
+            context: .
+            file: ./app/Dockerfile
+            cache-scope: app
+          - name: downloader
+            image: ${{ github.repository }}-downloader
+            context: ./downloader
+            file: ./downloader/Dockerfile
+            cache-scope: downloader
 
     steps:
       - name: Checkout repository
@@ -35,52 +47,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Extract metadata (tags, labels) for App
-      - name: Extract Docker metadata for App
-        id: meta-app
+      - name: Extract Docker metadata
+        id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.APP_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,format=short,prefix=sha-
             type=ref,event=branch
             type=semver,pattern={{version}}
 
-      # Extract metadata (tags, labels) for Downloader
-      - name: Extract Docker metadata for Downloader
-        id: meta-downloader
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.DOWNLOADER_IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=sha,format=short,prefix=sha-
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-
-      # Build and push App image (Multi-arch: linux/amd64, linux/arm64)
-      - name: Build and push App image
+      - name: Build and push ${{ matrix.name }} image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./app/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ${{ steps.meta-app.outputs.tags }}
-          labels: ${{ steps.meta-app.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # Build and push Downloader image (Multi-arch: linux/amd64, linux/arm64)
-      - name: Build and push Downloader image
-        uses: docker/build-push-action@v6
-        with:
-          context: ./downloader
-          file: ./downloader/Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta-downloader.outputs.tags }}
-          labels: ${{ steps.meta-downloader.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.cache-scope }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.cache-scope }}
