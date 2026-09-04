@@ -1,6 +1,8 @@
 import os
+import time
 import logging
 import shutil
+from datetime import datetime, timezone
 from typing import Optional, List
 from fastapi import FastAPI, UploadFile, File, Form, Header, HTTPException, Depends, Request, Response
 from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, RedirectResponse, FileResponse
@@ -62,7 +64,28 @@ async def serve_landing_page():
 async def serve_tracks_page():
     index_path = os.path.join(STATIC_DIR, "index.html")
     with open(index_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+        html = f.read()
+
+    # Pre-render dynamic resource links server-side to avoid client-side cache delays
+    sheet_url = settings.event.signup_sheet_url or f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
+    payment_url = settings.event.payment_url
+
+    if payment_url:
+        html = html.replace('id="payment-page-link" href="#" target="_blank" class="hidden', f'id="payment-page-link" href="{payment_url}" target="_blank" class="')
+        html = html.replace('id="payment-page-placeholder" class="inline-flex', 'id="payment-page-placeholder" class="hidden inline-flex')
+
+    if sheet_url:
+        html = html.replace('id="signup-sheet-link" href="https://docs.google.com"', f'id="signup-sheet-link" href="{sheet_url}"')
+
+    # Cache bust script
+    version = int(datetime.utcnow().timestamp())
+    html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
+
+    response = HTMLResponse(content=html)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/upload")
 async def redirect_upload_to_tracks():
