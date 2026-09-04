@@ -98,8 +98,14 @@ async def set_active_performance(entry_id: str, _authorized: bool = Depends(veri
     google_service.set_active_performance(entry_id)
     return {"status": "success", "active_entry_id": entry_id}
 
+@app.post("/api/clear-active")
+async def clear_active_performance(_authorized: bool = Depends(verify_admin_pin)):
+    google_service.clear_active_performance()
+    return {"status": "success", "message": "Performance uncued and returned to queue"}
+
 @app.get("/api/event-info")
 async def get_event_info():
+    sheet_url = settings.event.signup_sheet_url or f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
     return {
         "event_id": settings.event.id,
         "event_name": settings.event.name,
@@ -110,9 +116,10 @@ async def get_event_info():
         "poster_url": settings.event.poster_url,
         "venue": settings.event.venue,
         "time_range": settings.event.time_range,
+        "payment_url": settings.event.payment_url,
         "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
-        "sheet_url": f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
+        "sheet_url": sheet_url
     }
 
 @app.get("/api/track-info/{entry_id}")

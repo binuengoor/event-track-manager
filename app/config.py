@@ -93,6 +93,8 @@ class EventConfig(BaseModel):
     poster_url: Optional[str] = "/data/paattukoottam_animated.gif"
     venue: Optional[str] = "1 Scouting Wy, Exton, PA 19341, USA"
     time_range: Optional[str] = "5:00 PM - 9:00 PM EDT"
+    payment_url: Optional[str] = None
+    signup_sheet_url: Optional[str] = None
 
 class DriveFoldersConfig(BaseModel):
     active_folder_id: str = "1FQ1goCkaSajLjGv8Yt_vrWTS6krmZufW"
@@ -193,6 +195,16 @@ def load_config() -> AppConfig:
 
     if os.getenv("EVENT_TIME_RANGE"):
         config.event.time_range = os.getenv("EVENT_TIME_RANGE")
+
+    if os.getenv("EVENT_PAYMENT_URL"):
+        config.event.payment_url = os.getenv("EVENT_PAYMENT_URL")
+    elif os.getenv("PAYMENT_URL"):
+        config.event.payment_url = os.getenv("PAYMENT_URL")
+
+    if os.getenv("EVENT_SIGNUP_SHEET_URL"):
+        config.event.signup_sheet_url = os.getenv("EVENT_SIGNUP_SHEET_URL")
+    elif os.getenv("SIGNUP_SHEET_URL"):
+        config.event.signup_sheet_url = os.getenv("SIGNUP_SHEET_URL")
 
     # 2. Google Workspace & Drive URLs / IDs
     sheet_url_env = os.getenv("GOOGLE_SHEET_URL") or os.getenv("SHEET_ID")

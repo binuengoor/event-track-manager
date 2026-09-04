@@ -200,6 +200,25 @@ class DBService:
         except Exception:
             return False
 
+    def set_active_entry_id(self, entry_id: Optional[str]):
+        with self._get_connection() as conn:
+            if entry_id:
+                conn.execute("""
+                INSERT INTO sync_meta (key, value) VALUES ('active_entry_id', ?)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value
+                """, (entry_id,))
+            else:
+                conn.execute("DELETE FROM sync_meta WHERE key='active_entry_id'")
+            conn.commit()
+
+    def get_active_entry_id(self) -> Optional[str]:
+        try:
+            with self._get_connection() as conn:
+                row = conn.execute("SELECT value FROM sync_meta WHERE key='active_entry_id'").fetchone()
+                return row["value"] if row else None
+        except Exception:
+            return None
+
     def reset_database(self):
         """Drops and re-creates tables cleanly on user request."""
         with self._get_connection() as conn:

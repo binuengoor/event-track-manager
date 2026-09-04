@@ -194,3 +194,51 @@ def test_staged_reorder_and_push_sequence():
     live_res2 = client.get("/api/live-status")
     assert live_res2.status_code == 200
     assert live_res2.json()["is_dirty"] is False
+
+def test_cue_and_clear_active_performance():
+    client = TestClient(app)
+    perf_res = client.get("/api/performances")
+    items = perf_res.json()
+    assert len(items) > 0
+    first_id = items[0]["entry_id"]
+
+    # 1. Set active performance (cue track)
+    set_res = client.post(
+        f"/api/set-active/{first_id}",
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert set_res.status_code == 200
+    assert set_res.json()["status"] == "success"
+    assert set_res.json()["active_entry_id"] == first_id
+
+    # Verify live-status reflects active_entry_id and now_performing
+    live_res = client.get("/api/live-status")
+    assert live_res.status_code == 200
+    live_data = live_res.json()
+    assert live_data["active_entry_id"] == first_id
+    assert live_data["now_performing"] is not None
+    assert live_data["now_performing"]["entry_id"] == first_id
+
+    # 2. Clear active performance (uncue track)
+    clear_res = client.post(
+        "/api/clear-active",
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert clear_res.status_code == 200
+    assert clear_res.json()["status"] == "success"
+
+    # Verify live-status shows no active entry and now_performing is None
+    live_res2 = client.get("/api/live-status")
+    assert live_res2.status_code == 200
+    live_data2 = live_res2.json()
+    assert live_data2["active_entry_id"] is None
+    assert live_data2["now_performing"] is None
+
+def test_event_info_has_payment_and_sheet_urls():
+    client = TestClient(app)
+    res = client.get("/api/event-info")
+    assert res.status_code == 200
+    data = res.json()
+    assert "sheet_url" in data
+    assert "payment_url" in data
+

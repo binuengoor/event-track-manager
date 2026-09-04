@@ -33,6 +33,19 @@ async function initEventInfo() {
         sheetUrl = data.sheet_url;
         const sheetLink = document.getElementById('open-sheet-link');
         if (sheetLink) sheetLink.href = sheetUrl;
+        const signupSheetLink = document.getElementById('signup-sheet-link');
+        if (signupSheetLink) signupSheetLink.href = sheetUrl;
+      }
+      if (data.payment_url) {
+        const payLink = document.getElementById('payment-page-link');
+        const payPlaceholder = document.getElementById('payment-page-placeholder');
+        if (payLink) {
+          payLink.href = data.payment_url;
+          payLink.classList.remove('hidden');
+        }
+        if (payPlaceholder) {
+          payPlaceholder.classList.add('hidden');
+        }
       }
       if (data.max_upload_size_mb) {
         maxUploadSizeMb = data.max_upload_size_mb;

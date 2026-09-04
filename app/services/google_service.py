@@ -36,7 +36,8 @@ class GoogleService:
         self.drive = None
         self.is_xlsx = False
         self._mock_data: List[PerformanceEntry] = []
-        self.active_entry_id: Optional[str] = None
+        from app.services.db_service import db_service
+        self.active_entry_id: Optional[str] = db_service.get_active_entry_id()
 
         if self.mock_mode:
             logger.info("Initializing GoogleService in MOCK MODE (No external API calls)")
@@ -558,13 +559,28 @@ class GoogleService:
             "total_count": len(queue),
             "completed_count": len(performed),
             "last_synced_at": last_sync,
-            "is_dirty": db_service.is_sequence_dirty()
+            "is_dirty": db_service.is_sequence_dirty(),
+            "active_entry_id": self.active_entry_id
         }
 
     def set_active_performance(self, entry_id: str) -> bool:
+        from app.services.db_service import db_service
         self.active_entry_id = entry_id
-        # Optionally update performance_status in sheet
+        db_service.set_active_entry_id(entry_id)
+        # Update performance_status in sheet & db
         self.update_status(entry_id, "On Stage")
+        return True
+
+    def clear_active_performance(self) -> bool:
+        from app.services.db_service import db_service
+        prev_id = self.active_entry_id or db_service.get_active_entry_id()
+        self.active_entry_id = None
+        db_service.set_active_entry_id(None)
+        if prev_id:
+            try:
+                self.update_status(prev_id, "Upcoming")
+            except Exception as ex:
+                logger.warning("Failed to revert performance status for %s: %s", prev_id, ex)
         return True
 
     def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:

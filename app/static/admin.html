@@ -46,6 +46,29 @@
     </div>
   </div>
 
+  <!-- Audio Disruption Warning Modal -->
+  <div id="disruption-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-700 p-6 sm:p-7 rounded-3xl max-w-md w-full shadow-2xl space-y-5 text-center">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
+        <i data-lucide="alert-triangle" class="w-7 h-7 animate-pulse"></i>
+      </div>
+      <div class="space-y-1.5">
+        <h3 class="text-lg font-bold text-white tracking-tight">Audio Currently Playing</h3>
+        <p id="disruption-modal-msg" class="text-xs text-slate-300 leading-relaxed">
+          A track is currently playing live on stage. Proceeding will interrupt the audio.
+        </p>
+      </div>
+      <div class="flex items-center gap-3 pt-2">
+        <button id="disruption-cancel-btn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
+          Keep Playing
+        </button>
+        <button id="disruption-confirm-btn" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition">
+          Stop & Proceed
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Main Stage Console Header -->
   <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
     <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -205,6 +228,10 @@
           <button id="btn-hold-skip" class="px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="No-Show / Put On Hold">
             <i data-lucide="pause-circle" class="w-4 h-4"></i>
             <span>Hold</span>
+          </button>
+          <button id="btn-uncue" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-rose-200 font-semibold text-xs border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Uncue Track & Return to Queue">
+            <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
+            <span>Uncue</span>
           </button>
         </div>
 
