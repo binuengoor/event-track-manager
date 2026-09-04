@@ -8,29 +8,37 @@ It connects directly to **Google Sheets** for performer registration and live st
 
 ## Key Features
 
-1. **Performer Intake & Track Upload Portal (`/`)**:
+1. **Performer Intake & Track Upload Portal (`/tracks`)**:
    - Mobile-first, searchable performer dropdown matching both primary singers and duet partners.
    - Intelligent handling for multiple performances per singer.
-   - Missing song title detection with direct warning alerts.
+   - Missing song title detection with direct warning alerts and direct links to the Google Sign-Up sheet.
    - Dual submission modes: Direct Audio Upload (MP3, WAV, M4A up to 200MB) with 320kbps stage-fidelity transcoding, or YouTube URL extraction.
    - Interactive waveform preview with instant play/pause and track duration metadata.
+   - Integrated event poster, venue details, and optional direct payment link integration (`EVENT_PAYMENT_URL`).
    - Live synchronization indicator displaying relative sync times (`● Synced Just now`).
 
 2. **Public Live Stage Program (`/live`)**:
+   - **Adaptive 70/30 Split Screen**:
+     - Automatically expands into a 70/30 split on desktop/stage screens when gallery images exist.
+     - **Rotating Sponsor & Event Highlight Carousel**: Displays sponsor banners, flyers, and event logos from `./data/gallery` with auto-rotation every 6 seconds, smooth crossfade, and indicator dots. Fixed-height card eliminates all layout jumps.
+     - Automatically scales back to **100% full width** if no gallery images are present.
    - Pre-show countdown card (`[DAYS] [HOURS] [MINUTES] [SECONDS]`) driven by `EVENT_START_TIME`.
-   - Automatic live transition to `🔴 LIVE PROGRAM` and `🎤 NOW ON STAGE` when performances begin.
+   - Automatic live transition to `🔴 LIVE PROGRAM` and `🎤 NOW ON STAGE` when performances begin or a track is cued.
+   - **Stage Notes Display**: Dynamically highlights sound engineer notes (e.g., mic adjustments, count-in cues) below the song title when provided.
    - **Up Next (Please Be Ready)**: Automatically highlights the immediate next eligible acts so performers know when to report backstage.
    - Stage eligibility filter: Only acts that are Acoustic/Live, Group, or have an audio track uploaded are cued for backstage readiness.
-   - Multi-tier ordering configuration (`LIVE_ORDER_BY`) supporting readiness, sequence, and age group.
    - Auto-refreshes every 5 seconds with background polling.
 
 3. **Stage Sound & Playback Console (`/console`)**:
    - PIN-protected control center (configured via `ADMIN_PIN`).
+   - **Stage Audio Disruption Protection**: Active safeguards prevent accidentally cutting off live stage audio. A warning modal prompts confirmation if you try to mute, cue another track, uncue, or navigate away while audio is playing.
+   - **Live Stage Notes**: Add and edit stage notes per track (`[+ Note]`) or directly in the cued player bar. Notes sync immediately to the Live Program display.
+   - **Persistent Cue State & Uncue**: Cue state persists across browser reloads. An **Uncue** button returns the cued track to the queue and restores the countdown on `/live`.
    - **Staged Reordering with Glowing Sync**:
      - Drag-and-drop re-sequencing runs with `<1ms` response time in local SQLite.
      - Out-of-sync banner appears and the `Refresh Data` button turns into a glowing amber **"Sync to Sheet"** button.
      - 1-click batch synchronization updates Google Sheets and renames files in Google Drive.
-   - Full keyboard shortcuts (`Space` play/pause, `←`/`→` seek ±5s, `↓` cue next, `Enter` mark performed).
+   - Full keyboard shortcuts (`Space` play/pause, `←`/`→` seek ±5s, `M` mute/unmute, `↓` cue next, `Enter` mark performed).
    - Instant local audio file download button for emergency playback in external players (VLC, QuickTime).
    - Dynamic metadata tags (e.g. `Junior`, `Senior`, `Solo`, `Duet`) derived from spreadsheet columns.
    - **Offline ZIP**: 1-click bundle of all sequenced tracks into a numbered ZIP archive for offline USB backup.
@@ -39,7 +47,8 @@ It connects directly to **Google Sheets** for performer registration and live st
    - Accepts full Google Sheets and Google Drive URLs copied directly from your browser.
    - Dynamic Column Header Matching: Automatically matches columns from Row 1 by normalized name, so rearranging columns never breaks the app.
    - Configurable entry ID prefix (`ENTRY_ID_PREFIX="PK"` or `"EMA"`).
-   - Safe, non-destructive database management using a stable SQLite database file.
+   - Safe, non-destructive database management using a stable SQLite database file with automatic column migrations.
+
 
 ---
 
@@ -278,6 +287,37 @@ docker compose up -d
 
 ---
 
+## Stage Operator & User Guide
+
+### 1. For Singers & Performers (`/tracks`)
+- **Submit Backing Track**: Navigate to `/tracks`, select your name from the dropdown. You can upload an audio file (`.mp3`, `.wav`, `.m4a` up to 200MB) or paste a YouTube URL.
+- **Inspect Waveform**: Once uploaded, review the track duration and play the waveform preview to verify the starting point and quality.
+- **Sign-Up Sheet Verification**: If your song name is listed as missing, an alert button direct-links to the Google Sign-Up sheet to update it.
+
+### 2. For the Sound Coordinator / Stage Operator (`/console`)
+- **Login**: Enter the 4-digit PIN (default `2026`).
+- **Cue a Track**: Click `Cue` on any song row. The waveform loads in the bottom playback controller without autoplaying, ready for stage playback.
+- **Audio Playback**:
+  - `Space`: Play or Pause.
+  - `←` / `→`: Jump 5 seconds backward or forward.
+  - `M`: Mute / Unmute stage audio.
+  - `↓` or `[Cue Next]`: Cue the next sequenced performance.
+  - `Enter` or `[Done]`: Mark the current track as completed.
+- **Accidental Disruption Protection**: If audio is actively playing, actions that would cut off the sound (muting, cueing a different track, uncueing, or navigating away) trigger an immediate warning modal to prevent accidental stage disruptions.
+- **Stage Notes**: Click `+ Note` on any queue row or click the note text in the bottom player bar to add or edit stage notes (e.g. *"Needs low mic stand"*, *"Start after count-in"*). Notes sync immediately to the live stage view.
+- **Lineup Reordering**: Drag rows up or down to adjust performance order. Click the amber **"Sync to Sheet"** button to commit your order to Google Sheets and rename Drive files.
+- **Emergency Offline Backup**:
+  - Click **Offline ZIP** in the top header to download a numbered `.zip` of all tracks for USB playback on VLC/QuickTime.
+  - Click **Download** on the active track in the player bar to save the currently cued MP3 file with one click.
+
+### 3. For MCs & Live Audience Display (`/live`)
+- **Stage Countdown**: Before showtime, a live countdown ticks down to `EVENT_START_TIME`.
+- **Now on Stage**: Displays current performer, song name, and stage notes.
+- **Up Next**: Shows who is next and who should be ready backstage.
+- **Sponsor & Highlight Gallery**: Drop sponsor logos or event highlights into `./data/gallery` (`.png`, `.jpg`, `.webp`, `.gif`). The live screen automatically splits 70/30 and rotates slides every 6 seconds. If the gallery folder is empty, the screen smoothly stays at 100% full width.
+
+---
+
 ## Running Automated Tests
 
 Run the test suite inside the running container:
@@ -289,3 +329,4 @@ docker exec event_track_manager_app pytest /app/tests
 
 ## License & Community
 Maintained for **EMA Paattukoottam** (Exton Malayali Association). Built with FastAPI, Tailwind CSS, WaveSurfer.js, SQLite, and `yt-dlp`.
+
