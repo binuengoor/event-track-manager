@@ -41,6 +41,9 @@ class LoginRequest(BaseModel):
 class StatusUpdateRequest(BaseModel):
     status: str
 
+class PerformanceNotesRequest(BaseModel):
+    notes: str = ""
+
 # Helper for Admin PIN verification
 def verify_admin_pin(request: Request):
     auth_header = request.headers.get("X-Admin-PIN")
@@ -444,6 +447,22 @@ async def update_performance_status(
     except Exception as e:
         logger.exception("Failed to update status for %s: %s", entry_id, e)
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/api/performance-notes/{entry_id}")
+async def update_performance_notes(
+    entry_id: str,
+    payload: PerformanceNotesRequest,
+    _authorized: bool = Depends(verify_admin_pin)
+):
+    try:
+        success = google_service.update_stage_notes(entry_id, payload.notes)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Entry {entry_id} not found")
+        return {"status": "success", "entry_id": entry_id, "stage_notes": payload.notes.strip()}
+    except Exception as e:
+        logger.exception("Failed to update stage notes for %s: %s", entry_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/export-zip")
 async def export_zip(_authorized: bool = Depends(verify_admin_pin)):

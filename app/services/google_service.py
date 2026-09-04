@@ -28,6 +28,7 @@ class PerformanceEntry(BaseModel):
     row_index: int = 0
     is_song_name_missing: bool = False
     extra_tags: List[str] = []
+    stage_notes: Optional[str] = ""
 
 class GoogleService:
     def __init__(self):
@@ -597,6 +598,22 @@ class GoogleService:
                     item.last_updated = now_iso
                     return True
             return False
+
+    def update_stage_notes(self, entry_id: str, notes: str) -> bool:
+        """Updates stage notes for a performance in local SQLite cache."""
+        clean_notes = (notes or "").strip()
+        if self.mock_mode:
+            for item in self._mock_data:
+                if item.entry_id == entry_id:
+                    item.stage_notes = clean_notes
+                    return True
+            return False
+
+        from app.services.db_service import db_service
+        db_service.update_performance_field(entry_id, "stage_notes", clean_notes)
+        logger.info("Updated stage notes for %s in SQLite: %s", entry_id, clean_notes)
+        return True
+
 
         performances = self.get_performances()
         target = next((p for p in performances if p.entry_id == entry_id), None)

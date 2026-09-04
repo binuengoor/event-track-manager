@@ -366,8 +366,22 @@ function renderQueueList() {
           <p class="text-xs text-orange-400 font-medium mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}">
             "${escapeHtml(item.song_title)}" ${durationInfo}
           </p>
+          <div class="row-notes-container mt-1.5 flex items-center gap-1.5 flex-wrap">
+            ${item.stage_notes && item.stage_notes.trim() ? `
+              <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium cursor-pointer hover:bg-amber-500/25 transition btn-edit-note" title="Click to edit stage note">
+                <i data-lucide="file-text" class="w-3 h-3 text-amber-400"></i>
+                <span class="note-val">${escapeHtml(item.stage_notes.trim())}</span>
+              </span>
+            ` : `
+              <button class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md text-slate-400 hover:text-amber-300 hover:bg-slate-800/60 transition border border-dashed border-slate-700 hover:border-amber-500/40 btn-edit-note" title="Add stage note for live program view">
+                <i data-lucide="plus" class="w-2.5 h-2.5"></i>
+                <span>Note</span>
+              </button>
+            `}
+          </div>
         </div>
       </div>
+
 
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap justify-end">
@@ -408,6 +422,18 @@ function renderQueueList() {
     `;
 
     // Row event listeners
+    const noteEditBtn = row.querySelector('.btn-edit-note');
+    if (noteEditBtn) {
+      noteEditBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const currentNote = (item.stage_notes || '').trim();
+        const newNote = prompt(`Additional info / stage note for "${item.performer_name} - ${item.song_title}":\n(Will be shown live on stage screen. Leave blank to clear.)`, currentNote);
+        if (newNote !== null) {
+          updateStageNotes(item.entry_id, newNote);
+        }
+      });
+    }
+
     const cueBtn = row.querySelector('.btn-cue-row');
     if (cueBtn) {
       cueBtn.addEventListener('click', (e) => {
@@ -417,11 +443,12 @@ function renderQueueList() {
     }
 
     row.addEventListener('click', (e) => {
-      if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input')) return;
+      if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('.btn-edit-note')) return;
       if (isUploaded || item.drive_file_id) {
         cueTrack(item, false);
       }
     });
+
 
     const holdBtn = row.querySelector('.btn-hold-row');
     if (holdBtn) {
@@ -719,6 +746,9 @@ function resetPlayerBar() {
   if (playerPerformer) playerPerformer.textContent = 'Tap "Cue Track" on any song to inspect & play';
   if (playerBadge) playerBadge.className = 'w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700';
 
+  const notesBar = document.getElementById('player-notes-bar');
+  if (notesBar) notesBar.classList.add('hidden');
+
   if (playBtn) playBtn.disabled = true;
   if (markDoneBtn) markDoneBtn.disabled = true;
   if (holdBtn) holdBtn.disabled = true;
@@ -802,6 +832,8 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     let singerText = item.performer_name;
     if (item.partner_name) singerText = `Duet: ${item.performer_name} & ${item.partner_name}`;
     if (playerPerformer) playerPerformer.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')} • ${singerText}`;
+
+    updatePlayerBarNotes(item.stage_notes || '');
 
     if (playerBadge) playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
 
@@ -964,6 +996,54 @@ async function updateStatus(entryId, newStatus) {
   }
 }
 
+async function updateStageNotes(entryId, notes) {
+  try {
+    const res = await fetch(`/api/performance-notes/${entryId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
+      },
+      body: JSON.stringify({ notes: notes })
+    });
+
+    if (!res.ok) throw new Error('Failed to update stage note');
+    const data = await res.json();
+
+    const target = queue.find(q => q.entry_id === entryId);
+    if (target) target.stage_notes = data.stage_notes || '';
+
+    if (currentCuedItem && currentCuedItem.entry_id === entryId) {
+      currentCuedItem.stage_notes = data.stage_notes || '';
+      updatePlayerBarNotes(data.stage_notes || '');
+    }
+
+    renderQueueList();
+    showToast(data.stage_notes ? '✓ Stage note updated' : '✓ Stage note cleared');
+  } catch (err) {
+    showToast(`Stage note error: ${err.message}`, 'error');
+  }
+}
+
+function updatePlayerBarNotes(notes) {
+  const bar = document.getElementById('player-notes-bar');
+  const text = document.getElementById('player-notes-text');
+  if (!bar || !text) return;
+  if (!currentCuedItem) {
+    bar.classList.add('hidden');
+    return;
+  }
+  bar.classList.remove('hidden');
+  if (notes && notes.trim()) {
+    text.textContent = `Note: ${notes.trim()}`;
+    text.className = 'truncate font-medium text-amber-300 cursor-pointer hover:underline';
+  } else {
+    text.textContent = '+ Add stage note...';
+    text.className = 'truncate italic text-slate-400 cursor-pointer hover:text-amber-300 hover:underline';
+  }
+}
+
+
 function setupKeyboardHotkeys() {
   window.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -1044,6 +1124,24 @@ function setupActionButtons() {
       uncueTrack();
     });
   }
+
+  const promptPlayerBarNoteEdit = () => {
+    if (!currentCuedItem) return;
+    const currentNote = (currentCuedItem.stage_notes || '').trim();
+    let singerText = currentCuedItem.performer_name;
+    if (currentCuedItem.partner_name) singerText = `${currentCuedItem.performer_name} & ${currentCuedItem.partner_name}`;
+    const newNote = prompt(`Stage note / additional info for "${singerText} - ${currentCuedItem.song_title}":\n(Will be shown live on stage screen. Leave blank to clear.)`, currentNote);
+    if (newNote !== null) {
+      updateStageNotes(currentCuedItem.entry_id, newNote);
+    }
+  };
+
+  const notesText = document.getElementById('player-notes-text');
+  if (notesText) notesText.addEventListener('click', promptPlayerBarNoteEdit);
+
+  const notesEditBtn = document.getElementById('player-notes-edit-btn');
+  if (notesEditBtn) notesEditBtn.addEventListener('click', promptPlayerBarNoteEdit);
+
 
   // Sync / Refresh button
   const refreshBtn = document.getElementById('refresh-queue-btn');

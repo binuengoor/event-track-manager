@@ -49,9 +49,15 @@ class DBService:
                     last_updated TEXT,
                     row_index INTEGER DEFAULT 0,
                     is_song_name_missing INTEGER DEFAULT 0,
-                    extra_tags_json TEXT DEFAULT '[]'
+                    extra_tags_json TEXT DEFAULT '[]',
+                    stage_notes TEXT DEFAULT ''
                 )
                 """)
+                # Run migration to add stage_notes column if upgrading an existing db
+                try:
+                    conn.execute("ALTER TABLE performances ADD COLUMN stage_notes TEXT DEFAULT ''")
+                except Exception:
+                    pass
                 conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_perf_sequence ON performances (sequence_order)
                 """)
@@ -72,13 +78,14 @@ class DBService:
                 # We do an UPSERT
                 for p in entries:
                     extra_tags = getattr(p, "extra_tags", []) or []
+                    stage_notes = getattr(p, "stage_notes", "") or ""
                     conn.execute("""
                     INSERT INTO performances (
                         entry_id, performer_name, performance_type, partner_name, contact_info,
                         song_title, movie_name, sequence_order, performance_status, track_status,
                         duration, drive_file_id, drive_file_name, last_updated, row_index,
-                        is_song_name_missing, extra_tags_json
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        is_song_name_missing, extra_tags_json, stage_notes
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(entry_id) DO UPDATE SET
                         performer_name=excluded.performer_name,
                         performance_type=excluded.performance_type,
@@ -95,7 +102,8 @@ class DBService:
                         last_updated=excluded.last_updated,
                         row_index=excluded.row_index,
                         is_song_name_missing=excluded.is_song_name_missing,
-                        extra_tags_json=excluded.extra_tags_json
+                        extra_tags_json=excluded.extra_tags_json,
+                        stage_notes=COALESCE(NULLIF(excluded.stage_notes, ''), performances.stage_notes, '')
                     """, (
                         p.entry_id,
                         p.performer_name,
@@ -113,7 +121,8 @@ class DBService:
                         p.last_updated,
                         p.row_index,
                         1 if getattr(p, "is_song_name_missing", False) else 0,
-                        json.dumps(extra_tags)
+                        json.dumps(extra_tags),
+                        stage_notes
                     ))
 
                 # Also delete entries that are no longer in the sheet
@@ -158,7 +167,8 @@ class DBService:
         """Updates a specific field of a performance in SQLite."""
         allowed_fields = {
             "performance_status", "track_status", "sequence_order", "duration",
-            "drive_file_id", "drive_file_name", "last_updated", "song_title"
+            "drive_file_id", "drive_file_name", "last_updated", "song_title",
+            "stage_notes"
         }
         if field_name not in allowed_fields:
             raise ValueError(f"Field {field_name} not allowed for direct update")

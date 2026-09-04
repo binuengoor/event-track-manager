@@ -192,9 +192,16 @@
           <div id="player-badge" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
             <i data-lucide="music-2" class="w-5 h-5"></i>
           </div>
-          <div class="overflow-hidden">
+          <div class="overflow-hidden flex-1">
             <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
             <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue Track" on any song to inspect & play</p>
+            <div id="player-notes-bar" class="hidden mt-1 flex items-center gap-1.5 text-[11px] text-amber-300">
+              <i data-lucide="file-text" class="w-3 h-3 text-amber-400 shrink-0"></i>
+              <span id="player-notes-text" class="truncate font-medium cursor-pointer hover:underline" title="Click to edit live stage notes">No stage notes</span>
+              <button id="player-notes-edit-btn" class="text-[10px] text-slate-400 hover:text-amber-300 ml-1 p-0.5" title="Edit Note">
+                <i data-lucide="pencil" class="w-2.5 h-2.5"></i>
+              </button>
+            </div>
           </div>
         </div>
 

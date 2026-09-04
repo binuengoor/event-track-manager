@@ -129,7 +129,10 @@
             <p id="now-song-title" class="text-base sm:text-lg text-orange-400 font-semibold mt-1">
               Please wait...
             </p>
-            <p id="now-movie-name" class="text-xs text-slate-400 mt-0.5"></p>
+            <div id="now-stage-notes-container" class="hidden mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium w-fit max-w-full">
+              <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+              <span id="now-stage-notes" class="truncate"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -340,7 +343,8 @@
       const nowSeq = document.getElementById('now-seq-badge');
       const nowPerformer = document.getElementById('now-performer-name');
       const nowSong = document.getElementById('now-song-title');
-      const nowMovie = document.getElementById('now-movie-name');
+      const nowStageNotesContainer = document.getElementById('now-stage-notes-container');
+      const nowStageNotes = document.getElementById('now-stage-notes');
 
       if (data.now_performing) {
         const item = data.now_performing;
@@ -352,12 +356,20 @@
         }
         nowPerformer.innerHTML = nameText;
         nowSong.textContent = `"${item.song_title}"`;
-        nowMovie.textContent = item.movie_name ? `Movie / Album: ${item.movie_name}` : '';
+        
+        if (item.stage_notes && item.stage_notes.trim()) {
+          nowStageNotes.textContent = item.stage_notes.trim();
+          nowStageNotesContainer.classList.remove('hidden');
+        } else {
+          nowStageNotes.textContent = '';
+          nowStageNotesContainer.classList.add('hidden');
+        }
       } else {
         nowSeq.textContent = '#--';
         nowPerformer.innerHTML = '<span class="text-slate-400 font-normal italic">Waiting for next performance to cue...</span>';
         nowSong.textContent = 'Stage in preparation';
-        nowMovie.textContent = 'Please check Up Next below to see who is coming up';
+        nowStageNotes.textContent = '';
+        nowStageNotesContainer.classList.add('hidden');
       }
 
       // 2. Up Next
