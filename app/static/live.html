@@ -144,15 +144,15 @@
         </div>
 
         <!-- Gallery / Sponsor Carousel Column (30% width on desktop, hidden when no images) -->
-        <div id="hero-gallery-container" class="hidden relative overflow-hidden rounded-3xl bg-slate-900/80 border-2 border-slate-800 shadow-xl flex flex-col items-center justify-center p-3 sm:p-4 min-h-[220px] sm:min-h-[260px]">
-          <!-- Carousel Image Viewer -->
-          <div class="relative w-full h-full min-h-[200px] flex items-center justify-center overflow-hidden rounded-2xl bg-slate-950/60">
-            <img id="carousel-img" src="" alt="Event Highlight" class="max-w-full max-h-full object-contain transition-opacity duration-700 opacity-0 rounded-xl" />
+        <div id="hero-gallery-container" class="hidden relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 h-[320px] sm:h-[340px] shrink-0">
+          <!-- Carousel Image Viewer (Strictly fixed height & absolute centering, 0 layout jump) -->
+          <div class="relative w-full h-[250px] sm:h-[270px] overflow-hidden rounded-2xl bg-slate-950/70 p-2 border border-slate-800/60 flex items-center justify-center">
+            <img id="carousel-img" src="" alt="Event Highlight" class="absolute inset-0 m-auto max-w-[90%] max-h-[90%] object-contain transition-opacity duration-500 opacity-0 rounded-xl" />
           </div>
 
           <!-- Carousel Indicators & Badge -->
-          <div class="mt-2.5 flex items-center justify-between w-full px-1 text-[10px] text-slate-400">
-            <span class="flex items-center gap-1 text-slate-400 font-medium">
+          <div class="mt-2.5 flex items-center justify-between w-full px-1 text-[10px] text-slate-400 shrink-0 h-5">
+            <span class="flex items-center gap-1.5 text-slate-400 font-semibold tracking-wide uppercase text-[9px]">
               <i data-lucide="image" class="w-3 h-3 text-orange-400"></i>
               <span>Event Highlights</span>
             </span>
@@ -161,6 +161,8 @@
             </div>
           </div>
         </div>
+
+
 
       </div>
     </div>
@@ -533,7 +535,7 @@
       // Enable 70/30 adaptive split (approx 70% / 30% on lg screens)
       grid.className = 'grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch';
       mainCol.className = 'w-full lg:col-span-8 xl:col-span-8 flex flex-col';
-      galleryContainer.className = 'relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 min-h-[260px] lg:col-span-4 xl:col-span-4';
+      galleryContainer.className = 'relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 h-[320px] sm:h-[340px] shrink-0 lg:col-span-4 xl:col-span-4';
       galleryContainer.classList.remove('hidden');
 
       // Setup dots
