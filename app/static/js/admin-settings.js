@@ -110,6 +110,8 @@ async function loadSettings() {
     setValue("setting-event-poster-url", adminSettings.event_poster_url);
     setValue("setting-entry-id-prefix", adminSettings.entry_id_prefix);
     setValue("setting-payment-url", adminSettings.payment_url);
+    setValue("setting-hero-tag-primary", adminSettings.hero_tag_primary || "Musical Evening");
+    setValue("setting-hero-tag-status", adminSettings.hero_tag_status || "Stage Ready");
     setValue("setting-general-notes", adminSettings.general_notes || "");
     setValue("setting-signup-sheet-url", adminSettings.signup_sheet_url);
 
@@ -439,6 +441,8 @@ function setupActionHandlers() {
       event_poster_url: document.getElementById("setting-event-poster-url").value.trim(),
       entry_id_prefix: document.getElementById("setting-entry-id-prefix").value.trim(),
       payment_url: document.getElementById("setting-payment-url").value.trim(),
+      hero_tag_primary: document.getElementById("setting-hero-tag-primary") ? document.getElementById("setting-hero-tag-primary").value.trim() : "Musical Evening",
+      hero_tag_status: document.getElementById("setting-hero-tag-status") ? document.getElementById("setting-hero-tag-status").value.trim() : "Stage Ready",
       general_notes: document.getElementById("setting-general-notes") ? document.getElementById("setting-general-notes").value.trim() : "",
       signup_sheet_url: document.getElementById("setting-signup-sheet-url").value.trim()
     };

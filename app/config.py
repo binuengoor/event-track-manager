@@ -96,6 +96,8 @@ class EventConfig(BaseModel):
     venue: Optional[str] = "1 Scouting Wy, Exton, PA 19341, USA"
     time_range: Optional[str] = "5:00 PM - 9:00 PM EDT"
     general_notes: Optional[str] = ""
+    hero_tag_primary: Optional[str] = "Musical Evening"
+    hero_tag_status: Optional[str] = "Stage Ready"
     payment_url: Optional[str] = None
     signup_sheet_url: Optional[str] = None
 
@@ -422,6 +424,8 @@ def get_setting(key: str, default: Any = None) -> Any:
         "event_venue": settings.event.venue,
         "event_time_range": settings.event.time_range,
         "general_notes": settings.event.general_notes,
+        "hero_tag_primary": settings.event.hero_tag_primary,
+        "hero_tag_status": settings.event.hero_tag_status,
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url,
         "signup_sheet_url": settings.event.signup_sheet_url,

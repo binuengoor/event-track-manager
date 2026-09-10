@@ -207,7 +207,7 @@
           <div class="flex items-center gap-2 flex-wrap">
             <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 text-xs font-semibold">
               <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-              <span>Musical Evening</span>
+              <span id="hero-primary-tag-text">Musical Evening</span>
             </span>
             <div id="status-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
               <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -535,6 +535,16 @@
 
         if (info.time_range) {
           document.getElementById("event-time-range-text").textContent = info.time_range;
+        }
+
+        if (info.hero_tag_primary) {
+          const primaryTagEl = document.getElementById("hero-primary-tag-text");
+          if (primaryTagEl) primaryTagEl.textContent = info.hero_tag_primary;
+        }
+
+        if (info.hero_tag_status) {
+          const statusTagEl = document.getElementById("status-pill-text");
+          if (statusTagEl && !statusTagEl.dataset.isLive) statusTagEl.textContent = info.hero_tag_status;
         }
 
         if (info.general_notes && info.general_notes.trim()) {

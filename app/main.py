@@ -323,6 +323,9 @@ async def get_event_info():
     time_range = get_setting("time_range") or get_setting("event_time_range") or settings.event.time_range
     general_notes = get_setting("general_notes") or settings.event.general_notes or ""
 
+    hero_tag_primary = get_setting("hero_tag_primary") or getattr(settings.event, "hero_tag_primary", "Musical Evening")
+    hero_tag_status = get_setting("hero_tag_status") or getattr(settings.event, "hero_tag_status", "Stage Ready")
+
     return {
         "event_id": get_setting("event_id") or settings.event.id,
         "header_brand_title": header_brand_title,
@@ -336,6 +339,8 @@ async def get_event_info():
         "venue": venue,
         "time_range": time_range,
         "general_notes": general_notes,
+        "hero_tag_primary": hero_tag_primary,
+        "hero_tag_status": hero_tag_status,
         "payment_url": payment_url,
         "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
@@ -717,6 +722,8 @@ async def get_admin_settings(_authorized: bool = Depends(verify_admin_pin)):
         "event_venue": settings.event.venue,
         "event_time_range": settings.event.time_range,
         "general_notes": settings.event.general_notes or "",
+        "hero_tag_primary": getattr(settings.event, "hero_tag_primary", "Musical Evening"),
+        "hero_tag_status": getattr(settings.event, "hero_tag_status", "Stage Ready"),
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url or "",
         "signup_sheet_url": settings.event.signup_sheet_url or "",

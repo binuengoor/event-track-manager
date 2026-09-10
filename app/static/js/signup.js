@@ -358,28 +358,36 @@ function setupEventListeners() {
   // Live duplicate registration check on performer name
   const nameInput = document.getElementById("performer-name");
   const dupWarningBox = document.getElementById("duplicate-warning-box");
-  const matchedNameEl = document.getElementById("matched-performer-name");
-  const goToHubLink = document.getElementById("go-to-performer-hub-link");
+  const matchedListEl = document.getElementById("matched-performers-list");
   const dismissDupBtn = document.getElementById("dismiss-dup-warning-btn");
 
   if (nameInput && dupWarningBox) {
     nameInput.addEventListener("input", () => {
       const val = nameInput.value.trim().toLowerCase();
-      if (val.length < 2 || !signupConfig || !signupConfig.registered_performers) {
+      // Only start looking up once at least 3 characters are entered
+      if (val.length < 3 || !signupConfig || !signupConfig.registered_performers) {
         dupWarningBox.classList.add("hidden");
         return;
       }
 
-      // Check if matches an existing performer
+      // Find ALL matching registered performers
       const registered = signupConfig.registered_performers;
-      const matched = registered.find(p => {
+      const matches = registered.filter(p => {
         const norm = p.trim().toLowerCase();
-        return norm === val || norm.startsWith(val) || (val.length >= 4 && norm.includes(val));
+        return norm === val || norm.startsWith(val) || norm.includes(val);
       });
 
-      if (matched) {
-        if (matchedNameEl) matchedNameEl.textContent = `"${matched}"`;
-        if (goToHubLink) goToHubLink.href = `/performer?name=${encodeURIComponent(matched)}`;
+      if (matches.length > 0) {
+        if (matchedListEl) {
+          matchedListEl.innerHTML = "";
+          matches.forEach(m => {
+            const btn = document.createElement("a");
+            btn.href = `/performer?name=${encodeURIComponent(m)}`;
+            btn.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition";
+            btn.innerHTML = `<span>${escapeHtml(m)}</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>`;
+            matchedListEl.appendChild(btn);
+          });
+        }
         dupWarningBox.classList.remove("hidden");
         if (window.lucide) lucide.createIcons();
       } else {
