@@ -176,7 +176,11 @@ def test_export_zip_with_auth():
 def test_staged_reorder_and_push_sequence(monkeypatch):
     from app.services.google_service import google_service
     from app.services.db_service import db_service
-    monkeypatch.setattr(google_service, "update_sequence_orders", lambda *a, **kw: 2)
+    def mock_update_orders(items, push_to_sheet=True):
+        if not push_to_sheet:
+            db_service.set_dirty_sequence(True)
+        return len(items)
+    monkeypatch.setattr(google_service, "update_sequence_orders", mock_update_orders)
     def mock_sync():
         db_service.set_dirty_sequence(False)
         return 2
