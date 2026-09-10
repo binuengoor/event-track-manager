@@ -667,6 +667,7 @@ async function loadParticipants() {
     const query = document.getElementById("participant-search-input")?.value.trim().toLowerCase() || "";
     renderParticipantsTable(query);
   } catch (err) {
+    console.error("loadParticipants error:", err);
     tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-rose-400">Error loading participants</td></tr>`;
   }
 }
@@ -992,4 +993,15 @@ function showToast(msg, isError = false) {
   }
   toast.classList.remove("hidden");
   setTimeout(() => toast.classList.add("hidden"), 4000);
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[m]);
 }
