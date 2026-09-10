@@ -94,13 +94,17 @@
         <i data-lucide="utensils" class="w-4 h-4"></i>
         <span>Food & Potluck</span>
       </button>
+      <button data-tab="participants" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="users" class="w-4 h-4"></i>
+        <span>Participants</span>
+      </button>
       <button data-tab="stats" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
         <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
         <span>Event Summary</span>
       </button>
       <button data-tab="backup" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
         <i data-lucide="save" class="w-4 h-4"></i>
-        <span>Backup</span>
+        <span>Backup & Sync</span>
       </button>
     </div>
 
@@ -412,12 +416,70 @@
       </div>
     </section>
 
+    <!-- TAB: PARTICIPANTS & PERFORMANCES -->
+    <section id="panel-participants" class="admin-panel hidden space-y-5">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="users" class="w-4 h-4 text-orange-400"></i>
+              <span>Participants & Performances Roster</span>
+            </h3>
+            <p class="text-xs text-slate-400">Manage all registered performers, edit song/guardian details, or remove entries directly.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="sync-sheet-now-btn" class="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition flex items-center gap-1.5">
+              <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
+              <span>Export DB to Sheet</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter & Search toolbar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div class="relative flex-1 max-w-sm">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
+            <input type="text" id="participant-search-input" placeholder="Search by name, song, ID..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+          </div>
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-400">Total: <strong id="participants-count-total" class="text-white">0</strong></span>
+            <span class="text-slate-600">•</span>
+            <span class="text-slate-400">Juniors: <strong id="participants-count-juniors" class="text-amber-400">0</strong></span>
+            <span class="text-slate-600">•</span>
+            <span class="text-slate-400">Seniors: <strong id="participants-count-seniors" class="text-blue-400">0</strong></span>
+          </div>
+        </div>
+
+        <!-- Participants Table -->
+        <div class="overflow-x-auto rounded-2xl border border-slate-800">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+              <tr>
+                <th class="px-3 py-3">ID / Seq</th>
+                <th class="px-3 py-3">Performer & Guardian</th>
+                <th class="px-3 py-3">Type</th>
+                <th class="px-3 py-3">Song & Movie</th>
+                <th class="px-3 py-3">Track Status</th>
+                <th class="px-3 py-3">Origin</th>
+                <th class="px-3 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="participants-table-body" class="divide-y divide-slate-800 text-slate-300">
+              <tr>
+                <td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading participants...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <!-- TAB 5: BACKUP -->
     <section id="panel-backup" class="admin-panel hidden space-y-5">
       <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
-            <h3 class="text-base font-bold text-white">Automated Cloud Backup</h3>
+            <h3 class="text-base font-bold text-white">Automated Cloud Backup & One-Way Sync</h3>
             <p class="text-xs text-slate-400">Debounced background replication from SQLite to Google Sheet & Drive.</p>
           </div>
           <button id="force-backup-btn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition flex items-center gap-1.5">
@@ -452,6 +514,117 @@
     </section>
 
   </main>
+
+  <!-- Admin Edit Participant Modal -->
+  <div id="admin-edit-participant-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i data-lucide="user-check" class="w-4 h-4 text-orange-400"></i>
+            <span>Edit Participant & Performance</span>
+          </h3>
+          <p class="text-xs text-slate-400">Entry ID: <span id="admin-edit-entry-id-badge" class="font-mono text-orange-400 font-bold"></span></p>
+        </div>
+        <button type="button" id="close-admin-edit-modal-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="admin-edit-participant-form" class="space-y-3 text-xs">
+        <input type="hidden" id="admin-edit-entry-id">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Performer Name *</label>
+            <input type="text" id="admin-edit-performer-name" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Age Group</label>
+            <select id="admin-edit-age-group" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+              <option value="Senior">Senior</option>
+              <option value="Junior">Junior</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Guardian Name</label>
+            <input type="text" id="admin-edit-guardian-name" placeholder="Parent / Guardian" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Guardian Phone / Contact</label>
+            <input type="text" id="admin-edit-guardian-phone" placeholder="Phone or Email" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Performance Type</label>
+            <select id="admin-edit-performance-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+              <option value="Solo">Solo</option>
+              <option value="Duet">Duet</option>
+              <option value="Group">Group</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Partner / Group Members</label>
+            <input type="text" id="admin-edit-partner-name" placeholder="Partner Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Song Title</label>
+            <input type="text" id="admin-edit-song-title" placeholder="Song Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Movie / Album</label>
+            <input type="text" id="admin-edit-movie-name" placeholder="Movie Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Sequence #</label>
+            <input type="number" id="admin-edit-sequence-order" min="1" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Track Status</label>
+            <select id="admin-edit-track-status" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+              <option value="Pending">Pending</option>
+              <option value="Uploaded">Uploaded</option>
+              <option value="Acoustic">Acoustic</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Performance Status</label>
+            <select id="admin-edit-performance-status" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+              <option value="Upcoming">Upcoming</option>
+              <option value="On Stage">On Stage</option>
+              <option value="Performed">Performed</option>
+              <option value="On Hold">On Hold</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-300 mb-1">Stage Notes / Requests</label>
+          <textarea id="admin-edit-stage-notes" rows="2" placeholder="Special requirements or stage requests" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+          <button type="button" id="cancel-admin-edit-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="/static/js/admin-settings.js"></script>
 </body>

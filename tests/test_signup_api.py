@@ -66,9 +66,15 @@ def test_signup_guardian_requirement(client):
     assert res2.json()["status"] == "success"
 
 def test_signup_max_performances_and_solo_limit(client):
+    import uuid
+    # Ensure settings are set to standard defaults (max_solo=1, max_perfs=2)
+    db_service.set_app_setting("max_solo_per_participant", "1")
+    db_service.set_app_setting("max_performances_per_participant", "2")
+
     # Attempting 2 solos in one submission
+    greedy_name = f"Greedy Singer {uuid.uuid4().hex[:6]}"
     payload = {
-        "performer_name": "Greedy Singer",
+        "performer_name": greedy_name,
         "contact_info": "555-000-1111",
         "age_group": "Senior",
         "performances": [
@@ -81,8 +87,9 @@ def test_signup_max_performances_and_solo_limit(client):
     assert "Solo" in res.json()["detail"]
 
     # Attempting 3 performances
+    super_greedy_name = f"Super Greedy {uuid.uuid4().hex[:6]}"
     payload_3 = {
-        "performer_name": "Super Greedy",
+        "performer_name": super_greedy_name,
         "contact_info": "555-000-2222",
         "age_group": "Senior",
         "performances": [

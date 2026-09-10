@@ -100,9 +100,17 @@ def test_admin_auth():
 def test_upload_and_stream(tmp_path, monkeypatch):
     from app.services.audio_service import audio_service
     from app.services.google_service import google_service
+    from app.services.db_service import db_service
     monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
-    # Prevent tests from writing dummy audio files to live Google Drive
+    # Prevent tests from writing dummy audio files to live Google Drive or failing if sheet range differs
     monkeypatch.setattr(google_service, "upload_file_to_active", lambda *a, **kw: "mock_test_drive_id")
+    def mock_update_meta(entry_id, drive_file_id, **kw):
+        db_service.update_performance_field(entry_id, "drive_file_id", drive_file_id)
+        db_service.update_performance_field(entry_id, "track_status", "Uploaded")
+        return True
+    monkeypatch.setattr(google_service, "update_track_metadata", mock_update_meta)
+    # Bypass ffmpeg decoding for dummy bytes test file
+    monkeypatch.setattr(audio_service, "transcode_to_standard_mp3", lambda in_p, out_p, **kw: False)
     client = TestClient(app)
     
     import uuid
@@ -133,7 +141,9 @@ def test_upload_and_stream(tmp_path, monkeypatch):
     assert stream_res.status_code == 200
     assert stream_res.headers["Content-Type"] == "audio/mpeg"
 
-def test_status_update_with_auth():
+def test_status_update_with_auth(monkeypatch):
+    from app.services.google_service import google_service
+    monkeypatch.setattr(google_service, "update_status", lambda *a, **kw: True)
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     first_id = perf_res.json()[0]["entry_id"]
@@ -163,7 +173,14 @@ def test_export_zip_with_auth():
     assert res.headers["Content-Type"] == "application/zip"
     assert len(res.content) > 0
 
-def test_staged_reorder_and_push_sequence():
+def test_staged_reorder_and_push_sequence(monkeypatch):
+    from app.services.google_service import google_service
+    from app.services.db_service import db_service
+    monkeypatch.setattr(google_service, "update_sequence_orders", lambda *a, **kw: 2)
+    def mock_sync():
+        db_service.set_dirty_sequence(False)
+        return 2
+    monkeypatch.setattr(google_service, "sync_sequence_to_google", mock_sync)
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     items = perf_res.json()
@@ -209,7 +226,9 @@ def test_staged_reorder_and_push_sequence():
     assert live_res2.status_code == 200
     assert live_res2.json()["is_dirty"] is False
 
-def test_cue_and_clear_active_performance():
+def test_cue_and_clear_active_performance(monkeypatch):
+    from app.services.google_service import google_service
+    monkeypatch.setattr(google_service, "update_status", lambda *a, **kw: True)
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     items = perf_res.json()

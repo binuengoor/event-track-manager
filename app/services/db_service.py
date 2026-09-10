@@ -708,9 +708,9 @@ class DBService:
     def update_performance_details(self, entry_id: str, **fields) -> bool:
         """Updates specific performance details (e.g. song, movie, partner, age, guardian, track_status)."""
         allowed_fields = {
-            "song_title", "movie_name", "partner_name", "performance_type",
+            "performer_name", "song_title", "movie_name", "partner_name", "performance_type",
             "age_group", "guardian_name", "guardian_phone", "contact_info",
-            "stage_notes", "track_status"
+            "stage_notes", "track_status", "performance_status", "sequence_order"
         }
         updates = []
         params = []
@@ -737,6 +737,22 @@ class DBService:
             cursor = conn.execute(f"UPDATE performances SET {', '.join(updates)} WHERE entry_id = ?", params)
             conn.commit()
             return cursor.rowcount > 0
+
+    def delete_performance(self, entry_id: str) -> bool:
+        """Deletes a performance entry and purges its audio cache if present."""
+        with self._get_connection() as conn:
+            cursor = conn.execute("DELETE FROM performances WHERE entry_id = ?", (entry_id,))
+            conn.commit()
+            deleted = cursor.rowcount > 0
+
+        if deleted:
+            try:
+                from app.services.audio_service import audio_service
+                audio_service.purge_cache(entry_id)
+            except Exception:
+                pass
+
+        return deleted
 
     def count_performances_for_performer(self, name: str) -> Dict[str, int]:
         """Counts how many performances this participant is enrolled in (Solo, Duet, Group, Total)."""
@@ -824,15 +840,6 @@ class DBService:
                         guardian_phone,
                         created_via
                     ))
-
-                # Delete entries no longer in sheet, preserving web signups
-                incoming_ids = [p.entry_id for p in entries]
-                if incoming_ids:
-                    placeholders = ",".join("?" for _ in incoming_ids)
-                    conn.execute(
-                        f"DELETE FROM performances WHERE entry_id NOT IN ({placeholders}) AND created_via != 'signup'",
-                        incoming_ids
-                    )
 
                 conn.commit()
             self.set_last_sync_time()

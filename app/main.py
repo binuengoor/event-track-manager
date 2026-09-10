@@ -132,6 +132,21 @@ class PerformanceUpdateRequest(BaseModel):
     is_acoustic: Optional[bool] = None
     track_status: Optional[str] = None
 
+class AdminParticipantUpdateRequest(BaseModel):
+    performer_name: Optional[str] = None
+    age_group: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_phone: Optional[str] = None
+    contact_info: Optional[str] = None
+    performance_type: Optional[str] = None
+    partner_name: Optional[str] = None
+    song_title: Optional[str] = None
+    movie_name: Optional[str] = None
+    sequence_order: Optional[int] = None
+    track_status: Optional[str] = None
+    performance_status: Optional[str] = None
+    stage_notes: Optional[str] = None
+
 class AddPerformanceRequest(BaseModel):
     performer_name: str
     performance_type: str = "Solo"
@@ -871,6 +886,30 @@ async def get_backup_status_endpoint(_authorized: bool = Depends(verify_admin_pi
 async def trigger_immediate_backup(_authorized: bool = Depends(verify_admin_pin)):
     return await backup_service.backup_now()
 
+@app.get("/api/admin/participants")
+async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin)):
+    """Returns all performances/participants directly from SQLite with full details."""
+    return db_service.get_all_performances()
+
+@app.put("/api/admin/participants/{entry_id}")
+async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
+    """Updates participant details directly in SQLite and triggers debounced backup."""
+    update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
+    success = db_service.update_performance_details(entry_id, **update_data)
+    if not success:
+        raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
+    backup_service.trigger_backup()
+    return {"status": "success", "entry_id": entry_id, "message": "Participant updated successfully."}
+
+@app.delete("/api/admin/participants/{entry_id}")
+async def delete_admin_participant(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+    """Deletes a participant performance from SQLite and triggers backup."""
+    success = db_service.delete_performance(entry_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
+    backup_service.trigger_backup()
+    return {"status": "success", "entry_id": entry_id, "message": "Participant entry deleted."}
+
 
 # =============================================================================
 # STAGE PLAYBACK, CONSOLE & TRACK UPLOAD APIS
@@ -940,15 +979,37 @@ async def list_performances():
 
 @app.post("/api/sync")
 async def sync_data():
+    """One-way sync: Exports App DB (the source of truth) directly into Google Sheet."""
     try:
-        entries = google_service.get_performances(force_sync=True)
+        performances = db_service.get_all_performances()
+        food_items = db_service.get_all_food_items_with_signups()
+        
+        target_sheet_id = settings.google.sheet_id
+        folder_id = (
+            settings.backup.drive_folder_id
+            or getattr(settings.google.drive_folders, "archive_folder_id", "")
+            or getattr(settings.google.drive_folders, "active_folder_id", "")
+        )
+        event_id = get_setting("event_id", settings.event.id)
+        sheet_title = f"{event_id}_sync"
+
+        res = google_service.create_or_update_backup_sheet(
+            folder_id=folder_id,
+            title=sheet_title,
+            performances=performances,
+            food_items=food_items,
+            target_sheet_id=target_sheet_id
+        )
+        db_service.set_last_sync_time()
         return {
             "status": "success",
-            "count": len(entries),
-            "last_synced_at": db_service.get_last_sync_time()
+            "count": len(performances),
+            "food_count": len(food_items),
+            "last_synced_at": db_service.get_last_sync_time(),
+            "url": res.get("url")
         }
     except Exception as e:
-        logger.exception("Failed to sync data: %s", e)
+        logger.exception("Failed to sync data to Google Sheet: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/stage-queue", response_model=List[PerformanceEntry])
@@ -1105,10 +1166,18 @@ async def upload_track(
 async def stream_audio(entry_id: str, request: Request, range: Optional[str] = Header(None)):
     performances = google_service.get_performances()
     target = next((p for p in performances if p.entry_id == entry_id), None)
-    if not target:
-        raise HTTPException(status_code=404, detail="Performance entry not found")
+    drive_file_id = None
+    if target:
+        drive_file_id = target.drive_file_id
+    else:
+        # Check SQLite DB as fallback
+        db_perfs = db_service.get_all_performances()
+        db_target = next((p for p in db_perfs if p["entry_id"] == entry_id), None)
+        if not db_target:
+            raise HTTPException(status_code=404, detail="Performance entry not found")
+        drive_file_id = db_target.get("drive_file_id")
 
-    cache_path = audio_service.ensure_local_cache(entry_id, target.drive_file_id)
+    cache_path = audio_service.ensure_local_cache(entry_id, drive_file_id)
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio track available for this performance")
 

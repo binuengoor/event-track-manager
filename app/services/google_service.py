@@ -1021,9 +1021,10 @@ class GoogleService:
         folder_id: str,
         title: str,
         performances: List[Dict[str, Any]],
-        food_items: List[Dict[str, Any]]
+        food_items: List[Dict[str, Any]],
+        target_sheet_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Creates or updates a backup Google Sheet containing performances and food signups."""
+        """Creates or updates a Google Sheet containing performances and food signups from the App DB."""
         total_rows = len(performances) + len(food_items)
         if self.mock_mode:
             logger.info("Mock backup: %d performances and %d food items backed up", len(performances), len(food_items))
@@ -1035,42 +1036,51 @@ class GoogleService:
             }
 
         try:
-            # 1. Find existing backup file in target Drive folder or create a new one
-            q = f"name = '{title}' and '{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
-            res = self.drive.files().list(
-                q=q,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-                fields="files(id, name)"
-            ).execute()
-            files = res.get("files", [])
-
-            if files:
-                spreadsheet_id = files[0]["id"]
-                logger.info("Found existing backup spreadsheet %s (%s)", title, spreadsheet_id)
-            else:
-                body = {
-                    "name": title,
-                    "mimeType": "application/vnd.google-apps.spreadsheet",
-                    "parents": [folder_id]
-                }
-                created = self.drive.files().create(
-                    body=body,
+            spreadsheet_id = target_sheet_id
+            if not spreadsheet_id:
+                # 1. Find existing backup file in target Drive folder or create a new one
+                q = f"name = '{title}' and '{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+                res = self.drive.files().list(
+                    q=q,
                     supportsAllDrives=True,
-                    fields="id, name"
+                    includeItemsFromAllDrives=True,
+                    fields="files(id, name)"
                 ).execute()
-                spreadsheet_id = created["id"]
-                logger.info("Created new backup spreadsheet %s (%s)", title, spreadsheet_id)
+                files = res.get("files", [])
+
+                if files:
+                    spreadsheet_id = files[0]["id"]
+                    logger.info("Found existing backup spreadsheet %s (%s)", title, spreadsheet_id)
+                else:
+                    body = {
+                        "name": title,
+                        "mimeType": "application/vnd.google-apps.spreadsheet",
+                        "parents": [folder_id]
+                    }
+                    created = self.drive.files().create(
+                        body=body,
+                        supportsAllDrives=True,
+                        fields="id, name"
+                    ).execute()
+                    spreadsheet_id = created["id"]
+                    logger.info("Created new backup spreadsheet %s (%s)", title, spreadsheet_id)
 
             # 2. Ensure tabs exist
             meta = self.sheets.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
             existing_sheets = [s["properties"]["title"] for s in meta.get("sheets", [])]
 
+            # Determine performances tab name: use configured tab name (e.g. Song Sign-Up) or Performances
+            perf_tab = settings.google.sheet_tab_name or "Song Sign-Up"
+            if perf_tab not in existing_sheets and "Performances" in existing_sheets:
+                perf_tab = "Performances"
+
             requests = []
-            if "Performances" not in existing_sheets:
-                requests.append({"addSheet": {"properties": {"title": "Performances"}}})
-            if "Food Sign-Ups" not in existing_sheets:
-                requests.append({"addSheet": {"properties": {"title": "Food Sign-Ups"}}})
+            if perf_tab not in existing_sheets:
+                requests.append({"addSheet": {"properties": {"title": perf_tab}}})
+            if "Food Sign-Ups" not in existing_sheets and "Food Sign-Up" not in existing_sheets:
+                requests.append({"addSheet": {"properties": {"title": "Food Sign-Up"}}})
+
+            food_tab = "Food Sign-Up" if "Food Sign-Up" in existing_sheets else ("Food Sign-Ups" if "Food Sign-Ups" in existing_sheets else "Food Sign-Up")
 
             if requests:
                 self.sheets.spreadsheets().batchUpdate(
@@ -1125,13 +1135,16 @@ class GoogleService:
 
             # 5. Clear and write data
             data_payload = [
-                {"range": "Performances!A1:P", "values": perf_rows},
-                {"range": "Food Sign-Ups!A1:G", "values": food_rows}
+                {"range": f"'{perf_tab}'!A1:P", "values": perf_rows},
+                {"range": f"'{food_tab}'!A1:G", "values": food_rows}
             ]
 
             # Clear older rows first to avoid trailing data
-            self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Performances!A1:P1000").execute()
-            self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Food Sign-Ups!A1:G1000").execute()
+            try:
+                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{perf_tab}'!A1:P1000").execute()
+                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{food_tab}'!A1:G1000").execute()
+            except Exception:
+                pass
 
             self.sheets.spreadsheets().values().batchUpdate(
                 spreadsheetId=spreadsheet_id,

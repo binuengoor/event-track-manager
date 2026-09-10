@@ -3,6 +3,7 @@ let foodGroups = [];
 let foodItems = [];
 let perfTypes = [];
 let ageGroups = [];
+let allParticipants = [];
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
@@ -71,6 +72,7 @@ function setupTabs() {
       document.querySelectorAll(".admin-panel").forEach(p => p.classList.add("hidden"));
       document.getElementById(`panel-${targetTab}`)?.classList.remove("hidden");
 
+      if (targetTab === "participants") loadParticipants();
       if (targetTab === "stats") loadSummary();
       if (targetTab === "backup") loadBackupStatus();
     });
@@ -82,6 +84,7 @@ async function loadAllAdminData() {
     loadSettings(),
     loadFoodGroups(),
     loadFoodItems(),
+    loadParticipants(),
     loadSummary(),
     loadBackupStatus()
   ]);
@@ -596,7 +599,245 @@ function setupActionHandlers() {
       btn.disabled = false;
     }
   });
+
+  // Export DB to Sheet Now button
+  document.getElementById("sync-sheet-now-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("sync-sheet-now-btn");
+    btn.disabled = true;
+    showToast("Exporting local DB to Google Sheet...");
+    try {
+      const res = await fetch("/api/sync", { method: "POST" });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        showToast("Sync success: DB pushed to Google Sheet!");
+      } else {
+        showToast(`Sync error: ${data.message || "Failed"}`, true);
+      }
+    } catch (e) {
+      showToast("Sync request failed", true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // Participant Search Input
+  document.getElementById("participant-search-input")?.addEventListener("input", (e) => {
+    renderParticipantsTable(e.target.value.trim().toLowerCase());
+  });
+
+  // Modal Cancel / Close buttons
+  document.getElementById("close-admin-edit-modal-btn")?.addEventListener("click", closeAdminEditModal);
+  document.getElementById("cancel-admin-edit-btn")?.addEventListener("click", closeAdminEditModal);
+
+  // Participant Edit Form Submit
+  document.getElementById("admin-edit-participant-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveParticipantEdit();
+  });
 }
+
+async function loadParticipants() {
+  const tbody = document.getElementById("participants-table-body");
+  if (!tbody) return;
+  try {
+    const res = await fetch("/api/admin/participants");
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-rose-400">Failed to load participants</td></tr>`;
+      return;
+    }
+    allParticipants = await res.json();
+    updateParticipantCounters();
+    const query = document.getElementById("participant-search-input")?.value.trim().toLowerCase() || "";
+    renderParticipantsTable(query);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-rose-400">Error loading participants</td></tr>`;
+  }
+}
+
+function updateParticipantCounters() {
+  const total = allParticipants.length;
+  const juniors = allParticipants.filter(p => (p.age_group || "").toLowerCase().includes("junior")).length;
+  const seniors = allParticipants.filter(p => (p.age_group || "").toLowerCase().includes("senior")).length;
+
+  const totalEl = document.getElementById("participants-count-total");
+  const juniorsEl = document.getElementById("participants-count-juniors");
+  const seniorsEl = document.getElementById("participants-count-seniors");
+
+  if (totalEl) totalEl.textContent = total;
+  if (juniorsEl) juniorsEl.textContent = juniors;
+  if (seniorsEl) seniorsEl.textContent = seniors;
+}
+
+function renderParticipantsTable(query = "") {
+  const tbody = document.getElementById("participants-table-body");
+  if (!tbody) return;
+
+  const filtered = allParticipants.filter(p => {
+    if (!query) return true;
+    const matchName = (p.performer_name || "").toLowerCase().includes(query);
+    const matchGuardian = (p.guardian_name || "").toLowerCase().includes(query);
+    const matchSong = (p.song_title || "").toLowerCase().includes(query);
+    const matchMovie = (p.movie_name || "").toLowerCase().includes(query);
+    const matchId = (p.entry_id || "").toLowerCase().includes(query);
+    const matchPhone = (p.phone || "").toLowerCase().includes(query);
+    return matchName || matchGuardian || matchSong || matchMovie || matchId || matchPhone;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No participants found matching criteria.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(p => {
+    const isJunior = (p.age_group || "").toLowerCase().includes("junior");
+    const ageBadgeClass = isJunior
+      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+      : "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+
+    const trackStatus = p.track_status || "Pending";
+    let trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400">${trackStatus}</span>`;
+    if (trackStatus.toLowerCase() === "uploaded") {
+      trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Uploaded</span>`;
+    } else if (trackStatus.toLowerCase() === "acoustic") {
+      trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Acoustic</span>`;
+    }
+
+    const origin = p.origin || "app";
+    const originBadge = origin === "sheet"
+      ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-800 text-slate-400">Sheet</span>`
+      : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-orange-500/10 text-orange-400 border border-orange-500/20">App</span>`;
+
+    const seqDisplay = p.sequence_order ? `#${p.sequence_order}` : "-";
+
+    return `
+      <tr class="hover:bg-slate-800/40 transition">
+        <td class="px-3 py-3 font-mono font-bold text-slate-300">
+          <div>${p.entry_id}</div>
+          <div class="text-[10px] text-slate-500 font-sans">Seq: <span class="text-orange-400 font-bold">${seqDisplay}</span></div>
+        </td>
+        <td class="px-3 py-3">
+          <div class="font-bold text-white flex items-center gap-1.5">
+            <span>${p.performer_name || "Unknown"}</span>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${ageBadgeClass}">${p.age_group || "Senior"}</span>
+          </div>
+          ${p.guardian_name ? `<div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5"><i data-lucide="shield" class="w-3 h-3 text-slate-500"></i> ${p.guardian_name} ${p.phone ? `<span class="text-slate-500 font-mono text-[10px]">(${p.phone})</span>` : ""}</div>` : (p.phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${p.phone}</div>` : "")}
+        </td>
+        <td class="px-3 py-3">
+          <span class="font-medium text-slate-300">${p.performance_type || "Solo"}</span>
+          ${p.partner_name ? `<div class="text-[10px] text-slate-400 truncate max-w-[120px]">+ ${p.partner_name}</div>` : ""}
+        </td>
+        <td class="px-3 py-3">
+          <div class="font-medium text-white">${p.song_title || '<span class="italic text-slate-500">None</span>'}</div>
+          ${p.movie_name ? `<div class="text-[11px] text-slate-400">${p.movie_name}</div>` : ""}
+        </td>
+        <td class="px-3 py-3">${trackBadge}</td>
+        <td class="px-3 py-3">${originBadge}</td>
+        <td class="px-3 py-3 text-right">
+          <div class="flex items-center justify-end gap-1.5">
+            <button type="button" onclick="openEditParticipantModal('${p.entry_id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Edit Participant">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            </button>
+            <button type="button" onclick="deleteParticipant('${p.entry_id}', '${(p.performer_name || "this participant").replace(/'/g, "\\'")}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 transition" title="Delete Participant">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  if (window.lucide) lucide.createIcons();
+}
+
+window.openEditParticipantModal = function(entryId) {
+  const p = allParticipants.find(item => item.entry_id === entryId);
+  if (!p) {
+    showToast("Participant not found", true);
+    return;
+  }
+
+  document.getElementById("admin-edit-entry-id").value = p.entry_id;
+  document.getElementById("admin-edit-entry-id-badge").textContent = p.entry_id;
+  document.getElementById("admin-edit-performer-name").value = p.performer_name || "";
+  document.getElementById("admin-edit-age-group").value = p.age_group || "Senior";
+  document.getElementById("admin-edit-guardian-name").value = p.guardian_name || "";
+  document.getElementById("admin-edit-guardian-phone").value = p.phone || "";
+  document.getElementById("admin-edit-performance-type").value = p.performance_type || "Solo";
+  document.getElementById("admin-edit-partner-name").value = p.partner_name || "";
+  document.getElementById("admin-edit-song-title").value = p.song_title || "";
+  document.getElementById("admin-edit-movie-name").value = p.movie_name || "";
+  document.getElementById("admin-edit-sequence-order").value = p.sequence_order || "";
+  document.getElementById("admin-edit-track-status").value = p.track_status || "Pending";
+  document.getElementById("admin-edit-performance-status").value = p.performance_status || "Upcoming";
+  document.getElementById("admin-edit-stage-notes").value = p.stage_notes || "";
+
+  document.getElementById("admin-edit-participant-modal").classList.remove("hidden");
+  if (window.lucide) lucide.createIcons();
+};
+
+function closeAdminEditModal() {
+  document.getElementById("admin-edit-participant-modal").classList.add("hidden");
+}
+
+async function saveParticipantEdit() {
+  const entryId = document.getElementById("admin-edit-entry-id").value;
+  if (!entryId) return;
+
+  const seqVal = document.getElementById("admin-edit-sequence-order").value;
+  const payload = {
+    performer_name: document.getElementById("admin-edit-performer-name").value.trim(),
+    age_group: document.getElementById("admin-edit-age-group").value,
+    guardian_name: document.getElementById("admin-edit-guardian-name").value.trim() || null,
+    phone: document.getElementById("admin-edit-guardian-phone").value.trim() || null,
+    performance_type: document.getElementById("admin-edit-performance-type").value,
+    partner_name: document.getElementById("admin-edit-partner-name").value.trim() || null,
+    song_title: document.getElementById("admin-edit-song-title").value.trim() || null,
+    movie_name: document.getElementById("admin-edit-movie-name").value.trim() || null,
+    sequence_order: seqVal ? parseInt(seqVal, 10) : null,
+    track_status: document.getElementById("admin-edit-track-status").value,
+    performance_status: document.getElementById("admin-edit-performance-status").value,
+    stage_notes: document.getElementById("admin-edit-stage-notes").value.trim() || null
+  };
+
+  try {
+    const res = await fetch(`/api/admin/participants/${entryId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (res.ok) {
+      closeAdminEditModal();
+      showToast(`Updated ${payload.performer_name || entryId}`);
+      await Promise.all([loadParticipants(), loadSummary()]);
+    } else {
+      const err = await res.json();
+      showToast(`Update failed: ${err.detail || "Error"}`, true);
+    }
+  } catch (e) {
+    showToast("Network error updating participant", true);
+  }
+}
+
+window.deleteParticipant = async function(entryId, name) {
+  if (!confirm(`Are you sure you want to delete "${name}" (${entryId})? This will permanently remove the performance and its track cache.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/admin/participants/${entryId}`, {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      showToast(`Deleted ${name} (${entryId})`);
+      await Promise.all([loadParticipants(), loadSummary()]);
+    } else {
+      const err = await res.json();
+      showToast(`Delete failed: ${err.detail || "Error"}`, true);
+    }
+  } catch (e) {
+    showToast("Network error deleting participant", true);
+  }
+};
 
 window.moveGroup = async function(idx, direction) {
   const targetIdx = idx + direction;
