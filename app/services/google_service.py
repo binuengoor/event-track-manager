@@ -449,6 +449,25 @@ class GoogleService:
             except Exception as ex:
                 logger.warning("Could not save performances to SQLite: %s", ex)
 
+            # Sync Food Sign-Up tab if available in spreadsheet
+            if not self.mock_mode and self.sheets:
+                try:
+                    from app.services.db_service import db_service
+                    food_res = self.sheets.spreadsheets().values().get(
+                        spreadsheetId=settings.google.sheet_id,
+                        range="'Food Sign-Up'!A1:C60"
+                    ).execute()
+                    food_rows = food_res.get("values", [])
+                    if food_rows:
+                        serving_note = None
+                        if len(food_rows) > 0 and len(food_rows[0]) > 0:
+                            top_cell = str(food_rows[0][0])
+                            if "serving portion" in top_cell.lower():
+                                serving_note = top_cell.strip()
+                        db_service.sync_food_from_sheet(food_rows, serving_portion_note=serving_note)
+                except Exception as ex:
+                    logger.warning("Could not sync Food Sign-Up sheet: %s", ex)
+
             return entries
         except Exception as e:
             logger.error("Error fetching performances from Google Sheet: %s", e)

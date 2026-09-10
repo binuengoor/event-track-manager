@@ -534,6 +534,100 @@ class DBService:
         except Exception as ex:
             logger.error(f"Error seeding food catalog: {ex}")
 
+    def sync_food_from_sheet(self, sheet_rows: List[List[str]], serving_portion_note: Optional[str] = None):
+        """
+        Synchronizes food catalog and signups from Google Sheet 'Food Sign-Up' tab into SQLite.
+        sheet_rows: list of rows [Food Item Type, Name of Singer/Parent/Family, Food Description]
+        """
+        if not sheet_rows:
+            return
+
+        def categorize_item(item_name: str) -> str:
+            lower = item_name.lower()
+            if "appetizer" in lower:
+                return "Appetizers"
+            if "rice" in lower or "pulav" in lower or "pulao" in lower or "biriyani" in lower or "biryani" in lower:
+                return "Rice & Main"
+            if "curry" in lower:
+                return "Curries"
+            if "chappati" in lower or "roti" in lower or "naan" in lower or "bread" in lower:
+                return "Breads & Sides"
+            if "dessert" in lower or "sweet" in lower:
+                return "Desserts"
+            return "Main Dishes"
+
+        group_priority = {
+            "Appetizers": 1,
+            "Rice & Main": 2,
+            "Curries": 3,
+            "Breads & Sides": 4,
+            "Desserts": 5,
+            "Main Dishes": 6
+        }
+
+        try:
+            with self._get_connection() as conn:
+                if serving_portion_note and serving_portion_note.strip():
+                    conn.execute("""
+                    INSERT OR REPLACE INTO app_settings (key, value, updated_at)
+                    VALUES ('food_serving_note', ?, datetime('now'))
+                    """, (serving_portion_note.strip(),))
+
+                for row_idx, r in enumerate(sheet_rows):
+                    if not r:
+                        continue
+                    item_name = str(r[0]).strip() if len(r) > 0 else ""
+                    if not item_name or item_name.lower().startswith("food item") or item_name.lower().startswith("serving portion"):
+                        continue
+
+                    signer_name = str(r[1]).strip() if len(r) > 1 and r[1] is not None else ""
+                    dish_desc = str(r[2]).strip() if len(r) > 2 and r[2] is not None else ""
+
+                    group_name = categorize_item(item_name)
+                    g_row = conn.execute("SELECT group_id FROM food_groups WHERE name = ?", (group_name,)).fetchone()
+                    if not g_row:
+                        g_id = f"fg_{uuid.uuid4().hex[:8]}"
+                        d_order = group_priority.get(group_name, 10)
+                        conn.execute(
+                            "INSERT INTO food_groups (group_id, name, display_order) VALUES (?, ?, ?)",
+                            (g_id, group_name, d_order)
+                        )
+                    else:
+                        g_id = g_row["group_id"]
+
+                    i_row = conn.execute("SELECT item_id FROM food_items WHERE name = ?", (item_name,)).fetchone()
+                    if not i_row:
+                        i_id = f"fi_{uuid.uuid4().hex[:8]}"
+                        conn.execute(
+                            "INSERT INTO food_items (item_id, name, group_id, display_order) VALUES (?, ?, ?, ?)",
+                            (i_id, item_name, g_id, row_idx)
+                        )
+                    else:
+                        i_id = i_row["item_id"]
+                        conn.execute("UPDATE food_items SET display_order = ? WHERE item_id = ?", (row_idx, i_id))
+
+                    # If signer is present in the sheet, update or insert food_signup
+                    if signer_name:
+                        s_row = conn.execute("SELECT signup_id FROM food_signups WHERE item_id = ?", (i_id,)).fetchone()
+                        if s_row:
+                            conn.execute("""
+                            UPDATE food_signups 
+                            SET signer_name = ?, dish_description = ?, updated_at = datetime('now')
+                            WHERE item_id = ?
+                            """, (signer_name, dish_desc, i_id))
+                        else:
+                            s_id = f"fs_{uuid.uuid4().hex[:8]}"
+                            conn.execute("""
+                            INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, created_at, updated_at)
+                            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+                            """, (s_id, i_id, signer_name, dish_desc))
+
+                conn.commit()
+                logger.info("Successfully synced food catalog and signups from sheet.")
+        except Exception as ex:
+            logger.error(f"Error syncing food from sheet: {ex}")
+            raise
+
     # =========================================================================
     # PERFORMANCES
     # =========================================================================

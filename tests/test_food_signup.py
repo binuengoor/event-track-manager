@@ -65,3 +65,39 @@ def test_food_claim_update_release(client):
     # Clean up
     db_service.delete_food_item(item_id, force=True)
     db_service.delete_food_group(group_id)
+
+def test_sync_food_from_sheet(client):
+    sheet_sample = [
+        ["Serving Portion :\nPlease plan based on Attendance"],
+        ["Food Item Type", "Name of Singer/Parent/Family", "Food Description"],
+        ["Sync Test Veg Appetizer 99", "", ""],
+        ["Sync Test Non-Veg Appetizer 99", "Subin Sugunan", "Chicken Fry"],
+        ["Sync Test Veg Pulav 99", "Ishan (Sarina)", ""],
+        ["Sync Test Dessert 99", "", ""]
+    ]
+    db_service.sync_food_from_sheet(sheet_sample, serving_portion_note="Plan for 50 people")
+
+    # Verify items were created and categorized
+    all_items = db_service.get_all_food_items_with_signups()
+    item_names = {it["name"] for it in all_items}
+    assert "Sync Test Veg Appetizer 99" in item_names
+    assert "Sync Test Non-Veg Appetizer 99" in item_names
+    assert "Sync Test Veg Pulav 99" in item_names
+    assert "Sync Test Dessert 99" in item_names
+
+    # Verify claimed signups
+    non_veg_app = next(it for it in all_items if it["name"] == "Sync Test Non-Veg Appetizer 99")
+    assert non_veg_app["is_taken"] is True
+    assert non_veg_app["signer_name"] == "Subin Sugunan"
+    assert non_veg_app["dish_description"] == "Chicken Fry"
+    assert non_veg_app["group_name"] == "Appetizers"
+
+    # Verify open item
+    veg_app = next(it for it in all_items if it["name"] == "Sync Test Veg Appetizer 99")
+    assert veg_app["is_taken"] is False
+
+    # Verify serving note
+    note = db_service.get_app_setting("food_serving_note")
+    assert note == "Plan for 50 people"
+
+
