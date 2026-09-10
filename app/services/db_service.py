@@ -494,6 +494,46 @@ class DBService:
             logger.error(f"Error fetching food signup for signer {signer_name}: {ex}")
             return None
 
+    def get_all_food_signups_map(self) -> Dict[str, Dict[str, Any]]:
+        """Returns a mapping of normalized signer_name/aliases -> food signup dict."""
+        try:
+            with self._get_connection() as conn:
+                rows = conn.execute("""
+                SELECT 
+                    s.signup_id,
+                    s.item_id,
+                    s.signer_name,
+                    s.dish_description,
+                    s.created_at,
+                    i.name AS item_name,
+                    g.group_id,
+                    g.name AS group_name
+                FROM food_signups s
+                JOIN food_items i ON s.item_id = i.item_id
+                LEFT JOIN food_groups g ON i.group_id = g.group_id
+                """).fetchall()
+                result = {}
+                import re
+                for r in rows:
+                    d = dict(r)
+                    raw_signer = (d.get("signer_name") or "").strip().lower()
+                    if not raw_signer:
+                        continue
+                    result[raw_signer] = d
+                    # If format is "Performer (Guardian)" or "Name (Parent)"
+                    m = re.match(r"^(.*?)\s*\((.*?)\)$", raw_signer)
+                    if m:
+                        part1 = m.group(1).strip().lower()
+                        part2 = m.group(2).strip().lower()
+                        if part1 and part1 not in result:
+                            result[part1] = d
+                        if part2 and part2 not in result:
+                            result[part2] = d
+                return result
+        except Exception as ex:
+            logger.error(f"Error fetching all food signups map: {ex}")
+            return {}
+
     def seed_food_catalog(self, seed_items: List[Any]):
         """Seeds food groups and items from configuration if tables are empty."""
         try:

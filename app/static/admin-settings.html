@@ -380,20 +380,20 @@
       <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
         <h3 class="text-base font-bold text-white border-b border-slate-800 pb-3">Event Participation Statistics</h3>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-            <span id="stat-total-performers" class="text-2xl sm:text-3xl font-black text-white font-mono">0</span>
+          <div id="stat-card-participants" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-orange-500/50 cursor-pointer transition group" title="Click to view all participants">
+            <span id="stat-total-performers" class="text-2xl sm:text-3xl font-black text-white font-mono group-hover:text-orange-400 transition">0</span>
             <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Participants</span>
           </div>
           <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
             <span id="stat-total-performances" class="text-2xl sm:text-3xl font-black text-orange-400 font-mono">0</span>
             <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Total Acts</span>
           </div>
-          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-            <span id="stat-juniors" class="text-2xl sm:text-3xl font-black text-amber-400 font-mono">0</span>
+          <div id="stat-card-juniors" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 cursor-pointer transition group" title="Click to view Junior participants">
+            <span id="stat-juniors" class="text-2xl sm:text-3xl font-black text-amber-400 font-mono group-hover:text-amber-300 transition">0</span>
             <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Juniors</span>
           </div>
-          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
-            <span id="stat-seniors" class="text-2xl sm:text-3xl font-black text-blue-400 font-mono">0</span>
+          <div id="stat-card-seniors" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 cursor-pointer transition group" title="Click to view Senior participants">
+            <span id="stat-seniors" class="text-2xl sm:text-3xl font-black text-blue-400 font-mono group-hover:text-blue-300 transition">0</span>
             <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Seniors</span>
           </div>
         </div>
@@ -427,9 +427,9 @@
           <div>
             <h3 class="text-base font-bold text-white flex items-center gap-2">
               <i data-lucide="users" class="w-4 h-4 text-orange-400"></i>
-              <span>Participants & Performances Roster</span>
+              <span>Participants Roster</span>
             </h3>
-            <p class="text-xs text-slate-400">Manage all registered performers, edit song/guardian details, or remove entries directly.</p>
+            <p class="text-xs text-slate-400">Overview of all registered performers, acts, track upload status, and potluck food contributions.</p>
           </div>
           <div class="flex items-center gap-2">
             <button id="sync-sheet-now-btn" class="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition flex items-center gap-1.5">
@@ -443,34 +443,62 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="relative flex-1 max-w-sm">
             <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"></i>
-            <input type="text" id="participant-search-input" placeholder="Search by name, song, ID..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+            <input type="text" id="participant-search-input" placeholder="Search by name, guardian, food, song..." class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
           </div>
-          <div class="flex items-center gap-2 text-xs">
-            <span class="text-slate-400">Total: <strong id="participants-count-total" class="text-white">0</strong></span>
-            <span class="text-slate-600">•</span>
-            <span class="text-slate-400">Juniors: <strong id="participants-count-juniors" class="text-amber-400">0</strong></span>
-            <span class="text-slate-600">•</span>
-            <span class="text-slate-400">Seniors: <strong id="participants-count-seniors" class="text-blue-400">0</strong></span>
+          <div id="participant-filter-pills" class="flex items-center gap-1.5 text-xs bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button type="button" data-filter="all" class="part-filter-pill px-3 py-1.5 rounded-lg text-xs font-bold transition bg-orange-500 text-white shadow">
+              All (<span id="participants-count-total">0</span>)
+            </button>
+            <button type="button" data-filter="junior" class="part-filter-pill px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-amber-400">
+              Juniors (<span id="participants-count-juniors">0</span>)
+            </button>
+            <button type="button" data-filter="senior" class="part-filter-pill px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-blue-400">
+              Seniors (<span id="participants-count-seniors">0</span>)
+            </button>
           </div>
         </div>
 
         <!-- Participants Table -->
         <div class="overflow-x-auto rounded-2xl border border-slate-800">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800 select-none">
               <tr>
-                <th class="px-3 py-3">ID / Seq</th>
-                <th class="px-3 py-3">Performer & Guardian</th>
-                <th class="px-3 py-3">Type</th>
-                <th class="px-3 py-3">Song & Movie</th>
-                <th class="px-3 py-3">Track Status</th>
-                <th class="px-3 py-3">Origin</th>
-                <th class="px-3 py-3 text-right">Actions</th>
+                <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="seq">
+                  <div class="flex items-center gap-1">
+                    <span>Seq</span>
+                    <span id="sort-indicator-seq" class="text-orange-400 font-mono text-xs">▲</span>
+                  </div>
+                </th>
+                <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="name">
+                  <div class="flex items-center gap-1">
+                    <span>Participant & Guardian</span>
+                    <span id="sort-indicator-name" class="text-slate-600 font-mono text-xs">↕</span>
+                  </div>
+                </th>
+                <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="acts">
+                  <div class="flex items-center gap-1">
+                    <span>Performances</span>
+                    <span id="sort-indicator-acts" class="text-slate-600 font-mono text-xs">↕</span>
+                  </div>
+                </th>
+                <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="tracks">
+                  <div class="flex items-center gap-1">
+                    <span>Track Status</span>
+                    <span id="sort-indicator-tracks" class="text-slate-600 font-mono text-xs">↕</span>
+                  </div>
+                </th>
+                <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="food">
+                  <div class="flex items-center gap-1">
+                    <span>Food Sign-Up</span>
+                    <span id="sort-indicator-food" class="text-slate-600 font-mono text-xs">↕</span>
+                  </div>
+                </th>
+                <th class="px-3.5 py-3 text-right">Hub</th>
               </tr>
             </thead>
             <tbody id="participants-table-body" class="divide-y divide-slate-800 text-slate-300">
               <tr>
-                <td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading participants...</td>
+                <td colspan="6" class="px-4 py-8 text-center text-slate-500">Loading participants...</td>
               </tr>
             </tbody>
           </table>

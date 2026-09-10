@@ -904,8 +904,28 @@ async def trigger_immediate_backup(_authorized: bool = Depends(verify_admin_pin)
 
 @app.get("/api/admin/participants")
 async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin)):
-    """Returns all performances/participants directly from SQLite with full details."""
-    return db_service.get_all_performances()
+    """Returns all performances/participants directly from SQLite with food signup details."""
+    perfs = db_service.get_all_performances()
+    food_map = db_service.get_all_food_signups_map()
+    for p in perfs:
+        name_key = (p.get("performer_name") or "").strip().lower()
+        guardian_key = (p.get("guardian_name") or "").strip().lower()
+        first_name_key = name_key.split()[0] if name_key else ""
+        
+        # Try exact performer name, exact guardian name, first name, or matching food_map keys
+        food = food_map.get(name_key)
+        if not food and guardian_key:
+            food = food_map.get(guardian_key)
+        if not food and first_name_key:
+            food = food_map.get(first_name_key)
+        if not food:
+            # Check if any food_map key contains performer name or vice versa
+            for f_key, f_val in food_map.items():
+                if len(f_key) >= 3 and (f_key in name_key or (guardian_key and f_key in guardian_key)):
+                    food = f_val
+                    break
+        p["food_signup"] = food
+    return perfs
 
 @app.put("/api/admin/participants/{entry_id}")
 async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
