@@ -384,7 +384,16 @@ function setupEventListeners() {
             const btn = document.createElement("a");
             btn.href = `/performer?name=${encodeURIComponent(m)}`;
             btn.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition";
-            btn.innerHTML = `<span>${escapeHtml(m)}</span> <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>`;
+            
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = m;
+            btn.appendChild(nameSpan);
+
+            const icon = document.createElement("i");
+            icon.setAttribute("data-lucide", "arrow-right");
+            icon.className = "w-3.5 h-3.5";
+            btn.appendChild(icon);
+
             matchedListEl.appendChild(btn);
           });
         }
@@ -581,4 +590,15 @@ function showError(msg) {
 function hideError() {
   const errEl = document.getElementById("form-error");
   if (errEl) errEl.classList.add("hidden");
+}
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str).replace(/[&<>"']/g, (m) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[m]);
 }

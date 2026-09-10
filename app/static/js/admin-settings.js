@@ -634,6 +634,23 @@ function setupActionHandlers() {
     e.preventDefault();
     await saveParticipantEdit();
   });
+
+  // Table action button clicks (Edit & Delete delegation)
+  document.getElementById("participants-table-body")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    const entryId = btn.dataset.entryId;
+    if (!entryId) return;
+
+    if (action === "edit-participant") {
+      openEditParticipantModal(entryId);
+    } else if (action === "delete-participant") {
+      const p = allParticipants.find(item => item.entry_id === entryId);
+      const name = p ? p.performer_name : entryId;
+      deleteParticipant(entryId, name);
+    }
+  });
 }
 
 async function loadParticipants() {
@@ -695,50 +712,59 @@ function renderParticipantsTable(query = "") {
       : "bg-blue-500/10 text-blue-400 border border-blue-500/20";
 
     const trackStatus = p.track_status || "Pending";
-    let trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400">${trackStatus}</span>`;
+    let trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-800 text-slate-400">${escapeHtml(trackStatus)}</span>`;
     if (trackStatus.toLowerCase() === "uploaded") {
       trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Uploaded</span>`;
     } else if (trackStatus.toLowerCase() === "acoustic") {
       trackBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/20">Acoustic</span>`;
     }
 
-    const origin = p.origin || "app";
+    const origin = p.created_via || p.origin || "app";
     const originBadge = origin === "sheet"
       ? `<span class="px-1.5 py-0.5 rounded text-[9px] bg-slate-800 text-slate-400">Sheet</span>`
       : `<span class="px-1.5 py-0.5 rounded text-[9px] bg-orange-500/10 text-orange-400 border border-orange-500/20">App</span>`;
 
     const seqDisplay = p.sequence_order ? `#${p.sequence_order}` : "-";
+    const safeEntryId = escapeHtml(p.entry_id || "");
+    const safePerformerName = escapeHtml(p.performer_name || "Unknown");
+    const safeAgeGroup = escapeHtml(p.age_group || "Senior");
+    const safeGuardianName = escapeHtml(p.guardian_name || "");
+    const safePhone = escapeHtml(p.phone || "");
+    const safePerfType = escapeHtml(p.performance_type || "Solo");
+    const safePartner = escapeHtml(p.partner_name || "");
+    const safeSong = p.song_title ? escapeHtml(p.song_title) : '<span class="italic text-slate-500">None</span>';
+    const safeMovie = escapeHtml(p.movie_name || "");
 
     return `
       <tr class="hover:bg-slate-800/40 transition">
         <td class="px-3 py-3 font-mono font-bold text-slate-300">
-          <div>${p.entry_id}</div>
+          <div>${safeEntryId}</div>
           <div class="text-[10px] text-slate-500 font-sans">Seq: <span class="text-orange-400 font-bold">${seqDisplay}</span></div>
         </td>
         <td class="px-3 py-3">
           <div class="font-bold text-white flex items-center gap-1.5">
-            <span>${p.performer_name || "Unknown"}</span>
-            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${ageBadgeClass}">${p.age_group || "Senior"}</span>
+            <span>${safePerformerName}</span>
+            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${ageBadgeClass}">${safeAgeGroup}</span>
           </div>
-          ${p.guardian_name ? `<div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5"><i data-lucide="shield" class="w-3 h-3 text-slate-500"></i> ${p.guardian_name} ${p.phone ? `<span class="text-slate-500 font-mono text-[10px]">(${p.phone})</span>` : ""}</div>` : (p.phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${p.phone}</div>` : "")}
+          ${p.guardian_name ? `<div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5"><i data-lucide="shield" class="w-3 h-3 text-slate-500"></i> ${safeGuardianName} ${p.phone ? `<span class="text-slate-500 font-mono text-[10px]">(${safePhone})</span>` : ""}</div>` : (p.phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${safePhone}</div>` : "")}
         </td>
         <td class="px-3 py-3">
-          <span class="font-medium text-slate-300">${p.performance_type || "Solo"}</span>
-          ${p.partner_name ? `<div class="text-[10px] text-slate-400 truncate max-w-[120px]">+ ${p.partner_name}</div>` : ""}
+          <span class="font-medium text-slate-300">${safePerfType}</span>
+          ${p.partner_name ? `<div class="text-[10px] text-slate-400 truncate max-w-[120px]">+ ${safePartner}</div>` : ""}
         </td>
         <td class="px-3 py-3">
-          <div class="font-medium text-white">${p.song_title || '<span class="italic text-slate-500">None</span>'}</div>
-          ${p.movie_name ? `<div class="text-[11px] text-slate-400">${p.movie_name}</div>` : ""}
+          <div class="font-medium text-white">${safeSong}</div>
+          ${p.movie_name ? `<div class="text-[11px] text-slate-400">${safeMovie}</div>` : ""}
         </td>
         <td class="px-3 py-3">${trackBadge}</td>
         <td class="px-3 py-3">${originBadge}</td>
         <td class="px-3 py-3 text-right">
           <div class="flex items-center justify-end gap-1.5">
-            <button type="button" onclick="openEditParticipantModal('${p.entry_id}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Edit Participant">
-              <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            <button type="button" data-action="edit-participant" data-entry-id="${safeEntryId}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition" title="Edit Participant">
+              <i data-lucide="edit-3" class="w-3.5 h-3.5 pointer-events-none"></i>
             </button>
-            <button type="button" onclick="deleteParticipant('${p.entry_id}', '${(p.performer_name || "this participant").replace(/'/g, "\\'")}')" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 transition" title="Delete Participant">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <button type="button" data-action="delete-participant" data-entry-id="${safeEntryId}" class="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 transition" title="Delete Participant">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5 pointer-events-none"></i>
             </button>
           </div>
         </td>

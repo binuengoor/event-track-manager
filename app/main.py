@@ -232,6 +232,10 @@ async def serve_signup_page():
     signup_path = os.path.join(STATIC_DIR, "signup.html")
     with open(signup_path, "r", encoding="utf-8") as f:
         html = f.read()
+
+    version = int(datetime.now(timezone.utc).timestamp())
+    html = html.replace('/static/js/signup.js', f'/static/js/signup.js?v={version}')
+
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -288,6 +292,10 @@ async def serve_admin_settings_page():
     admin_settings_path = os.path.join(STATIC_DIR, "admin-settings.html")
     with open(admin_settings_path, "r", encoding="utf-8") as f:
         html = f.read()
+
+    version = int(datetime.now(timezone.utc).timestamp())
+    html = html.replace('/static/js/admin-settings.js', f'/static/js/admin-settings.js?v={version}')
+
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
