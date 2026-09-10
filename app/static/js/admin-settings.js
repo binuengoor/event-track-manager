@@ -751,7 +751,7 @@ function renderParticipantsTable(query = "") {
         </td>
         <td class="px-3 py-3">
           <span class="font-medium text-slate-300">${safePerfType}</span>
-          ${p.partner_name ? `<div class="text-[10px] text-slate-400 truncate max-w-[120px]">+ ${safePartner}</div>` : ""}
+          ${p.partner_name ? `<div class="text-[10px] text-slate-400 truncate max-w-[140px]">+ ${safePartner}${p.partner_age_group ? ` <span class="text-amber-400 font-semibold">(${escapeHtml(p.partner_age_group)})</span>` : ''}</div>` : ""}
         </td>
         <td class="px-3 py-3">
           <div class="font-medium text-white">${safeSong}</div>
@@ -791,6 +791,7 @@ window.openEditParticipantModal = function(entryId) {
   document.getElementById("admin-edit-guardian-phone").value = p.phone || "";
   document.getElementById("admin-edit-performance-type").value = p.performance_type || "Solo";
   document.getElementById("admin-edit-partner-name").value = p.partner_name || "";
+  document.getElementById("admin-edit-partner-age-group").value = p.partner_age_group || "";
   document.getElementById("admin-edit-song-title").value = p.song_title || "";
   document.getElementById("admin-edit-movie-name").value = p.movie_name || "";
   document.getElementById("admin-edit-sequence-order").value = p.sequence_order || "";
@@ -818,6 +819,7 @@ async function saveParticipantEdit() {
     phone: document.getElementById("admin-edit-guardian-phone").value.trim() || null,
     performance_type: document.getElementById("admin-edit-performance-type").value,
     partner_name: document.getElementById("admin-edit-partner-name").value.trim() || null,
+    partner_age_group: document.getElementById("admin-edit-partner-age-group").value || null,
     song_title: document.getElementById("admin-edit-song-title").value.trim() || null,
     movie_name: document.getElementById("admin-edit-movie-name").value.trim() || null,
     sequence_order: seqVal ? parseInt(seqVal, 10) : null,

@@ -101,3 +101,53 @@ def test_signup_max_performances_and_solo_limit(client):
     res3 = client.post("/api/signup", json=payload_3)
     assert res3.status_code == 400
     assert "exceeds limit" in res3.json()["detail"]
+
+def test_signup_duet_partner_age_group(client):
+    import uuid
+    pname = f"Duet Primary {uuid.uuid4().hex[:6]}"
+    partner_name = f"Brand New Partner {uuid.uuid4().hex[:6]}"
+    payload = {
+        "performer_name": pname,
+        "contact_info": "555-444-5555",
+        "age_group": "Senior",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner_name,
+                "partner_age_group": "Junior",
+                "song_title": "Aayiram Kannumai"
+            }
+        ]
+    }
+    res = client.post("/api/signup", json=payload)
+    assert res.status_code == 200
+    entry_id = res.json()["entry_ids"][0]
+
+    # Verify directly from database
+    perf = db_service.get_performance_by_id(entry_id)
+    assert perf is not None
+    assert perf["performer_name"] == pname
+    assert perf["partner_name"] == partner_name
+    assert perf["partner_age_group"] == "Junior"
+
+    # Test auto-resolution of existing partner's age group when omitted
+    another_pname = f"Another Singer {uuid.uuid4().hex[:6]}"
+    payload_auto = {
+        "performer_name": another_pname,
+        "contact_info": "555-777-8888",
+        "age_group": "Senior",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": pname,  # pname was registered as Senior
+                "song_title": "Sundari Neeyum"
+            }
+        ]
+    }
+    res_auto = client.post("/api/signup", json=payload_auto)
+    assert res_auto.status_code == 200
+    entry_id_auto = res_auto.json()["entry_ids"][0]
+    perf_auto = db_service.get_performance_by_id(entry_id_auto)
+    assert perf_auto["partner_name"] == pname
+    assert perf_auto["partner_age_group"] == "Senior"
+

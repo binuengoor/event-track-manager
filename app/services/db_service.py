@@ -59,6 +59,7 @@ class DBService:
                     age_group TEXT DEFAULT '',
                     guardian_name TEXT DEFAULT '',
                     guardian_phone TEXT DEFAULT '',
+                    partner_age_group TEXT DEFAULT '',
                     created_via TEXT DEFAULT 'sheet'
                 )
                 """)
@@ -69,6 +70,7 @@ class DBService:
                     ("age_group", "TEXT DEFAULT ''"),
                     ("guardian_name", "TEXT DEFAULT ''"),
                     ("guardian_phone", "TEXT DEFAULT ''"),
+                    ("partner_age_group", "TEXT DEFAULT ''"),
                     ("created_via", "TEXT DEFAULT 'sheet'"),
                 ]:
                     try:
@@ -637,6 +639,7 @@ class DBService:
         performer_name: str,
         performance_type: str = "Solo",
         partner_name: Optional[str] = None,
+        partner_age_group: Optional[str] = None,
         contact_info: Optional[str] = None,
         song_title: str = "",
         movie_name: Optional[str] = None,
@@ -651,8 +654,21 @@ class DBService:
         prefix = getattr(settings, "entry_id_prefix", "PK") or "PK"
         now_iso = datetime.now(timezone.utc).isoformat()
         extra_tags = [age_group] if age_group else []
+        if partner_age_group:
+            extra_tags.append(f"Partner:{partner_age_group}")
 
         with self._get_connection() as conn:
+            # If partner age group not explicitly provided, try to resolve from existing performer record
+            if partner_name and not partner_age_group:
+                p_row = conn.execute(
+                    "SELECT age_group FROM performances WHERE LOWER(TRIM(performer_name)) = ? AND age_group IS NOT NULL AND age_group != '' LIMIT 1",
+                    (partner_name.strip().lower(),)
+                ).fetchone()
+                if p_row and p_row["age_group"]:
+                    partner_age_group = p_row["age_group"]
+                    if f"Partner:{partner_age_group}" not in extra_tags:
+                        extra_tags.append(f"Partner:{partner_age_group}")
+
             # Determine next entry_id number
             rows = conn.execute("SELECT entry_id FROM performances WHERE entry_id LIKE ?", (f"{prefix}-%",)).fetchall()
             max_num = 0
@@ -671,17 +687,18 @@ class DBService:
 
             conn.execute("""
             INSERT INTO performances (
-                entry_id, performer_name, performance_type, partner_name, contact_info,
+                entry_id, performer_name, performance_type, partner_name, partner_age_group, contact_info,
                 song_title, movie_name, sequence_order, performance_status, track_status,
                 duration, drive_file_id, drive_file_name, last_updated, row_index,
                 is_song_name_missing, extra_tags_json, stage_notes, age_group,
                 guardian_name, guardian_phone, created_via
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry_id,
                 performer_name.strip(),
                 performance_type.strip(),
                 partner_name.strip() if partner_name else None,
+                partner_age_group.strip() if partner_age_group else "",
                 contact_info.strip() if contact_info else None,
                 song_title.strip(),
                 movie_name.strip() if movie_name else None,
@@ -708,7 +725,7 @@ class DBService:
     def update_performance_details(self, entry_id: str, **fields) -> bool:
         """Updates specific performance details (e.g. song, movie, partner, age, guardian, track_status)."""
         allowed_fields = {
-            "performer_name", "song_title", "movie_name", "partner_name", "performance_type",
+            "performer_name", "song_title", "movie_name", "partner_name", "partner_age_group", "performance_type",
             "age_group", "guardian_name", "guardian_phone", "contact_info",
             "stage_notes", "track_status", "performance_status", "sequence_order"
         }
@@ -872,6 +889,28 @@ class DBService:
         except Exception as ex:
             logger.error(f"Error fetching performances from SQLite: {ex}")
             return []
+
+    def get_performance(self, entry_id: str) -> Optional[Dict[str, Any]]:
+        """Returns a single performance dictionary by entry_id, or None."""
+        try:
+            with self._get_connection() as conn:
+                row = conn.execute("SELECT * FROM performances WHERE entry_id = ?", (entry_id,)).fetchone()
+                if not row:
+                    return None
+                item = dict(row)
+                item["is_song_name_missing"] = bool(item.get("is_song_name_missing", 0))
+                try:
+                    item["extra_tags"] = json.loads(item["extra_tags_json"]) if item.get("extra_tags_json") else []
+                except Exception:
+                    item["extra_tags"] = []
+                item.pop("extra_tags_json", None)
+                return item
+        except Exception as ex:
+            logger.error(f"Error fetching performance {entry_id} from SQLite: {ex}")
+            return None
+
+    def get_performance_by_id(self, entry_id: str) -> Optional[Dict[str, Any]]:
+        return self.get_performance(entry_id)
 
     def update_performance_field(self, entry_id: str, field_name: str, value: Any):
         """Updates a specific field of a performance in SQLite."""

@@ -134,6 +134,29 @@ function renderPerformanceTypes(types) {
   });
 }
 
+function renderPartnerAgeGroups(cardNum, ageGroups) {
+  const container = document.getElementById(`partner-age-options-${cardNum}`);
+  if (!container) return;
+  container.innerHTML = "";
+
+  const groups = (ageGroups && ageGroups.length > 0) ? ageGroups : [{ name: "Senior" }, { name: "Junior" }];
+  groups.forEach((ag, idx) => {
+    const label = document.createElement("label");
+    label.className = `flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:border-orange-500/50 cursor-pointer transition text-xs font-semibold text-slate-300 partner-age-opt-${cardNum}`;
+
+    const input = document.createElement("input");
+    input.type = "radio";
+    input.name = `partner_age_group_${cardNum}`;
+    input.value = ag.name;
+    input.className = "text-orange-500 focus:ring-orange-500";
+    if (idx === 0) input.checked = true;
+
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(ag.name));
+    container.appendChild(label);
+  });
+}
+
 function renderPartnerOptions(registeredNames) {
   [1, 2].forEach(cardNum => {
     const select = document.getElementById(`partner-select-${cardNum}`);
@@ -147,11 +170,16 @@ function renderPartnerOptions(registeredNames) {
       select.appendChild(opt);
     });
 
+    renderPartnerAgeGroups(cardNum, signupConfig?.age_groups || []);
+
     const toggleBtn = document.getElementById(`toggle-custom-partner-${cardNum}`);
     const selectWrap = document.getElementById(`partner-select-wrap-${cardNum}`);
     const customWrap = document.getElementById(`partner-custom-wrap-${cardNum}`);
     const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
     const hiddenPartner = document.getElementById(`partner-name-${cardNum}`);
+    const dupBox = document.getElementById(`partner-dup-box-${cardNum}`);
+    const matchedListEl = document.getElementById(`partner-matched-list-${cardNum}`);
+    const dismissBtn = document.getElementById(`dismiss-partner-dup-${cardNum}`);
 
     if (toggleBtn && !toggleBtn._configured) {
       toggleBtn._configured = true;
@@ -172,6 +200,7 @@ function renderPartnerOptions(registeredNames) {
           toggleBtn.textContent = "+ Add other participant";
           customInput.value = "";
           hiddenPartner.value = select.value.trim();
+          if (dupBox) dupBox.classList.add("hidden");
         }
       });
     }
@@ -186,7 +215,72 @@ function renderPartnerOptions(registeredNames) {
     if (customInput && !customInput._configured) {
       customInput._configured = true;
       customInput.addEventListener("input", () => {
-        hiddenPartner.value = customInput.value.trim();
+        const rawVal = customInput.value.trim();
+        hiddenPartner.value = rawVal;
+        const val = rawVal.toLowerCase();
+
+        // Check if >= 3 characters entered
+        if (val.length < 3 || !signupConfig || !signupConfig.registered_performers) {
+          if (dupBox) dupBox.classList.add("hidden");
+          return;
+        }
+
+        const registered = signupConfig.registered_performers;
+        const matches = registered.filter(p => {
+          const norm = p.trim().toLowerCase();
+          return norm === val || norm.startsWith(val) || norm.includes(val);
+        });
+
+        if (matches.length > 0 && dupBox && matchedListEl) {
+          matchedListEl.innerHTML = "";
+          matches.forEach(m => {
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = m;
+            pill.appendChild(nameSpan);
+
+            const icon = document.createElement("i");
+            icon.setAttribute("data-lucide", "check");
+            icon.className = "w-3 h-3";
+            pill.appendChild(icon);
+
+            pill.addEventListener("click", () => {
+              // Ensure option exists in select
+              let opt = Array.from(select.options).find(o => o.value.toLowerCase() === m.toLowerCase());
+              if (!opt) {
+                opt = document.createElement("option");
+                opt.value = m;
+                opt.textContent = m;
+                select.appendChild(opt);
+              }
+              select.value = opt.value;
+              hiddenPartner.value = opt.value;
+
+              // Switch back to select mode
+              customWrap.classList.add("hidden");
+              selectWrap.classList.remove("hidden");
+              toggleBtn.textContent = "+ Add other participant";
+              customInput.value = "";
+              dupBox.classList.add("hidden");
+            });
+
+            matchedListEl.appendChild(pill);
+          });
+          dupBox.classList.remove("hidden");
+          if (window.lucide) lucide.createIcons();
+        } else {
+          if (dupBox) dupBox.classList.add("hidden");
+        }
+      });
+    }
+
+    if (dismissBtn && !dismissBtn._configured) {
+      dismissBtn._configured = true;
+      dismissBtn.addEventListener("click", () => {
+        if (dupBox) dupBox.classList.add("hidden");
       });
     }
   });
@@ -208,6 +302,8 @@ function handleTypeChange(cardNum, type) {
       if (select) select.value = "";
       const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
       if (customInput) customInput.value = "";
+      const dupBox = document.getElementById(`partner-dup-box-${cardNum}`);
+      if (dupBox) dupBox.classList.add("hidden");
     }
   }
 }
@@ -449,6 +545,11 @@ async function handleSignupSubmit(e) {
   const notes1 = document.getElementById("stage-notes-1")?.value.trim() || "";
   const acoustic1 = Boolean(document.getElementById("acoustic-1")?.checked);
 
+  const isCustomPartner1 = !document.getElementById("partner-custom-wrap-1")?.classList.contains("hidden");
+  const partnerAgeGroup1 = (type1.toLowerCase() === "duet" && isCustomPartner1)
+    ? (document.querySelector('input[name="partner_age_group_1"]:checked')?.value || "Senior")
+    : null;
+
   if (type1.toLowerCase() === "duet" && !partner1) {
     showError("Please specify your duet partner's name for Performance 1.");
     return;
@@ -458,6 +559,7 @@ async function handleSignupSubmit(e) {
     {
       performance_type: type1,
       partner_name: partner1,
+      partner_age_group: partnerAgeGroup1,
       song_title: song1,
       movie_name: movie1,
       stage_notes: notes1,
@@ -474,6 +576,11 @@ async function handleSignupSubmit(e) {
     const notes2 = document.getElementById("stage-notes-2")?.value.trim() || "";
     const acoustic2 = Boolean(document.getElementById("acoustic-2")?.checked);
 
+    const isCustomPartner2 = !document.getElementById("partner-custom-wrap-2")?.classList.contains("hidden");
+    const partnerAgeGroup2 = (type2.toLowerCase() === "duet" && isCustomPartner2)
+      ? (document.querySelector('input[name="partner_age_group_2"]:checked')?.value || "Senior")
+      : null;
+
     if (type2.toLowerCase() === "duet" && !partner2) {
       showError("Please specify your duet partner's name for Performance 2.");
       return;
@@ -482,6 +589,7 @@ async function handleSignupSubmit(e) {
     performances.push({
       performance_type: type2,
       partner_name: partner2,
+      partner_age_group: partnerAgeGroup2,
       song_title: song2,
       movie_name: movie2,
       stage_notes: notes2,

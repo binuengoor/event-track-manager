@@ -104,6 +104,7 @@ class PerformanceSignupItem(BaseModel):
     song_title: Optional[str] = ""
     movie_name: Optional[str] = ""
     partner_name: Optional[str] = None
+    partner_age_group: Optional[str] = None
     stage_notes: Optional[str] = ""
     is_acoustic: bool = False
 
@@ -124,6 +125,7 @@ class PerformanceUpdateRequest(BaseModel):
     song_title: Optional[str] = None
     movie_name: Optional[str] = None
     partner_name: Optional[str] = None
+    partner_age_group: Optional[str] = None
     performance_type: Optional[str] = None
     stage_notes: Optional[str] = None
     age_group: Optional[str] = None
@@ -138,8 +140,10 @@ class AdminParticipantUpdateRequest(BaseModel):
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
     contact_info: Optional[str] = None
+    phone: Optional[str] = None
     performance_type: Optional[str] = None
     partner_name: Optional[str] = None
+    partner_age_group: Optional[str] = None
     song_title: Optional[str] = None
     movie_name: Optional[str] = None
     sequence_order: Optional[int] = None
@@ -153,6 +157,7 @@ class AddPerformanceRequest(BaseModel):
     song_title: str = ""
     movie_name: Optional[str] = ""
     partner_name: Optional[str] = ""
+    partner_age_group: Optional[str] = None
     is_acoustic: Optional[bool] = False
     stage_notes: Optional[str] = ""
 
@@ -475,6 +480,7 @@ async def register_participant(payload: SignupRequest):
             performer_name=clean_name,
             performance_type=p.performance_type,
             partner_name=p.partner_name,
+            partner_age_group=p.partner_age_group,
             contact_info=payload.contact_info,
             song_title=p.song_title or "",
             movie_name=p.movie_name or "",
@@ -516,6 +522,7 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
         "song_title": payload.song_title,
         "movie_name": payload.movie_name,
         "partner_name": payload.partner_name,
+        "partner_age_group": payload.partner_age_group,
         "performance_type": payload.performance_type,
         "stage_notes": payload.stage_notes,
         "age_group": payload.age_group,
@@ -662,6 +669,7 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         performer_name=clean_name,
         performance_type=perf_type,
         partner_name=payload.partner_name.strip() if payload.partner_name else None,
+        partner_age_group=payload.partner_age_group.strip() if payload.partner_age_group else None,
         contact_info=contact_info,
         song_title=payload.song_title.strip() if payload.song_title else "",
         movie_name=payload.movie_name.strip() if payload.movie_name else None,
@@ -903,6 +911,8 @@ async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin))
 async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
     """Updates participant details directly in SQLite and triggers debounced backup."""
     update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
+    if "phone" in update_data:
+        update_data["guardian_phone"] = update_data.pop("phone")
     success = db_service.update_performance_details(entry_id, **update_data)
     if not success:
         raise HTTPException(status_code=404, detail="Participant/performance entry not found.")

@@ -187,8 +187,39 @@
                   <option value="">-- Choose from registered performers --</option>
                 </select>
               </div>
-              <div id="partner-custom-wrap-1" class="hidden">
-                <input type="text" id="partner-custom-name-1" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              <div id="partner-custom-wrap-1" class="hidden space-y-3">
+                <div>
+                  <input type="text" id="partner-custom-name-1" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                  
+                  <!-- Live Duplicate Check Alert for Partner 1 -->
+                  <div id="partner-dup-box-1" class="hidden mt-2 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs transition">
+                    <div class="flex items-start gap-2">
+                      <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                      <div class="flex-1 space-y-1.5">
+                        <div class="font-bold text-amber-300 flex items-center justify-between">
+                          <span>Already registered? Matching performers found:</span>
+                          <button type="button" id="dismiss-partner-dup-1" class="text-amber-400/80 hover:text-white text-[11px] p-0.5">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                        <p class="text-slate-300 text-xs leading-relaxed">
+                          If your duet partner is already registered, tap their name to select them:
+                        </p>
+                        <div id="partner-matched-list-1" class="flex flex-wrap gap-1.5 pt-0.5">
+                          <!-- Populated dynamically -->
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Partner Age Category Selection -->
+                <div id="partner-age-wrap-1" class="pt-0.5">
+                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Age Category *</label>
+                  <div id="partner-age-options-1" class="flex gap-2">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
               </div>
               <input type="hidden" id="partner-name-1" value="">
             </div>
@@ -257,8 +288,39 @@
                   <option value="">-- Choose from registered performers --</option>
                 </select>
               </div>
-              <div id="partner-custom-wrap-2" class="hidden">
-                <input type="text" id="partner-custom-name-2" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              <div id="partner-custom-wrap-2" class="hidden space-y-3">
+                <div>
+                  <input type="text" id="partner-custom-name-2" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+                  
+                  <!-- Live Duplicate Check Alert for Partner 2 -->
+                  <div id="partner-dup-box-2" class="hidden mt-2 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs transition">
+                    <div class="flex items-start gap-2">
+                      <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                      <div class="flex-1 space-y-1.5">
+                        <div class="font-bold text-amber-300 flex items-center justify-between">
+                          <span>Already registered? Matching performers found:</span>
+                          <button type="button" id="dismiss-partner-dup-2" class="text-amber-400/80 hover:text-white text-[11px] p-0.5">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                          </button>
+                        </div>
+                        <p class="text-slate-300 text-xs leading-relaxed">
+                          If your duet partner is already registered, tap their name to select them:
+                        </p>
+                        <div id="partner-matched-list-2" class="flex flex-wrap gap-1.5 pt-0.5">
+                          <!-- Populated dynamically -->
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Partner Age Category Selection -->
+                <div id="partner-age-wrap-2" class="pt-0.5">
+                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Age Category *</label>
+                  <div id="partner-age-options-2" class="flex gap-2">
+                    <!-- Populated dynamically -->
+                  </div>
+                </div>
               </div>
               <input type="hidden" id="partner-name-2" value="">
             </div>
