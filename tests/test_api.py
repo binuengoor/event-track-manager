@@ -99,7 +99,10 @@ def test_admin_auth():
 
 def test_upload_and_stream(tmp_path, monkeypatch):
     from app.services.audio_service import audio_service
+    from app.services.google_service import google_service
     monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
+    # Prevent tests from writing dummy audio files to live Google Drive
+    monkeypatch.setattr(google_service, "upload_file_to_active", lambda *a, **kw: "mock_test_drive_id")
     client = TestClient(app)
     
     import uuid
