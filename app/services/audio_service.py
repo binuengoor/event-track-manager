@@ -88,7 +88,8 @@ class AudioService:
         cache_path = self.get_cache_path(entry_id)
 
         # If no drive_file_id and not mock mode, the file was deleted from Drive: purge cache!
-        if not drive_file_id and not settings.mock_google_api:
+        is_mock = settings.mock_google_api or getattr(google_service, "mock_mode", False)
+        if not drive_file_id and not is_mock:
             self.purge_cache(entry_id)
             return None
 
@@ -106,7 +107,7 @@ class AudioService:
                 return cache_path
 
         # If in mock mode or file doesn't exist, create a tiny silent MP3 placeholder if needed
-        if settings.mock_google_api and not os.path.isfile(cache_path):
+        if is_mock and not os.path.isfile(cache_path):
             self._create_mock_mp3(cache_path)
             return cache_path
 

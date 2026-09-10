@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: app/Dockerfile
+    container_name: event_track_manager_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${PORT:-8088}:8000"
+    environment:
+      - CONFIG_PATH=/app/config.yaml
+      - ADMIN_PIN=${ADMIN_PIN:-2026}
+      - DOWNLOADER_SERVICE_URL=http://downloader:8001
+      - CACHE_DIR=/data/cache
+      - GOOGLE_CREDENTIALS_PATH=/secrets/credentials.json
+      - MOCK_GOOGLE_API=${MOCK_GOOGLE_API:-false}
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./secrets:/secrets:ro
+      - ./data:/data
+      - ./app:/app/app:ro
+      - audio_cache:/data/cache
+    depends_on:
+      - downloader
+
+  downloader:
+    build:
+      context: ./downloader
+      dockerfile: Dockerfile
+    container_name: event_track_manager_downloader
+    restart: unless-stopped
+    environment:
+      - CACHE_DIR=/data/cache
+      - COOKIES_PATH=/secrets/yt_cookies.txt
+    volumes:
+      - ./secrets:/secrets:ro
+      - audio_cache:/data/cache
+
+volumes:
+  audio_cache:
+    driver: local

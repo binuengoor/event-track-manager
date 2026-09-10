@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EMA Paattukoottam - Track Intake</title>
+  <title>EMA Paattukoottam - Performer Hub</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://unpkg.com/wavesurfer.js@7"></script>
@@ -13,70 +13,75 @@
 
   <!-- Navigation Bar -->
   <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3 group">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
           <h1 id="event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
-          <p id="event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night • Track Submission</p>
+          <p id="event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <!-- Live Sync Timestamp Indicator -->
-        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="sync-status-text">Synced</span>
-        </div>
-        <a href="/tracks" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Track Intake & Submission">
-          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Upload Tracks</span>
+        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Sign Up</span>
         </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
+        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-orange-600 text-white shadow-md shadow-orange-600/30 transition" title="Performer Hub & Track Submission">
+          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-white"></i>
+          <span>Performer</span>
+        </a>
+        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
           <span>Live Program</span>
         </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
           <span>Console</span>
         </a>
-        <button id="refresh-data-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh data from Google Sheet & Drive">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          <span>Refresh Data</span>
-        </button>
+        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Admin</span>
+        </a>
       </nav>
     </div>
   </header>
 
-  <!-- Main Intake Content -->
-  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10">
+  <!-- Main Content -->
+  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
     <!-- Notification Banner for Mock Mode -->
-    <div id="mock-banner" class="hidden mb-6 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
+    <div id="mock-banner" class="hidden p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
       <i data-lucide="info" class="w-4 h-4 shrink-0 text-amber-400"></i>
-      <span><strong>Preview Mode:</strong> Running with sample performances. Uploads and statuses are simulated in-memory.</span>
+      <span><strong>Preview Mode:</strong> Running with sample performances. Uploads and updates are simulated in-memory.</span>
     </div>
 
     <!-- Intro Card -->
-    <div class="mb-6 bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
-      <h2 class="text-xl font-bold text-white mb-1.5 flex items-center gap-2">
-        <span>Upload Your Backing Track</span>
-        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">Karaoke / Audio</span>
-      </h2>
+    <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+          <span>Performer Hub</span>
+        </h2>
+        <a href="/signup" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+          <span>Not registered yet?</span>
+          <i data-lucide="arrow-right" class="w-3 h-3"></i>
+        </a>
+      </div>
       <p class="text-sm text-slate-400 leading-relaxed">
-        Select your registered name from the sign-up list. You can upload an audio file directly (<span class="text-slate-300 font-medium">.mp3, .m4a, .wav</span>) or paste a YouTube karaoke link.
+        Select your name to manage your performances, update song titles, upload karaoke backing tracks, and sign up for potluck food items.
       </p>
 
       <!-- Quick Resource Links: Sign-Up Sheet & Payment Page -->
       <div class="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2.5">
-        <a id="signup-sheet-link" href="https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 transition shadow-sm">
-          <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>View Sign-Up Sheet</span>
-          <i data-lucide="external-link" class="w-3 h-3 text-slate-500"></i>
+        <a href="/dashboard" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 transition shadow-sm">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>View Public Dashboard</span>
         </a>
-
-        <!-- Payment Link (Active or Coming Soon) -->
         <a id="payment-page-link" href="#" target="_blank" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 transition shadow-sm">
           <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i>
           <span>Event Payment</span>
@@ -89,36 +94,41 @@
       </div>
     </div>
 
-    <!-- Intake Form -->
-    <form id="intake-form" class="space-y-6">
-
-      <!-- Step 1: Select Performer -->
-      <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
-        <label for="performer-select" class="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-          <span class="flex items-center gap-2">
-            <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
-            Select Performer
-          </span>
-          <span id="performer-count-badge" class="text-xs text-slate-400 font-normal">Loading participants...</span>
-        </label>
-        
-        <div class="relative">
-          <select id="performer-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none cursor-pointer">
-            <option value="">-- Choose your name from the sign-up list --</option>
-          </select>
-          <div class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-            <i data-lucide="chevron-down" class="w-4 h-4"></i>
-          </div>
+    <!-- 1. Performer Selection -->
+    <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
+      <label for="performer-select" class="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
+        <span class="flex items-center gap-2">
+          <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
+          <span>Select Performer</span>
+        </span>
+        <span id="performer-count-badge" class="text-xs text-slate-400 font-normal">Loading participants...</span>
+      </label>
+      
+      <div class="relative">
+        <select id="performer-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none cursor-pointer">
+          <option value="">-- Choose your name from the sign-up list --</option>
+        </select>
+        <div class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+          <i data-lucide="chevron-down" class="w-4 h-4"></i>
         </div>
       </div>
+    </div>
 
-      <!-- Step 2: Select Song / Performance (appears once performer selected) -->
+    <!-- Song Selection & Track Upload Form -->
+    <form id="intake-form" class="space-y-6">
+
+      <!-- 2. Registered Performances -->
       <div id="song-selection-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-3">
-        <label class="block text-sm font-semibold text-slate-200 flex items-center gap-2">
-          <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">2</span>
-          Choose Song to Upload For
-        </label>
-        <p class="text-xs text-slate-400">If you have registered for multiple performances, select which track you are providing:</p>
+        <div class="flex items-center justify-between">
+          <label class="block text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">2</span>
+            <span>Your Registered Performances</span>
+          </label>
+          <button type="button" id="add-performance-btn" class="hidden px-2.5 py-1 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm">
+            <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-orange-400"></i>
+            <span>Add Another Performance</span>
+          </button>
+        </div>
         
         <div id="song-options-container" class="space-y-2.5 pt-1">
           <!-- Populated dynamically -->
@@ -130,23 +140,56 @@
             <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
             <div>
               <strong class="font-bold text-amber-200 block">Song title is missing for this entry!</strong>
-              <span>Please add your song name in the Google Sheet so your performance can be properly sequenced. After adding it in the sheet, click <strong>"Refresh Data"</strong> below.</span>
+              <span>Please click <strong>"Edit Details"</strong> on the song card above to add your song title.</span>
             </div>
           </div>
-          <div class="flex items-center gap-2 pt-1">
-            <a id="open-sheet-link" href="https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit" target="_blank" class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition shadow">
-              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
-              <span>Open Google Sheet</span>
-            </a>
-            <button type="button" id="alert-refresh-btn" class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-              <span>Refresh Data</span>
+        </div>
+      </div>
+
+      <!-- 3. Food Sign-Up CTA Card (Dynamic based on performer's food status) -->
+      <div id="food-cta-section" class="hidden">
+        <!-- Injected dynamically via JS: Yellow Pick-a-Dish or Green Claimed Card -->
+      </div>
+
+      <!-- Inline Food Selector Modal/Card (expands when picking/changing food) -->
+      <div id="food-selector-card" class="hidden bg-slate-900/95 border border-amber-500/40 p-5 rounded-2xl space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <i data-lucide="utensils" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">Select Potluck Food Item</h3>
+              <p id="food-serving-note-display" class="text-xs text-amber-300">Bring one dish to share</p>
+            </div>
+          </div>
+          <button type="button" id="close-food-selector-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div id="food-groups-picker" class="space-y-4 max-h-80 overflow-y-auto pr-1">
+          <!-- Populated dynamically with grouped food items -->
+        </div>
+
+        <!-- Description input and Save -->
+        <div class="pt-3 border-t border-slate-800 space-y-3">
+          <div>
+            <label for="food-dish-input" class="block text-xs font-semibold text-slate-300 mb-1">What dish are you bringing? (Optional details)</label>
+            <input type="text" id="food-dish-input" placeholder="e.g. Samosa, Chicken 65, Gulab Jamun" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            <button type="button" id="cancel-food-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+              Cancel
+            </button>
+            <button type="button" id="save-food-btn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 transition disabled:opacity-50">
+              Save Food Sign-Up
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Step 3: Track Upload Tabs (appears once song selected) -->
+      <!-- 4. Track Upload Tabs (appears once song selected) -->
       <div id="upload-methods-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-4">
         
         <!-- Existing Track Audio Preview Card -->
@@ -177,9 +220,25 @@
           </p>
         </div>
 
-        <label class="block text-sm font-semibold text-slate-200 flex items-center justify-between pt-1">
+        <!-- Acoustic Notice Banner -->
+        <div id="acoustic-notice-banner" class="hidden p-4 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-2">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-blue-300 text-xs font-bold">
+              <i data-lucide="guitar" class="w-4 h-4 text-blue-400"></i>
+              <span>Marked as Acoustic Performance</span>
+            </div>
+            <button type="button" id="switch-to-track-btn" class="text-[11px] text-blue-300 hover:text-white underline font-semibold transition">
+              Switch to Track Upload
+            </button>
+          </div>
+          <p class="text-xs text-blue-200/90 leading-normal">
+            You've marked this performance as acoustic / live instruments. No audio track upload is required. If you decide to use a backing track instead, click "Switch to Track Upload" above.
+          </p>
+        </div>
+
+        <label id="upload-methods-label" class="block text-sm font-semibold text-slate-200 flex items-center justify-between pt-1">
           <span class="flex items-center gap-2">
-            <span class="w-5 h-5 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">3</span>
+            <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">4</span>
             <span id="upload-action-title">Provide Backing Track</span>
           </span>
           <span id="active-track-badge" class="text-xs"></span>
@@ -245,6 +304,14 @@
           <span id="submit-text">Upload Track to Google Drive</span>
         </button>
 
+        <!-- Or Mark Acoustic Button -->
+        <div id="acoustic-toggle-container" class="text-center pt-1">
+          <button type="button" id="mark-acoustic-btn" class="text-xs text-slate-400 hover:text-orange-400 inline-flex items-center gap-1.5 transition underline font-medium">
+            <i data-lucide="guitar" class="w-3.5 h-3.5"></i>
+            <span id="mark-acoustic-text">Playing acoustic with live instruments? Click to mark as No Track Needed</span>
+          </button>
+        </div>
+
         <!-- Progress Indicator -->
         <div id="progress-container" class="hidden space-y-2">
           <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
@@ -258,7 +325,7 @@
     </form>
 
     <!-- Success Modal / Toast -->
-    <div id="success-card" class="hidden mt-6 bg-emerald-950/40 border border-emerald-500/40 p-5 rounded-2xl space-y-3 animate-fade-in">
+    <div id="success-card" class="hidden bg-emerald-950/40 border border-emerald-500/40 p-5 rounded-2xl space-y-3 animate-fade-in">
       <div class="flex items-center gap-3 text-emerald-400">
         <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
           <i data-lucide="check-circle" class="w-6 h-6"></i>
@@ -278,10 +345,10 @@
     </div>
 
     <!-- Error Toast -->
-    <div id="error-card" class="hidden mt-6 bg-rose-950/40 border border-rose-500/40 p-4 rounded-2xl flex items-start gap-3 text-rose-300 text-xs">
+    <div id="error-card" class="hidden bg-rose-950/40 border border-rose-500/40 p-4 rounded-2xl flex items-start gap-3 text-rose-300 text-xs">
       <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 shrink-0 mt-0.5"></i>
       <div class="flex-1">
-        <strong class="font-semibold text-rose-200 block mb-0.5">Submission Failed</strong>
+        <strong class="font-semibold text-rose-200 block mb-0.5">Notice</strong>
         <span id="error-message">Something went wrong.</span>
       </div>
       <button type="button" onclick="document.getElementById('error-card').classList.add('hidden')" class="text-rose-400 hover:text-rose-200">
@@ -289,7 +356,169 @@
       </button>
     </div>
 
+    <!-- Others' Registered Songs Section (Transparency Preview) -->
+    <div class="pt-6 border-t border-slate-800/80 space-y-3">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
+          <i data-lucide="music-2" class="w-4 h-4 text-orange-400"></i>
+          <span>Others' Registered Songs</span>
+        </h3>
+        <a href="/dashboard" class="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold">
+          <span>Full Dashboard</span>
+          <i data-lucide="external-link" class="w-3 h-3"></i>
+        </a>
+      </div>
+      <p class="text-xs text-slate-400">
+        Check what songs others have picked to avoid duplicate selections:
+      </p>
+      <div class="relative">
+        <input type="text" id="others-search-input" placeholder="Search songs or singers..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:ring-1 focus:ring-orange-500 focus:outline-none">
+      </div>
+      <div id="others-songs-list" class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+        <!-- Populated dynamically via JS -->
+      </div>
+    </div>
+
   </main>
+
+  <!-- Edit Song Modal -->
+  <div id="edit-song-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-bold text-white flex items-center gap-2">
+          <i data-lucide="edit-3" class="w-4 h-4 text-orange-400"></i>
+          <span>Edit Performance Details</span>
+        </h3>
+        <button type="button" id="close-edit-modal-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="edit-song-form" class="space-y-3.5">
+        <input type="hidden" id="edit-entry-id">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
+          <input type="text" id="edit-song-title" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Performance Type</label>
+          <select id="edit-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+            <option value="Solo">Solo</option>
+            <option value="Duet">Duet</option>
+            <option value="Group">Group</option>
+          </select>
+        </div>
+        <div id="edit-partner-row" class="hidden">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Partner Name</label>
+          <input type="text" id="edit-partner-name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+        <div id="edit-group-members-row" class="hidden">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Group Members</label>
+          <input type="text" id="edit-group-members" placeholder="Comma-separated names" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">YouTube Karaoke Reference URL (Optional)</label>
+          <input type="url" id="edit-youtube-url" placeholder="https://youtube.com/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+
+        <div class="pt-1">
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
+            <input type="checkbox" id="edit-acoustic-check" class="rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
+            <div>
+              <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="guitar" class="w-3.5 h-3.5 text-orange-400"></i>
+                <span>Acoustic Performance (No Backing Track Upload Needed)</span>
+              </span>
+              <span class="text-[11px] text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancel-edit-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button type="submit" id="save-edit-btn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Performance Modal -->
+  <div id="add-performance-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div>
+          <h3 class="font-bold text-sm text-white flex items-center gap-2">
+            <i data-lucide="plus-circle" class="w-4 h-4 text-orange-400"></i>
+            <span>Add Another Performance</span>
+          </h3>
+          <p class="text-xs text-slate-400" id="add-perf-modal-subtitle">Add a 2nd song for this participant</p>
+        </div>
+        <button type="button" id="close-add-perf-modal" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <form id="add-perf-form" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Performance Type *</label>
+          <select id="add-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+            <option value="Solo">Solo</option>
+            <option value="Duet">Duet</option>
+            <option value="Group">Group</option>
+          </select>
+          <p id="add-perf-solo-warning" class="hidden text-[11px] text-amber-400 mt-1">Note: Only 1 solo performance is allowed per participant.</p>
+        </div>
+
+        <div id="add-perf-partner-row" class="hidden">
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Duet / Group Partner(s) *</label>
+          <input type="text" id="add-perf-partner" list="add-perf-partner-list" placeholder="Choose registered participant or type name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+          <datalist id="add-perf-partner-list"></datalist>
+          <p class="text-[11px] text-slate-500 mt-1">Select from registered participants or type a custom name.</p>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
+          <input type="text" id="add-perf-song-title" required placeholder="e.g. Kannalane" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
+          <input type="text" id="add-perf-movie-name" placeholder="e.g. Bombay" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Stage Notes / Special Requests (Optional)</label>
+          <input type="text" id="add-perf-stage-notes" placeholder="e.g. 2 wireless mics needed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        </div>
+
+        <div class="pt-1">
+          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
+            <input type="checkbox" id="add-perf-acoustic" class="rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
+            <div>
+              <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <i data-lucide="guitar" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span>Acoustic Performance (No Backing Track Upload Needed)</span>
+              </span>
+              <span class="text-[11px] text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" id="cancel-add-perf-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
+            Cancel
+          </button>
+          <button type="submit" id="submit-add-perf-btn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
+            Add Performance
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="border-t border-slate-900 bg-slate-950/80 py-4 text-center text-xs text-slate-400">

@@ -29,6 +29,10 @@ class PerformanceEntry(BaseModel):
     is_song_name_missing: bool = False
     extra_tags: List[str] = []
     stage_notes: Optional[str] = ""
+    age_group: Optional[str] = ""
+    guardian_name: Optional[str] = ""
+    guardian_phone: Optional[str] = ""
+    created_via: Optional[str] = "sheet"
 
 class GoogleService:
     def __init__(self):
@@ -160,6 +164,16 @@ class GoogleService:
 
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
+            try:
+                from app.services.db_service import db_service
+                db_entries = db_service.get_all_performances()
+                if db_entries:
+                    mock_ids = {p.entry_id for p in self._mock_data}
+                    extras = [PerformanceEntry(**row) for row in db_entries if row["entry_id"] not in mock_ids]
+                    if extras:
+                        return self._mock_data + extras
+            except Exception:
+                pass
             return self._mock_data
 
         if not force_sync:
@@ -610,18 +624,6 @@ class GoogleService:
                 logger.warning("Failed to revert performance status for %s: %s", prev_id, ex)
         return True
 
-    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:
-        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        if self.mock_mode:
-            for item in self._mock_data:
-                if item.entry_id == entry_id:
-                    item.drive_file_id = file_id
-                    item.track_status = status
-                    item.duration = duration_str or item.duration
-                    item.last_updated = now_iso
-                    return True
-            return False
-
     def update_stage_notes(self, entry_id: str, notes: str) -> bool:
         """Updates stage notes for a performance in local SQLite cache."""
         clean_notes = (notes or "").strip()
@@ -630,18 +632,14 @@ class GoogleService:
                 if item.entry_id == entry_id:
                     item.stage_notes = clean_notes
                     return True
-            return False
 
         from app.services.db_service import db_service
         db_service.update_performance_field(entry_id, "stage_notes", clean_notes)
         logger.info("Updated stage notes for %s in SQLite: %s", entry_id, clean_notes)
         return True
 
-
-        performances = self.get_performances()
-        target = next((p for p in performances if p.entry_id == entry_id), None)
-        if not target:
-            raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
+    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:
+        now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         # Update SQLite database immediately
         try:
@@ -654,6 +652,22 @@ class GoogleService:
             db_service.update_performance_field(entry_id, "last_updated", now_iso)
         except Exception as ex:
             logger.warning("Error updating track metadata in SQLite: %s", ex)
+
+        if self.mock_mode:
+            for item in self._mock_data:
+                if item.entry_id == entry_id:
+                    item.drive_file_id = file_id
+                    item.track_status = status
+                    item.duration = duration_str or item.duration
+                    item.last_updated = now_iso
+                    return True
+            return True
+
+        performances = self.get_performances()
+        target = next((p for p in performances if p.entry_id == entry_id), None)
+        if not target or not target.row_index or target.row_index <= 0:
+            # If it's a web signup not yet in sheet or not assigned a row, it is updated in SQLite
+            return True
 
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
@@ -783,7 +797,10 @@ class GoogleService:
             for p in self._mock_data:
                 if p.entry_id in item_map:
                     p.sequence_order = item_map[p.entry_id]
-            db_service.set_dirty_sequence(False)
+            if not push_to_sheet:
+                db_service.set_dirty_sequence(True)
+            else:
+                db_service.set_dirty_sequence(False)
             return len(item_map)
 
         if not push_to_sheet:
@@ -841,8 +858,9 @@ class GoogleService:
             for p in performances:
                 if p.entry_id in item_map:
                     new_seq = item_map[p.entry_id]
-                    cell = f"{tab_name}!{col_letter(cols.sequence_order)}{p.row_index}"
-                    updates.append({"range": cell, "values": [[new_seq]]})
+                    if p.row_index and p.row_index > 0:
+                        cell = f"{tab_name}!{col_letter(cols.sequence_order)}{p.row_index}"
+                        updates.append({"range": cell, "values": [[new_seq]]})
 
                     # If this performance has a backing track in Drive, rename it with the new sequence prefix
                     if p.drive_file_id:
@@ -979,4 +997,138 @@ class GoogleService:
             logger.error("Failed to download file %s from Google Drive: %s", file_id, e)
             return None
 
+    def create_or_update_backup_sheet(
+        self,
+        folder_id: str,
+        title: str,
+        performances: List[Dict[str, Any]],
+        food_items: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Creates or updates a backup Google Sheet containing performances and food signups."""
+        total_rows = len(performances) + len(food_items)
+        if self.mock_mode:
+            logger.info("Mock backup: %d performances and %d food items backed up", len(performances), len(food_items))
+            return {
+                "file_id": "mock_backup_sheet_id",
+                "title": title,
+                "rows_backed": total_rows,
+                "url": f"https://docs.google.com/spreadsheets/d/mock_backup_sheet_id/edit"
+            }
+
+        try:
+            # 1. Find existing backup file in target Drive folder or create a new one
+            q = f"name = '{title}' and '{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
+            res = self.drive.files().list(
+                q=q,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                fields="files(id, name)"
+            ).execute()
+            files = res.get("files", [])
+
+            if files:
+                spreadsheet_id = files[0]["id"]
+                logger.info("Found existing backup spreadsheet %s (%s)", title, spreadsheet_id)
+            else:
+                body = {
+                    "name": title,
+                    "mimeType": "application/vnd.google-apps.spreadsheet",
+                    "parents": [folder_id]
+                }
+                created = self.drive.files().create(
+                    body=body,
+                    supportsAllDrives=True,
+                    fields="id, name"
+                ).execute()
+                spreadsheet_id = created["id"]
+                logger.info("Created new backup spreadsheet %s (%s)", title, spreadsheet_id)
+
+            # 2. Ensure tabs exist
+            meta = self.sheets.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+            existing_sheets = [s["properties"]["title"] for s in meta.get("sheets", [])]
+
+            requests = []
+            if "Performances" not in existing_sheets:
+                requests.append({"addSheet": {"properties": {"title": "Performances"}}})
+            if "Food Sign-Ups" not in existing_sheets:
+                requests.append({"addSheet": {"properties": {"title": "Food Sign-Ups"}}})
+
+            if requests:
+                self.sheets.spreadsheets().batchUpdate(
+                    spreadsheetId=spreadsheet_id,
+                    body={"requests": requests}
+                ).execute()
+
+            # 3. Format performance data
+            perf_headers = [
+                "Entry ID", "Performer Name", "Age Group", "Performance Type",
+                "Duet Partner", "Song Name", "Movie/Album", "Sequence",
+                "Guardian Name", "Guardian Phone", "Contact Info", "Track Status",
+                "Duration", "Drive File ID", "Created Via", "Last Updated"
+            ]
+            perf_rows = [perf_headers]
+            for p in performances:
+                perf_rows.append([
+                    p.get("entry_id", ""),
+                    p.get("performer_name", ""),
+                    p.get("age_group", ""),
+                    p.get("performance_type", "Solo"),
+                    p.get("partner_name", "") or "",
+                    p.get("song_title", "") or "",
+                    p.get("movie_name", "") or "",
+                    str(p.get("sequence_order", "") or ""),
+                    p.get("guardian_name", "") or "",
+                    p.get("guardian_phone", "") or "",
+                    p.get("contact_info", "") or "",
+                    p.get("track_status", "Pending") or "",
+                    p.get("duration", "") or "",
+                    p.get("drive_file_id", "") or "",
+                    p.get("created_via", "sheet") or "",
+                    p.get("last_updated", "") or ""
+                ])
+
+            # 4. Format food data
+            food_headers = [
+                "Item ID", "Food Group", "Item Name", "Status",
+                "Signer Name", "Dish Description", "Claimed At"
+            ]
+            food_rows = [food_headers]
+            for f in food_items:
+                food_rows.append([
+                    f.get("item_id", ""),
+                    f.get("group_name", ""),
+                    f.get("name", ""),
+                    "Taken" if f.get("is_taken") else "Open",
+                    f.get("signer_name", "") or "",
+                    f.get("dish_description", "") or "",
+                    f.get("claimed_at", "") or ""
+                ])
+
+            # 5. Clear and write data
+            data_payload = [
+                {"range": "Performances!A1:P", "values": perf_rows},
+                {"range": "Food Sign-Ups!A1:G", "values": food_rows}
+            ]
+
+            # Clear older rows first to avoid trailing data
+            self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Performances!A1:P1000").execute()
+            self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range="Food Sign-Ups!A1:G1000").execute()
+
+            self.sheets.spreadsheets().values().batchUpdate(
+                spreadsheetId=spreadsheet_id,
+                body={"valueInputOption": "USER_ENTERED", "data": data_payload}
+            ).execute()
+
+            logger.info("Successfully backed up %d rows to Sheet %s", total_rows, spreadsheet_id)
+            return {
+                "file_id": spreadsheet_id,
+                "title": title,
+                "rows_backed": total_rows,
+                "url": f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
+            }
+        except Exception as e:
+            logger.error("Failed to backup to Google Sheet: %s", e)
+            raise
+
 google_service = GoogleService()
+

@@ -12,39 +12,43 @@
 
   <!-- Header with Live Status Pulse -->
   <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30 shadow-lg">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3 group">
-        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow shadow-orange-500/20 group-hover:scale-105 transition">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 id="live-event-title" class="font-bold text-base text-white">EMA Paattukoottam</h1>
-          <p id="live-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night • Live Stage Schedule</p>
+          <h1 id="live-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <p id="live-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
 
       <!-- Navigation Bar -->
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <div id="live-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold">
-          <span id="live-badge-dot" class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-          <span id="live-badge-text">LIVE</span>
-        </div>
-        <a href="/tracks" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Track Intake & Submission">
-          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Upload Tracks</span>
+        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Sign Up</span>
         </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-rose-500/30" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
+        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
+          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Performer</span>
+        </a>
+        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-rose-600 text-white shadow-md shadow-rose-600/30 transition" title="Live Stage Program & Lineup">
+          <i data-lucide="radio" class="w-3.5 h-3.5 text-white"></i>
           <span>Live Program</span>
         </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-slate-400"></i>
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
           <span>Console</span>
         </a>
-        <button id="refresh-data-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest stage status">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          <span>Refresh Data</span>
-        </button>
+        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Admin</span>
+        </a>
       </nav>
     </div>
   </header>
@@ -117,10 +121,11 @@
             </div>
 
             <div class="relative z-10 space-y-4">
-              <div class="flex items-center gap-3">
+              <div class="flex items-center gap-3 flex-wrap">
                 <span id="now-seq-badge" class="px-3.5 py-1.5 rounded-xl bg-orange-500 text-white font-mono font-bold text-sm shadow">
                   #01
                 </span>
+                <span id="now-category-badge"></span>
                 <span class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
                   <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                   <span>CURRENT PERFORMANCE</span>
@@ -282,6 +287,21 @@
       return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
     }
 
+    function renderCategoryBadge(ageGroup) {
+      if (!ageGroup || !ageGroup.trim()) return '';
+      const raw = ageGroup.trim();
+      const lower = raw.toLowerCase();
+      let colorClasses = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
+      if (lower.includes('junior')) {
+        colorClasses = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
+      } else if (lower.includes('senior')) {
+        colorClasses = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      } else if (lower.includes('adult') || lower.includes('open')) {
+        colorClasses = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+      }
+      return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
+    }
+
     function updateCountdown() {
       if (!targetStartTime) return;
       const now = new Date();
@@ -342,13 +362,15 @@
     function renderLiveStatus(data) {
       latestData = data;
 
-      if (data.event_name) {
-        document.getElementById('live-event-title').textContent = data.event_name;
-        document.title = `${data.event_name} - Live Stage Schedule`;
+      const titleEl = document.getElementById('live-event-title');
+      if (titleEl) {
+        titleEl.textContent = data.header_brand_title || 'EMA Paattukoottam';
       }
-      if (data.event_subtitle) {
-        const sub = document.getElementById('live-event-subtitle');
-        if (sub) sub.textContent = data.event_subtitle;
+      document.title = `Live Stage Program - ${data.header_brand_title || 'EMA Paattukoottam'}`;
+
+      const sub = document.getElementById('live-event-subtitle');
+      if (sub) {
+        sub.textContent = data.header_brand_subtitle || data.event_subtitle || 'Musical Night';
       }
       if (data.event_start_time_iso) {
         const parsed = new Date(data.event_start_time_iso);
@@ -374,6 +396,7 @@
       // 1. Now Performing
       const nowCard = document.getElementById('now-performing-card');
       const nowSeq = document.getElementById('now-seq-badge');
+      const nowCategory = document.getElementById('now-category-badge');
       const nowPerformer = document.getElementById('now-performer-name');
       const nowSong = document.getElementById('now-song-title');
       const nowStageNotesContainer = document.getElementById('now-stage-notes-container');
@@ -382,6 +405,9 @@
       if (data.now_performing) {
         const item = data.now_performing;
         nowSeq.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')}`;
+        if (nowCategory) {
+          nowCategory.innerHTML = renderCategoryBadge(item.age_group);
+        }
         
         let nameText = escapeHtml(item.performer_name);
         if (item.partner_name) {
@@ -399,6 +425,7 @@
         }
       } else {
         nowSeq.textContent = '#--';
+        if (nowCategory) nowCategory.innerHTML = '';
         nowPerformer.innerHTML = '<span class="text-slate-400 font-normal italic">Waiting for next performance to cue...</span>';
         nowSong.textContent = 'Stage in preparation';
         nowStageNotes.textContent = '';
@@ -428,7 +455,10 @@
                 ${idx === 0 ? '⏭️ Immediate Next' : '⏳ In 2 Songs'}
               </span>
             </div>
-            <h4 class="font-bold text-white text-base truncate">${nameText}</h4>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h4 class="font-bold text-white text-base truncate">${nameText}</h4>
+              ${renderCategoryBadge(item.age_group)}
+            </div>
             <p class="text-xs text-orange-400 truncate">"${escapeHtml(item.song_title)}"</p>
           `;
           upNextContainer.appendChild(card);
@@ -458,8 +488,11 @@
               <span class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center shrink-0 border border-slate-700">
                 #${String(item.sequence_order || 0).padStart(2, '0')}
               </span>
-              <div class="overflow-hidden">
-                <div class="font-bold text-white truncate">${nameText}</div>
+              <div class="overflow-hidden space-y-0.5">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-bold text-white truncate">${nameText}</span>
+                  ${renderCategoryBadge(item.age_group)}
+                </div>
                 <div class="text-orange-400 font-medium truncate">"${escapeHtml(item.song_title)}"</div>
               </div>
             </div>

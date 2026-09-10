@@ -86,6 +86,8 @@ def parse_event_datetime(dt_str: Optional[str]) -> Optional[str]:
 
 class EventConfig(BaseModel):
     id: str = "paattukoottam-2026"
+    header_brand_title: str = "EMA Paattukoottam"
+    header_brand_subtitle: str = "Musical Night"
     name: str = "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
     subtitle: str = "Musical Night • September 19, 2026"
     start_time: Optional[str] = "09-19-2026 05:00PM"
@@ -93,6 +95,7 @@ class EventConfig(BaseModel):
     poster_url: Optional[str] = "/data/paattukoottam_animated.gif"
     venue: Optional[str] = "1 Scouting Wy, Exton, PA 19341, USA"
     time_range: Optional[str] = "5:00 PM - 9:00 PM EDT"
+    general_notes: Optional[str] = ""
     payment_url: Optional[str] = None
     signup_sheet_url: Optional[str] = None
 
@@ -148,6 +151,30 @@ class DownloaderConfig(BaseModel):
     service_url: str = "http://downloader:8001"
     timeout_seconds: int = 120
 
+class AgeGroupConfig(BaseModel):
+    name: str
+    requires_guardian: bool = False
+
+class SignupConfig(BaseModel):
+    food_signup_enabled: bool = True
+    food_serving_note: str = "Half-Tray or Above (15+ servings)"
+    age_groups: List[AgeGroupConfig] = Field(default_factory=lambda: [
+        AgeGroupConfig(name="Junior", requires_guardian=True),
+        AgeGroupConfig(name="Senior", requires_guardian=False),
+    ])
+    performance_types: List[str] = Field(default_factory=lambda: ["Solo", "Duet", "Group"])
+    max_performances_per_participant: int = 2
+    max_solo_per_participant: int = 1
+
+class FoodItemSeed(BaseModel):
+    name: str
+    group: str
+
+class BackupConfig(BaseModel):
+    enabled: bool = True
+    drive_folder_id: str = ""
+    debounce_seconds: int = 10
+
 class AppConfig(BaseModel):
     event: EventConfig = Field(default_factory=EventConfig)
     google: GoogleConfig = Field(default_factory=GoogleConfig)
@@ -155,6 +182,9 @@ class AppConfig(BaseModel):
     columns: ColumnsConfig = Field(default_factory=ColumnsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     downloader: DownloaderConfig = Field(default_factory=DownloaderConfig)
+    signup: SignupConfig = Field(default_factory=SignupConfig)
+    food_items_seed: List[FoodItemSeed] = Field(default_factory=list)
+    backup: BackupConfig = Field(default_factory=BackupConfig)
     console_extra_columns: List[str] = Field(default_factory=lambda: ["Age Group"])
     live_order_by: str = "readiness,sequence"
     audio_bitrate: str = "320k"
@@ -174,6 +204,10 @@ def load_config() -> AppConfig:
     config = AppConfig(**data)
 
     # 1. Event branding & metadata overrides
+    if os.getenv("HEADER_BRAND_TITLE"):
+        config.event.header_brand_title = os.getenv("HEADER_BRAND_TITLE")
+    if os.getenv("HEADER_BRAND_SUBTITLE"):
+        config.event.header_brand_subtitle = os.getenv("HEADER_BRAND_SUBTITLE")
     if os.getenv("APP_TITLE"):
         config.event.name = os.getenv("APP_TITLE")
     if os.getenv("APP_SUBTITLE"):
@@ -196,6 +230,9 @@ def load_config() -> AppConfig:
 
     if os.getenv("EVENT_TIME_RANGE"):
         config.event.time_range = os.getenv("EVENT_TIME_RANGE")
+
+    if os.getenv("EVENT_GENERAL_NOTES"):
+        config.event.general_notes = os.getenv("EVENT_GENERAL_NOTES")
 
     if os.getenv("EVENT_PAYMENT_URL"):
         config.event.payment_url = os.getenv("EVENT_PAYMENT_URL")
@@ -298,6 +335,29 @@ def load_config() -> AppConfig:
         raw_cols = os.getenv("CONSOLE_EXTRA_COLUMNS", "")
         config.console_extra_columns = [c.strip() for c in raw_cols.split(",") if c.strip()]
 
+    if os.getenv("BACKUP_ENABLED"):
+        b_val = os.getenv("BACKUP_ENABLED", "").lower()
+        config.backup.enabled = b_val in ("true", "1", "yes")
+
+    backup_folder_env = os.getenv("BACKUP_DRIVE_FOLDER") or os.getenv("BACKUP_FOLDER_ID")
+    if backup_folder_env:
+        extracted = extract_google_id(backup_folder_env)
+        if extracted:
+            config.backup.drive_folder_id = extracted
+
+    if os.getenv("BACKUP_DEBOUNCE_SECONDS"):
+        try:
+            config.backup.debounce_seconds = int(os.getenv("BACKUP_DEBOUNCE_SECONDS"))
+        except ValueError:
+            pass
+
+    if os.getenv("FOOD_SIGNUP_ENABLED"):
+        f_val = os.getenv("FOOD_SIGNUP_ENABLED", "").lower()
+        config.signup.food_signup_enabled = f_val in ("true", "1", "yes")
+
+    if os.getenv("FOOD_SERVING_NOTE"):
+        config.signup.food_serving_note = os.getenv("FOOD_SERVING_NOTE")
+
     if os.getenv("CACHE_DIR"):
         config.storage.cache_dir = os.getenv("CACHE_DIR")
     elif not os.path.exists("/.dockerenv") and config.storage.cache_dir.startswith("/data"):
@@ -324,3 +384,59 @@ def load_config() -> AppConfig:
 
 
 settings = load_config()
+
+
+def get_setting(key: str, default: Any = None) -> Any:
+    """Reads from app_settings DB first, falls back to config/env."""
+    try:
+        from app.services.db_service import db_service
+        db_val = db_service.get_app_setting(key)
+        if db_val is not None:
+            if db_val.lower() == "false":
+                return False
+            if db_val.lower() == "true":
+                return True
+            try:
+                return json.loads(db_val)
+            except Exception:
+                return db_val
+    except Exception:
+        pass
+
+    # Direct attribute checks
+    if hasattr(settings, key):
+        return getattr(settings, key)
+    if hasattr(settings.event, key):
+        return getattr(settings.event, key)
+    if hasattr(settings.signup, key):
+        return getattr(settings.signup, key)
+    if hasattr(settings.backup, key):
+        return getattr(settings.backup, key)
+
+    # Key alias matching (e.g. event_name -> settings.event.name)
+    key_aliases = {
+        "event_name": settings.event.name,
+        "event_subtitle": settings.event.subtitle,
+        "event_date_time": settings.event.start_time,
+        "event_start_time": settings.event.start_time,
+        "event_venue": settings.event.venue,
+        "event_time_range": settings.event.time_range,
+        "general_notes": settings.event.general_notes,
+        "event_poster_url": settings.event.poster_url,
+        "payment_url": settings.event.payment_url,
+        "signup_sheet_url": settings.event.signup_sheet_url,
+        "food_signup_enabled": settings.signup.food_signup_enabled,
+        "food_serving_note": settings.signup.food_serving_note,
+        "max_performances_per_participant": settings.signup.max_performances_per_participant,
+        "max_solo_per_participant": settings.signup.max_solo_per_participant,
+        "performance_types": settings.signup.performance_types,
+        "age_groups": settings.signup.age_groups,
+        "entry_id_prefix": settings.entry_id_prefix,
+        "console_extra_columns": settings.console_extra_columns,
+        "live_order_by": settings.live_order_by,
+    }
+    if key in key_aliases:
+        return key_aliases[key]
+
+    return default
+

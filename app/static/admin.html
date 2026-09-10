@@ -77,51 +77,77 @@
           <i data-lucide="disc-3" class="w-5 h-5 animate-spin" style="animation-duration: 6s;"></i>
         </div>
         <div>
-          <div class="flex items-center gap-2">
-            <h1 id="admin-event-title" class="font-bold text-base text-white">EMA Paattukoottam</h1>
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 font-semibold border border-slate-700">STAGE CONSOLE</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-            <span id="stats-summary">Loading stage queue...</span>
-          </div>
+          <h1 id="admin-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <p id="admin-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
 
-      <!-- Navigation & Action Buttons -->
+      <!-- Clean Uniform Navigation Links -->
       <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <!-- Live Sync Indicator -->
-        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="sync-status-text">Connected</span>
-        </div>
-
-        <a href="/tracks" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Track Intake & Submission">
-          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Upload Tracks</span>
+        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Sign Up</span>
         </a>
 
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 text-slate-400 hover:text-white hover:bg-slate-800/60 border border-transparent transition" title="Live Stage Program & Lineup">
+        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
+          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Performer</span>
+        </a>
+
+        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
           <span>Live Program</span>
         </a>
 
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800 text-white border border-slate-700 shadow-sm ring-1 ring-orange-500/30" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-orange-400"></i>
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-amber-600 text-white shadow-md shadow-amber-600/30 transition" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-white"></i>
           <span>Console</span>
         </a>
 
+        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Admin</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Dedicated Sub-Header: Database Single Source of Truth, Mirror Status & Action Controls -->
+  <div class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+    <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 text-xs flex-wrap">
+        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-semibold" title="SQLite database is the authoritative primary source of truth for all performances and food registrations">
+          <i data-lucide="database" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Event DB: Primary Source of Truth</span>
+        </span>
+
+        <!-- Live Outbound Mirror Status Indicator -->
+        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20" title="Outbound mirror to Google Sheet">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="sync-status-text">Connected</span>
+        </div>
+
+        <span id="stats-summary" class="text-xs text-slate-400 ml-1">Loading stage queue...</span>
+      </div>
+
+      <div class="flex items-center gap-2">
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
           <i data-lucide="archive" class="w-3.5 h-3.5"></i>
           <span>Offline ZIP</span>
         </button>
 
-        <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Google Sheet & Drive">
+        <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Event Database">
           <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
           <span>Refresh Data</span>
         </button>
-      </nav>
+      </div>
     </div>
-  </header>
+  </div>
 
   <!-- Stage Queue Section -->
   <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-4">

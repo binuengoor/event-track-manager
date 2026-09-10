@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Settings - EMA Paattukoottam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3 group">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
+          <i data-lucide="music" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 id="nav-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <p id="nav-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
+        </div>
+      </a>
+
+      <!-- Quick Nav Links -->
+      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <div id="auth-status-badge" class="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>PIN Authorized</span>
+        </div>
+        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Sign Up</span>
+        </a>
+        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
+          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Performer</span>
+        </a>
+        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
+          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
+          <span>Live Program</span>
+        </a>
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
+          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Console</span>
+        </a>
+        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-purple-600 text-white shadow-md shadow-purple-600/30 transition" title="Admin Settings">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-white"></i>
+          <span>Admin</span>
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- PIN Protection Overlay (If not authenticated) -->
+  <div id="pin-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl text-center space-y-4">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shadow-lg">
+        <i data-lucide="lock" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h2 class="text-xl font-black text-white">Admin Access</h2>
+        <p class="text-xs text-slate-400 mt-1">Enter your admin security PIN to configure event rules.</p>
+      </div>
+      <form id="pin-form" class="space-y-3">
+        <input type="password" id="pin-input" autofocus placeholder="Enter 4-digit PIN" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono tracking-widest text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+        <button type="submit" class="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition">
+          Unlock Admin Panel
+        </button>
+        <p id="pin-error" class="hidden text-xs text-rose-400 font-semibold"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Administration Area -->
+  <main id="admin-main-container" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 space-y-6">
+
+    <!-- Admin Navigation Tabs -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
+      <button data-tab="event" class="admin-tab-btn active px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow">
+        <i data-lucide="file-text" class="w-4 h-4"></i>
+        <span>Event Details</span>
+      </button>
+      <button data-tab="rules" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="mic" class="w-4 h-4"></i>
+        <span>Sign-Up Rules</span>
+      </button>
+      <button data-tab="food" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="utensils" class="w-4 h-4"></i>
+        <span>Food & Potluck</span>
+      </button>
+      <button data-tab="stats" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
+        <span>Event Summary</span>
+      </button>
+      <button data-tab="backup" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="save" class="w-4 h-4"></i>
+        <span>Backup</span>
+      </button>
+    </div>
+
+    <!-- Alert / Toast Banner -->
+    <div id="admin-toast" class="hidden p-4 rounded-2xl text-xs font-bold transition flex items-center justify-between">
+      <span id="admin-toast-text"></span>
+      <button type="button" onclick="this.parentElement.classList.add('hidden')"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <!-- TAB 1: EVENT DETAILS -->
+    <section id="panel-event" class="admin-panel space-y-5">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
+        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white">Event Metadata & Branding</h3>
+            <p class="text-xs text-slate-400">Changes save directly to the database and take effect immediately across all pages without restarting the server.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">LIVE UPDATE</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <!-- Top Navigation Header Branding -->
+          <div class="sm:col-span-2 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                <i data-lucide="layout" class="w-3.5 h-3.5"></i>
+                Top Navigation Bar Branding (Across All Pages)
+              </span>
+              <span class="text-[10px] text-slate-500">Header Branding</span>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block font-semibold text-slate-300">Header Title (Max 35 chars)</label>
+                  <span id="header-title-char-count" class="text-[11px] text-slate-500 font-mono">0/35</span>
+                </div>
+                <input type="text" id="setting-header-brand-title" maxlength="35" placeholder="e.g. EMA Paattukoottam" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block font-semibold text-slate-300">Header Subtitle (Max 45 chars)</label>
+                  <span id="header-subtitle-char-count" class="text-[11px] text-slate-500 font-mono">0/45</span>
+                </div>
+                <input type="text" id="setting-header-brand-subtitle" maxlength="45" placeholder="e.g. Musical Night" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Homepage Hero Card Branding -->
+          <div class="sm:col-span-2 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                <i data-lucide="home" class="w-3.5 h-3.5"></i>
+                Homepage Hero Card & Poster Branding
+              </span>
+              <span class="text-[10px] text-slate-500">Card Branding</span>
+            </div>
+            <div class="space-y-3">
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block font-semibold text-slate-300">Homepage Event Title (Max 60 chars)</label>
+                  <span id="title-char-count" class="text-[11px] text-slate-500 font-mono">0/60</span>
+                </div>
+                <input type="text" id="setting-event-name" maxlength="60" placeholder="e.g. ✨🎤✨ Paattukoottam Sing & Serenade ✨🎶✨" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block font-semibold text-slate-300">Homepage Event Subtitle (Max 80 chars)</label>
+                  <span id="subtitle-char-count" class="text-[11px] text-slate-500 font-mono">0/80</span>
+                </div>
+                <input type="text" id="setting-event-subtitle" maxlength="80" placeholder="e.g. Musical Night • September 19, 2026" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
+              </div>
+            </div>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Event Date & Time (e.g. 09-19-2026 05:00PM)</label>
+            <input type="text" id="setting-event-date-time" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Time Range Display (e.g. 5:00 PM - 9:00 PM EDT)</label>
+            <input type="text" id="setting-event-time-range" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block font-semibold text-slate-300 mb-1">Venue Address</label>
+            <input type="text" id="setting-event-venue" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Event Poster URL</label>
+            <input type="text" id="setting-event-poster-url" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Entry ID Prefix (e.g. PK)</label>
+            <input type="text" id="setting-entry-id-prefix" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white uppercase">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Payment URL (Optional)</label>
+            <input type="text" id="setting-payment-url" placeholder="https://..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div class="sm:col-span-2">
+            <div class="flex items-center justify-between mb-1">
+              <label class="block font-semibold text-slate-300">General Notes & Announcements (Markdown Supported)</label>
+              <span class="text-[10px] text-slate-500 font-mono">Supports **bold**, *italic*, bullets (-)</span>
+            </div>
+            <textarea id="setting-general-notes" rows="4" placeholder="Enter any general rules, parking details, announcements, or arrival guidelines for performers and guests..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs font-mono"></textarea>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">External Sign-Up Sheet URL (Optional)</label>
+            <input type="text" id="setting-signup-sheet-url" placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button id="save-event-settings-btn" class="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Save Event Details</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: SIGN-UP RULES -->
+    <section id="panel-rules" class="admin-panel hidden space-y-5">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Registration Constraints & Performance Types</h3>
+          <p class="text-xs text-slate-400">Configure participant limits and age requirements enforced during self-service sign-up.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Max Performances Per Participant</label>
+            <input type="number" id="setting-max-perfs" min="1" max="10" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Max Solo Performances Per Participant</label>
+            <input type="number" id="setting-max-solo" min="0" max="5" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+
+          <!-- Performance Types Chips -->
+          <div class="sm:col-span-2 space-y-2">
+            <label class="block font-semibold text-slate-300">Performance Types</label>
+            <div id="types-chips-container" class="flex flex-wrap gap-2"></div>
+            <div class="flex items-center gap-2 pt-1 max-w-sm">
+              <input type="text" id="new-type-input" placeholder="New type (e.g. Group Acoustic)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white flex-1">
+              <button type="button" id="add-type-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">Add</button>
+            </div>
+          </div>
+
+          <!-- Age Groups -->
+          <div class="sm:col-span-2 space-y-2 pt-2">
+            <label class="block font-semibold text-slate-300">Age Groups & Guardian Requirements</label>
+            <div id="age-groups-table-container" class="space-y-2"></div>
+            <div class="flex items-center gap-2 pt-1 max-w-md">
+              <input type="text" id="new-ag-name" placeholder="Age group name (e.g. Toddler)" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white flex-1">
+              <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
+                <input type="checkbox" id="new-ag-guardian" class="rounded bg-slate-950 border-slate-700 text-orange-500">
+                <span>Requires Guardian</span>
+              </label>
+              <button type="button" id="add-ag-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">Add</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end">
+          <button id="save-rules-btn" class="px-6 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow-md transition flex items-center gap-1.5">
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span>Save Rules</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: FOOD MANAGEMENT -->
+    <section id="panel-food" class="admin-panel hidden space-y-6">
+      <!-- Serving Note & Toggle Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <h3 class="text-base font-bold text-white">General Potluck Settings</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs items-end">
+          <div class="sm:col-span-2">
+            <label class="block font-semibold text-slate-300 mb-1">Serving Guideline Text</label>
+            <input type="text" id="setting-food-serving-note" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-300 mb-1">Food Sign-Up Status</label>
+            <button id="toggle-food-status-btn" class="w-full py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2"></button>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <button id="save-food-note-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition">
+            Update Serving Note
+          </button>
+        </div>
+      </div>
+
+      <!-- Groups Management Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Food Groups</h3>
+            <p class="text-xs text-slate-400">Empty groups are automatically hidden from user-facing pages.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="text" id="new-group-name" placeholder="New group name..." class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white">
+            <button id="add-group-btn" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Group</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="admin-food-groups-list" class="space-y-2">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Items Management Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Food Items Catalog</h3>
+            <p class="text-xs text-slate-400">Manage individual dish slots and review sign-up claims.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="filter-group-select" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"></select>
+            <button id="open-add-item-modal-btn" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>Add Item</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Item Form (Inline) -->
+        <div id="add-item-box" class="hidden p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
+          <h4 class="text-xs font-bold text-emerald-400">Add New Food Item</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">Item Slot Name</label>
+              <input type="text" id="new-item-name" placeholder="e.g. Non-Veg Appetizer 5" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white">
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-300 mb-1">Assign to Group</label>
+              <select id="new-item-group-select" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-white"></select>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2">
+            <button id="cancel-add-item-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold">Cancel</button>
+            <button id="submit-add-item-btn" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold">Save Item</button>
+          </div>
+        </div>
+
+        <div id="admin-food-items-list" class="space-y-2">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: EVENT SUMMARY STATS -->
+    <section id="panel-stats" class="admin-panel hidden space-y-5">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
+        <h3 class="text-base font-bold text-white border-b border-slate-800 pb-3">Event Participation Statistics</h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+            <span id="stat-total-performers" class="text-2xl sm:text-3xl font-black text-white font-mono">0</span>
+            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Participants</span>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+            <span id="stat-total-performances" class="text-2xl sm:text-3xl font-black text-orange-400 font-mono">0</span>
+            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Total Acts</span>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+            <span id="stat-juniors" class="text-2xl sm:text-3xl font-black text-amber-400 font-mono">0</span>
+            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Juniors</span>
+          </div>
+          <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+            <span id="stat-seniors" class="text-2xl sm:text-3xl font-black text-blue-400 font-mono">0</span>
+            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Seniors</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-xs">
+          <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+            <h4 class="font-bold text-slate-300">Act Breakdown</h4>
+            <div class="space-y-1.5 text-slate-400">
+              <div class="flex justify-between"><span>Solo Acts:</span><strong id="stat-solo" class="text-white">0</strong></div>
+              <div class="flex justify-between"><span>Duet Acts:</span><strong id="stat-duet" class="text-white">0</strong></div>
+              <div class="flex justify-between"><span>Group Acts:</span><strong id="stat-group" class="text-white">0</strong></div>
+            </div>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-2">
+            <h4 class="font-bold text-slate-300">Potluck Food Progress</h4>
+            <div class="space-y-1.5 text-slate-400">
+              <div class="flex justify-between"><span>Claimed Slots:</span><strong id="stat-food-claimed" class="text-emerald-400">0</strong></div>
+              <div class="flex justify-between"><span>Total Food Slots:</span><strong id="stat-food-total" class="text-white">0</strong></div>
+              <div class="flex justify-between"><span>Coverage:</span><strong id="stat-food-percent" class="text-white">0%</strong></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: BACKUP -->
+    <section id="panel-backup" class="admin-panel hidden space-y-5">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Automated Cloud Backup</h3>
+            <p class="text-xs text-slate-400">Debounced background replication from SQLite to Google Sheet & Drive.</p>
+          </div>
+          <button id="force-backup-btn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition flex items-center gap-1.5">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Force Backup Now</span>
+          </button>
+        </div>
+
+        <div id="backup-status-card" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+          <!-- Populated -->
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Recent Backup Snapshots</h4>
+          <div class="overflow-x-auto rounded-2xl border border-slate-800">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+                <tr>
+                  <th class="px-4 py-2.5">Time</th>
+                  <th class="px-4 py-2.5">Status</th>
+                  <th class="px-4 py-2.5">Rows Backed</th>
+                  <th class="px-4 py-2.5">Error / Details</th>
+                </tr>
+              </thead>
+              <tbody id="backup-history-body" class="divide-y divide-slate-800 text-slate-300">
+                <tr><td colspan="4" class="px-4 py-6 text-center text-slate-500">No backup history available.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/static/js/admin-settings.js"></script>
+</body>
+</html>

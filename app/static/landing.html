@@ -21,30 +21,42 @@
 
   <!-- Top Navigation Bar -->
   <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3 group">
         <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
           <h1 id="nav-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
-          <p id="nav-event-subtitle" class="text-xs text-orange-400 font-medium">Sing & Serenade • Sep 19, 2026</p>
+          <p id="nav-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
 
       <!-- Quick Nav Links -->
-      <nav class="flex items-center gap-2">
-        <a href="/tracks" class="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition">
-          <i data-lucide="upload" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span class="hidden sm:inline">Upload Tracks</span>
+      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="New Participant Registration">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Sign Up</span>
         </a>
-        <a href="/live" class="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition">
+        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Performer Hub & Track Submission">
+          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
+          <span>Performer</span>
+        </a>
+        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Transparency Dashboard">
+          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Live Stage Program & Lineup">
           <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span class="hidden sm:inline">Live Program</span>
+          <span>Live Program</span>
         </a>
-        <a href="/console" class="px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition">
+        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Stage Sound & Playback Console">
           <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span class="hidden sm:inline">Console</span>
+          <span>Console</span>
+        </a>
+        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Admin Settings">
+          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Admin</span>
         </a>
       </nav>
     </div>
@@ -125,6 +137,15 @@
             </div>
           </a>
         </div>
+
+        <!-- General Notes & Guidelines Section -->
+        <div id="general-notes-card" class="hidden p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-amber-500/20 space-y-2">
+          <div class="flex items-center gap-2 text-xs font-bold text-amber-400">
+            <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
+            <span>General Notes & Guidelines</span>
+          </div>
+          <div id="general-notes-content" class="text-xs text-slate-300 leading-relaxed space-y-2 font-normal"></div>
+        </div>
       </div>
     </div>
 
@@ -162,23 +183,51 @@
       </div>
     </div>
 
-    <!-- The 3 Core Action Cards (Same-Tab Navigation) -->
+    <!-- The 6 Core Action Cards Grid -->
     <div class="space-y-3">
       <div class="flex items-center justify-between px-1">
         <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5">
           <i data-lucide="layers" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Choose Your Destination</span>
+          <span>Event Navigation Hub</span>
         </h3>
-        <span class="text-xs text-slate-500">Tap any card to continue</span>
+        <span class="text-xs text-slate-500">Tap any destination below</span>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <!-- 1. Upload Tracks Card -->
-        <a href="/tracks" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/50 shadow-lg hover:shadow-orange-500/10 transition-all duration-200">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+
+        <!-- 1. Self-Service Registration Card -->
+        <a href="/signup" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 shadow-lg hover:shadow-emerald-500/10 transition-all duration-200">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
+                <i data-lucide="user-plus" class="w-6 h-6"></i>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
+                Register
+              </span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold text-white group-hover:text-emerald-400 transition flex items-center gap-1.5">
+                <span>Sign Up</span>
+                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed mt-1">
+                New participant registration. Sign up for Solo, Duet, or Group performances, and choose a potluck dish to share.
+              </p>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
+            <span>Register Now</span>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </div>
+        </a>
+
+        <!-- 2. Performer Hub Card -->
+        <a href="/performer" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/50 shadow-lg hover:shadow-orange-500/10 transition-all duration-200">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500/20 to-amber-500/20 border border-orange-500/30 text-orange-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+                <i data-lucide="mic-2" class="w-6 h-6"></i>
               </div>
               <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-wider">
                 Performers
@@ -186,21 +235,48 @@
             </div>
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-orange-400 transition flex items-center gap-1.5">
-                <span>Upload Tracks</span>
+                <span>Performer Hub</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p class="text-xs text-slate-400 leading-relaxed mt-1">
-                Upload your backing audio track (<span class="text-slate-300 font-medium">MP3, M4A, WAV</span>) or paste a YouTube karaoke link before the event.
+                Edit song details, upload backing tracks (<span class="text-slate-300 font-medium">MP3, M4A, WAV</span>), paste YouTube links, and update food sign-up.
               </p>
             </div>
           </div>
           <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-orange-400">
-            <span>Submit Track</span>
+            <span>Manage Songs & Tracks</span>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </div>
         </a>
 
-        <!-- 2. Live Program Card -->
+        <!-- 3. Transparency Dashboard Card -->
+        <a href="/dashboard" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/10 transition-all duration-200">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition">
+                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
+                Community
+              </span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold text-white group-hover:text-indigo-400 transition flex items-center gap-1.5">
+                <span>Dashboard</span>
+                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed mt-1">
+                Public transparency board. Browse registered songs to avoid duplicates, and check open potluck items on the food board.
+              </p>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
+            <span>View Community Board</span>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </div>
+        </a>
+
+        <!-- 4. Live Program Card -->
         <a href="/live" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-rose-500/50 shadow-lg hover:shadow-rose-500/10 transition-all duration-200">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
@@ -214,7 +290,6 @@
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-rose-400 transition flex items-center gap-1.5">
                 <span>Live Program</span>
-                <span class="text-xs text-rose-400/80 font-normal">(Event Day)</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p class="text-xs text-slate-400 leading-relaxed mt-1">
@@ -228,21 +303,20 @@
           </div>
         </a>
 
-        <!-- 3. Console Card -->
+        <!-- 5. Sound Console Card -->
         <a href="/console" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 shadow-lg hover:shadow-amber-500/10 transition-all duration-200">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-yellow-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="shield-alert" class="w-6 h-6"></i>
+                <i data-lucide="disc-3" class="w-6 h-6"></i>
               </div>
               <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
-                Admin
+                Sound Desk
               </span>
             </div>
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-amber-400 transition flex items-center gap-1.5">
-                <span>Console</span>
-                <span class="text-xs text-amber-400/80 font-normal">(Admin)</span>
+                <span>Sound Console</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p class="text-xs text-slate-400 leading-relaxed mt-1">
@@ -251,10 +325,38 @@
             </div>
           </div>
           <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
-            <span>Access Console (PIN)</span>
+            <span>Playback Console (PIN)</span>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </div>
         </a>
+
+        <!-- 6. Admin Settings Card -->
+        <a href="/admin" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/10 transition-all duration-200">
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500/20 to-violet-500/20 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-110 transition">
+                <i data-lucide="settings" class="w-6 h-6"></i>
+              </div>
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+                Admin
+              </span>
+            </div>
+            <div>
+              <h4 class="text-base font-bold text-white group-hover:text-purple-400 transition flex items-center gap-1.5">
+                <span>Admin Settings</span>
+                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
+              </h4>
+              <p class="text-xs text-slate-400 leading-relaxed mt-1">
+                Event details, sign-up rules, food groups & items management, live statistics, and Google Drive backup snapshots.
+              </p>
+            </div>
+          </div>
+          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
+            <span>Manage Settings (PIN)</span>
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+          </div>
+        </a>
+
       </div>
     </div>
 
@@ -267,10 +369,13 @@
         <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
         <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
       </div>
-      <div class="flex items-center gap-4">
-        <a href="/tracks" class="hover:text-slate-300 transition">Upload Tracks</a>
+      <div class="flex items-center gap-4 flex-wrap">
+        <a href="/signup" class="hover:text-slate-300 transition">Sign Up</a>
+        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
+        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
         <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Admin Console</a>
+        <a href="/console" class="hover:text-slate-300 transition">Console</a>
+        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
       </div>
     </div>
   </footer>
@@ -299,9 +404,18 @@
           }
         }
 
-        if (info.app_title) {
-          document.getElementById("nav-event-title").textContent = "EMA Paattukoottam";
-          document.getElementById("event-title-display").textContent = info.app_title;
+        if (info.header_brand_title) {
+          const navTitle = document.getElementById("nav-event-title");
+          if (navTitle) navTitle.textContent = info.header_brand_title;
+          document.title = `${info.header_brand_title} - Sing & Serenade`;
+        }
+        if (info.header_brand_subtitle) {
+          const navSub = document.getElementById("nav-event-subtitle");
+          if (navSub) navSub.textContent = info.header_brand_subtitle;
+        }
+        if (info.event_name || info.app_title) {
+          const titleDisplay = document.getElementById("event-title-display");
+          if (titleDisplay) titleDisplay.textContent = info.event_name || info.app_title;
         }
 
         if (info.venue) {
@@ -315,6 +429,24 @@
 
         if (info.time_range) {
           document.getElementById("event-time-range-text").textContent = info.time_range;
+        }
+
+        if (info.general_notes && info.general_notes.trim()) {
+          const notesCard = document.getElementById("general-notes-card");
+          const notesContent = document.getElementById("general-notes-content");
+          if (notesCard && notesContent) {
+            // Simple markdown formatter for bold, italic, lists, and linebreaks
+            const formatted = info.general_notes
+              .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/\*(.*?)\*/g, '<em>$1</em>')
+              .replace(/^[*-]\s+(.*)$/gm, '<li class="ml-4 list-disc">$1</li>')
+              .replace(/\n\n/g, '<br/><br/>')
+              .replace(/\n/g, '<br/>');
+            notesContent.innerHTML = formatted;
+            notesCard.classList.remove("hidden");
+            lucide.createIcons();
+          }
         }
       } catch (e) {
         console.warn("Could not fetch event info:", e);

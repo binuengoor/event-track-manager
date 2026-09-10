@@ -1,6 +1,8 @@
 # EMA Paattukoottam Event & Track Manager Configuration
 event:
   id: "paattukoottam-2026"
+  header_brand_title: "EMA Paattukoottam"
+  header_brand_subtitle: "Musical Night"
   name: "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
   subtitle: "Musical Night • September 19, 2026"
   start_time: "09-19-2026 05:00PM"
@@ -41,3 +43,90 @@ storage:
 downloader:
   service_url: "http://downloader:8001"
   timeout_seconds: 120
+
+signup:
+  food_signup_enabled: true
+  food_serving_note: "Half-Tray or Above (15+ servings)"
+  max_performances_per_participant: 2
+  max_solo_per_participant: 1
+  performance_types:
+    - "Solo"
+    - "Duet"
+    - "Group"
+  age_groups:
+    - name: "Junior"
+      requires_guardian: true
+    - name: "Senior"
+      requires_guardian: false
+
+backup:
+  enabled: true
+  drive_folder_id: "1T6zqI02lKQfLfqpPRjQOhn561uUEKDil"
+  debounce_seconds: 10
+
+food_items_seed:
+  - name: "Veg Appetizer 1"
+    group: "Appetizers"
+  - name: "Veg Appetizer 2"
+    group: "Appetizers"
+  - name: "Veg Appetizer 3"
+    group: "Appetizers"
+  - name: "Non-Veg Appetizer 1"
+    group: "Appetizers"
+  - name: "Non-Veg Appetizer 2"
+    group: "Appetizers"
+  - name: "Non-Veg Appetizer 3"
+    group: "Appetizers"
+  - name: "Non-Veg Appetizer 4"
+    group: "Appetizers"
+
+  - name: "Veg Fried Rice"
+    group: "Rice & Main"
+  - name: "Non-Veg Fried Rice"
+    group: "Rice & Main"
+  - name: "Veg Biryani"
+    group: "Rice & Main"
+  - name: "Chicken Biryani"
+    group: "Rice & Main"
+  - name: "Jeera Rice"
+    group: "Rice & Main"
+  - name: "White Rice"
+    group: "Rice & Main"
+  - name: "Noodles"
+    group: "Rice & Main"
+  - name: "Pulao"
+    group: "Rice & Main"
+
+  - name: "Paneer Butter Masala"
+    group: "Curries"
+  - name: "Mixed Veg Curry"
+    group: "Curries"
+  - name: "Dal Makhani"
+    group: "Curries"
+  - name: "Chicken Curry 1"
+    group: "Curries"
+  - name: "Chicken Curry 2"
+    group: "Curries"
+  - name: "Mutton Curry"
+    group: "Curries"
+  - name: "Fish Curry"
+    group: "Curries"
+
+  - name: "Naan / Roti 1"
+    group: "Breads & Sides"
+  - name: "Naan / Roti 2"
+    group: "Breads & Sides"
+  - name: "Salad / Raita"
+    group: "Breads & Sides"
+  - name: "Pickle & Papad"
+    group: "Breads & Sides"
+
+  - name: "Gulab Jamun"
+    group: "Desserts"
+  - name: "Payasam"
+    group: "Desserts"
+  - name: "Cake / Pastries"
+    group: "Desserts"
+  - name: "Ice Cream / Fruit Salad"
+    group: "Desserts"
+

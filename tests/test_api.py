@@ -30,14 +30,15 @@ def test_landing_and_tracks_pages():
     res_root = client.get("/")
     assert res_root.status_code == 200
     assert "Sing & Serenade" in res_root.text
-    assert "Upload Tracks" in res_root.text
+    assert "Sign Up" in res_root.text
+    assert "Performer Hub" in res_root.text
     assert "Live Program" in res_root.text
     assert "Console" in res_root.text
 
-    # Tracks page at /tracks
+    # Tracks page at /tracks (redirects to /performer or serves performer hub)
     res_tracks = client.get("/tracks")
     assert res_tracks.status_code == 200
-    assert "Upload Your Backing Track" in res_tracks.text
+    assert "Performer Hub" in res_tracks.text
 
     # Redirects for /upload and /intake
     res_up = client.get("/upload", follow_redirects=False)
@@ -96,26 +97,36 @@ def test_admin_auth():
     assert res_ok.status_code == 200
     assert res_ok.json()["status"] == "success"
 
-def test_upload_and_stream():
+def test_upload_and_stream(tmp_path, monkeypatch):
+    from app.services.audio_service import audio_service
+    monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
     client = TestClient(app)
-    # Get first available entry
-    perf_res = client.get("/api/performances")
-    first_id = perf_res.json()[0]["entry_id"]
+    
+    import uuid
+    pname = f"Test Audio Uploader {uuid.uuid4().hex[:6]}"
+    signup_res = client.post("/api/signup", json={
+        "performer_name": pname,
+        "contact_info": "audio@test.com",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "Test Song", "movie_name": "Movie"}]
+    })
+    assert signup_res.status_code == 200
+    temp_id = signup_res.json().get("entry_ids", ["PK-TEST"])[0]
 
-    # Direct audio file upload
+    # Direct audio file upload to isolated tmp directory
     file_content = b"ID3" + b"\x00" * 200
     res = client.post(
         "/api/upload",
-        data={"entry_id": first_id, "submission_type": "file"},
+        data={"entry_id": temp_id, "submission_type": "file"},
         files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
     )
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "success"
-    assert data["entry_id"] == first_id
+    assert data["entry_id"] == temp_id
 
-    # Now stream the track
-    stream_res = client.get(f"/api/stream/{first_id}")
+    # Now stream the track from tmp directory
+    stream_res = client.get(f"/api/stream/{temp_id}")
     assert stream_res.status_code == 200
     assert stream_res.headers["Content-Type"] == "audio/mpeg"
 

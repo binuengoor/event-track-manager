@@ -12,8 +12,16 @@ RUN apt-get update && \
         curl \
         unzip \
         ca-certificates && \
-    curl -fsSL https://deno.land/install.sh | sh && \
-    ln -s /root/.deno/bin/deno /usr/local/bin/deno && \
+    ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        DENO_ARCH="aarch64-unknown-linux-gnu"; \
+    else \
+        DENO_ARCH="x86_64-unknown-linux-gnu"; \
+    fi && \
+    curl -fsSL "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}.zip" -o /tmp/deno.zip && \
+    unzip /tmp/deno.zip -d /usr/local/bin && \
+    rm /tmp/deno.zip && \
+    chmod +x /usr/local/bin/deno && \
     rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

@@ -43,11 +43,14 @@ async function fetchEventInfo() {
     const res = await fetch('/api/event-info');
     if (res.ok) {
       const data = await res.json();
-      const title = data.app_title || data.event_name;
-      if (title) {
+      if (data.header_brand_title) {
         const titleEl = document.getElementById('admin-event-title');
-        if (titleEl) titleEl.textContent = title;
-        document.title = `${title} - Stage Console`;
+        if (titleEl) titleEl.textContent = data.header_brand_title;
+        document.title = `Stage Playback Console - ${data.header_brand_title}`;
+      }
+      if (data.header_brand_subtitle) {
+        const subEl = document.getElementById('admin-event-subtitle');
+        if (subEl) subEl.textContent = data.header_brand_subtitle;
       }
     }
   } catch (e) {
@@ -217,7 +220,7 @@ async function loadQueue(silent = false) {
     }
 
     if (!silent) {
-      showToast(`Synced ${total} performances from Google Sheet`);
+      showToast(`Loaded ${total} performances from Event Database`);
     }
   } catch (err) {
     syncText.textContent = 'Sync Error';
@@ -389,11 +392,11 @@ function renderQueueList() {
 
         <!-- Cue Track -->
         <button class="btn-cue-row px-2.5 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1 ${
-          isUploaded || item.drive_file_id
+          isUploaded || item.drive_file_id || isAcoustic
             ? (isCued ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700')
             : 'bg-slate-800/50 text-slate-600 cursor-not-allowed border border-slate-800'
-        }" ${isUploaded || item.drive_file_id ? '' : 'disabled'} title="Load track into player view without autoplay">
-          <i data-lucide="${isCued ? 'disc' : 'disc-3'}" class="w-3.5 h-3.5 ${isCued && isPlaying ? 'animate-spin' : ''}"></i>
+        }" ${isUploaded || item.drive_file_id || isAcoustic ? '' : 'disabled'} title="Load act into player view & stage display">
+          <i data-lucide="${isCued ? (isAcoustic ? 'guitar' : 'disc') : (isAcoustic ? 'guitar' : 'disc-3')}" class="w-3.5 h-3.5 ${isCued && isPlaying ? 'animate-spin' : ''}"></i>
           <span>${isCued ? 'Cued' : 'Cue'}</span>
         </button>
 
@@ -444,7 +447,7 @@ function renderQueueList() {
 
     row.addEventListener('click', (e) => {
       if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('.btn-edit-note')) return;
-      if (isUploaded || item.drive_file_id) {
+      if (isUploaded || item.drive_file_id || isAcoustic) {
         cueTrack(item, false);
       }
     });
@@ -835,66 +838,96 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     updatePlayerBarNotes(item.stage_notes || '');
 
-    if (playerBadge) playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
+    const isAcoustic = item.track_status === 'Acoustic';
 
-    if (playBtn) playBtn.disabled = false;
+    if (playerBadge) {
+      if (isAcoustic) {
+        playerBadge.className = 'w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/40';
+        playerBadge.innerHTML = '<i data-lucide="guitar" class="w-5 h-5"></i>';
+      } else {
+        playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
+        playerBadge.innerHTML = '<i data-lucide="music-2" class="w-5 h-5"></i>';
+      }
+    }
+
+    if (playBtn) playBtn.disabled = isAcoustic;
     if (markDoneBtn) markDoneBtn.disabled = false;
     if (holdBtn) holdBtn.disabled = false;
     if (uncueBtn) uncueBtn.disabled = false;
 
     // Configure 1-Click Track Download for Local Playback
     if (downloadBtn) {
-      downloadBtn.onclick = async (e) => {
-        e.preventDefault();
-        if (!currentCuedItem) return;
-        downloadBtn.classList.add('opacity-50', 'pointer-events-none');
-        showToast('Downloading track...');
-        try {
-          const pin = localStorage.getItem('paattukoottam_pin') || '2026';
-          const res = await fetch(`/api/download-track/${currentCuedItem.entry_id}?pin=${encodeURIComponent(pin)}`, {
-            headers: getAuthHeaders()
-          });
-          if (!res.ok) throw new Error('Download failed from server');
-          const blob = await res.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          const disp = res.headers.get('Content-Disposition');
-          let filename = `${currentCuedItem.entry_id}_track.mp3`;
-          if (disp && disp.includes('filename=')) {
-            filename = disp.split('filename=')[1].replace(/["']/g, '').trim();
+      if (isAcoustic) {
+        downloadBtn.classList.add('opacity-40', 'pointer-events-none');
+        downloadBtn.onclick = null;
+      } else {
+        downloadBtn.onclick = async (e) => {
+          e.preventDefault();
+          if (!currentCuedItem) return;
+          downloadBtn.classList.add('opacity-50', 'pointer-events-none');
+          showToast('Downloading track...');
+          try {
+            const pin = localStorage.getItem('paattukoottam_pin') || '2026';
+            const res = await fetch(`/api/download-track/${currentCuedItem.entry_id}?pin=${encodeURIComponent(pin)}`, {
+              headers: getAuthHeaders()
+            });
+            if (!res.ok) throw new Error('Download failed from server');
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const disp = res.headers.get('Content-Disposition');
+            let filename = `${currentCuedItem.entry_id}_track.mp3`;
+            if (disp && disp.includes('filename=')) {
+              filename = disp.split('filename=')[1].replace(/["']/g, '').trim();
+            }
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            showToast('✓ Track downloaded for local playback!');
+          } catch (err) {
+            showToast(`Download error: ${err.message}`, 'error');
+          } finally {
+            downloadBtn.classList.remove('opacity-50', 'pointer-events-none');
           }
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
-          window.URL.revokeObjectURL(url);
-          showToast('✓ Track downloaded for local playback!');
-        } catch (err) {
-          showToast(`Download error: ${err.message}`, 'error');
-        } finally {
-          downloadBtn.classList.remove('opacity-50', 'pointer-events-none');
-        }
-      };
-      downloadBtn.classList.remove('opacity-40', 'pointer-events-none');
+        };
+        downloadBtn.classList.remove('opacity-40', 'pointer-events-none');
+      }
     }
 
     const placeholder = document.getElementById('waveform-placeholder');
-    if (placeholder) {
-      placeholder.textContent = 'Loading audio waveform...';
-      placeholder.classList.remove('hidden');
-    }
+    if (isAcoustic) {
+      if (placeholder) {
+        placeholder.textContent = '🎸 Acoustic Act — Live Instruments / No Backing Track File Needed';
+        placeholder.classList.remove('hidden');
+      }
+      if (wavesurfer) {
+        try {
+          wavesurfer.stop();
+          wavesurfer.empty();
+        } catch (e) {}
+      }
+      document.getElementById('player-current-time').textContent = 'Live';
+      document.getElementById('player-duration').textContent = 'Stage';
+    } else {
+      if (placeholder) {
+        placeholder.textContent = 'Loading audio waveform...';
+        placeholder.classList.remove('hidden');
+      }
 
-    if (wavesurfer) {
-      try {
-        wavesurfer.load(`/api/stream/${item.entry_id}`);
-        if (autoPlay) {
-          wavesurfer.once('ready', () => {
-            wavesurfer.play();
-          });
+      if (wavesurfer) {
+        try {
+          wavesurfer.load(`/api/stream/${item.entry_id}`);
+          if (autoPlay) {
+            wavesurfer.once('ready', () => {
+              wavesurfer.play();
+            });
+          }
+        } catch (err) {
+          console.warn('WaveSurfer load error:', err);
         }
-      } catch (err) {
-        console.warn('WaveSurfer load error:', err);
       }
     }
 
@@ -1274,9 +1307,9 @@ function updateSyncStatusBadge() {
   } else {
     syncBadge.className = 'flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20';
     const ago = formatTimeAgo(lastSyncedAt);
-    syncText.textContent = `● Synced ${ago}`;
+    syncText.textContent = `● Sheet Mirror: ${ago}`;
     if (lastSyncedAt) {
-      syncBadge.title = `Last synchronized with Google Sheet: ${new Date(lastSyncedAt).toLocaleString()}`;
+      syncBadge.title = `Event DB is primary source of truth. Background mirror to Google Sheet updated: ${new Date(lastSyncedAt).toLocaleString()}`;
     }
     const dot = syncBadge.querySelector('span:first-child');
     if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';
