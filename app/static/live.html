@@ -126,7 +126,11 @@
                   #01
                 </span>
                 <span id="now-category-badge"></span>
-                <span class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
+                <span id="now-acoustic-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center gap-1.5">
+                  <i data-lucide="guitar" class="w-3.5 h-3.5"></i>
+                  <span>LIVE ACOUSTIC PERFORMANCE</span>
+                </span>
+                <span id="now-regular-badge" class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
                   <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
                   <span>CURRENT PERFORMANCE</span>
                 </span>
@@ -401,9 +405,22 @@
       const nowSong = document.getElementById('now-song-title');
       const nowStageNotesContainer = document.getElementById('now-stage-notes-container');
       const nowStageNotes = document.getElementById('now-stage-notes');
+      const nowAcousticBadge = document.getElementById('now-acoustic-badge');
+      const nowRegularBadge = document.getElementById('now-regular-badge');
 
       if (data.now_performing) {
         const item = data.now_performing;
+        const isAcoustic = item.track_status === 'Acoustic' || (item.performance_type && item.performance_type.toLowerCase().includes('acoustic'));
+
+        if (nowAcousticBadge && nowRegularBadge) {
+          if (isAcoustic) {
+            nowAcousticBadge.classList.remove('hidden');
+            nowRegularBadge.classList.add('hidden');
+          } else {
+            nowAcousticBadge.classList.add('hidden');
+            nowRegularBadge.classList.remove('hidden');
+          }
+        }
         nowSeq.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')}`;
         if (nowCategory) {
           nowCategory.innerHTML = renderCategoryBadge(item.age_group);
