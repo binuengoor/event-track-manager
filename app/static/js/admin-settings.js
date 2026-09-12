@@ -134,7 +134,8 @@ async function loadSettings() {
     ];
     renderAgeGroupsTable();
 
-    // Food settings
+    // Sign-Up & Food settings
+    updateSignupToggleButton(Boolean(adminSettings.signup_enabled !== false));
     setValue("setting-food-serving-note", adminSettings.food_serving_note || "Bring one dish to share");
     updateFoodToggleButton(Boolean(adminSettings.food_signup_enabled !== false));
 
@@ -215,6 +216,18 @@ window.removeAgeGroup = function(idx) {
   ageGroups.splice(idx, 1);
   renderAgeGroupsTable();
 };
+
+function updateSignupToggleButton(enabled) {
+  const btn = document.getElementById("toggle-signup-status-btn");
+  if (!btn) return;
+  if (enabled) {
+    btn.className = "w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20";
+    btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Sign-Ups Open</span>`;
+  } else {
+    btn.className = "w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2 bg-rose-500/10 text-rose-400 border-rose-500/30 hover:bg-rose-500/20";
+    btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Sign-Ups Closed</span>`;
+  }
+}
 
 function updateFoodToggleButton(enabled) {
   const btn = document.getElementById("toggle-food-status-btn");
@@ -502,6 +515,26 @@ function setupActionHandlers() {
       if (res.ok) showToast("Serving note updated!");
     } catch (e) {
       showToast("Failed to update serving note", true);
+    }
+  });
+
+  // Sign-Up Status Toggle
+  document.getElementById("toggle-signup-status-btn")?.addEventListener("click", async () => {
+    const currentlyEnabled = Boolean(adminSettings.signup_enabled !== false);
+    const newEnabled = !currentlyEnabled;
+    try {
+      const res = await fetch("/api/admin/signup-toggle", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: newEnabled })
+      });
+      if (res.ok) {
+        adminSettings.signup_enabled = newEnabled;
+        updateSignupToggleButton(newEnabled);
+        showToast(`Sign-ups ${newEnabled ? 'opened' : 'closed'}!`);
+      }
+    } catch (e) {
+      showToast("Toggle failed", true);
     }
   });
 

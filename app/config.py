@@ -158,6 +158,7 @@ class AgeGroupConfig(BaseModel):
     requires_guardian: bool = False
 
 class SignupConfig(BaseModel):
+    signup_enabled: bool = True
     food_signup_enabled: bool = True
     food_serving_note: str = "Half-Tray or Above (15+ servings)"
     age_groups: List[AgeGroupConfig] = Field(default_factory=lambda: [
@@ -357,6 +358,10 @@ def load_config() -> AppConfig:
         f_val = os.getenv("FOOD_SIGNUP_ENABLED", "").lower()
         config.signup.food_signup_enabled = f_val in ("true", "1", "yes")
 
+    if os.getenv("SIGNUP_ENABLED"):
+        s_val = os.getenv("SIGNUP_ENABLED", "").lower()
+        config.signup.signup_enabled = s_val in ("true", "1", "yes")
+
     if os.getenv("FOOD_SERVING_NOTE"):
         config.signup.food_serving_note = os.getenv("FOOD_SERVING_NOTE")
 
@@ -429,6 +434,7 @@ def get_setting(key: str, default: Any = None) -> Any:
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url,
         "signup_sheet_url": settings.event.signup_sheet_url,
+        "signup_enabled": settings.signup.signup_enabled,
         "food_signup_enabled": settings.signup.food_signup_enabled,
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,

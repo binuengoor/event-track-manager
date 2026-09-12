@@ -811,6 +811,48 @@ class DBService:
 
         return deleted
 
+    def rename_performer(self, old_name: str, new_name: str) -> bool:
+        """Safely renames a performer across all performances and food signups."""
+        clean_old = old_name.strip()
+        clean_new = new_name.strip()
+        if not clean_new or len(clean_new) < 2:
+            raise ValueError("New name must be at least 2 characters long.")
+        if clean_old.lower() == clean_new.lower():
+            return True
+
+        with self._get_connection() as conn:
+            # Check collision with other participants
+            existing = conn.execute("""
+                SELECT 1 FROM performances 
+                WHERE (LOWER(TRIM(performer_name)) = ? OR LOWER(TRIM(partner_name)) = ?)
+                  AND LOWER(TRIM(performer_name)) != ?
+                LIMIT 1
+            """, (clean_new.lower(), clean_new.lower(), clean_old.lower())).fetchone()
+            if existing:
+                raise ValueError(f"A participant named '{clean_new}' is already registered.")
+
+            now_iso = datetime.now(timezone.utc).isoformat()
+            conn.execute("""
+                UPDATE performances 
+                SET performer_name = ?, last_updated = ?
+                WHERE LOWER(TRIM(performer_name)) = ?
+            """, (clean_new, now_iso, clean_old.lower()))
+
+            conn.execute("""
+                UPDATE performances 
+                SET partner_name = ?, last_updated = ?
+                WHERE LOWER(TRIM(partner_name)) = ?
+            """, (clean_new, now_iso, clean_old.lower()))
+
+            conn.execute("""
+                UPDATE food_signups 
+                SET signer_name = ?
+                WHERE LOWER(TRIM(signer_name)) = ?
+            """, (clean_new, clean_old.lower()))
+
+            conn.commit()
+        return True
+
     def count_performances_for_performer(self, name: str) -> Dict[str, int]:
         """Counts how many performances this participant is enrolled in (Solo, Duet, Group, Total)."""
         clean_name = name.strip().lower()

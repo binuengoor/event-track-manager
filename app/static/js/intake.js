@@ -286,6 +286,9 @@ function setupEventListeners() {
   // Edit song modal events
   setupEditModalEvents();
 
+  // Rename performer modal events
+  setupRenamePerformerModal();
+
   // Food selector events
   setupFoodSelectorEvents();
 
@@ -331,6 +334,240 @@ function setupEventListeners() {
   }
 }
 
+function isPlaceholderSong(title) {
+  if (!title) return true;
+  const t = title.trim().toLowerCase();
+  if (!t) return true;
+  const placeholders = [
+    'tbd', 'tba', 'to be decided', 'to be announced',
+    'test', 'testing', 'n/a', 'na', 'none', 'unknown',
+    'song title missing', 'missing', 'pending', 'null'
+  ];
+  if (placeholders.includes(t)) return true;
+  if (/^performance\s+\d+$/i.test(t)) return true;
+  if (/^song\s+\d+$/i.test(t)) return true;
+  return false;
+}
+
+function findDuplicateSong(title, currentEntryId = null) {
+  if (!title || isPlaceholderSong(title)) return null;
+  const cleanTitle = title.trim().toLowerCase();
+  if (cleanTitle.length < 3) return null;
+
+  for (const p of performances) {
+    if (currentEntryId && p.entry_id === currentEntryId) continue;
+    if (p.is_song_name_missing) continue;
+    const existingTitle = (p.song_title || '').trim();
+    if (isPlaceholderSong(existingTitle)) continue;
+
+    const existingLower = existingTitle.toLowerCase();
+    if (existingLower === cleanTitle || 
+        (cleanTitle.length >= 4 && (existingLower.includes(cleanTitle) || cleanTitle.includes(existingLower)))) {
+      return p;
+    }
+  }
+  return null;
+}
+
+function getRegisteredPerformersList(excludeName = '') {
+  const s = new Set();
+  performances.forEach(p => {
+    if (p.performer_name && p.performer_name.trim()) s.add(p.performer_name.trim());
+    if (p.partner_name && p.partner_name.trim()) s.add(p.partner_name.trim());
+  });
+  return Array.from(s)
+    .filter(n => !excludeName || n.toLowerCase() !== excludeName.toLowerCase())
+    .sort((a, b) => a.localeCompare(b));
+}
+
+function setupPartnerAutocomplete(inputEl, dupBoxEl, listEl, getExcludedNames) {
+  if (!inputEl || !dupBoxEl || !listEl) return;
+  inputEl.addEventListener('input', () => {
+    const val = inputEl.value.trim().toLowerCase();
+    if (val.length < 3) {
+      dupBoxEl.classList.add('hidden');
+      return;
+    }
+    const excluded = (getExcludedNames ? getExcludedNames() : []).map(x => x.toLowerCase());
+    const candidates = getRegisteredPerformersList().filter(name => !excluded.includes(name.toLowerCase()));
+    const matches = candidates.filter(name => {
+      const n = name.toLowerCase();
+      return n === val || n.startsWith(val) || n.includes(val);
+    });
+
+    if (matches.length > 0) {
+      listEl.innerHTML = '';
+      matches.forEach(m => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+        pill.textContent = m;
+        pill.addEventListener('click', () => {
+          inputEl.value = m;
+          dupBoxEl.classList.add('hidden');
+          inputEl.dispatchEvent(new Event('change'));
+        });
+        listEl.appendChild(pill);
+      });
+      dupBoxEl.classList.remove('hidden');
+    } else {
+      dupBoxEl.classList.add('hidden');
+    }
+  });
+}
+
+function setupGroupAutocomplete(inputEl, dupBoxEl, listEl, getExcludedNames) {
+  if (!inputEl || !dupBoxEl || !listEl) return;
+  inputEl.addEventListener('input', () => {
+    const rawVal = inputEl.value;
+    const parts = rawVal.split(',');
+    const activePart = parts[parts.length - 1].trim().toLowerCase();
+    if (activePart.length < 3) {
+      dupBoxEl.classList.add('hidden');
+      return;
+    }
+
+    const alreadyEntered = parts.slice(0, -1).map(p => p.trim().toLowerCase());
+    const excluded = [...(getExcludedNames ? getExcludedNames() : []), ...alreadyEntered].map(x => x.toLowerCase());
+    const candidates = getRegisteredPerformersList().filter(name => !excluded.includes(name.toLowerCase()));
+    const matches = candidates.filter(name => {
+      const n = name.toLowerCase();
+      return n === activePart || n.startsWith(activePart) || n.includes(activePart);
+    });
+
+    if (matches.length > 0) {
+      listEl.innerHTML = '';
+      matches.forEach(m => {
+        const pill = document.createElement('button');
+        pill.type = 'button';
+        pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+        pill.textContent = m;
+        pill.addEventListener('click', () => {
+          parts[parts.length - 1] = ' ' + m;
+          inputEl.value = parts.map(p => p.trim()).filter(Boolean).join(', ') + ', ';
+          dupBoxEl.classList.add('hidden');
+          inputEl.focus();
+        });
+        listEl.appendChild(pill);
+      });
+      dupBoxEl.classList.remove('hidden');
+    } else {
+      dupBoxEl.classList.add('hidden');
+    }
+  });
+}
+
+function setupSongDuplicateWarning(inputEl, warningBoxEl, getExcludeEntryId) {
+  if (!inputEl || !warningBoxEl) return;
+  inputEl.addEventListener('input', () => {
+    const val = inputEl.value.trim();
+    const excludeId = getExcludeEntryId ? getExcludeEntryId() : null;
+    const dup = findDuplicateSong(val, excludeId);
+    if (dup) {
+      const singer = dup.partner_name 
+        ? `${escapeHtml(dup.performer_name)} & ${escapeHtml(dup.partner_name)}` 
+        : escapeHtml(dup.performer_name);
+      warningBoxEl.innerHTML = `
+        <div class="flex items-start gap-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+          <div>
+            <span class="font-bold text-amber-300">Song already chosen:</span>
+            <span>"<strong>${escapeHtml(dup.song_title)}</strong>" has already been selected by <strong>${singer}</strong> (${escapeHtml(dup.performance_type || 'Solo')}).</span>
+          </div>
+        </div>
+      `;
+      warningBoxEl.classList.remove('hidden');
+      if (window.lucide) lucide.createIcons();
+    } else {
+      warningBoxEl.classList.add('hidden');
+      warningBoxEl.innerHTML = '';
+    }
+  });
+}
+
+function setupRenamePerformerModal() {
+  const modal = document.getElementById('rename-performer-modal');
+  const openBtn = document.getElementById('edit-performer-name-btn');
+  const closeBtn = document.getElementById('close-rename-modal-btn');
+  const cancelBtn = document.getElementById('cancel-rename-btn');
+  const form = document.getElementById('rename-performer-form');
+  const nameInput = document.getElementById('new-performer-name-input');
+  const errorMsg = document.getElementById('rename-error-msg');
+  const saveBtn = document.getElementById('save-rename-btn');
+
+  if (!modal || !openBtn || !form) return;
+
+  const hideModal = () => {
+    modal.classList.add('hidden');
+    if (errorMsg) {
+      errorMsg.classList.add('hidden');
+      errorMsg.textContent = '';
+    }
+  };
+
+  openBtn.addEventListener('click', () => {
+    if (!selectedPerformer) return;
+    nameInput.value = selectedPerformer;
+    errorMsg.classList.add('hidden');
+    errorMsg.textContent = '';
+    modal.classList.remove('hidden');
+    nameInput.focus();
+    if (window.lucide) lucide.createIcons();
+  });
+
+  closeBtn?.addEventListener('click', hideModal);
+  cancelBtn?.addEventListener('click', hideModal);
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const newName = nameInput.value.trim();
+    if (!newName || newName.length < 2) {
+      errorMsg.textContent = 'Name must be at least 2 characters.';
+      errorMsg.classList.remove('hidden');
+      return;
+    }
+
+    if (newName.toLowerCase() === selectedPerformer.toLowerCase()) {
+      hideModal();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+    errorMsg.classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/performer/rename', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          old_name: selectedPerformer,
+          new_name: newName
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || 'Could not rename performer');
+      }
+
+      hideModal();
+      selectedPerformer = newName;
+      await loadPerformances();
+      const select = document.getElementById('performer-select');
+      if (select) select.value = newName;
+      await handlePerformerSelected(newName);
+      showToast(`✓ Participant renamed to ${newName}`);
+    } catch (err) {
+      errorMsg.textContent = err.message || 'Error renaming participant';
+      errorMsg.classList.remove('hidden');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Name';
+    }
+  });
+}
+
 function setupEditModalEvents() {
   const modal = document.getElementById('edit-song-modal');
   const closeBtn = document.getElementById('close-edit-modal-btn');
@@ -347,6 +584,26 @@ function setupEditModalEvents() {
     document.getElementById('edit-partner-row').classList.toggle('hidden', val !== 'Duet');
     document.getElementById('edit-group-members-row').classList.toggle('hidden', val !== 'Group');
   });
+
+  setupPartnerAutocomplete(
+    document.getElementById('edit-partner-name'),
+    document.getElementById('edit-partner-dup-box'),
+    document.getElementById('edit-partner-matched-list'),
+    () => selectedPerformer ? [selectedPerformer] : []
+  );
+
+  setupGroupAutocomplete(
+    document.getElementById('edit-group-members'),
+    document.getElementById('edit-group-dup-box'),
+    document.getElementById('edit-group-matched-list'),
+    () => selectedPerformer ? [selectedPerformer] : []
+  );
+
+  setupSongDuplicateWarning(
+    document.getElementById('edit-song-title'),
+    document.getElementById('edit-song-dup-warning'),
+    () => document.getElementById('edit-entry-id').value
+  );
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -410,6 +667,13 @@ function openEditSongModal(song) {
   if (acousticCheck) {
     acousticCheck.checked = song.track_status === 'Acoustic';
   }
+
+  const songDupWarn = document.getElementById('edit-song-dup-warning');
+  if (songDupWarn) { songDupWarn.classList.add('hidden'); songDupWarn.innerHTML = ''; }
+  const partnerDup = document.getElementById('edit-partner-dup-box');
+  if (partnerDup) partnerDup.classList.add('hidden');
+  const groupDup = document.getElementById('edit-group-dup-box');
+  if (groupDup) groupDup.classList.add('hidden');
 
   document.getElementById('edit-partner-row').classList.toggle('hidden', perfTypeSelect.value !== 'Duet');
   document.getElementById('edit-group-members-row').classList.toggle('hidden', perfTypeSelect.value !== 'Group');
@@ -545,14 +809,23 @@ async function handlePerformerSelected(name) {
   const songSection = document.getElementById('song-selection-section');
   const uploadSection = document.getElementById('upload-methods-section');
   const songContainer = document.getElementById('song-options-container');
+  const selectedBar = document.getElementById('selected-performer-bar');
+  const selectedNameDisplay = document.getElementById('selected-performer-display-name');
 
   if (!name) {
+    if (selectedBar) selectedBar.classList.add('hidden');
     songSection.classList.add('hidden');
     uploadSection.classList.add('hidden');
     document.getElementById('food-cta-section').classList.add('hidden');
     document.getElementById('food-selector-card').classList.add('hidden');
     selectedEntry = null;
     return;
+  }
+
+  if (selectedBar && selectedNameDisplay) {
+    selectedBar.classList.remove('hidden');
+    selectedNameDisplay.textContent = name;
+    if (window.lucide) lucide.createIcons();
   }
 
   // Load food status
@@ -1209,6 +1482,11 @@ function setupAddPerformanceModal() {
     document.getElementById('add-perf-stage-notes').value = '';
     document.getElementById('add-perf-acoustic').checked = false;
 
+    const addSongDup = document.getElementById('add-perf-song-dup-warning');
+    if (addSongDup) { addSongDup.classList.add('hidden'); addSongDup.innerHTML = ''; }
+    const addPartnerDup = document.getElementById('add-perf-partner-dup-box');
+    if (addPartnerDup) addPartnerDup.classList.add('hidden');
+
     // Populate partner datalist options
     if (partnerList) {
       const performerSet = new Set();
@@ -1226,6 +1504,72 @@ function setupAddPerformanceModal() {
     modal.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
   });
+
+  const addPartnerInput = document.getElementById('add-perf-partner');
+  const addPartnerDupBox = document.getElementById('add-perf-partner-dup-box');
+  const addPartnerMatchedList = document.getElementById('add-perf-partner-matched-list');
+  const addSongTitleInput = document.getElementById('add-perf-song-title');
+  const addSongDupWarning = document.getElementById('add-perf-song-dup-warning');
+
+  if (addPartnerInput && addPartnerDupBox && addPartnerMatchedList && !addPartnerInput._configured) {
+    addPartnerInput._configured = true;
+    addPartnerInput.addEventListener('input', () => {
+      const isGroup = typeSelect && typeSelect.value === 'Group';
+      const rawVal = addPartnerInput.value;
+      let activePart = '';
+      let parts = [];
+      let excluded = selectedPerformer ? [selectedPerformer.toLowerCase()] : [];
+
+      if (isGroup) {
+        parts = rawVal.split(',');
+        activePart = parts[parts.length - 1].trim().toLowerCase();
+        const already = parts.slice(0, -1).map(p => p.trim().toLowerCase());
+        excluded = [...excluded, ...already];
+      } else {
+        activePart = rawVal.trim().toLowerCase();
+      }
+
+      if (activePart.length < 3) {
+        addPartnerDupBox.classList.add('hidden');
+        return;
+      }
+
+      const candidates = getRegisteredPerformersList().filter(name => !excluded.includes(name.toLowerCase()));
+      const matches = candidates.filter(name => {
+        const n = name.toLowerCase();
+        return n === activePart || n.startsWith(activePart) || n.includes(activePart);
+      });
+
+      if (matches.length > 0) {
+        addPartnerMatchedList.innerHTML = '';
+        matches.forEach(m => {
+          const pill = document.createElement('button');
+          pill.type = 'button';
+          pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+          pill.textContent = m;
+          pill.addEventListener('click', () => {
+            if (isGroup) {
+              parts[parts.length - 1] = ' ' + m;
+              addPartnerInput.value = parts.map(p => p.trim()).filter(Boolean).join(', ') + ', ';
+            } else {
+              addPartnerInput.value = m;
+            }
+            addPartnerDupBox.classList.add('hidden');
+            addPartnerInput.focus();
+          });
+          addPartnerMatchedList.appendChild(pill);
+        });
+        addPartnerDupBox.classList.remove('hidden');
+      } else {
+        addPartnerDupBox.classList.add('hidden');
+      }
+    });
+  }
+
+  if (addSongTitleInput && addSongDupWarning && !addSongTitleInput._configured) {
+    addSongTitleInput._configured = true;
+    setupSongDuplicateWarning(addSongTitleInput, addSongDupWarning, () => null);
+  }
 
   typeSelect?.addEventListener('change', () => {
     if (typeSelect.value === 'Solo') {

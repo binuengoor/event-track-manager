@@ -161,6 +161,10 @@ class AddPerformanceRequest(BaseModel):
     is_acoustic: Optional[bool] = False
     stage_notes: Optional[str] = ""
 
+class PerformerRenameRequest(BaseModel):
+    old_name: str
+    new_name: str
+
 class FoodClaimRequest(BaseModel):
     item_id: str
     signer_name: str
@@ -193,6 +197,9 @@ class FoodServingNoteRequest(BaseModel):
     text: str
 
 class FoodToggleRequest(BaseModel):
+    enabled: bool
+
+class SignupToggleRequest(BaseModel):
     enabled: bool
 
 class SequenceItem(BaseModel):
@@ -402,6 +409,17 @@ async def get_signup_config():
 
     perfs = db_service.get_all_performances()
     registered_names = sorted(list({p["performer_name"] for p in perfs if p.get("performer_name")}))
+    existing_songs = [
+        {
+            "song_title": (p.get("song_title") or "").strip(),
+            "performer_name": (p.get("performer_name") or "").strip(),
+            "partner_name": (p.get("partner_name") or "").strip(),
+            "performance_type": p.get("performance_type", "Solo"),
+            "entry_id": p.get("entry_id")
+        }
+        for p in perfs
+        if p.get("song_title") and not p.get("is_song_name_missing")
+    ]
 
     header_brand_title = get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "EMA Paattukoottam")
     header_brand_subtitle = get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "Musical Night")
@@ -413,6 +431,7 @@ async def get_signup_config():
         "event_subtitle": get_setting("event_subtitle", settings.event.subtitle),
         "poster_url": get_setting("event_poster_url", settings.event.poster_url),
         "payment_url": get_setting("payment_url", settings.event.payment_url),
+        "signup_enabled": bool(get_setting("signup_enabled", settings.signup.signup_enabled)),
         "food_signup_enabled": bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled)),
         "food_serving_note": get_setting("food_serving_note", settings.signup.food_serving_note),
         "max_performances_per_participant": int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant)),
@@ -421,11 +440,19 @@ async def get_signup_config():
         "age_groups": age_groups,
         "food_groups": visible_groups,
         "food_items": all_items,
-        "registered_performers": registered_names
+        "registered_performers": registered_names,
+        "existing_songs": existing_songs
     }
 
 @app.post("/api/signup")
 async def register_participant(payload: SignupRequest):
+    signup_enabled = bool(get_setting("signup_enabled", settings.signup.signup_enabled))
+    if not signup_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="Thanks for your interest, but the sign-ups for this event are currently closed. Please reach out to the organizers for more information."
+        )
+
     clean_name = payload.performer_name.strip()
     if not clean_name:
         raise HTTPException(status_code=400, detail="Performer name is required.")
@@ -683,6 +710,25 @@ async def add_performer_performance(payload: AddPerformanceRequest):
     backup_service.trigger_backup()
     return {"status": "success", "entry_id": entry_id, "message": "Performance added successfully."}
 
+@app.put("/api/performer/rename")
+async def rename_performer_endpoint(payload: PerformerRenameRequest):
+    old_name = payload.old_name.strip()
+    new_name = payload.new_name.strip()
+    if not old_name or not new_name:
+        raise HTTPException(status_code=400, detail="Both old name and new name are required.")
+    
+    try:
+        db_service.rename_performer(old_name, new_name)
+        backup_service.trigger_backup()
+        return {
+            "status": "success",
+            "old_name": old_name,
+            "new_name": new_name,
+            "message": f"Successfully renamed '{old_name}' to '{new_name}'."
+        }
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
 
 # =============================================================================
 # PUBLIC TRANSPARENCY DASHBOARD APIS
@@ -758,6 +804,7 @@ async def get_admin_settings(_authorized: bool = Depends(verify_admin_pin)):
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url or "",
         "signup_sheet_url": settings.event.signup_sheet_url or "",
+        "signup_enabled": getattr(settings.signup, "signup_enabled", True),
         "food_signup_enabled": settings.signup.food_signup_enabled,
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,
@@ -868,6 +915,12 @@ async def update_admin_food_toggle(payload: FoodToggleRequest, _authorized: bool
     db_service.set_app_setting("food_signup_enabled", payload.enabled)
     backup_service.trigger_backup()
     return {"status": "success"}
+
+@app.put("/api/admin/signup-toggle")
+async def update_admin_signup_toggle(payload: SignupToggleRequest, _authorized: bool = Depends(verify_admin_pin)):
+    db_service.set_app_setting("signup_enabled", payload.enabled)
+    backup_service.trigger_backup()
+    return {"status": "success", "enabled": payload.enabled}
 
 @app.get("/api/admin/summary")
 async def get_admin_summary(_authorized: bool = Depends(verify_admin_pin)):

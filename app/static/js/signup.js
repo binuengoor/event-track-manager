@@ -34,6 +34,17 @@ async function loadSignupConfig() {
       if (foodSec) foodSec.classList.add("hidden");
     }
 
+    if (signupConfig.signup_enabled === false) {
+      const closedBanner = document.getElementById("signup-closed-banner");
+      if (closedBanner) closedBanner.classList.remove("hidden");
+      const submitBtnText = document.getElementById("submit-btn-text");
+      if (submitBtnText) submitBtnText.textContent = "Sign-Ups Closed";
+      const submitBtn = document.getElementById("submit-btn");
+      if (submitBtn) {
+        submitBtn.className = "w-full py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm shadow-md flex items-center justify-center gap-2 transition hover:bg-slate-700 cursor-pointer";
+      }
+    }
+
     renderAgeGroups(signupConfig.age_groups || []);
     renderPerformanceTypes(signupConfig.performance_types || ["Solo", "Duet", "Group"]);
     renderPartnerOptions(signupConfig.registered_performers || []);
@@ -215,21 +226,37 @@ function renderPartnerOptions(registeredNames) {
     if (customInput && !customInput._configured) {
       customInput._configured = true;
       customInput.addEventListener("input", () => {
-        const rawVal = customInput.value.trim();
-        hiddenPartner.value = rawVal;
-        const val = rawVal.toLowerCase();
+        const rawVal = customInput.value;
+        hiddenPartner.value = rawVal.trim();
+
+        const currentType = document.querySelector(`input[name="perf_type_${cardNum}"]:checked`)?.value?.toLowerCase() || "duet";
+        const isGroup = currentType === "group";
+
+        let activePart = "";
+        let parts = [];
+        let excluded = [];
+
+        if (isGroup) {
+          parts = rawVal.split(',');
+          activePart = parts[parts.length - 1].trim().toLowerCase();
+          excluded = parts.slice(0, -1).map(p => p.trim().toLowerCase());
+        } else {
+          activePart = rawVal.trim().toLowerCase();
+        }
 
         // Check if >= 3 characters entered
-        if (val.length < 3 || !signupConfig || !signupConfig.registered_performers) {
+        if (activePart.length < 3 || !signupConfig || !signupConfig.registered_performers) {
           if (dupBox) dupBox.classList.add("hidden");
           return;
         }
 
         const registered = signupConfig.registered_performers;
-        const matches = registered.filter(p => {
-          const norm = p.trim().toLowerCase();
-          return norm === val || norm.startsWith(val) || norm.includes(val);
-        });
+        const matches = registered
+          .filter(p => !excluded.includes(p.trim().toLowerCase()))
+          .filter(p => {
+            const norm = p.trim().toLowerCase();
+            return norm === activePart || norm.startsWith(activePart) || norm.includes(activePart);
+          });
 
         if (matches.length > 0 && dupBox && matchedListEl) {
           matchedListEl.innerHTML = "";
@@ -243,28 +270,36 @@ function renderPartnerOptions(registeredNames) {
             pill.appendChild(nameSpan);
 
             const icon = document.createElement("i");
-            icon.setAttribute("data-lucide", "check");
+            icon.setAttribute("data-lucide", isGroup ? "plus" : "check");
             icon.className = "w-3 h-3";
             pill.appendChild(icon);
 
             pill.addEventListener("click", () => {
-              // Ensure option exists in select
-              let opt = Array.from(select.options).find(o => o.value.toLowerCase() === m.toLowerCase());
-              if (!opt) {
-                opt = document.createElement("option");
-                opt.value = m;
-                opt.textContent = m;
-                select.appendChild(opt);
-              }
-              select.value = opt.value;
-              hiddenPartner.value = opt.value;
+              if (isGroup) {
+                parts[parts.length - 1] = " " + m;
+                customInput.value = parts.map(p => p.trim()).filter(Boolean).join(", ") + ", ";
+                hiddenPartner.value = customInput.value.trim();
+                dupBox.classList.add("hidden");
+                customInput.focus();
+              } else {
+                // Ensure option exists in select
+                let opt = Array.from(select.options).find(o => o.value.toLowerCase() === m.toLowerCase());
+                if (!opt) {
+                  opt = document.createElement("option");
+                  opt.value = m;
+                  opt.textContent = m;
+                  select.appendChild(opt);
+                }
+                select.value = opt.value;
+                hiddenPartner.value = opt.value;
 
-              // Switch back to select mode
-              customWrap.classList.add("hidden");
-              selectWrap.classList.remove("hidden");
-              toggleBtn.textContent = "+ Add other participant";
-              customInput.value = "";
-              dupBox.classList.add("hidden");
+                // Switch back to select mode
+                customWrap.classList.add("hidden");
+                selectWrap.classList.remove("hidden");
+                toggleBtn.textContent = "+ Add other participant";
+                customInput.value = "";
+                dupBox.classList.add("hidden");
+              }
             });
 
             matchedListEl.appendChild(pill);
@@ -290,11 +325,37 @@ function handleTypeChange(cardNum, type) {
   const partnerBox = document.getElementById(`partner-box-1`);
   const partnerBox2 = document.getElementById(`partner-box-2`);
   const hiddenPartner = document.getElementById(`partner-name-${cardNum}`);
+  const selectWrap = document.getElementById(`partner-select-wrap-${cardNum}`);
+  const customWrap = document.getElementById(`partner-custom-wrap-${cardNum}`);
+  const toggleBtn = document.getElementById(`toggle-custom-partner-${cardNum}`);
 
   const targetBox = cardNum === 1 ? partnerBox : partnerBox2;
+  const label = targetBox ? targetBox.querySelector('label') : null;
+  const t = type.toLowerCase();
+
   if (targetBox) {
-    if (type.toLowerCase() === "duet") {
+    if (t === "duet" || t === "group") {
       targetBox.classList.remove("hidden");
+      if (t === "group") {
+        if (label) label.textContent = "Group Members *";
+        if (customWrap && selectWrap) {
+          customWrap.classList.remove("hidden");
+          selectWrap.classList.add("hidden");
+        }
+        if (toggleBtn) toggleBtn.classList.add("hidden");
+        const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
+        if (customInput) customInput.placeholder = "Comma-separated names (e.g. Alice, Bob, Charlie)";
+      } else {
+        if (label) label.textContent = "Duet Partner Name *";
+        if (toggleBtn) {
+          toggleBtn.classList.remove("hidden");
+          toggleBtn.textContent = customWrap && !customWrap.classList.contains("hidden") 
+            ? "← Choose from registered list" 
+            : "+ Add other participant";
+        }
+        const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
+        if (customInput) customInput.placeholder = "Enter participant's full name";
+      }
     } else {
       targetBox.classList.add("hidden");
       if (hiddenPartner) hiddenPartner.value = "";
@@ -394,6 +455,39 @@ function renderFoodGroups(groups, allItems) {
     groupWrapper.appendChild(itemsGrid);
     container.appendChild(groupWrapper);
   });
+}
+
+function isPlaceholderSong(title) {
+  if (!title) return true;
+  const t = title.trim().toLowerCase();
+  if (!t) return true;
+  const placeholders = [
+    'tbd', 'tba', 'to be decided', 'to be announced',
+    'test', 'testing', 'n/a', 'na', 'none', 'unknown',
+    'song title missing', 'missing', 'pending', 'null'
+  ];
+  if (placeholders.includes(t)) return true;
+  if (/^performance\s+\d+$/i.test(t)) return true;
+  if (/^song\s+\d+$/i.test(t)) return true;
+  return false;
+}
+
+function findDuplicateSongSignup(title) {
+  if (!title || isPlaceholderSong(title) || !signupConfig || !signupConfig.existing_songs) return null;
+  const cleanTitle = title.trim().toLowerCase();
+  if (cleanTitle.length < 3) return null;
+
+  for (const s of signupConfig.existing_songs) {
+    const existingTitle = (s.song_title || '').trim();
+    if (isPlaceholderSong(existingTitle)) continue;
+
+    const existingLower = existingTitle.toLowerCase();
+    if (existingLower === cleanTitle || 
+        (cleanTitle.length >= 4 && (existingLower.includes(cleanTitle) || cleanTitle.includes(existingLower)))) {
+      return s;
+    }
+  }
+  return null;
 }
 
 function setupEventListeners() {
@@ -507,6 +601,37 @@ function setupEventListeners() {
     }
   }
 
+  // Live duplicate check on song titles
+  [1, 2].forEach(cardNum => {
+    const songInput = document.getElementById(`song-title-${cardNum}`);
+    const songDupBox = document.getElementById(`song-dup-box-${cardNum}`);
+    if (songInput && songDupBox) {
+      songInput.addEventListener("input", () => {
+        const val = songInput.value.trim();
+        const dup = findDuplicateSongSignup(val);
+        if (dup) {
+          const singer = dup.partner_name 
+            ? `${dup.performer_name} & ${dup.partner_name}` 
+            : dup.performer_name;
+          songDupBox.innerHTML = `
+            <div class="flex items-start gap-2">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+              <div>
+                <span class="font-bold text-amber-300">Song already chosen:</span>
+                <span>"<strong>${escapeHtml(dup.song_title)}</strong>" has already been selected by <strong>${escapeHtml(singer)}</strong> (${escapeHtml(dup.performance_type || 'Solo')}).</span>
+              </div>
+            </div>
+          `;
+          songDupBox.classList.remove("hidden");
+          if (window.lucide) lucide.createIcons();
+        } else {
+          songDupBox.classList.add("hidden");
+          songDupBox.innerHTML = "";
+        }
+      });
+    }
+  });
+
   // Signup form submit
   const form = document.getElementById("signup-form");
   if (form) {
@@ -517,6 +642,11 @@ function setupEventListeners() {
 async function handleSignupSubmit(e) {
   e.preventDefault();
   hideError();
+
+  if (signupConfig && signupConfig.signup_enabled === false) {
+    showError("Thanks for your interest, but the sign-ups for this event are currently closed. Please reach out to the organizers for more information.");
+    return;
+  }
 
   const name = document.getElementById("performer-name").value.trim();
   const contact = document.getElementById("contact-info").value.trim();
