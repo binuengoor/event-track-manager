@@ -787,6 +787,7 @@ function groupPerformancesByParticipant(performances) {
     }
     if (!p.guardian_name && perf.guardian_name) p.guardian_name = perf.guardian_name;
     if (!p.guardian_phone && (perf.guardian_phone || perf.phone)) p.guardian_phone = perf.guardian_phone || perf.phone;
+    if (!p.contact_info && perf.contact_info) p.contact_info = perf.contact_info;
     if (!p.food_signup && perf.food_signup) p.food_signup = perf.food_signup;
   });
 
@@ -858,13 +859,14 @@ function renderParticipantsTable() {
     if (!query) return true;
     const matchName = p.performer_name.toLowerCase().includes(query);
     const matchGuardian = (p.guardian_name || "").toLowerCase().includes(query);
-    const matchPhone = (p.guardian_phone || "").toLowerCase().includes(query);
+    const matchPhone = (p.guardian_phone || "").toLowerCase().includes(query) || (p.contact_info || "").toLowerCase().includes(query);
     const matchFood = p.food_signup ? (p.food_signup.item_name || "").toLowerCase().includes(query) || (p.food_signup.dish_description || "").toLowerCase().includes(query) : false;
     const matchSong = p.performances.some(perf => 
       (perf.song_title || "").toLowerCase().includes(query) || 
       (perf.movie_name || "").toLowerCase().includes(query) ||
       (perf.entry_id || "").toLowerCase().includes(query) ||
-      (perf.partner_name || "").toLowerCase().includes(query)
+      (perf.partner_name || "").toLowerCase().includes(query) ||
+      (perf.partner_phone || "").toLowerCase().includes(query)
     );
 
     return matchName || matchGuardian || matchPhone || matchFood || matchSong;
@@ -959,7 +961,7 @@ function renderParticipantsTable() {
               <div class="truncate max-w-[160px]">
                 <span class="font-bold text-orange-400">${escapeHtml(perf.performance_type || 'Solo')}</span>: 
                 <span class="text-slate-300 font-medium">${perf.song_title ? escapeHtml(perf.song_title) : '<span class="italic text-slate-500">No song</span>'}</span>
-                ${perf.partner_name ? `<span class="text-[9px] text-amber-300 block truncate">+ ${escapeHtml(perf.partner_name)}</span>` : ''}
+                ${perf.partner_name ? `<span class="text-[9px] text-amber-300 block truncate">+ ${escapeHtml(perf.partner_name)}${perf.partner_phone ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.partner_phone)})</span>` : ''}</span>` : ''}
               </div>
               <div class="flex items-center gap-0.5 shrink-0">
                 <button type="button" data-action="edit-participant" data-entry-id="${escapeHtml(perf.entry_id)}" class="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Edit ${escapeHtml(perf.entry_id)}">
@@ -985,13 +987,19 @@ function renderParticipantsTable() {
             <span>${escapeHtml(p.performer_name)}</span>
             <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${ageBadgeClass}">${escapeHtml(p.age_group)}</span>
           </div>
+          ${p.contact_info ? `
+            <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
+              <i data-lucide="phone" class="w-3 h-3 text-slate-500"></i>
+              <span class="font-mono text-[10px]">${escapeHtml(p.contact_info)}</span>
+            </div>
+          ` : ''}
           ${p.guardian_name ? `
             <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
               <i data-lucide="shield" class="w-3 h-3 text-slate-500"></i>
               <span>${escapeHtml(p.guardian_name)}</span>
               ${p.guardian_phone ? `<span class="text-slate-500 font-mono text-[10px]">(${escapeHtml(p.guardian_phone)})</span>` : ''}
             </div>
-          ` : (p.guardian_phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${escapeHtml(p.guardian_phone)}</div>` : '')}
+          ` : (!p.contact_info && p.guardian_phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${escapeHtml(p.guardian_phone)}</div>` : '')}
         </td>
         <td class="px-3.5 py-3">
           ${actsHtml}
@@ -1025,11 +1033,13 @@ window.openEditParticipantModal = function(entryId) {
   document.getElementById("admin-edit-entry-id").value = p.entry_id;
   document.getElementById("admin-edit-entry-id-badge").textContent = p.entry_id;
   document.getElementById("admin-edit-performer-name").value = p.performer_name || "";
+  document.getElementById("admin-edit-contact-info").value = p.contact_info || "";
   document.getElementById("admin-edit-age-group").value = p.age_group || "Senior";
   document.getElementById("admin-edit-guardian-name").value = p.guardian_name || "";
-  document.getElementById("admin-edit-guardian-phone").value = p.phone || "";
+  document.getElementById("admin-edit-guardian-phone").value = p.guardian_phone || p.phone || "";
   document.getElementById("admin-edit-performance-type").value = p.performance_type || "Solo";
   document.getElementById("admin-edit-partner-name").value = p.partner_name || "";
+  document.getElementById("admin-edit-partner-phone").value = p.partner_phone || "";
   document.getElementById("admin-edit-partner-age-group").value = p.partner_age_group || "";
   document.getElementById("admin-edit-song-title").value = p.song_title || "";
   document.getElementById("admin-edit-movie-name").value = p.movie_name || "";
@@ -1050,14 +1060,38 @@ async function saveParticipantEdit() {
   const entryId = document.getElementById("admin-edit-entry-id").value;
   if (!entryId) return;
 
+  const contactInfoVal = document.getElementById("admin-edit-contact-info").value.trim();
+  const guardianPhoneVal = document.getElementById("admin-edit-guardian-phone").value.trim();
+  const partnerPhoneVal = document.getElementById("admin-edit-partner-phone").value.trim();
+  const perfType = document.getElementById("admin-edit-performance-type").value;
+  const partnerName = document.getElementById("admin-edit-partner-name").value.trim();
+
+  // Validate phone format if entered
+  const cleanPhone = (val) => (val || "").replace(/\D/g, "");
+  if (contactInfoVal && cleanPhone(contactInfoVal).length < 10) {
+    showToast("Participant phone number must be at least 10 digits", true);
+    return;
+  }
+  if (guardianPhoneVal && cleanPhone(guardianPhoneVal).length < 10) {
+    showToast("Guardian phone number must be at least 10 digits", true);
+    return;
+  }
+  if (perfType.toLowerCase() === "duet" && partnerName && partnerPhoneVal && cleanPhone(partnerPhoneVal).length < 10) {
+    showToast("Partner phone number must be at least 10 digits", true);
+    return;
+  }
+
   const seqVal = document.getElementById("admin-edit-sequence-order").value;
   const payload = {
     performer_name: document.getElementById("admin-edit-performer-name").value.trim(),
+    contact_info: contactInfoVal || null,
     age_group: document.getElementById("admin-edit-age-group").value,
     guardian_name: document.getElementById("admin-edit-guardian-name").value.trim() || null,
-    phone: document.getElementById("admin-edit-guardian-phone").value.trim() || null,
-    performance_type: document.getElementById("admin-edit-performance-type").value,
-    partner_name: document.getElementById("admin-edit-partner-name").value.trim() || null,
+    guardian_phone: guardianPhoneVal || null,
+    phone: guardianPhoneVal || null,
+    performance_type: perfType,
+    partner_name: partnerName || null,
+    partner_phone: partnerPhoneVal || null,
     partner_age_group: document.getElementById("admin-edit-partner-age-group").value || null,
     song_title: document.getElementById("admin-edit-song-title").value.trim() || null,
     movie_name: document.getElementById("admin-edit-movie-name").value.trim() || null,

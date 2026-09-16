@@ -117,7 +117,7 @@ def test_upload_and_stream(tmp_path, monkeypatch):
     pname = f"Test Audio Uploader {uuid.uuid4().hex[:6]}"
     signup_res = client.post("/api/signup", json={
         "performer_name": pname,
-        "contact_info": "audio@test.com",
+        "contact_info": "555-444-3333",
         "age_group": "Senior",
         "performances": [{"performance_type": "Solo", "song_title": "Test Song", "movie_name": "Movie"}]
     })

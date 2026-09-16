@@ -99,12 +99,20 @@ class StatusUpdateRequest(BaseModel):
 class PerformanceNotesRequest(BaseModel):
     notes: str = ""
 
+def validate_phone(phone: Optional[str]) -> bool:
+    """Validates that a phone number contains at least 10 digits."""
+    if not phone:
+        return False
+    digits = re.sub(r"\D", "", str(phone))
+    return len(digits) >= 10
+
 class PerformanceSignupItem(BaseModel):
     performance_type: str = "Solo"
     song_title: Optional[str] = ""
     movie_name: Optional[str] = ""
     partner_name: Optional[str] = None
     partner_age_group: Optional[str] = None
+    partner_phone: Optional[str] = ""
     stage_notes: Optional[str] = ""
     is_acoustic: bool = False
 
@@ -126,11 +134,13 @@ class PerformanceUpdateRequest(BaseModel):
     movie_name: Optional[str] = None
     partner_name: Optional[str] = None
     partner_age_group: Optional[str] = None
+    partner_phone: Optional[str] = None
     performance_type: Optional[str] = None
     stage_notes: Optional[str] = None
     age_group: Optional[str] = None
     guardian_name: Optional[str] = None
     guardian_phone: Optional[str] = None
+    contact_info: Optional[str] = None
     is_acoustic: Optional[bool] = None
     track_status: Optional[str] = None
 
@@ -144,6 +154,7 @@ class AdminParticipantUpdateRequest(BaseModel):
     performance_type: Optional[str] = None
     partner_name: Optional[str] = None
     partner_age_group: Optional[str] = None
+    partner_phone: Optional[str] = None
     song_title: Optional[str] = None
     movie_name: Optional[str] = None
     sequence_order: Optional[int] = None
@@ -158,6 +169,7 @@ class AddPerformanceRequest(BaseModel):
     movie_name: Optional[str] = ""
     partner_name: Optional[str] = ""
     partner_age_group: Optional[str] = None
+    partner_phone: Optional[str] = ""
     is_acoustic: Optional[bool] = False
     stage_notes: Optional[str] = ""
 
@@ -471,13 +483,57 @@ async def register_participant(payload: SignupRequest):
         age_groups = [ag.model_dump() for ag in settings.signup.age_groups]
 
     selected_group_config = next((ag for ag in age_groups if (ag.get("name") if isinstance(ag, dict) else ag.name) == payload.age_group), None)
+    requires_guardian = False
     if selected_group_config:
-        req_guardian = selected_group_config.get("requires_guardian") if isinstance(selected_group_config, dict) else selected_group_config.requires_guardian
-        if req_guardian:
-            if not payload.guardian_name or not payload.guardian_name.strip():
-                raise HTTPException(status_code=400, detail=f"Guardian name is required for {payload.age_group} participants.")
-            if not payload.guardian_phone or not payload.guardian_phone.strip():
-                raise HTTPException(status_code=400, detail=f"Guardian phone is required for {payload.age_group} participants.")
+        requires_guardian = bool(selected_group_config.get("requires_guardian") if isinstance(selected_group_config, dict) else selected_group_config.requires_guardian)
+
+    contact_phone = (payload.contact_info or "").strip()
+    guardian_phone = (payload.guardian_phone or "").strip()
+    guardian_name = (payload.guardian_name or "").strip()
+
+    if requires_guardian:
+        if not guardian_name:
+            raise HTTPException(status_code=400, detail=f"Guardian name is required for {payload.age_group} participants.")
+        if not guardian_phone or not validate_phone(guardian_phone):
+            raise HTTPException(status_code=400, detail=f"A valid 10-digit guardian phone number is required for {payload.age_group} participants.")
+        if not contact_phone:
+            contact_phone = guardian_phone
+        elif not validate_phone(contact_phone):
+            raise HTTPException(status_code=400, detail="A valid 10-digit phone number is required.")
+    else:
+        if not contact_phone or not validate_phone(contact_phone):
+            raise HTTPException(status_code=400, detail="A valid 10-digit phone number is required for registration.")
+
+    # Validate duet / custom partner requirements
+    all_existing_perfs = db_service.get_all_performances()
+    registered_names = {
+        (p.get("performer_name") or "").strip().lower()
+        for p in all_existing_perfs
+        if p.get("performer_name")
+    }
+
+    for idx, p in enumerate(payload.performances):
+        perf_type = (p.performance_type or "").strip().capitalize()
+        if perf_type == "Duet":
+            p_name = (p.partner_name or "").strip()
+            if not p_name:
+                raise HTTPException(status_code=400, detail=f"Partner name is required for Duet performance #{idx + 1}.")
+            if p_name.lower() not in registered_names:
+                p_phone = (p.partner_phone or "").strip()
+                if not p_phone or not validate_phone(p_phone):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"A valid 10-digit phone number is required for partner '{p_name}'."
+                    )
+        elif perf_type == "Group":
+            p_name = (p.partner_name or "").strip()
+            p_phone = (p.partner_phone or "").strip()
+            if p_name and p_name.lower() not in registered_names and p_phone:
+                if not validate_phone(p_phone):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"A valid 10-digit phone number is required for partner '{p_name}'."
+                    )
 
     # Validate constraints
     max_perfs = int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant))
@@ -508,12 +564,13 @@ async def register_participant(payload: SignupRequest):
             performance_type=p.performance_type,
             partner_name=p.partner_name,
             partner_age_group=p.partner_age_group,
-            contact_info=payload.contact_info,
+            contact_info=contact_phone,
+            partner_phone=p.partner_phone or "",
             song_title=p.song_title or "",
             movie_name=p.movie_name or "",
             age_group=payload.age_group,
-            guardian_name=payload.guardian_name,
-            guardian_phone=payload.guardian_phone,
+            guardian_name=guardian_name if requires_guardian else "",
+            guardian_phone=guardian_phone if requires_guardian else "",
             stage_notes=p.stage_notes or "",
             track_status=initial_track_status,
             created_via="signup"
@@ -550,11 +607,13 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
         "movie_name": payload.movie_name,
         "partner_name": payload.partner_name,
         "partner_age_group": payload.partner_age_group,
+        "partner_phone": payload.partner_phone,
         "performance_type": payload.performance_type,
         "stage_notes": payload.stage_notes,
         "age_group": payload.age_group,
         "guardian_name": payload.guardian_name,
-        "guardian_phone": payload.guardian_phone
+        "guardian_phone": payload.guardian_phone,
+        "contact_info": payload.contact_info
     }
     if payload.track_status is not None:
         update_kwargs["track_status"] = payload.track_status
@@ -683,6 +742,23 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         if solo_count >= max_solo:
             raise HTTPException(status_code=400, detail=f"Only {max_solo} solo performance is allowed per participant.")
 
+    partner_name = payload.partner_name.strip() if payload.partner_name else None
+    partner_phone = payload.partner_phone.strip() if payload.partner_phone else ""
+    if perf_type == "Duet":
+        if not partner_name:
+            raise HTTPException(status_code=400, detail="Partner name is required for Duet performance.")
+        registered_names = {
+            (p.get("performer_name") or "").strip().lower()
+            for p in all_perfs
+            if p.get("performer_name")
+        }
+        if partner_name.lower() not in registered_names:
+            if not partner_phone or not validate_phone(partner_phone):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"A valid 10-digit phone number is required for partner '{partner_name}'."
+                )
+
     # Inherit demographics from primary performance
     ref_perf = user_perfs[0]
     contact_info = ref_perf.get("contact_info") or ""
@@ -695,9 +771,10 @@ async def add_performer_performance(payload: AddPerformanceRequest):
     entry_id = db_service.create_performance(
         performer_name=clean_name,
         performance_type=perf_type,
-        partner_name=payload.partner_name.strip() if payload.partner_name else None,
+        partner_name=partner_name,
         partner_age_group=payload.partner_age_group.strip() if payload.partner_age_group else None,
         contact_info=contact_info,
+        partner_phone=partner_phone,
         song_title=payload.song_title.strip() if payload.song_title else "",
         movie_name=payload.movie_name.strip() if payload.movie_name else None,
         age_group=age_group,
@@ -985,7 +1062,11 @@ async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdat
     """Updates participant details directly in SQLite and triggers debounced backup."""
     update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
     if "phone" in update_data:
-        update_data["guardian_phone"] = update_data.pop("phone")
+        legacy_phone = update_data.pop("phone")
+        if "guardian_phone" not in update_data and legacy_phone:
+            update_data["guardian_phone"] = legacy_phone
+        if "contact_info" not in update_data and legacy_phone:
+            update_data["contact_info"] = legacy_phone
     success = db_service.update_performance_details(entry_id, **update_data)
     if not success:
         raise HTTPException(status_code=404, detail="Participant/performance entry not found.")

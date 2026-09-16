@@ -93,7 +93,7 @@ def test_signup_enable_disable_toggle(client):
         # 3. Attempt signup while disabled
         signup_payload = {
             "performer_name": "Late Bird",
-            "contact_info": "late@example.com",
+            "contact_info": "555-777-8888",
             "age_group": "Senior",
             "performances": [
                 {"performance_type": "Solo", "song_title": "Late Song"}

@@ -192,10 +192,17 @@ function renderPartnerOptions(registeredNames) {
     const matchedListEl = document.getElementById(`partner-matched-list-${cardNum}`);
     const dismissBtn = document.getElementById(`dismiss-partner-dup-${cardNum}`);
 
+function isValidPhone(phone) {
+  if (!phone) return false;
+  const digits = String(phone).replace(/\D/g, "");
+  return digits.length >= 10;
+}
+
     if (toggleBtn && !toggleBtn._configured) {
       toggleBtn._configured = true;
       toggleBtn.addEventListener("click", () => {
         const isCustomHidden = customWrap.classList.contains("hidden");
+        const customPhoneInput = document.getElementById(`partner-custom-phone-${cardNum}`);
         if (isCustomHidden) {
           // Switch to custom text input
           customWrap.classList.remove("hidden");
@@ -210,6 +217,7 @@ function renderPartnerOptions(registeredNames) {
           selectWrap.classList.remove("hidden");
           toggleBtn.textContent = "+ Add other participant";
           customInput.value = "";
+          if (customPhoneInput) customPhoneInput.value = "";
           hiddenPartner.value = select.value.trim();
           if (dupBox) dupBox.classList.add("hidden");
         }
@@ -298,6 +306,8 @@ function renderPartnerOptions(registeredNames) {
                 selectWrap.classList.remove("hidden");
                 toggleBtn.textContent = "+ Add other participant";
                 customInput.value = "";
+                const customPhoneInput = document.getElementById(`partner-custom-phone-${cardNum}`);
+                if (customPhoneInput) customPhoneInput.value = "";
                 dupBox.classList.add("hidden");
               }
             });
@@ -659,10 +669,28 @@ async function handleSignupSubmit(e) {
 
   const guardianName = document.getElementById("guardian-name")?.value.trim() || "";
   const guardianPhone = document.getElementById("guardian-phone")?.value.trim() || "";
+  const isJunior = Boolean(selectedAgeGroup && selectedAgeGroup.requires_guardian);
 
-  if (selectedAgeGroup && selectedAgeGroup.requires_guardian) {
-    if (!guardianName || !guardianPhone) {
-      showError("Parent/Guardian name and phone are required for Junior registration.");
+  if (isJunior) {
+    if (!guardianName) {
+      showError("Parent/Guardian name is required for Junior registration.");
+      return;
+    }
+    if (!guardianPhone || !isValidPhone(guardianPhone)) {
+      showError("Please enter a valid 10-digit phone number for the Parent/Guardian.");
+      return;
+    }
+    if (contact && !isValidPhone(contact)) {
+      showError("Please enter a valid 10-digit phone number for the participant.");
+      return;
+    }
+  } else {
+    if (!contact) {
+      showError("Phone number is required for registration.");
+      return;
+    }
+    if (!isValidPhone(contact)) {
+      showError("Please enter a valid 10-digit phone number.");
       return;
     }
   }
@@ -676,13 +704,26 @@ async function handleSignupSubmit(e) {
   const acoustic1 = Boolean(document.getElementById("acoustic-1")?.checked);
 
   const isCustomPartner1 = !document.getElementById("partner-custom-wrap-1")?.classList.contains("hidden");
+  const partnerPhone1 = isCustomPartner1 ? (document.getElementById("partner-custom-phone-1")?.value.trim() || "") : "";
   const partnerAgeGroup1 = (type1.toLowerCase() === "duet" && isCustomPartner1)
     ? (document.querySelector('input[name="partner_age_group_1"]:checked')?.value || "Senior")
     : null;
 
-  if (type1.toLowerCase() === "duet" && !partner1) {
-    showError("Please specify your duet partner's name for Performance 1.");
-    return;
+  if (type1.toLowerCase() === "duet") {
+    if (!partner1) {
+      showError("Please specify your duet partner's name for Performance 1.");
+      return;
+    }
+    if (isCustomPartner1) {
+      if (!partnerPhone1) {
+        showError("Please enter a phone number for your duet partner in Performance 1.");
+        return;
+      }
+      if (!isValidPhone(partnerPhone1)) {
+        showError("Please enter a valid 10-digit phone number for your duet partner in Performance 1.");
+        return;
+      }
+    }
   }
 
   const performances = [
@@ -690,6 +731,7 @@ async function handleSignupSubmit(e) {
       performance_type: type1,
       partner_name: partner1,
       partner_age_group: partnerAgeGroup1,
+      partner_phone: partnerPhone1,
       song_title: song1,
       movie_name: movie1,
       stage_notes: notes1,
@@ -707,19 +749,33 @@ async function handleSignupSubmit(e) {
     const acoustic2 = Boolean(document.getElementById("acoustic-2")?.checked);
 
     const isCustomPartner2 = !document.getElementById("partner-custom-wrap-2")?.classList.contains("hidden");
+    const partnerPhone2 = isCustomPartner2 ? (document.getElementById("partner-custom-phone-2")?.value.trim() || "") : "";
     const partnerAgeGroup2 = (type2.toLowerCase() === "duet" && isCustomPartner2)
       ? (document.querySelector('input[name="partner_age_group_2"]:checked')?.value || "Senior")
       : null;
 
-    if (type2.toLowerCase() === "duet" && !partner2) {
-      showError("Please specify your duet partner's name for Performance 2.");
-      return;
+    if (type2.toLowerCase() === "duet") {
+      if (!partner2) {
+        showError("Please specify your duet partner's name for Performance 2.");
+        return;
+      }
+      if (isCustomPartner2) {
+        if (!partnerPhone2) {
+          showError("Please enter a phone number for your duet partner in Performance 2.");
+          return;
+        }
+        if (!isValidPhone(partnerPhone2)) {
+          showError("Please enter a valid 10-digit phone number for your duet partner in Performance 2.");
+          return;
+        }
+      }
     }
 
     performances.push({
       performance_type: type2,
       partner_name: partner2,
       partner_age_group: partnerAgeGroup2,
+      partner_phone: partnerPhone2,
       song_title: song2,
       movie_name: movie2,
       stage_notes: notes2,

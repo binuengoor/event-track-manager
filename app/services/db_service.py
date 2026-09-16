@@ -60,6 +60,7 @@ class DBService:
                     guardian_name TEXT DEFAULT '',
                     guardian_phone TEXT DEFAULT '',
                     partner_age_group TEXT DEFAULT '',
+                    partner_phone TEXT DEFAULT '',
                     created_via TEXT DEFAULT 'sheet'
                 )
                 """)
@@ -71,6 +72,7 @@ class DBService:
                     ("guardian_name", "TEXT DEFAULT ''"),
                     ("guardian_phone", "TEXT DEFAULT ''"),
                     ("partner_age_group", "TEXT DEFAULT ''"),
+                    ("partner_phone", "TEXT DEFAULT ''"),
                     ("created_via", "TEXT DEFAULT 'sheet'"),
                 ]:
                     try:
@@ -681,6 +683,7 @@ class DBService:
         partner_name: Optional[str] = None,
         partner_age_group: Optional[str] = None,
         contact_info: Optional[str] = None,
+        partner_phone: Optional[str] = None,
         song_title: str = "",
         movie_name: Optional[str] = None,
         age_group: Optional[str] = None,
@@ -728,11 +731,11 @@ class DBService:
             conn.execute("""
             INSERT INTO performances (
                 entry_id, performer_name, performance_type, partner_name, partner_age_group, contact_info,
-                song_title, movie_name, sequence_order, performance_status, track_status,
+                partner_phone, song_title, movie_name, sequence_order, performance_status, track_status,
                 duration, drive_file_id, drive_file_name, last_updated, row_index,
                 is_song_name_missing, extra_tags_json, stage_notes, age_group,
                 guardian_name, guardian_phone, created_via
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry_id,
                 performer_name.strip(),
@@ -740,6 +743,7 @@ class DBService:
                 partner_name.strip() if partner_name else None,
                 partner_age_group.strip() if partner_age_group else "",
                 contact_info.strip() if contact_info else None,
+                partner_phone.strip() if partner_phone else "",
                 song_title.strip(),
                 movie_name.strip() if movie_name else None,
                 sequence_order,
@@ -765,7 +769,7 @@ class DBService:
     def update_performance_details(self, entry_id: str, **fields) -> bool:
         """Updates specific performance details (e.g. song, movie, partner, age, guardian, track_status)."""
         allowed_fields = {
-            "performer_name", "song_title", "movie_name", "partner_name", "partner_age_group", "performance_type",
+            "performer_name", "song_title", "movie_name", "partner_name", "partner_age_group", "partner_phone", "performance_type",
             "age_group", "guardian_name", "guardian_phone", "contact_info",
             "stage_notes", "track_status", "performance_status", "sequence_order"
         }
@@ -884,6 +888,7 @@ class DBService:
                     age_group = getattr(p, "age_group", "") or ""
                     guardian_name = getattr(p, "guardian_name", "") or ""
                     guardian_phone = getattr(p, "guardian_phone", "") or ""
+                    partner_phone = getattr(p, "partner_phone", "") or ""
                     created_via = getattr(p, "created_via", "sheet") or "sheet"
 
                     conn.execute("""
@@ -892,8 +897,8 @@ class DBService:
                         song_title, movie_name, sequence_order, performance_status, track_status,
                         duration, drive_file_id, drive_file_name, last_updated, row_index,
                         is_song_name_missing, extra_tags_json, stage_notes, age_group,
-                        guardian_name, guardian_phone, created_via
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        guardian_name, guardian_phone, partner_phone, created_via
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(entry_id) DO UPDATE SET
                         performer_name=excluded.performer_name,
                         performance_type=excluded.performance_type,
@@ -914,7 +919,8 @@ class DBService:
                         stage_notes=COALESCE(NULLIF(excluded.stage_notes, ''), performances.stage_notes, ''),
                         age_group=COALESCE(NULLIF(excluded.age_group, ''), performances.age_group, ''),
                         guardian_name=COALESCE(NULLIF(excluded.guardian_name, ''), performances.guardian_name, ''),
-                        guardian_phone=COALESCE(NULLIF(excluded.guardian_phone, ''), performances.guardian_phone, '')
+                        guardian_phone=COALESCE(NULLIF(excluded.guardian_phone, ''), performances.guardian_phone, ''),
+                        partner_phone=COALESCE(NULLIF(excluded.partner_phone, ''), performances.partner_phone, '')
                     """, (
                         p.entry_id,
                         p.performer_name,
@@ -937,6 +943,7 @@ class DBService:
                         age_group,
                         guardian_name,
                         guardian_phone,
+                        partner_phone,
                         created_via
                     ))
 

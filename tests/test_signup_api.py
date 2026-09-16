@@ -94,7 +94,7 @@ def test_signup_max_performances_and_solo_limit(client):
         "age_group": "Senior",
         "performances": [
             {"performance_type": "Solo", "song_title": "Song 1"},
-            {"performance_type": "Duet", "song_title": "Song 2", "partner_name": "Partner A"},
+            {"performance_type": "Duet", "song_title": "Song 2", "partner_name": "Partner A", "partner_phone": "555-444-1111"},
             {"performance_type": "Group", "song_title": "Song 3"}
         ]
     }
@@ -115,6 +115,7 @@ def test_signup_duet_partner_age_group(client):
                 "performance_type": "Duet",
                 "partner_name": partner_name,
                 "partner_age_group": "Junior",
+                "partner_phone": "555-666-7777",
                 "song_title": "Aayiram Kannumai"
             }
         ]
@@ -129,8 +130,9 @@ def test_signup_duet_partner_age_group(client):
     assert perf["performer_name"] == pname
     assert perf["partner_name"] == partner_name
     assert perf["partner_age_group"] == "Junior"
+    assert perf["partner_phone"] == "555-666-7777"
 
-    # Test auto-resolution of existing partner's age group when omitted
+    # Test auto-resolution of existing partner's age group when omitted (and no partner_phone needed for registered partner)
     another_pname = f"Another Singer {uuid.uuid4().hex[:6]}"
     payload_auto = {
         "performer_name": another_pname,
@@ -151,3 +153,101 @@ def test_signup_duet_partner_age_group(client):
     assert perf_auto["partner_name"] == pname
     assert perf_auto["partner_age_group"] == "Senior"
 
+def test_signup_phone_mandatory_for_participant(client):
+    import uuid
+    name = f"Phone Test {uuid.uuid4().hex[:6]}"
+
+    # 1. Missing phone for Senior must fail
+    res_empty = client.post("/api/signup", json={
+        "performer_name": name,
+        "contact_info": "",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "Song 1"}]
+    })
+    assert res_empty.status_code == 400
+    assert "phone" in res_empty.json()["detail"].lower()
+
+    # 2. Too short / non-phone must fail
+    res_short = client.post("/api/signup", json={
+        "performer_name": name,
+        "contact_info": "12345",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "Song 1"}]
+    })
+    assert res_short.status_code == 400
+    assert "phone" in res_short.json()["detail"].lower()
+
+    # 3. Junior registration with valid guardian phone succeeds and inherits phone
+    jname = f"Junior AutoPhone {uuid.uuid4().hex[:6]}"
+    res_junior = client.post("/api/signup", json={
+        "performer_name": jname,
+        "contact_info": "",
+        "age_group": "Junior",
+        "guardian_name": "Guardian Person",
+        "guardian_phone": "(555) 987-6543",
+        "performances": [{"performance_type": "Solo", "song_title": "Song 1"}]
+    })
+    assert res_junior.status_code == 200
+    eid = res_junior.json()["entry_ids"][0]
+    p = db_service.get_performance_by_id(eid)
+    assert p["contact_info"] == "(555) 987-6543"
+    assert p["guardian_phone"] == "(555) 987-6543"
+
+def test_signup_duet_custom_partner_phone_mandatory(client):
+    import uuid
+    pname = f"Duet Lead {uuid.uuid4().hex[:6]}"
+    partner = f"Unregistered Partner {uuid.uuid4().hex[:6]}"
+
+    # Custom partner without phone must fail
+    res_no_partner_phone = client.post("/api/signup", json={
+        "performer_name": pname,
+        "contact_info": "555-123-4567",
+        "age_group": "Senior",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner,
+                "partner_phone": "",
+                "song_title": "Duet Song"
+            }
+        ]
+    })
+    assert res_no_partner_phone.status_code == 400
+    assert "phone number is required for partner" in res_no_partner_phone.json()["detail"].lower()
+
+    # Custom partner with invalid phone must fail
+    res_bad_phone = client.post("/api/signup", json={
+        "performer_name": pname,
+        "contact_info": "555-123-4567",
+        "age_group": "Senior",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner,
+                "partner_phone": "123",
+                "song_title": "Duet Song"
+            }
+        ]
+    })
+    assert res_bad_phone.status_code == 400
+    assert "phone number is required for partner" in res_bad_phone.json()["detail"].lower()
+
+    # Custom partner with valid phone succeeds
+    res_good = client.post("/api/signup", json={
+        "performer_name": pname,
+        "contact_info": "555-123-4567",
+        "age_group": "Senior",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner,
+                "partner_phone": "(555) 321-7654",
+                "song_title": "Duet Song"
+            }
+        ]
+    })
+    assert res_good.status_code == 200
+    eid = res_good.json()["entry_ids"][0]
+    p = db_service.get_performance_by_id(eid)
+    assert p["partner_name"] == partner
+    assert p["partner_phone"] == "(555) 321-7654"

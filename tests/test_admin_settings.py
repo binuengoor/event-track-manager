@@ -76,7 +76,7 @@ def test_add_performance_flow(client):
     # First create a test participant via /api/signup
     signup_payload = {
         "performer_name": unique_name,
-        "contact_info": "test@test.com",
+        "contact_info": "555-222-3333",
         "age_group": "Senior",
         "performances": [
             {
@@ -95,6 +95,7 @@ def test_add_performance_flow(client):
         "performer_name": unique_name,
         "performance_type": "Duet",
         "partner_name": "Test Partner",
+        "partner_phone": "555-888-9999",
         "song_title": "Second Duet Song",
         "movie_name": "Movie 2",
         "is_acoustic": True,

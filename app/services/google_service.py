@@ -1091,7 +1091,7 @@ class GoogleService:
             # 3. Format performance data
             perf_headers = [
                 "Entry ID", "Performer Name", "Age Group", "Performance Type",
-                "Duet Partner", "Song Name", "Movie/Album", "Sequence",
+                "Duet Partner", "Partner Phone", "Song Name", "Movie/Album", "Sequence",
                 "Guardian Name", "Guardian Phone", "Contact Info", "Track Status",
                 "Duration", "Drive File ID", "Created Via", "Last Updated"
             ]
@@ -1103,6 +1103,7 @@ class GoogleService:
                     p.get("age_group", ""),
                     p.get("performance_type", "Solo"),
                     p.get("partner_name", "") or "",
+                    p.get("partner_phone", "") or "",
                     p.get("song_title", "") or "",
                     p.get("movie_name", "") or "",
                     str(p.get("sequence_order", "") or ""),

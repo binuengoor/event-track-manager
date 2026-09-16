@@ -582,6 +582,7 @@ function setupEditModalEvents() {
   perfTypeSelect.addEventListener('change', (e) => {
     const val = e.target.value;
     document.getElementById('edit-partner-row').classList.toggle('hidden', val !== 'Duet');
+    document.getElementById('edit-partner-phone-row')?.classList.toggle('hidden', val !== 'Duet');
     document.getElementById('edit-group-members-row').classList.toggle('hidden', val !== 'Group');
   });
 
@@ -615,6 +616,12 @@ function setupEditModalEvents() {
     const ytUrl = document.getElementById('edit-youtube-url').value.trim();
 
     const isAcousticChecked = document.getElementById('edit-acoustic-check')?.checked;
+    const partnerPhone = document.getElementById('edit-partner-phone')?.value.trim() || '';
+
+    if (perfType === 'Duet' && partnerPhone && partnerPhone.replace(/\D/g, '').length < 10) {
+      alert('Please enter a valid 10-digit phone number for the partner.');
+      return;
+    }
 
     const saveBtn = document.getElementById('save-edit-btn');
     saveBtn.disabled = true;
@@ -628,6 +635,7 @@ function setupEditModalEvents() {
           song_title: songTitle,
           performance_type: perfType,
           partner_name: perfType === 'Duet' ? partnerName : '',
+          partner_phone: perfType === 'Duet' ? partnerPhone : '',
           group_members: perfType === 'Group' ? groupMembers : '',
           youtube_url: ytUrl,
           track_status: isAcousticChecked ? 'Acoustic' : (selectedEntry && selectedEntry.track_status === 'Acoustic' ? 'Pending' : undefined)
@@ -660,6 +668,18 @@ function openEditSongModal(song) {
   const perfTypeSelect = document.getElementById('edit-perf-type');
   perfTypeSelect.value = song.performance_type || 'Solo';
   document.getElementById('edit-partner-name').value = song.partner_name || '';
+  const partnerPhoneInput = document.getElementById('edit-partner-phone');
+  if (partnerPhoneInput) {
+    partnerPhoneInput.value = song.partner_phone || '';
+  }
+  const partnerPhoneRow = document.getElementById('edit-partner-phone-row');
+  if (partnerPhoneRow) {
+    if (song.performance_type === 'Duet') {
+      partnerPhoneRow.classList.remove('hidden');
+    } else {
+      partnerPhoneRow.classList.add('hidden');
+    }
+  }
   document.getElementById('edit-group-members').value = song.group_members || '';
   document.getElementById('edit-youtube-url').value = song.youtube_url || '';
 
@@ -1553,6 +1573,9 @@ function setupAddPerformanceModal() {
               addPartnerInput.value = parts.map(p => p.trim()).filter(Boolean).join(', ') + ', ';
             } else {
               addPartnerInput.value = m;
+              if (partnerPhoneWrap) partnerPhoneWrap.classList.add('hidden');
+              const partnerPhoneInput = document.getElementById('add-perf-partner-phone');
+              if (partnerPhoneInput) partnerPhoneInput.value = '';
             }
             addPartnerDupBox.classList.add('hidden');
             addPartnerInput.focus();
@@ -1571,12 +1594,28 @@ function setupAddPerformanceModal() {
     setupSongDuplicateWarning(addSongTitleInput, addSongDupWarning, () => null);
   }
 
+  const partnerPhoneWrap = document.getElementById('add-perf-partner-phone-wrap');
+  const checkPartnerPhoneVisibility = () => {
+    if (!partnerPhoneWrap) return;
+    const curType = typeSelect ? typeSelect.value : 'Solo';
+    const curPartner = (addPartnerInput ? addPartnerInput.value : '').trim();
+    if (curType === 'Duet' && curPartner) {
+      const isRegistered = getRegisteredPerformersList().some(n => n.toLowerCase() === curPartner.toLowerCase());
+      partnerPhoneWrap.classList.toggle('hidden', isRegistered);
+    } else {
+      partnerPhoneWrap.classList.add('hidden');
+    }
+  };
+  addPartnerInput?.addEventListener('input', checkPartnerPhoneVisibility);
+  addPartnerInput?.addEventListener('change', checkPartnerPhoneVisibility);
+
   typeSelect?.addEventListener('change', () => {
     if (typeSelect.value === 'Solo') {
       partnerRow.classList.add('hidden');
     } else {
       partnerRow.classList.remove('hidden');
     }
+    checkPartnerPhoneVisibility();
   });
 
   const closeModal = () => modal.classList.add('hidden');
@@ -1593,6 +1632,8 @@ function setupAddPerformanceModal() {
     const partnerName = document.getElementById('add-perf-partner').value.trim();
     const stageNotes = document.getElementById('add-perf-stage-notes').value.trim();
     const isAcoustic = document.getElementById('add-perf-acoustic').checked;
+    const partnerPhoneInput = document.getElementById('add-perf-partner-phone');
+    const partnerPhone = partnerPhoneInput ? partnerPhoneInput.value.trim() : '';
 
     if (!songTitle) {
       alert('Please enter a song title.');
@@ -1602,6 +1643,22 @@ function setupAddPerformanceModal() {
     if (type !== 'Solo' && !partnerName) {
       alert('Please enter a partner name for a Duet or Group performance.');
       return;
+    }
+
+    if (type === 'Duet' && partnerName) {
+      const isRegistered = getRegisteredPerformersList().some(n => n.toLowerCase() === partnerName.toLowerCase());
+      if (!isRegistered) {
+        if (!partnerPhone) {
+          alert('Please enter a phone number for your duet partner so organizers can identify them.');
+          if (partnerPhoneInput) partnerPhoneInput.focus();
+          return;
+        }
+        if (partnerPhone.replace(/\D/g, '').length < 10) {
+          alert('Please enter a valid 10-digit phone number for your duet partner.');
+          if (partnerPhoneInput) partnerPhoneInput.focus();
+          return;
+        }
+      }
     }
 
     const submitBtn = document.getElementById('submit-add-perf-btn');
@@ -1620,6 +1677,7 @@ function setupAddPerformanceModal() {
           song_title: songTitle,
           movie_name: movieName,
           partner_name: partnerName,
+          partner_phone: partnerPhone,
           is_acoustic: isAcoustic,
           stage_notes: stageNotes
         })
