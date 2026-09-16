@@ -192,12 +192,6 @@ function renderPartnerOptions(registeredNames) {
     const matchedListEl = document.getElementById(`partner-matched-list-${cardNum}`);
     const dismissBtn = document.getElementById(`dismiss-partner-dup-${cardNum}`);
 
-function isValidPhone(phone) {
-  if (!phone) return false;
-  const digits = String(phone).replace(/\D/g, "");
-  return digits.length >= 10;
-}
-
     if (toggleBtn && !toggleBtn._configured) {
       toggleBtn._configured = true;
       toggleBtn.addEventListener("click", () => {
@@ -896,3 +890,10 @@ function escapeHtml(str) {
     "'": "&#39;"
   })[m]);
 }
+
+function isValidPhone(phone) {
+  if (!phone) return false;
+  const digits = String(phone).replace(/\D/g, "");
+  return digits.length >= 10;
+}
+
