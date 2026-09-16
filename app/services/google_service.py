@@ -157,10 +157,76 @@ class GoogleService:
             mime = meta.get("mimeType", "")
             self.is_xlsx = ("spreadsheetml.sheet" in mime or meta.get("name", "").endswith(".xlsx"))
             logger.info("Connected to target sheet: %s (Type: %s, is_xlsx=%s)", meta.get("name"), mime, self.is_xlsx)
+            self._last_drive_reconcile = 0.0
         except Exception as e:
             logger.error("Failed to initialize Google clients (%s). Falling back to MOCK MODE.", e)
             self.mock_mode = True
             self._init_mock_data()
+
+    def _reconcile_drive_tracks(self, entries: List[PerformanceEntry], force: bool = False) -> List[PerformanceEntry]:
+        """Reconciles Google Drive Active folder backing tracks against performance entries directly in SQLite."""
+        if self.mock_mode or not self.drive:
+            return entries
+
+        import time
+        now = time.time()
+        if not force and (now - getattr(self, "_last_drive_reconcile", 0.0)) < 15.0:
+            return entries
+        self._last_drive_reconcile = now
+
+        try:
+            folder_id = settings.google.drive_folders.active_folder_id
+            if not folder_id:
+                return entries
+
+            q = f"'{folder_id}' in parents and trashed = false"
+            res = self.drive.files().list(
+                q=q,
+                supportsAllDrives=True,
+                includeItemsFromAllDrives=True,
+                fields="files(id, name)"
+            ).execute()
+            active_files = res.get("files", [])
+            active_file_ids = {f["id"] for f in active_files}
+
+            prefix = getattr(settings, "entry_id_prefix", "PK") or "PK"
+            active_by_entry = {}
+            for f in active_files:
+                fname = f.get("name", "")
+                for part in fname.split("_"):
+                    if part.startswith(f"{prefix}-") or part.startswith("PK-"):
+                        active_by_entry[part] = f
+                        break
+
+            from app.services.db_service import db_service
+            for p in entries:
+                matched_file = None
+                if p.drive_file_id and p.drive_file_id in active_file_ids:
+                    matched_file = next((f for f in active_files if f["id"] == p.drive_file_id), None)
+                elif p.entry_id in active_by_entry:
+                    matched_file = active_by_entry[p.entry_id]
+
+                if matched_file:
+                    target_status = "Acoustic" if p.track_status == "Acoustic" else "Uploaded"
+                    if p.drive_file_id != matched_file["id"] or p.drive_file_name != matched_file.get("name") or p.track_status != target_status:
+                        p.drive_file_id = matched_file["id"]
+                        p.drive_file_name = matched_file.get("name")
+                        p.track_status = target_status
+                        db_service.update_performance_field(p.entry_id, "drive_file_id", p.drive_file_id)
+                        db_service.update_performance_field(p.entry_id, "drive_file_name", p.drive_file_name)
+                        db_service.update_performance_field(p.entry_id, "track_status", p.track_status)
+                else:
+                    if p.track_status == "Uploaded" and p.drive_file_id and p.drive_file_id not in active_file_ids:
+                        p.drive_file_id = None
+                        p.drive_file_name = None
+                        p.track_status = "Pending"
+                        db_service.update_performance_field(p.entry_id, "drive_file_id", None)
+                        db_service.update_performance_field(p.entry_id, "drive_file_name", None)
+                        db_service.update_performance_field(p.entry_id, "track_status", "Pending")
+        except Exception as ex:
+            logger.warning("Drive track reconciliation failed: %s", ex)
+
+        return entries
 
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
@@ -176,14 +242,16 @@ class GoogleService:
                 pass
             return self._mock_data
 
-        if not force_sync:
-            try:
-                from app.services.db_service import db_service
-                cached = db_service.get_all_performances()
-                if cached:
-                    return [PerformanceEntry(**row) for row in cached]
-            except Exception as ex:
-                logger.warning("Error reading from SQLite cache: %s", ex)
+        try:
+            from app.services.db_service import db_service
+            cached = db_service.get_all_performances()
+            if cached:
+                entries = [PerformanceEntry(**row) for row in cached]
+                if self.drive:
+                    entries = self._reconcile_drive_tracks(entries, force=force_sync)
+                return entries
+        except Exception as ex:
+            logger.warning("Error reading from SQLite database: %s", ex)
 
         return self._fetch_and_cache_from_google()
 
@@ -227,6 +295,7 @@ class GoogleService:
                             return idx
                     return fallback
 
+                cols.entry_id = find_col_idx(getattr(names, "entry_id", "Entry ID"), getattr(cols, "entry_id", -1))
                 cols.performer_name = find_col_idx(names.performer_name, cols.performer_name)
                 cols.age_group = find_col_idx(names.age_group, getattr(cols, "age_group", -1))
                 cols.partner_name = find_col_idx(names.partner_name, cols.partner_name)
@@ -448,25 +517,6 @@ class GoogleService:
                 db_service.save_performances(entries)
             except Exception as ex:
                 logger.warning("Could not save performances to SQLite: %s", ex)
-
-            # Sync Food Sign-Up tab if available in spreadsheet
-            if not self.mock_mode and self.sheets:
-                try:
-                    from app.services.db_service import db_service
-                    food_res = self.sheets.spreadsheets().values().get(
-                        spreadsheetId=settings.google.sheet_id,
-                        range="'Food Sign-Up'!A1:C60"
-                    ).execute()
-                    food_rows = food_res.get("values", [])
-                    if food_rows:
-                        serving_note = None
-                        if len(food_rows) > 0 and len(food_rows[0]) > 0:
-                            top_cell = str(food_rows[0][0])
-                            if "serving portion" in top_cell.lower():
-                                serving_note = top_cell.strip()
-                        db_service.sync_food_from_sheet(food_rows, serving_portion_note=serving_note)
-                except Exception as ex:
-                    logger.warning("Could not sync Food Sign-Up sheet: %s", ex)
 
             return entries
         except Exception as e:
@@ -1136,13 +1186,13 @@ class GoogleService:
 
             # 5. Clear and write data
             data_payload = [
-                {"range": f"'{perf_tab}'!A1:P", "values": perf_rows},
+                {"range": f"'{perf_tab}'!A1:Q", "values": perf_rows},
                 {"range": f"'{food_tab}'!A1:G", "values": food_rows}
             ]
 
             # Clear older rows first to avoid trailing data
             try:
-                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{perf_tab}'!A1:P1000").execute()
+                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{perf_tab}'!A1:Q1000").execute()
                 self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{food_tab}'!A1:G1000").execute()
             except Exception:
                 pass

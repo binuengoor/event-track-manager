@@ -114,6 +114,7 @@ class GoogleConfig(BaseModel):
     drive_folders: DriveFoldersConfig = Field(default_factory=DriveFoldersConfig)
 
 class ColumnNamesConfig(BaseModel):
+    entry_id: str = "Entry ID"
     performer_name: str = "Performer Name"
     age_group: str = "Age Group"
     performance_type: str = "Performance Type"

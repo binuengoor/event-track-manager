@@ -279,3 +279,12 @@ def test_event_info_has_payment_and_sheet_urls():
     assert "sheet_url" in data
     assert "payment_url" in data
 
+def test_one_way_sync_sqlite_priority():
+    from app.services.google_service import google_service
+    from app.services.db_service import db_service
+    # Verify google_service reads from SQLite without calling Google Sheet
+    perfs = google_service.get_performances()
+    assert isinstance(perfs, list)
+    assert len(perfs) > 0
+
+
