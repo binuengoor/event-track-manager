@@ -166,11 +166,33 @@ async function loadFoodCatalog() {
   }
 }
 
+function isPlaceholderSong(title) {
+  if (!title) return true;
+  const t = title.trim().toLowerCase();
+  if (!t) return true;
+  const placeholders = [
+    'tbd', 'tba', 'to be decided', 'to be announced',
+    'test', 'testing', 'n/a', 'na', 'none', 'unknown',
+    'song title missing', 'missing', 'pending', 'null', 'untitled'
+  ];
+  if (placeholders.includes(t)) return true;
+  if (t.includes('song title missing')) return true;
+  if (t.includes('(song') && t.includes('missing)')) return true;
+  if (/^performance\s*(?:#?\d+)?$/i.test(t)) return true;
+  if (/^song\s*(?:#?\d+)?$/i.test(t)) return true;
+  return false;
+}
+
+function isSongTitleMissing(song) {
+  if (!song) return true;
+  return Boolean(song.is_song_name_missing) || isPlaceholderSong(song.song_title);
+}
+
 function renderOthersSongs(filterQuery = '') {
   const listEl = document.getElementById('others-songs-list');
   if (!listEl) return;
 
-  const validSongs = performances.filter(p => p.song_title && !p.is_song_name_missing);
+  const validSongs = performances.filter(p => p.song_title && !isSongTitleMissing(p));
   const filtered = filterQuery
     ? validSongs.filter(p =>
         p.song_title.toLowerCase().includes(filterQuery.toLowerCase()) ||
@@ -246,7 +268,14 @@ function setupEventListeners() {
   const dropZone = document.getElementById('drop-zone');
   const fileInput = document.getElementById('audio-file-input');
 
-  dropZone.addEventListener('click', () => fileInput.click());
+  dropZone.addEventListener('click', () => {
+    if (selectedEntry && isSongTitleMissing(selectedEntry)) {
+      openEditSongModal(selectedEntry);
+      showToast('Please specify your song title before uploading a track.', 'error');
+      return;
+    }
+    fileInput.click();
+  });
   dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
     dropZone.classList.add('border-orange-500', 'bg-orange-500/5');
@@ -257,16 +286,34 @@ function setupEventListeners() {
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
     dropZone.classList.remove('border-orange-500', 'bg-orange-500/5');
+    if (selectedEntry && isSongTitleMissing(selectedEntry)) {
+      openEditSongModal(selectedEntry);
+      showToast('Please specify your song title before uploading a track.', 'error');
+      return;
+    }
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       fileInput.files = e.dataTransfer.files;
       handleFileSelected(fileInput.files[0]);
     }
   });
   fileInput.addEventListener('change', () => {
+    if (selectedEntry && isSongTitleMissing(selectedEntry)) {
+      fileInput.value = '';
+      openEditSongModal(selectedEntry);
+      showToast('Please specify your song title before uploading a track.', 'error');
+      return;
+    }
     if (fileInput.files && fileInput.files[0]) {
       handleFileSelected(fileInput.files[0]);
     }
   });
+
+  const alertAddTitleBtn = document.getElementById('alert-add-title-btn');
+  if (alertAddTitleBtn) {
+    alertAddTitleBtn.addEventListener('click', () => {
+      if (selectedEntry) openEditSongModal(selectedEntry);
+    });
+  }
 
   // Form submit
   document.getElementById('intake-form').addEventListener('submit', handleFormSubmit);
@@ -334,21 +381,6 @@ function setupEventListeners() {
   }
 }
 
-function isPlaceholderSong(title) {
-  if (!title) return true;
-  const t = title.trim().toLowerCase();
-  if (!t) return true;
-  const placeholders = [
-    'tbd', 'tba', 'to be decided', 'to be announced',
-    'test', 'testing', 'n/a', 'na', 'none', 'unknown',
-    'song title missing', 'missing', 'pending', 'null'
-  ];
-  if (placeholders.includes(t)) return true;
-  if (/^performance\s+\d+$/i.test(t)) return true;
-  if (/^song\s+\d+$/i.test(t)) return true;
-  return false;
-}
-
 function findDuplicateSong(title, currentEntryId = null) {
   if (!title || isPlaceholderSong(title)) return null;
   const cleanTitle = title.trim().toLowerCase();
@@ -356,7 +388,7 @@ function findDuplicateSong(title, currentEntryId = null) {
 
   for (const p of performances) {
     if (currentEntryId && p.entry_id === currentEntryId) continue;
-    if (p.is_song_name_missing) continue;
+    if (isSongTitleMissing(p)) continue;
     const existingTitle = (p.song_title || '').trim();
     if (isPlaceholderSong(existingTitle)) continue;
 
@@ -663,7 +695,9 @@ function setupEditModalEvents() {
 
 function openEditSongModal(song) {
   document.getElementById('edit-entry-id').value = song.entry_id;
-  document.getElementById('edit-song-title').value = song.song_title || '';
+  const isPlaceholder = isPlaceholderSong(song.song_title);
+  const songTitleInput = document.getElementById('edit-song-title');
+  songTitleInput.value = isPlaceholder ? '' : (song.song_title || '');
   
   const perfTypeSelect = document.getElementById('edit-perf-type');
   perfTypeSelect.value = song.performance_type || 'Solo';
@@ -699,6 +733,12 @@ function openEditSongModal(song) {
   document.getElementById('edit-group-members-row').classList.toggle('hidden', perfTypeSelect.value !== 'Group');
 
   document.getElementById('edit-song-modal').classList.remove('hidden');
+  setTimeout(() => {
+    if (songTitleInput) {
+      songTitleInput.focus();
+      if (songTitleInput.value) songTitleInput.select();
+    }
+  }, 100);
   if (window.lucide) lucide.createIcons();
 }
 
@@ -879,7 +919,7 @@ async function handlePerformerSelected(name) {
     } else if (song.track_status === 'Acoustic') {
       statusClass = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
       statusLabel = 'Acoustic / No Track';
-    } else if (song.is_song_name_missing) {
+    } else if (isSongTitleMissing(song)) {
       statusClass = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
       statusLabel = 'Song Name Missing';
     }
@@ -892,8 +932,8 @@ async function handlePerformerSelected(name) {
       <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
         <input type="radio" name="selected_song" value="${song.entry_id}" ${isChecked ? 'checked' : ''} class="text-orange-500 focus:ring-orange-500 accent-orange-500">
         <div class="truncate">
-          <div class="font-semibold text-sm ${song.is_song_name_missing ? 'text-amber-300 italic' : 'text-white'} truncate">
-            ${escapeHtml(song.song_title || 'Untitled Song (Click Edit)')}
+          <div class="font-semibold text-sm ${isSongTitleMissing(song) ? 'text-amber-300 italic' : 'text-white'} truncate">
+            ${escapeHtml(!isSongTitleMissing(song) ? song.song_title : 'Untitled Song (Click Edit)')}
           </div>
           <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-1 flex-wrap">
             ${renderTypePill(song.performance_type)}
@@ -1126,12 +1166,10 @@ function updateSelectedSong(song) {
   const acousticBanner = document.getElementById('acoustic-notice-banner');
   const acousticToggle = document.getElementById('acoustic-toggle-container');
 
-  if (song.is_song_name_missing) {
+  if (isSongTitleMissing(song)) {
     missingAlert.classList.remove('hidden');
-    submitBtn.disabled = true;
   } else {
     missingAlert.classList.add('hidden');
-    submitBtn.disabled = false;
   }
 
   // Acoustic state rendering
@@ -1159,13 +1197,17 @@ function updateSubmitButtonText() {
 
   if (!selectedEntry) return;
 
-  if (selectedEntry.is_song_name_missing) {
-    submitBtn.disabled = true;
-    submitText.textContent = 'Add song title to upload track';
+  if (isSongTitleMissing(selectedEntry)) {
+    submitBtn.disabled = false;
+    submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition cursor-pointer';
+    submitText.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="edit-3" class="w-4 h-4"></i> Add Song Title to Upload Track</span>';
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
   submitBtn.disabled = false;
+  submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed';
+
   const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id;
 
   if (currentMethod === 'youtube') {
@@ -1173,6 +1215,7 @@ function updateSubmitButtonText() {
   } else {
     submitText.textContent = isReplacing ? 'Replace Existing Track' : 'Upload Track to Google Drive';
   }
+  if (window.lucide) lucide.createIcons();
 }
 
 let previewWavesurfer = null;
@@ -1278,7 +1321,7 @@ function updateActiveTrackBadge() {
   const badge = document.getElementById('active-track-badge');
   if (!selectedEntry) return;
 
-  if (selectedEntry.is_song_name_missing) {
+  if (isSongTitleMissing(selectedEntry)) {
     badge.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Title Missing</span>';
   } else if (selectedEntry.track_status === 'Acoustic') {
     badge.innerHTML = '<span class="text-blue-400 flex items-center gap-1"><i data-lucide="guitar" class="w-3.5 h-3.5"></i> Acoustic (No Track)</span>';
@@ -1313,8 +1356,9 @@ async function handleFormSubmit(e) {
     return;
   }
 
-  if (selectedEntry.is_song_name_missing) {
-    showError('Song title is missing. Please click Edit on the performance card to add your song title first.');
+  if (isSongTitleMissing(selectedEntry)) {
+    openEditSongModal(selectedEntry);
+    showToast('Please specify your song title before uploading a track.', 'error');
     return;
   }
 

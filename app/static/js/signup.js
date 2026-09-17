@@ -468,11 +468,13 @@ function isPlaceholderSong(title) {
   const placeholders = [
     'tbd', 'tba', 'to be decided', 'to be announced',
     'test', 'testing', 'n/a', 'na', 'none', 'unknown',
-    'song title missing', 'missing', 'pending', 'null'
+    'song title missing', 'missing', 'pending', 'null', 'untitled'
   ];
   if (placeholders.includes(t)) return true;
-  if (/^performance\s+\d+$/i.test(t)) return true;
-  if (/^song\s+\d+$/i.test(t)) return true;
+  if (t.includes('song title missing')) return true;
+  if (t.includes('(song') && t.includes('missing)')) return true;
+  if (/^performance\s*(?:#?\d+)?$/i.test(t)) return true;
+  if (/^song\s*(?:#?\d+)?$/i.test(t)) return true;
   return false;
 }
 

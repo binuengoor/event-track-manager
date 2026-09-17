@@ -288,3 +288,87 @@ def test_one_way_sync_sqlite_priority():
     assert len(perfs) > 0
 
 
+def test_is_placeholder_song_title_helper():
+    from app.services.db_service import is_placeholder_song_title
+
+    assert is_placeholder_song_title("") is True
+    assert is_placeholder_song_title(None) is True
+    assert is_placeholder_song_title("   ") is True
+    assert is_placeholder_song_title("TBD") is True
+    assert is_placeholder_song_title("tba") is True
+    assert is_placeholder_song_title("Performance #16 (Song title missing)") is True
+    assert is_placeholder_song_title("Performance (Song title missing)") is True
+    assert is_placeholder_song_title("Song title missing") is True
+    assert is_placeholder_song_title("Performance 5") is True
+    assert is_placeholder_song_title("Performance #12") is True
+    assert is_placeholder_song_title("Untitled") is True
+
+    # Valid songs
+    assert is_placeholder_song_title("Kal Ho Na Ho") is False
+    assert is_placeholder_song_title("Kunjikavil meghame") is False
+    assert is_placeholder_song_title("Teri Aankhon Ke Siva Duniya Mein") is False
+
+
+def test_upload_blocked_when_song_title_missing_or_placeholder(tmp_path, monkeypatch):
+    from app.services.db_service import db_service
+    client = TestClient(app)
+
+    import uuid
+    # 1. Register with empty song title
+    pname1 = f"No Song {uuid.uuid4().hex[:6]}"
+    signup_res = client.post("/api/signup", json={
+        "performer_name": pname1,
+        "contact_info": "555-000-1111",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "", "movie_name": ""}]
+    })
+    assert signup_res.status_code == 200
+    missing_id = signup_res.json()["entry_ids"][0]
+
+    # Verify upload is rejected
+    file_content = b"ID3" + b"\x00" * 200
+    res = client.post(
+        "/api/upload",
+        data={"entry_id": missing_id, "submission_type": "file"},
+        files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
+    )
+    assert res.status_code == 400
+    assert "Song title is missing" in res.json()["detail"]
+
+    # 2. Register with placeholder title "Performance #99 (Song title missing)"
+    pname2 = f"Placeholder {uuid.uuid4().hex[:6]}"
+    signup_res2 = client.post("/api/signup", json={
+        "performer_name": pname2,
+        "contact_info": "555-000-2222",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "Performance #99 (Song title missing)", "movie_name": ""}]
+    })
+    assert signup_res2.status_code == 200
+    ph_id = signup_res2.json()["entry_ids"][0]
+
+    res2 = client.post(
+        "/api/upload",
+        data={"entry_id": ph_id, "submission_type": "file"},
+        files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
+    )
+    assert res2.status_code == 400
+    assert "Song title is missing" in res2.json()["detail"]
+
+    # 3. Update song title with valid title
+    put_res = client.put(f"/api/signup/performance/{ph_id}", json={
+        "song_title": "Real Song Title",
+        "performance_type": "Solo"
+    })
+    assert put_res.status_code == 200
+
+    # Upload now succeeds
+    res3 = client.post(
+        "/api/upload",
+        data={"entry_id": ph_id, "submission_type": "file"},
+        files={"file": ("test_track.mp3", io.BytesIO(file_content), "audio/mpeg")}
+    )
+    assert res3.status_code == 200
+    assert res3.json()["status"] == "success"
+
+
+

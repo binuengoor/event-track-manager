@@ -6,6 +6,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
 from app.config import settings
+from app.services.db_service import is_placeholder_song_title
 
 logger = logging.getLogger("google-service")
 
@@ -372,7 +373,7 @@ class GoogleService:
                 # Song title
                 raw_song_title = get_col(cols.song_title)
                 movie_name = get_col(cols.movie_name)
-                is_missing = not bool(raw_song_title)
+                is_missing = is_placeholder_song_title(raw_song_title)
 
                 if raw_song_title:
                     song_title = raw_song_title
@@ -462,7 +463,7 @@ class GoogleService:
                     drive_file_name=drive_file_name,
                     last_updated=last_up,
                     row_index=row_index,
-                    is_song_name_missing=is_missing,
+                    is_song_name_missing=is_missing or is_placeholder_song_title(song_title),
                     extra_tags=extra_tags
                 ))
 

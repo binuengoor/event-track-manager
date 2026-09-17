@@ -150,14 +150,18 @@
         </div>
 
         <!-- Missing Song Name Alert Box -->
-        <div id="missing-song-alert" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-2.5">
+        <div id="missing-song-alert" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div class="flex items-start gap-2.5 text-amber-300 text-xs">
             <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
             <div>
               <strong class="font-bold text-amber-200 block">Song title is missing for this entry!</strong>
-              <span>Please click <strong>"Edit Details"</strong> on the song card above to add your song title.</span>
+              <span>You must specify a song title before uploading a backing track.</span>
             </div>
           </div>
+          <button type="button" id="alert-add-title-btn" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shrink-0 transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20">
+            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+            <span>Add Title Now</span>
+          </button>
         </div>
       </div>
 

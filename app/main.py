@@ -23,7 +23,7 @@ from app.config import settings, get_setting, parse_event_datetime
 from app.services.google_service import google_service, PerformanceEntry
 from app.services.audio_service import audio_service, sanitize_filename
 from app.services.downloader_client import downloader_client
-from app.services.db_service import db_service
+from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
 
 logging.basicConfig(level=logging.INFO)
@@ -698,11 +698,11 @@ async def get_performer_profile(name: str):
         {
             "entry_id": p["entry_id"],
             "performer_name": p["performer_name"],
-            "song_title": p.get("song_title") or "TBD",
+            "song_title": p.get("song_title") or "",
             "movie_name": p.get("movie_name") or "",
             "performance_type": p.get("performance_type", "Solo")
         }
-        for p in all_perfs if p["entry_id"] not in user_ids
+        for p in all_perfs if p["entry_id"] not in user_ids and not is_placeholder_song_title(p.get("song_title"))
     ]
 
     return {
@@ -1203,6 +1203,12 @@ async def upload_track(
     target_entry = next((p for p in performances if p.entry_id == entry_id), None)
     if not target_entry:
         raise HTTPException(status_code=404, detail=f"Performance entry {entry_id} not found")
+
+    if target_entry.is_song_name_missing or is_placeholder_song_title(target_entry.song_title):
+        raise HTTPException(
+            status_code=400,
+            detail="Song title is missing. Please specify your song title before uploading a backing track."
+        )
 
     safe_performer = sanitize_filename(target_entry.performer_name)
     safe_song = sanitize_filename(target_entry.song_title)

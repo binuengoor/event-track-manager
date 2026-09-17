@@ -11,6 +11,31 @@ from app.config import settings
 logger = logging.getLogger("db-service")
 
 
+def is_placeholder_song_title(title: Optional[str]) -> bool:
+    """Returns True if the song title is empty, whitespace, or a known placeholder."""
+    if not title:
+        return True
+    t = str(title).strip().lower()
+    if not t:
+        return True
+    placeholders = {
+        "tbd", "tba", "to be decided", "to be announced",
+        "test", "testing", "n/a", "na", "none", "unknown",
+        "song title missing", "missing", "pending", "null", "untitled"
+    }
+    if t in placeholders:
+        return True
+    if "song title missing" in t:
+        return True
+    if "(song" in t and "missing)" in t:
+        return True
+    if re.match(r"^performance\s*(?:#?\d+)?$", t):
+        return True
+    if re.match(r"^song\s*(?:#?\d+)?$", t):
+        return True
+    return False
+
+
 class DBService:
     def __init__(self):
         self._db_path = None
@@ -726,7 +751,7 @@ class DBService:
             seq_row = conn.execute("SELECT COALESCE(MAX(sequence_order), 0) + 1 AS next_seq FROM performances").fetchone()
             sequence_order = seq_row["next_seq"] if seq_row else 1
 
-            is_missing = 1 if not song_title or not song_title.strip() else 0
+            is_missing = 1 if is_placeholder_song_title(song_title) else 0
 
             conn.execute("""
             INSERT INTO performances (
@@ -785,7 +810,7 @@ class DBService:
 
         if "song_title" in fields:
             song_val = fields["song_title"]
-            is_missing = 1 if not song_val or not str(song_val).strip() else 0
+            is_missing = 1 if is_placeholder_song_title(song_val) else 0
             updates.append("is_song_name_missing = ?")
             params.append(is_missing)
 
@@ -937,7 +962,7 @@ class DBService:
                         getattr(p, "drive_file_name", None),
                         p.last_updated,
                         p.row_index,
-                        1 if getattr(p, "is_song_name_missing", False) else 0,
+                        1 if (getattr(p, "is_song_name_missing", False) or is_placeholder_song_title(getattr(p, "song_title", ""))) else 0,
                         json.dumps(extra_tags),
                         stage_notes,
                         age_group,
@@ -967,7 +992,7 @@ class DBService:
                 results = []
                 for r in rows:
                     item = dict(r)
-                    item["is_song_name_missing"] = bool(item["is_song_name_missing"])
+                    item["is_song_name_missing"] = bool(item["is_song_name_missing"]) or is_placeholder_song_title(item.get("song_title", ""))
                     try:
                         item["extra_tags"] = json.loads(item["extra_tags_json"]) if item["extra_tags_json"] else []
                     except Exception:
@@ -987,7 +1012,7 @@ class DBService:
                 if not row:
                     return None
                 item = dict(row)
-                item["is_song_name_missing"] = bool(item.get("is_song_name_missing", 0))
+                item["is_song_name_missing"] = bool(item.get("is_song_name_missing", 0)) or is_placeholder_song_title(item.get("song_title", ""))
                 try:
                     item["extra_tags"] = json.loads(item["extra_tags_json"]) if item.get("extra_tags_json") else []
                 except Exception:
