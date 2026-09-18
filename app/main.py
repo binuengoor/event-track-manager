@@ -358,6 +358,18 @@ async def serve_live_page():
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
+@app.get("/sw.js")
+async def serve_service_worker():
+    sw_path = os.path.join(STATIC_DIR, "sw.js")
+    if not os.path.exists(sw_path):
+        raise HTTPException(status_code=404, detail="Service worker not found")
+    with open(sw_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    response = Response(content=content, media_type="application/javascript")
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
 
 # =============================================================================
 # PUBLIC EVENT & SIGN-UP APIS
@@ -1532,6 +1544,7 @@ async def update_performance_notes(entry_id: str, payload: PerformanceNotesReque
         logger.exception("Failed to update stage notes for %s: %s", entry_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/admin/export-tracks-zip")
 @app.get("/api/export-sequenced-zip")
 @app.get("/api/export-zip")
 async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):

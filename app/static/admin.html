@@ -137,10 +137,27 @@
           <span id="sync-status-text">Connected</span>
         </div>
 
+        <!-- Connection Status Indicator (Online / Offline Mode) -->
+        <div id="network-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20" title="Internet connectivity status">
+          <span class="w-2 h-2 rounded-full bg-emerald-500" id="network-dot"></span>
+          <span id="network-status-text">Online</span>
+        </div>
+
+        <!-- IndexedDB Offline Audio Vault Status -->
+        <div id="vault-status-indicator" class="flex items-center gap-1.5 text-xs text-cyan-400 font-medium px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20" title="Audio tracks stored in browser IndexedDB for 100% offline playback">
+          <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span id="vault-status-text">Vault: 0 Tracks</span>
+        </div>
+
         <span id="stats-summary" class="text-xs text-slate-400 ml-1">Loading stage queue...</span>
       </div>
 
       <div class="flex items-center gap-2">
+        <button id="cache-all-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition active:scale-95" title="Pre-download and store all ready audio tracks into local browser IndexedDB for offline playback">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400" id="cache-all-icon"></i>
+          <span id="cache-all-text">Cache All Offline</span>
+        </button>
+
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
           <i data-lucide="archive" class="w-3.5 h-3.5"></i>
           <span>Offline ZIP</span>
@@ -226,6 +243,10 @@
           <div class="overflow-hidden flex-1">
             <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
             <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue Track" on any song to inspect & play</p>
+            <div id="cued-vault-status" class="hidden mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+              <i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i>
+              <span id="cued-vault-text">Cached locally in Vault</span>
+            </div>
             <div id="player-notes-bar" class="hidden mt-1 flex items-center gap-1.5 text-[11px] text-amber-300">
               <i data-lucide="file-text" class="w-3 h-3 text-amber-400 shrink-0"></i>
               <span id="player-notes-text" class="truncate font-medium cursor-pointer hover:underline" title="Click to edit live stage notes">No stage notes</span>

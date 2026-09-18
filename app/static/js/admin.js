@@ -2,6 +2,7 @@
 let queue = [];
 let filteredQueue = [];
 let currentCuedItem = null;
+let currentCuedObjectUrl = null;
 let wavesurfer = null;
 let isPlaying = false;
 let isMuted = false;
@@ -12,6 +13,294 @@ let autoSyncInterval = null;
 let isSequenceDirty = false;
 let lastSyncedAt = null;
 
+// =============================================================================
+// INDEXEDDB AUDIO VAULT FOR 100% OFFLINE STAGE PLAYBACK
+// =============================================================================
+const VAULT_DB_NAME = 'PaattukoottamAudioVault';
+const VAULT_STORE_NAME = 'audio_tracks';
+const VAULT_DB_VERSION = 1;
+
+let vaultDbPromise = null;
+
+function getVaultDb() {
+  if (vaultDbPromise) return vaultDbPromise;
+  vaultDbPromise = new Promise((resolve) => {
+    if (!window.indexedDB) {
+      console.warn('IndexedDB not supported in this browser.');
+      resolve(null);
+      return;
+    }
+    const req = indexedDB.open(VAULT_DB_NAME, VAULT_DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(VAULT_STORE_NAME)) {
+        db.createObjectStore(VAULT_STORE_NAME, { keyPath: 'entry_id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => {
+      console.error('IndexedDB open error:', req.error);
+      resolve(null);
+    };
+  });
+  return vaultDbPromise;
+}
+
+async function getCachedTrack(entryId) {
+  const db = await getVaultDb();
+  if (!db) return null;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readonly');
+      const store = tx.objectStore(VAULT_STORE_NAME);
+      const req = store.get(entryId);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function saveCachedTrack(entryId, blob, metadata = {}) {
+  const db = await getVaultDb();
+  if (!db) return false;
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(VAULT_STORE_NAME);
+      const record = {
+        entry_id: entryId,
+        blob: blob,
+        size_bytes: blob.size,
+        content_type: blob.type || 'audio/mpeg',
+        timestamp: Date.now(),
+        ...metadata
+      };
+      const req = store.put(record);
+      req.onsuccess = () => resolve(true);
+      req.onerror = () => resolve(false);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
+async function getVaultStats() {
+  const db = await getVaultDb();
+  if (!db) return { count: 0, totalBytes: 0 };
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readonly');
+      const store = tx.objectStore(VAULT_STORE_NAME);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        const items = req.result || [];
+        let totalBytes = 0;
+        items.forEach(it => {
+          totalBytes += (it.blob ? it.blob.size : (it.size_bytes || 0));
+        });
+        resolve({ count: items.length, totalBytes });
+      };
+      req.onerror = () => resolve({ count: 0, totalBytes: 0 });
+    } catch (e) {
+      resolve({ count: 0, totalBytes: 0 });
+    }
+  });
+}
+
+async function updateVaultStatusDisplay() {
+  const vaultText = document.getElementById('vault-status-text');
+  if (!vaultText) return;
+  const stats = await getVaultStats();
+  const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
+  const mb = (stats.totalBytes / (1024 * 1024)).toFixed(1);
+  if (readyTracks.length > 0) {
+    vaultText.textContent = `Vault: ${stats.count}/${readyTracks.length} Ready (${mb} MB)`;
+  } else {
+    vaultText.textContent = `Vault: ${stats.count} Tracks (${mb} MB)`;
+  }
+}
+
+async function cacheAllTracksOffline() {
+  const btn = document.getElementById('cache-all-btn');
+  const icon = document.getElementById('cache-all-icon');
+  const text = document.getElementById('cache-all-text');
+
+  const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
+  if (readyTracks.length === 0) {
+    showToast('No uploaded tracks to cache in stage queue.', 'info');
+    return;
+  }
+
+  if (btn) btn.disabled = true;
+  if (icon) icon.classList.add('animate-spin');
+  if (text) text.textContent = `Caching 0/${readyTracks.length}...`;
+  showToast(`Starting offline caching for ${readyTracks.length} tracks...`);
+
+  let cachedCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < readyTracks.length; i++) {
+    const item = readyTracks[i];
+    if (text) text.textContent = `Caching ${i + 1}/${readyTracks.length}...`;
+
+    try {
+      const res = await fetch(`/api/stream/${item.entry_id}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        await saveCachedTrack(item.entry_id, blob, {
+          song_title: item.song_title,
+          performer_name: item.performer_name,
+          sequence_order: item.sequence_order
+        });
+        cachedCount++;
+      } else {
+        failedCount++;
+      }
+    } catch (e) {
+      failedCount++;
+    }
+  }
+
+  await updateVaultStatusDisplay();
+  if (btn) btn.disabled = false;
+  if (icon) icon.classList.remove('animate-spin');
+  if (text) text.textContent = 'Cache All Offline';
+
+  if (failedCount === 0) {
+    showToast(`✓ All ${cachedCount} tracks stored in Vault! Ready for 100% offline playback.`);
+  } else {
+    showToast(`Cached ${cachedCount} tracks (${failedCount} failed). Check network.`, 'warning');
+  }
+
+  if (currentCuedItem) {
+    const cached = await getCachedTrack(currentCuedItem.entry_id);
+    const cuedVaultStatus = document.getElementById('cued-vault-status');
+    if (cached && cuedVaultStatus) {
+      cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
+      cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+}
+
+// =============================================================================
+// OFFLINE ACTIONS & NETWORK RECOVERY SYNC
+// =============================================================================
+const OFFLINE_QUEUE_KEY = 'paattukoottam_offline_actions';
+
+function getOfflineActions() {
+  try {
+    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveOfflineActions(actions) {
+  try {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(actions));
+  } catch (e) {}
+}
+
+function enqueueOfflineAction(type, entryId, payload = {}) {
+  const actions = getOfflineActions();
+  actions.push({
+    type,
+    entryId,
+    payload,
+    timestamp: Date.now()
+  });
+  saveOfflineActions(actions);
+  updateNetworkStatusDisplay();
+}
+
+async function syncOfflineActions() {
+  if (!navigator.onLine) return;
+  const actions = getOfflineActions();
+  if (!actions || actions.length === 0) {
+    updateNetworkStatusDisplay();
+    return;
+  }
+
+  showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
+  const remaining = [];
+
+  for (const act of actions) {
+    try {
+      let res;
+      if (act.type === 'update_status') {
+        res = await fetch(`/api/status/${act.entryId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(act.payload)
+        });
+      } else if (act.type === 'stage_notes') {
+        res = await fetch(`/api/performance-notes/${act.entryId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(act.payload)
+        });
+      } else if (act.type === 'set_active') {
+        res = await fetch(`/api/set-active/${act.entryId}`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+      } else if (act.type === 'uncue') {
+        res = await fetch('/api/clear-active', {
+          method: 'POST',
+          headers: getAuthHeaders()
+        });
+      } else if (act.type === 'reorder') {
+        res = await fetch('/api/reorder-queue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify(act.payload)
+        });
+      }
+      if (!res || !res.ok) {
+        remaining.push(act);
+      }
+    } catch (err) {
+      remaining.push(act);
+    }
+  }
+
+  saveOfflineActions(remaining);
+  updateNetworkStatusDisplay();
+
+  const syncedCount = actions.length - remaining.length;
+  if (syncedCount > 0) {
+    showToast(`✓ Successfully synced ${syncedCount} offline actions to server!`);
+    await loadQueue();
+  }
+}
+
+function updateNetworkStatusDisplay() {
+  const dot = document.getElementById('network-dot');
+  const text = document.getElementById('network-status-text');
+  const indicator = document.getElementById('network-status-indicator');
+  if (!text || !dot) return;
+
+  const isOnline = navigator.onLine;
+  const offlineCount = getOfflineActions().length;
+
+  if (isOnline) {
+    dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
+    if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20';
+    if (offlineCount > 0) {
+      text.textContent = `Online (${offlineCount} syncing...)`;
+    } else {
+      text.textContent = 'Online';
+    }
+  } else {
+    dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
+    if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-amber-400 font-medium px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20';
+    text.textContent = `Offline Mode${offlineCount > 0 ? ` (${offlineCount} pending)` : ''}`;
+  }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   setupAuth();
   initWaveSurfer();
@@ -21,16 +310,38 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupSearch();
   fetchEventInfo();
 
+  // Register Service Worker for offline app loading
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service Worker registration skipped:', err);
+    });
+  }
+
+  // Network online/offline event listeners
+  window.addEventListener('online', () => {
+    updateNetworkStatusDisplay();
+    showToast('✓ Internet restored. Connected to server.', 'success');
+    syncOfflineActions();
+  });
+  window.addEventListener('offline', () => {
+    updateNetworkStatusDisplay();
+    showToast('⚠️ Wi-Fi / Internet disconnected. Console running in offline mode.', 'warning');
+  });
+
+  updateNetworkStatusDisplay();
+  updateVaultStatusDisplay();
+
   if (userAdminPin) {
     await testAuthAndLoad();
   } else {
     showAuthModal();
   }
 
-  // Periodic background sync every 45s (only if sequence is not dirty, so operator's unsaved reorder isn't overwritten)
+  // Periodic background sync every 45s (only if online and sequence is not dirty)
   autoSyncInterval = setInterval(() => {
-    if (userAdminPin && !isSequenceDirty && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
+    if (navigator.onLine && userAdminPin && !isSequenceDirty && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
       loadQueue(true); // silent background sync
+      syncOfflineActions();
     }
   }, 45000);
 
@@ -154,7 +465,20 @@ async function testAuthAndLoad() {
     }
   } catch (e) {
     console.error('Initial load failed:', e);
-    showAuthModal();
+    const savedQueue = localStorage.getItem('paattukoottam_cached_queue');
+    if (savedQueue && userAdminPin) {
+      hideAuthModal();
+      try {
+        queue = JSON.parse(savedQueue);
+        filteredQueue = [...queue];
+        renderQueueList();
+        updateVaultStatusDisplay();
+        updateNetworkStatusDisplay();
+        showToast('⚠️ Running in Offline Mode with local cache', 'warning');
+      } catch (err) {}
+    } else {
+      showAuthModal();
+    }
   }
 }
 
@@ -174,6 +498,7 @@ async function loadQueue(silent = false) {
     const res = await fetch('/api/stage-queue', { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch stage queue');
     queue = await res.json();
+    localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
 
     const total = queue.length;
     const uploaded = queue.filter(q => q.track_status === 'Uploaded').length;
@@ -199,6 +524,7 @@ async function loadQueue(silent = false) {
 
     updateSyncStatusBadge();
     applyFilter();
+    updateVaultStatusDisplay();
 
     // Auto-restore active / cued track on load if not already cued
     if (!currentCuedItem && queue.length > 0) {
@@ -223,9 +549,18 @@ async function loadQueue(silent = false) {
       showToast(`Loaded ${total} performances from Event Database`);
     }
   } catch (err) {
-    syncText.textContent = 'Sync Error';
+    syncText.textContent = navigator.onLine ? 'Sync Error' : 'Offline';
+    const savedQueue = localStorage.getItem('paattukoottam_cached_queue');
+    if (savedQueue && (!queue || queue.length === 0)) {
+      try {
+        queue = JSON.parse(savedQueue);
+        filteredQueue = [...queue];
+        renderQueueList();
+        updateVaultStatusDisplay();
+      } catch (e) {}
+    }
     if (!silent) {
-      showToast(`Sync failed: ${err.message}`, 'error');
+      showToast(navigator.onLine ? `Sync failed: ${err.message}` : 'Running in Offline Mode using local cache', navigator.onLine ? 'error' : 'warning');
     }
   } finally {
     if (refreshIcon) refreshIcon.classList.remove('animate-spin');
@@ -735,6 +1070,14 @@ function resetPlayerBar() {
   currentCuedItem = null;
   localStorage.removeItem('paattukoottam_cued_entry_id');
 
+  if (currentCuedObjectUrl) {
+    URL.revokeObjectURL(currentCuedObjectUrl);
+    currentCuedObjectUrl = null;
+  }
+
+  const cuedVaultStatus = document.getElementById('cued-vault-status');
+  if (cuedVaultStatus) cuedVaultStatus.classList.add('hidden');
+
   const playerTitle = document.getElementById('player-title');
   const playerPerformer = document.getElementById('player-performer');
   const playBtn = document.getElementById('btn-play-pause');
@@ -785,29 +1128,36 @@ async function uncueTrack() {
   const songName = itemToUncue ? itemToUncue.song_title : 'Active Track';
 
   confirmIfPlaying(`Uncueing "${songName}"`, async () => {
+    if (itemToUncue) {
+      const target = queue.find(q => q.entry_id === itemToUncue.entry_id);
+      if (target && target.performance_status === 'On Stage') {
+        target.performance_status = 'Upcoming';
+      }
+    } else {
+      queue.forEach(q => {
+        if (q.performance_status === 'On Stage') q.performance_status = 'Upcoming';
+      });
+    }
+
+    localStorage.removeItem('paattukoottam_cued_entry_id');
+    resetPlayerBar();
+
+    if (!navigator.onLine) {
+      enqueueOfflineAction('uncue', null, {});
+      showToast(`✓ Uncued "${songName}" locally. Live Program restored.`);
+      return;
+    }
+
     try {
       const res = await fetch('/api/clear-active', {
         method: 'POST',
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to uncue track on server');
-
-      if (itemToUncue) {
-        const target = queue.find(q => q.entry_id === itemToUncue.entry_id);
-        if (target && target.performance_status === 'On Stage') {
-          target.performance_status = 'Upcoming';
-        }
-      } else {
-        queue.forEach(q => {
-          if (q.performance_status === 'On Stage') q.performance_status = 'Upcoming';
-        });
-      }
-
-      localStorage.removeItem('paattukoottam_cued_entry_id');
-      resetPlayerBar();
       showToast(`✓ Uncued "${songName}". Live Program restored to countdown.`);
     } catch (err) {
-      showToast(`Uncue failed: ${err.message}`, 'error');
+      enqueueOfflineAction('uncue', null, {});
+      showToast(`Uncued locally (network error, will sync when online)`, 'warning');
     }
   });
 }
@@ -818,7 +1168,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     return;
   }
 
-  const applyCue = () => {
+  const applyCue = async () => {
     currentCuedItem = item;
     localStorage.setItem('paattukoottam_cued_entry_id', item.entry_id);
 
@@ -830,6 +1180,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     const uncueBtn = document.getElementById('btn-uncue');
     const downloadBtn = document.getElementById('btn-download-cued');
     const playerBadge = document.getElementById('player-badge');
+    const cuedVaultStatus = document.getElementById('cued-vault-status');
 
     if (playerTitle) playerTitle.textContent = item.song_title;
     let singerText = item.performer_name;
@@ -864,6 +1215,22 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
         downloadBtn.onclick = async (e) => {
           e.preventDefault();
           if (!currentCuedItem) return;
+
+          // Check if already in local Vault
+          const cached = await getCachedTrack(currentCuedItem.entry_id);
+          if (cached && cached.blob) {
+            const url = window.URL.createObjectURL(cached.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentCuedItem.entry_id}_${currentCuedItem.performer_name}_${currentCuedItem.song_title}.mp3`.replace(/\s+/g, '_');
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            showToast('✓ Track exported from local Vault!');
+            return;
+          }
+
           downloadBtn.classList.add('opacity-50', 'pointer-events-none');
           showToast('Downloading track...');
           try {
@@ -899,6 +1266,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     const placeholder = document.getElementById('waveform-placeholder');
     if (isAcoustic) {
+      if (cuedVaultStatus) cuedVaultStatus.classList.add('hidden');
       if (placeholder) {
         placeholder.textContent = '🎸 Acoustic Act — Live Instruments / No Backing Track File Needed';
         placeholder.classList.remove('hidden');
@@ -917,9 +1285,76 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
         placeholder.classList.remove('hidden');
       }
 
-      if (wavesurfer) {
+      if (cuedVaultStatus) {
+        cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400';
+        cuedVaultStatus.innerHTML = '<span class="animate-spin text-xs">⚡</span><span>Checking Vault...</span>';
+        cuedVaultStatus.classList.remove('hidden');
+      }
+
+      let audioSourceUrl = `/api/stream/${item.entry_id}`;
+      let isVaultCached = false;
+
+      // 1. Check IndexedDB Audio Vault
+      const cached = await getCachedTrack(item.entry_id);
+      if (cached && cached.blob) {
+        isVaultCached = true;
+        if (currentCuedObjectUrl) {
+          URL.revokeObjectURL(currentCuedObjectUrl);
+        }
+        currentCuedObjectUrl = URL.createObjectURL(cached.blob);
+        audioSourceUrl = currentCuedObjectUrl;
+
+        if (cuedVaultStatus) {
+          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
+          cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+          if (window.lucide) lucide.createIcons();
+        }
+      } else if (navigator.onLine) {
+        // 2. Online & not yet cached: Fetch and store in Vault!
+        if (cuedVaultStatus) {
+          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-400 animate-pulse';
+          cuedVaultStatus.innerHTML = '<i data-lucide="hard-drive-download" class="w-3 h-3 text-cyan-400"></i><span>Caching track to Vault...</span>';
+          if (window.lucide) lucide.createIcons();
+        }
+
         try {
-          wavesurfer.load(`/api/stream/${item.entry_id}`);
+          const res = await fetch(`/api/stream/${item.entry_id}`);
+          if (res.ok) {
+            const blob = await res.blob();
+            await saveCachedTrack(item.entry_id, blob, {
+              song_title: item.song_title,
+              performer_name: item.performer_name
+            });
+            isVaultCached = true;
+            if (currentCuedObjectUrl) {
+              URL.revokeObjectURL(currentCuedObjectUrl);
+            }
+            currentCuedObjectUrl = URL.createObjectURL(blob);
+            audioSourceUrl = currentCuedObjectUrl;
+            updateVaultStatusDisplay();
+
+            if (cuedVaultStatus) {
+              cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
+              cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+              if (window.lucide) lucide.createIcons();
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('Could not cache to Vault on cue:', fetchErr);
+        }
+      } else {
+        // 3. Offline and not cached
+        if (cuedVaultStatus) {
+          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-rose-400';
+          cuedVaultStatus.innerHTML = '<i data-lucide="alert-triangle" class="w-3 h-3 text-rose-400"></i><span>⚠️ Not cached in Vault. Connect to Wi-Fi.</span>';
+          if (window.lucide) lucide.createIcons();
+        }
+        showToast('⚠️ Track was not cached locally and console is offline. Connect to Wi-Fi to load.', 'error');
+      }
+
+      if (wavesurfer && (isVaultCached || navigator.onLine)) {
+        try {
+          wavesurfer.load(audioSourceUrl);
           if (autoPlay) {
             wavesurfer.once('ready', () => {
               wavesurfer.play();
@@ -937,10 +1372,16 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     // Notify Live View of currently cued / active performer (skip during page reload restoration)
     if (!isRestoration) {
-      fetch(`/api/set-active/${item.entry_id}`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      }).catch(() => {});
+      if (navigator.onLine) {
+        fetch(`/api/set-active/${item.entry_id}`, {
+          method: 'POST',
+          headers: getAuthHeaders()
+        }).catch(() => {
+          enqueueOfflineAction('set_active', item.entry_id, {});
+        });
+      } else {
+        enqueueOfflineAction('set_active', item.entry_id, {});
+      }
     }
   };
 
@@ -1007,6 +1448,20 @@ function cueNextTrack(autoPlay = false) {
 }
 
 async function updateStatus(entryId, newStatus) {
+  const target = queue.find(q => q.entry_id === entryId);
+  if (target) {
+    target.track_status = newStatus;
+    target.performance_status = newStatus;
+  }
+  applyFilter();
+  localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+
+  if (!navigator.onLine) {
+    enqueueOfflineAction('update_status', entryId, { status: newStatus });
+    showToast(`✓ Marked ${newStatus} locally (will sync when online)`, 'info');
+    return;
+  }
+
   try {
     const res = await fetch(`/api/status/${entryId}`, {
       method: 'PATCH',
@@ -1018,18 +1473,31 @@ async function updateStatus(entryId, newStatus) {
     });
 
     if (!res.ok) throw new Error('Status update failed');
-
-    const target = queue.find(q => q.entry_id === entryId);
-    if (target) target.track_status = newStatus;
-
-    applyFilter();
     showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${newStatus}`);
   } catch (err) {
-    showToast(`Status update error: ${err.message}`, 'error');
+    enqueueOfflineAction('update_status', entryId, { status: newStatus });
+    showToast(`Saved locally (network error, will sync when online)`, 'warning');
   }
 }
 
 async function updateStageNotes(entryId, notes) {
+  const target = queue.find(q => q.entry_id === entryId);
+  if (target) target.stage_notes = notes || '';
+
+  if (currentCuedItem && currentCuedItem.entry_id === entryId) {
+    currentCuedItem.stage_notes = notes || '';
+    updatePlayerBarNotes(notes || '');
+  }
+
+  renderQueueList();
+  localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+
+  if (!navigator.onLine) {
+    enqueueOfflineAction('stage_notes', entryId, { notes: notes });
+    showToast('✓ Stage note updated locally (will sync when online)', 'info');
+    return;
+  }
+
   try {
     const res = await fetch(`/api/performance-notes/${entryId}`, {
       method: 'PATCH',
@@ -1042,19 +1510,10 @@ async function updateStageNotes(entryId, notes) {
 
     if (!res.ok) throw new Error('Failed to update stage note');
     const data = await res.json();
-
-    const target = queue.find(q => q.entry_id === entryId);
-    if (target) target.stage_notes = data.stage_notes || '';
-
-    if (currentCuedItem && currentCuedItem.entry_id === entryId) {
-      currentCuedItem.stage_notes = data.stage_notes || '';
-      updatePlayerBarNotes(data.stage_notes || '');
-    }
-
-    renderQueueList();
     showToast(data.stage_notes ? '✓ Stage note updated' : '✓ Stage note cleared');
   } catch (err) {
-    showToast(`Stage note error: ${err.message}`, 'error');
+    enqueueOfflineAction('stage_notes', entryId, { notes: notes });
+    showToast('Saved locally (network error, will sync when online)', 'warning');
   }
 }
 
@@ -1190,36 +1649,56 @@ function setupActionButtons() {
     });
   }
 
+  // Cache All Offline button
+  const cacheAllBtn = document.getElementById('cache-all-btn');
+  if (cacheAllBtn) {
+    cacheAllBtn.addEventListener('click', async () => {
+      await cacheAllTracksOffline();
+    });
+  }
+
   // Offline ZIP Download button
   const zipBtn = document.getElementById('download-zip-btn');
-  zipBtn.addEventListener('click', async () => {
-    zipBtn.classList.add('opacity-50', 'pointer-events-none');
-    const originalText = zipBtn.innerHTML;
-    zipBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Bundling...</span>`;
-    if (window.lucide) lucide.createIcons();
-
-    try {
-      const res = await fetch('/api/export-zip', { headers: getAuthHeaders() });
-      if (!res.ok) throw new Error('ZIP bundling failed');
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Paattukoottam_Stage_Tracks_${Date.now()}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      showToast('✓ Offline ZIP downloaded successfully!');
-    } catch (err) {
-      showToast(`Could not export offline tracks: ${err.message}`, 'error');
-    } finally {
-      zipBtn.innerHTML = originalText;
-      zipBtn.classList.remove('opacity-50', 'pointer-events-none');
+  if (zipBtn) {
+    zipBtn.addEventListener('click', async () => {
+      zipBtn.classList.add('opacity-50', 'pointer-events-none');
+      const originalText = zipBtn.innerHTML;
+      zipBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Bundling...</span>`;
       if (window.lucide) lucide.createIcons();
-    }
-  });
+
+      try {
+        const pin = localStorage.getItem('paattukoottam_pin') || '2026';
+        const res = await fetch(`/api/admin/export-tracks-zip?pin=${encodeURIComponent(pin)}`, {
+          headers: getAuthHeaders()
+        });
+        if (!res.ok) throw new Error('ZIP bundling failed');
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        const disp = res.headers.get('Content-Disposition');
+        let filename = `Paattukoottam_Stage_Tracks_${Date.now()}.zip`;
+        if (disp && disp.includes('filename=')) {
+          filename = disp.split('filename=')[1].replace(/["']/g, '').trim();
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        showToast('✓ Offline ZIP downloaded successfully!');
+      } catch (err) {
+        showToast(`Could not export offline tracks: ${err.message}`, 'error');
+      } finally {
+        zipBtn.innerHTML = originalText;
+        zipBtn.classList.remove('opacity-50', 'pointer-events-none');
+        if (window.lucide) lucide.createIcons();
+      }
+    });
+  }
 }
 
 async function handleSyncButtonClick() {

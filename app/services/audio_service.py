@@ -211,35 +211,60 @@ class AudioService:
         return StreamingResponse(file_iterator(), status_code=status_code, headers=headers)
 
     def export_sequenced_zip(self) -> Tuple[io.BytesIO, str]:
+        from app.services.db_service import db_service
         queue = google_service.get_stage_queue()
+        if not queue:
+            db_perfs = db_service.get_all_performances()
+            # Convert db records to objects with attribute access
+            class SimplePerf:
+                def __init__(self, d):
+                    for k, v in d.items():
+                        setattr(self, k, v)
+            queue = [SimplePerf(p) for p in sorted(db_perfs, key=lambda x: x.get("sequence_order") if x.get("sequence_order") is not None else 9999)]
+
         zip_buffer = io.BytesIO()
 
         with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-            manifest_lines = [
-                f"EMA Paattukoottam - Live Stage Sequence",
+            run_sheet_lines = [
+                "EMA Paattukoottam - Live Stage Show Run Sheet",
                 f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                "=" * 50,
-                ""
+                "=" * 70,
+                f"{'Seq':<5} | {'Performer(s)':<35} | {'Song Title':<30} | {'Type':<8} | {'Status':<10} | Stage Notes",
+                "-" * 120,
             ]
 
             for item in queue:
-                seq_num = f"{item.sequence_order:02d}" if item.sequence_order is not None else "XX"
-                singer_clean = sanitize_filename(item.performer_name)
-                song_clean = sanitize_filename(item.song_title)
+                seq_num = f"{item.sequence_order:02d}" if getattr(item, "sequence_order", None) is not None else "XX"
+                singer_clean = sanitize_filename(getattr(item, "performer_name", "") or "Performer")
+                partner_raw = getattr(item, "partner_name", "") or ""
+                partner_clean = sanitize_filename(partner_raw)
+                partner_suffix = f"_w_{partner_clean}" if partner_clean else ""
+                song_clean = sanitize_filename(getattr(item, "song_title", "") or "Track")
+                perf_type = getattr(item, "performance_type", "Solo") or "Solo"
+                track_status = getattr(item, "track_status", "Pending") or "Pending"
+                stage_notes = getattr(item, "stage_notes", "") or ""
+                performer_display = getattr(item, "performer_name", "") or ""
+                if partner_raw:
+                    performer_display = f"{performer_display} & {partner_raw}"
 
-                line = f"#{seq_num} | {item.performer_name} | {item.song_title} ({item.performance_type}) - Status: {item.track_status}"
-                manifest_lines.append(line)
+                line = f"#{seq_num:<4} | {performer_display:<35} | {(getattr(item, 'song_title', '') or '-'):<30} | {perf_type:<8} | {track_status:<10} | {stage_notes}"
+                run_sheet_lines.append(line)
 
                 # Skip if acoustic or no track
-                if item.track_status in ("Acoustic", "Pending") and not item.drive_file_id:
+                drive_id = getattr(item, "drive_file_id", None)
+                if track_status in ("Acoustic", "Pending") and not drive_id:
                     continue
 
-                cache_file = self.ensure_local_cache(item.entry_id, item.drive_file_id)
+                entry_id = getattr(item, "entry_id", "")
+                cache_file = self.ensure_local_cache(entry_id, drive_id)
                 if cache_file and os.path.isfile(cache_file):
-                    zip_entry_name = f"{seq_num}_{singer_clean}_{song_clean}.mp3"
+                    ext = os.path.splitext(cache_file)[1] or ".mp3"
+                    zip_entry_name = f"{seq_num}_{singer_clean}{partner_suffix}_{song_clean}{ext}"
                     zf.write(cache_file, arcname=zip_entry_name)
 
-            zf.writestr("00_SEQUENCE_MANIFEST.txt", "\n".join(manifest_lines))
+            manifest_content = "\n".join(run_sheet_lines)
+            zf.writestr("00_Show_Run_Sheet.txt", manifest_content)
+            zf.writestr("00_SEQUENCE_MANIFEST.txt", manifest_content)
 
         zip_buffer.seek(0)
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
