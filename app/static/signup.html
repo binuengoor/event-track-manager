@@ -110,10 +110,10 @@
             <div>
               <div class="text-sm font-bold text-white flex items-center gap-1.5">
                 <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
-                <span>Attendee (Potluck Only)</span>
+                <span>Attendee / Family (Potluck Only)</span>
               </div>
               <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-                Attending without performing on stage. Sign up to bring a dish for our community potluck.
+                Attending without performing on stage. Only one sign-up is needed per family/household to bring a dish.
               </p>
             </div>
           </label>
@@ -130,9 +130,18 @@
           <span class="text-xs text-slate-500">* Required fields</span>
         </div>
 
+        <!-- Family / Household Notice for Attendees -->
+        <div id="family-signup-note" class="hidden p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-start gap-2.5">
+          <i data-lucide="users" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
+          <div>
+            <strong class="font-bold text-emerald-300">Only one sign-up needed per family:</strong>
+            <span class="text-slate-300"> If you are coming with family, you just need this single sign-up to coordinate your potluck contribution. Individual attendees from the same family do not need separate registrations.</span>
+          </div>
+        </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div class="sm:col-span-2">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+            <label id="performer-name-label" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
               Full Name *
             </label>
             <input type="text" id="performer-name" required placeholder="e.g. Maya Suresh" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
@@ -159,14 +168,14 @@
             </div>
           </div>
 
-          <div>
+          <div id="contact-info-wrap" class="sm:col-span-1">
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
               Phone Number *
             </label>
             <input type="tel" id="contact-info" required placeholder="e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
           </div>
 
-          <div>
+          <div id="age-group-wrap" class="sm:col-span-1">
             <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
               Age Group *
             </label>

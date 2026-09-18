@@ -510,6 +510,13 @@ function setupEventListeners() {
   const submitBtnText = document.getElementById("submit-btn-text");
 
   function updateRoleUI(role) {
+    const ageGroupWrap = document.getElementById("age-group-wrap");
+    const contactInfoWrap = document.getElementById("contact-info-wrap");
+    const familyNote = document.getElementById("family-signup-note");
+    const nameLabel = document.getElementById("performer-name-label");
+    const nameInput = document.getElementById("performer-name");
+    const guardianContainer = document.getElementById("guardian-container");
+
     if (role === "food_only") {
       if (roleAttendeeCard) {
         roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 cursor-pointer transition";
@@ -518,8 +525,17 @@ function setupEventListeners() {
         rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
       }
       if (perfSection) perfSection.classList.add("hidden");
+      if (ageGroupWrap) ageGroupWrap.classList.add("hidden");
+      if (contactInfoWrap) {
+        contactInfoWrap.classList.remove("sm:col-span-1");
+        contactInfoWrap.classList.add("sm:col-span-2");
+      }
+      if (familyNote) familyNote.classList.remove("hidden");
+      if (guardianContainer) guardianContainer.classList.add("hidden");
+      if (nameLabel) nameLabel.textContent = "Contact / Family Name *";
+      if (nameInput) nameInput.placeholder = "e.g. Maya Suresh or Suresh Family";
       if (step3Num) step3Num.textContent = "2";
-      if (step1Title) step1Title.textContent = "Attendee Information";
+      if (step1Title) step1Title.textContent = "Family & Contact Information";
       if (skipFoodWrap) skipFoodWrap.classList.add("hidden");
       if (attendeeFoodNotice) attendeeFoodNotice.classList.remove("hidden");
       if (skipFoodCheckbox) skipFoodCheckbox.checked = false;
@@ -534,12 +550,23 @@ function setupEventListeners() {
         roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
       }
       if (perfSection) perfSection.classList.remove("hidden");
+      if (ageGroupWrap) ageGroupWrap.classList.remove("hidden");
+      if (contactInfoWrap) {
+        contactInfoWrap.classList.remove("sm:col-span-2");
+        contactInfoWrap.classList.add("sm:col-span-1");
+      }
+      if (familyNote) familyNote.classList.add("hidden");
+      if (nameLabel) nameLabel.textContent = "Full Name *";
+      if (nameInput) nameInput.placeholder = "e.g. Maya Suresh";
       if (step3Num) step3Num.textContent = "3";
       if (step1Title) step1Title.textContent = "Participant Information";
       if (skipFoodWrap) skipFoodWrap.classList.remove("hidden");
       if (attendeeFoodNotice) attendeeFoodNotice.classList.add("hidden");
       if (submitBtnText && (!signupConfig || signupConfig.signup_enabled !== false)) {
         submitBtnText.textContent = "Complete Registration";
+      }
+      if (selectedAgeGroup) {
+        toggleGuardianRequirement(selectedAgeGroup.requires_guardian);
       }
     }
   }
