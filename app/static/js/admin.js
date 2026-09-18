@@ -105,17 +105,33 @@ async function getVaultTrackIds() {
 }
 
 function updateRowCachePills() {
-  document.querySelectorAll('.btn-cache-single').forEach(btn => {
-    const entryId = btn.dataset.entryId;
+  document.querySelectorAll('[id^="queue-row-"]').forEach(row => {
+    const entryId = row.dataset.entryId;
+    if (!entryId) return;
     const isCached = cachedVaultEntryIds.has(entryId);
-    if (isCached) {
-      btn.className = 'btn-cache-single px-2 py-1 rounded-xl text-[11px] font-semibold border transition flex items-center gap-1 bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25';
-      btn.title = 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.';
-      btn.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i><span>Cached</span>';
-    } else {
-      btn.className = 'btn-cache-single px-2 py-1 rounded-xl text-[11px] font-semibold border transition flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border-slate-800 hover:border-cyan-500/40';
-      btn.title = 'Pre-cache this audio track into local browser Vault for offline playback';
-      btn.innerHTML = '<i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-slate-400"></i><span>Cache</span>';
+
+    // 1. Update the Cached status pill next to the track name & tags
+    const cachedTag = row.querySelector('.vault-cached-tag');
+    if (cachedTag) {
+      if (isCached) {
+        cachedTag.classList.remove('hidden');
+      } else {
+        cachedTag.classList.add('hidden');
+      }
+    }
+
+    // 2. Update the Cache / Re-cache button in the action buttons area
+    const cacheBtn = row.querySelector('.btn-cache-single');
+    if (cacheBtn) {
+      if (isCached) {
+        cacheBtn.className = 'btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border-slate-800 hover:border-emerald-500/40';
+        cacheBtn.title = 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.';
+        cacheBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400"></i><span>Re-cache</span>';
+      } else {
+        cacheBtn.className = 'btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border-slate-800 hover:border-cyan-500/40 shadow-sm';
+        cacheBtn.title = 'Pre-cache this audio track into local browser Vault without cueing';
+        cacheBtn.innerHTML = '<i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-cyan-400"></i><span>Cache</span>';
+      }
     }
   });
   if (window.lucide) lucide.createIcons();
@@ -744,17 +760,21 @@ function renderQueueList() {
       return `<span class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
     }).join(' ');
 
-    let cachePill = '';
+    const isCached = cachedVaultEntryIds.has(item.entry_id);
+    const cachedBadgeHtml = (isUploaded || item.drive_file_id)
+      ? `<span class="vault-cached-tag ${isCached ? '' : 'hidden'} inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 tracking-wide shrink-0" title="Audio cached in local Vault for offline playback"><i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>Cached</span></span>`
+      : '';
+
+    let cacheBtnHtml = '';
     if (isUploaded || item.drive_file_id) {
-      const isCached = cachedVaultEntryIds.has(item.entry_id);
-      cachePill = `
-        <button class="btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1 ${
+      cacheBtnHtml = `
+        <button class="btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 ${
           isCached
-            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
-            : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border-slate-800 hover:border-cyan-500/40'
-        }" data-entry-id="${item.entry_id}" title="${isCached ? 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.' : 'Pre-cache this audio track into local browser Vault for offline playback'}">
-          <i data-lucide="${isCached ? 'shield-check' : 'hard-drive-download'}" class="w-3.5 h-3.5 ${isCached ? 'text-emerald-400' : 'text-slate-400'}"></i>
-          <span>${isCached ? 'Cached' : 'Cache'}</span>
+            ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border-slate-800 hover:border-emerald-500/40'
+            : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border-slate-800 hover:border-cyan-500/40 shadow-sm'
+        }" data-entry-id="${item.entry_id}" title="${isCached ? 'Track already in browser Vault. Click to re-download fresh copy.' : 'Pre-cache this audio track into local browser Vault without cueing'}">
+          <i data-lucide="${isCached ? 'refresh-cw' : 'hard-drive-download'}" class="w-3.5 h-3.5 ${isCached ? 'text-slate-400' : 'text-cyan-400'}"></i>
+          <span>${isCached ? 'Re-cache' : 'Cache'}</span>
         </button>
       `;
     }
@@ -781,6 +801,7 @@ function renderQueueList() {
             </h3>
             ${renderTypePill(item.performance_type)}
             ${extraTagsPills}
+            ${cachedBadgeHtml}
           </div>
           <p class="text-xs text-orange-400 font-medium mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}">
             "${escapeHtml(item.song_title)}" ${durationInfo}
@@ -805,7 +826,7 @@ function renderQueueList() {
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap justify-end">
         ${statusPill}
-        ${cachePill}
+        ${cacheBtnHtml}
 
         <!-- Cue Track -->
         <button class="btn-cue-row px-2.5 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1 ${
