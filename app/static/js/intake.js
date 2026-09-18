@@ -4,7 +4,7 @@ let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
 let sheetUrl = 'https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit';
-let maxUploadSizeMb = 200;
+let maxUploadSizeMb = 100;
 let performerFoodSignup = null;
 let allFoodGroups = [];
 let allFoodItems = [];
@@ -1338,8 +1338,19 @@ function handleFileSelected(file) {
   const nameDisplay = document.getElementById('file-name-display');
   const sizeDisplay = document.getElementById('file-size-display');
   const label = document.getElementById('file-select-label');
+  const fileInput = document.getElementById('audio-file-input');
 
   if (file) {
+    const maxBytes = maxUploadSizeMb * 1024 * 1024;
+    if (file.size > maxBytes) {
+      if (fileInput) fileInput.value = '';
+      if (infoBar) infoBar.classList.add('hidden');
+      if (label) label.textContent = 'Tap to select or drag audio file here';
+      showError(`File size (${formatBytes(file.size)}) exceeds the maximum upload limit of ${maxUploadSizeMb}MB. Uncompressed WAV files can be very large—please convert the track to MP3 (320kbps) or M4A and try again.`);
+      return;
+    }
+
+    hideError();
     nameDisplay.textContent = file.name;
     sizeDisplay.textContent = formatBytes(file.size);
     label.textContent = 'File chosen! Tap to change';
@@ -1372,7 +1383,13 @@ async function handleFormSubmit(e) {
       showError('Please select an audio file to upload.');
       return;
     }
-    formData.append('file', fileInput.files[0]);
+    const file = fileInput.files[0];
+    const maxBytes = maxUploadSizeMb * 1024 * 1024;
+    if (file.size > maxBytes) {
+      showError(`File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of ${maxUploadSizeMb}MB. Please convert this file to MP3 (320kbps) or M4A before uploading.`);
+      return;
+    }
+    formData.append('file', file);
   } else if (currentMethod === 'youtube') {
     const ytUrl = document.getElementById('youtube-url-input').value.trim();
     if (!ytUrl) {
@@ -1406,9 +1423,32 @@ async function handleFormSubmit(e) {
     progressBar.style.width = '80%';
     progressText.textContent = 'Saving version and updating database...';
 
-    const result = await res.json();
+    let result = null;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        result = await res.json();
+      } catch (_) {
+        result = null;
+      }
+    }
+
     if (!res.ok) {
-      throw new Error(result.detail || 'Upload failed. Please try again.');
+      if (res.status === 413) {
+        throw new Error(`File is too large for upload (HTTP 413). WAV audio files can be very large—please upload an audio file under ${maxUploadSizeMb}MB or convert it to MP3 (320kbps).`);
+      }
+      if (res.status === 502 || res.status === 504) {
+        throw new Error(`Upload timed out (HTTP ${res.status}). If uploading a large WAV file, please convert it to MP3 (320kbps) and try again.`);
+      }
+      throw new Error(result?.detail || `Upload failed (HTTP ${res.status}). Please try again.`);
+    }
+
+    if (!result) {
+      try {
+        result = await res.json();
+      } catch (_) {
+        throw new Error('Upload succeeded on the server, but received an unexpected response format.');
+      }
     }
 
     progressBar.style.width = '100%';
@@ -1436,7 +1476,11 @@ async function handleFormSubmit(e) {
   } catch (err) {
     submitBtn.disabled = false;
     progressContainer.classList.add('hidden');
-    showError(err.message || 'An unexpected error occurred during submission.');
+    let msg = err?.message || 'An unexpected error occurred during submission.';
+    if (msg.includes('expected pattern') || msg.includes('SyntaxError') || msg.includes('token <')) {
+      msg = `Upload failed or was blocked by network limits (HTTP 413 / Gateway). If you are uploading a large uncompressed WAV file, please convert it to MP3 (320kbps) and try again.`;
+    }
+    showError(msg);
   }
 }
 

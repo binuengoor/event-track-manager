@@ -148,7 +148,7 @@ class ColumnsConfig(BaseModel):
 class StorageConfig(BaseModel):
     cache_dir: str = "/data/cache"
     gallery_dir: str = "/data/gallery"
-    max_upload_size_mb: int = 200
+    max_upload_size_mb: int = 100
 
 class DownloaderConfig(BaseModel):
     service_url: str = "http://downloader:8001"
