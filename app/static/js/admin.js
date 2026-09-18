@@ -86,6 +86,69 @@ async function saveCachedTrack(entryId, blob, metadata = {}) {
   });
 }
 
+let cachedVaultEntryIds = new Set();
+
+async function getVaultTrackIds() {
+  const db = await getVaultDb();
+  if (!db) return new Set();
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readonly');
+      const store = tx.objectStore(VAULT_STORE_NAME);
+      const req = store.getAllKeys();
+      req.onsuccess = () => resolve(new Set(req.result || []));
+      req.onerror = () => resolve(new Set());
+    } catch (e) {
+      resolve(new Set());
+    }
+  });
+}
+
+function updateRowCachePills() {
+  document.querySelectorAll('.btn-cache-single').forEach(btn => {
+    const entryId = btn.dataset.entryId;
+    const isCached = cachedVaultEntryIds.has(entryId);
+    if (isCached) {
+      btn.className = 'btn-cache-single px-2 py-1 rounded-xl text-[11px] font-semibold border transition flex items-center gap-1 bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25';
+      btn.title = 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.';
+      btn.innerHTML = '<i data-lucide="shield-check" class="w-3.5 h-3.5 text-emerald-400"></i><span>Cached</span>';
+    } else {
+      btn.className = 'btn-cache-single px-2 py-1 rounded-xl text-[11px] font-semibold border transition flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border-slate-800 hover:border-cyan-500/40';
+      btn.title = 'Pre-cache this audio track into local browser Vault for offline playback';
+      btn.innerHTML = '<i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-slate-400"></i><span>Cache</span>';
+    }
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+async function handleSingleTrackCache(entryId, btn) {
+  const item = queue.find(q => q.entry_id === entryId);
+  if (!item) return;
+
+  btn.classList.add('opacity-60', 'pointer-events-none');
+  btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Caching...</span>`;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const res = await fetch(`/api/stream/${entryId}`);
+    if (!res.ok) throw new Error('Download failed from server');
+    const blob = await res.blob();
+    await saveCachedTrack(entryId, blob, {
+      song_title: item.song_title,
+      performer_name: item.performer_name,
+      sequence_order: item.sequence_order
+    });
+    cachedVaultEntryIds.add(entryId);
+    await updateVaultStatusDisplay();
+    showToast(`✓ Cached "${item.song_title}" into local Vault!`);
+  } catch (err) {
+    showToast(`Could not cache track: ${err.message}`, 'error');
+  } finally {
+    btn.classList.remove('opacity-60', 'pointer-events-none');
+    updateRowCachePills();
+  }
+}
+
 async function getVaultStats() {
   const db = await getVaultDb();
   if (!db) return { count: 0, totalBytes: 0 };
@@ -110,16 +173,19 @@ async function getVaultStats() {
 }
 
 async function updateVaultStatusDisplay() {
+  cachedVaultEntryIds = await getVaultTrackIds();
   const vaultText = document.getElementById('vault-status-text');
-  if (!vaultText) return;
-  const stats = await getVaultStats();
-  const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
-  const mb = (stats.totalBytes / (1024 * 1024)).toFixed(1);
-  if (readyTracks.length > 0) {
-    vaultText.textContent = `Vault: ${stats.count}/${readyTracks.length} Ready (${mb} MB)`;
-  } else {
-    vaultText.textContent = `Vault: ${stats.count} Tracks (${mb} MB)`;
+  if (vaultText) {
+    const stats = await getVaultStats();
+    const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
+    const mb = (stats.totalBytes / (1024 * 1024)).toFixed(1);
+    if (readyTracks.length > 0) {
+      vaultText.textContent = `Vault: ${stats.count}/${readyTracks.length} Ready (${mb} MB)`;
+    } else {
+      vaultText.textContent = `Vault: ${stats.count} Tracks (${mb} MB)`;
+    }
   }
+  updateRowCachePills();
 }
 
 async function cacheAllTracksOffline() {
@@ -678,6 +744,21 @@ function renderQueueList() {
       return `<span class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
     }).join(' ');
 
+    let cachePill = '';
+    if (isUploaded || item.drive_file_id) {
+      const isCached = cachedVaultEntryIds.has(item.entry_id);
+      cachePill = `
+        <button class="btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1 ${
+          isCached
+            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25'
+            : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border-slate-800 hover:border-cyan-500/40'
+        }" data-entry-id="${item.entry_id}" title="${isCached ? 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.' : 'Pre-cache this audio track into local browser Vault for offline playback'}">
+          <i data-lucide="${isCached ? 'shield-check' : 'hard-drive-download'}" class="w-3.5 h-3.5 ${isCached ? 'text-emerald-400' : 'text-slate-400'}"></i>
+          <span>${isCached ? 'Cached' : 'Cache'}</span>
+        </button>
+      `;
+    }
+
     row.innerHTML = `
       <div class="flex items-center gap-3">
         <!-- Drag Handle (hidden during search) -->
@@ -724,6 +805,7 @@ function renderQueueList() {
       <!-- Action Buttons -->
       <div class="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap justify-end">
         ${statusPill}
+        ${cachePill}
 
         <!-- Cue Track -->
         <button class="btn-cue-row px-2.5 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1 ${
@@ -760,6 +842,14 @@ function renderQueueList() {
     `;
 
     // Row event listeners
+    const singleCacheBtn = row.querySelector('.btn-cache-single');
+    if (singleCacheBtn) {
+      singleCacheBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        await handleSingleTrackCache(item.entry_id, singleCacheBtn);
+      });
+    }
+
     const noteEditBtn = row.querySelector('.btn-edit-note');
     if (noteEditBtn) {
       noteEditBtn.addEventListener('click', (e) => {
