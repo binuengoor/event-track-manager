@@ -646,6 +646,8 @@ function setupEditModalEvents() {
     const partnerName = document.getElementById('edit-partner-name').value.trim();
     const groupMembers = document.getElementById('edit-group-members').value.trim();
     const ytUrl = document.getElementById('edit-youtube-url').value.trim();
+    const movieName = document.getElementById('edit-movie-name')?.value.trim() || '';
+    const stageNotes = document.getElementById('edit-stage-notes')?.value.trim() || '';
 
     const isAcousticChecked = document.getElementById('edit-acoustic-check')?.checked;
     const partnerPhone = document.getElementById('edit-partner-phone')?.value.trim() || '';
@@ -669,6 +671,8 @@ function setupEditModalEvents() {
           partner_name: perfType === 'Duet' ? partnerName : '',
           partner_phone: perfType === 'Duet' ? partnerPhone : '',
           group_members: perfType === 'Group' ? groupMembers : '',
+          movie_name: movieName,
+          stage_notes: stageNotes,
           youtube_url: ytUrl,
           track_status: isAcousticChecked ? 'Acoustic' : (selectedEntry && selectedEntry.track_status === 'Acoustic' ? 'Pending' : undefined)
         })
@@ -716,6 +720,16 @@ function openEditSongModal(song) {
   }
   document.getElementById('edit-group-members').value = song.group_members || '';
   document.getElementById('edit-youtube-url').value = song.youtube_url || '';
+
+  const movieNameInput = document.getElementById('edit-movie-name');
+  if (movieNameInput) {
+    movieNameInput.value = song.movie_name || '';
+  }
+
+  const stageNotesInput = document.getElementById('edit-stage-notes');
+  if (stageNotesInput) {
+    stageNotesInput.value = song.stage_notes || '';
+  }
 
   const acousticCheck = document.getElementById('edit-acoustic-check');
   if (acousticCheck) {
@@ -934,6 +948,7 @@ async function handlePerformerSelected(name) {
         <div class="truncate">
           <div class="font-semibold text-sm ${isSongTitleMissing(song) ? 'text-amber-300 italic' : 'text-white'} truncate">
             ${escapeHtml(!isSongTitleMissing(song) ? song.song_title : 'Untitled Song (Click Edit)')}
+            ${song.movie_name ? `<span class="text-xs font-normal text-slate-400 ml-1.5 font-sans">(${escapeHtml(song.movie_name)})</span>` : ''}
           </div>
           <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-1 flex-wrap">
             ${renderTypePill(song.performance_type)}
