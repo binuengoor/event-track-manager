@@ -49,6 +49,87 @@ def split_signer_names(raw: Optional[str]) -> List[str]:
     return cleaned
 
 
+def names_match(name_a: Optional[str], name_b: Optional[str]) -> bool:
+    """
+    Intelligently determines if two person/signer names refer to the same individual or family entity.
+    Handles:
+    - Exact match (case-insensitive)
+    - Single-word name vs multi-word name (e.g. 'Binu' vs 'Binu Pradeep', 'Reema' vs 'Reema Aby')
+    - Parenthetical aliases (e.g. 'Ishan (Sarina)' vs 'Ishan Ratheesh')
+    - Surnames conflict safety (prevents 'Dhyan Rakesh Madhavan' matching 'Dhyan Menon')
+    """
+    if not name_a or not name_b:
+        return False
+    
+    a = str(name_a).strip().lower()
+    b = str(name_b).strip().lower()
+    
+    if not a or not b:
+        return False
+    if a == b:
+        return True
+        
+    tokens_a = split_signer_names(a)
+    tokens_b = split_signer_names(b)
+    if len(tokens_a) > 1 or len(tokens_b) > 1:
+        for ta in tokens_a:
+            for tb in tokens_b:
+                if names_match(ta, tb):
+                    return True
+        return False
+
+    def expand_parens(s: str) -> List[str]:
+        m = re.match(r"^(.*?)\s*\((.*?)\)$", s)
+        if m:
+            p1 = m.group(1).strip()
+            p2 = m.group(2).strip()
+            res = [s]
+            if p1:
+                res.append(p1)
+            if p2:
+                res.append(p2)
+            return res
+        return [s]
+
+    sub_a = expand_parens(a)
+    sub_b = expand_parens(b)
+
+    for cand_a in sub_a:
+        for cand_b in sub_b:
+            if cand_a == cand_b:
+                return True
+            
+            words_a = [w for w in re.split(r"\s+", cand_a) if w]
+            words_b = [w for w in re.split(r"\s+", cand_b) if w]
+            if not words_a or not words_b:
+                continue
+
+            first_a = words_a[0]
+            first_b = words_b[0]
+
+            # If both have multiple words:
+            # They only match if one's word list is a contiguous sublist of the other
+            # (e.g. "Binu Pradeep" vs "Binu Pradeep K")
+            if len(words_a) > 1 and len(words_b) > 1:
+                shorter, longer = (words_a, words_b) if len(words_a) <= len(words_b) else (words_b, words_a)
+                match_seq = False
+                for i in range(len(longer) - len(shorter) + 1):
+                    if longer[i:i+len(shorter)] == shorter:
+                        match_seq = True
+                        break
+                if match_seq:
+                    return True
+                continue
+
+            # If at least one is a single word (e.g. 'Reema' and 'Reema Aby', or 'Binu' and 'Binu Pradeep')
+            # and first name is at least 3 characters
+            if (len(words_a) == 1 or len(words_b) == 1) and len(first_a) >= 3 and first_a == first_b:
+                return True
+
+    return False
+
+
+
 class DBService:
     def __init__(self):
         self._db_path = None
@@ -528,7 +609,7 @@ class DBService:
             return cursor.rowcount > 0
 
     def get_food_signup_for_signer(self, signer_name: str) -> Optional[Dict[str, Any]]:
-        clean_target = (signer_name or "").strip().lower()
+        clean_target = (signer_name or "").strip()
         if not clean_target:
             return None
         try:
@@ -549,19 +630,26 @@ class DBService:
                 JOIN food_items i ON s.item_id = i.item_id
                 JOIN food_groups g ON i.group_id = g.group_id
                 """).fetchall()
+
+                # Tier 1: Exact match
                 for r in rows:
-                    d = dict(r)
-                    raw_signer = (d.get("signer_name") or "").strip().lower()
-                    if raw_signer == clean_target:
-                        return d
-                    for name in split_signer_names(raw_signer):
-                        clean_n = name.strip().lower()
-                        if clean_n == clean_target:
-                            return d
-                        m = re.match(r"^(.*?)\s*\((.*?)\)$", clean_n)
-                        if m:
-                            if m.group(1).strip().lower() == clean_target or m.group(2).strip().lower() == clean_target:
-                                return d
+                    raw_signer = (r["signer_name"] or "").strip()
+                    if raw_signer.lower() == clean_target.lower():
+                        return dict(r)
+
+                # Tier 2: Token exact match
+                for r in rows:
+                    raw_signer = (r["signer_name"] or "").strip()
+                    for t in split_signer_names(raw_signer):
+                        if t.strip().lower() == clean_target.lower():
+                            return dict(r)
+
+                # Tier 3: Intelligent names_match
+                for r in rows:
+                    raw_signer = (r["signer_name"] or "").strip()
+                    if names_match(clean_target, raw_signer):
+                        return dict(r)
+
                 return None
         except Exception as ex:
             logger.error(f"Error fetching food signup for signer {signer_name}: {ex}")
@@ -611,6 +699,17 @@ class DBService:
                                 result[part1] = d
                             if part2 and part2 not in result:
                                 result[part2] = d
+                            p1_first = part1.split()[0]
+                            if len(p1_first) >= 3 and p1_first not in result:
+                                result[p1_first] = d
+                            p2_first = part2.split()[0]
+                            if len(p2_first) >= 3 and p2_first not in result:
+                                result[p2_first] = d
+                        else:
+                            tokens = sub_clean.split()
+                            if len(tokens) >= 1 and len(tokens[0]) >= 3:
+                                if tokens[0] not in result:
+                                    result[tokens[0]] = d
 
                 return result
         except Exception as ex:
@@ -640,8 +739,8 @@ class DBService:
             old_signup_id = None
             old_item_id = None
             for s in current_signups:
-                signers = split_signer_names(s["signer_name"])
-                if any(sn.strip().lower() == clean_name.lower() for sn in signers):
+                s_name = s["signer_name"] or ""
+                if names_match(clean_name, s_name):
                     old_signup_id = s["signup_id"]
                     old_item_id = s["item_id"]
                     break
@@ -655,7 +754,7 @@ class DBService:
                 old_row = conn.execute("SELECT * FROM food_signups WHERE signup_id = ?", (old_signup_id,)).fetchone()
                 if old_row:
                     signers = split_signer_names(old_row["signer_name"])
-                    remaining = [sn for sn in signers if sn.strip().lower() != clean_name.lower()]
+                    remaining = [sn for sn in signers if not names_match(clean_name, sn)]
                     if not remaining:
                         # Sole signer: release claim
                         conn.execute("DELETE FROM food_signups WHERE signup_id = ?", (old_signup_id,))
@@ -673,7 +772,7 @@ class DBService:
                 if target_row:
                     # Item already claimed: add this performer as a co-signer
                     existing_signers = split_signer_names(target_row["signer_name"])
-                    if not any(sn.strip().lower() == clean_name.lower() for sn in existing_signers):
+                    if not any(names_match(clean_name, sn) for sn in existing_signers):
                         combined = existing_signers + [clean_name]
                         conn.execute("""
                             UPDATE food_signups 
@@ -1092,15 +1191,38 @@ class DBService:
                 WHERE LOWER(TRIM(partner_name)) = ?
             """, (clean_new, now_iso, clean_old.lower()))
 
-            # Update food signups (both exact match and composite token match)
+            # Update food signups (both exact match and composite/parenthetical token match)
             for fs in conn.execute("SELECT signup_id, signer_name FROM food_signups").fetchall():
                 s_name = fs["signer_name"] or ""
+                if not s_name:
+                    continue
                 if clean_old.lower() == s_name.strip().lower():
                     conn.execute("UPDATE food_signups SET signer_name = ? WHERE signup_id = ?", (clean_new, fs["signup_id"]))
-                elif clean_old.lower() in s_name.lower():
+                elif names_match(clean_old, s_name):
                     tokens = split_signer_names(s_name)
-                    updated_tokens = [clean_new if t.strip().lower() == clean_old.lower() else t for t in tokens]
-                    if updated_tokens != tokens:
+                    updated_tokens = []
+                    changed = False
+                    for t in tokens:
+                        if names_match(clean_old, t):
+                            m = re.match(r"^(.*?)\s*\((.*?)\)$", t)
+                            if m:
+                                p1 = m.group(1).strip()
+                                p2 = m.group(2).strip()
+                                if names_match(clean_old, p1):
+                                    updated_tokens.append(f"{clean_new} ({p2})")
+                                    changed = True
+                                elif names_match(clean_old, p2):
+                                    updated_tokens.append(f"{p1} ({clean_new})")
+                                    changed = True
+                                else:
+                                    updated_tokens.append(clean_new)
+                                    changed = True
+                            else:
+                                updated_tokens.append(clean_new)
+                                changed = True
+                        else:
+                            updated_tokens.append(t)
+                    if changed:
                         conn.execute("UPDATE food_signups SET signer_name = ? WHERE signup_id = ?", (" & ".join(updated_tokens), fs["signup_id"]))
 
             conn.commit()

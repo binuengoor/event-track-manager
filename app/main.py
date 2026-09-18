@@ -745,6 +745,20 @@ async def get_performer_profile(name: str):
     ]
 
     food_signup = db_service.get_food_signup_for_signer(clean_name)
+    if not food_signup:
+        for p in user_perfs:
+            g_name = p.get("guardian_name")
+            if g_name:
+                food_signup = db_service.get_food_signup_for_signer(g_name)
+                if food_signup:
+                    break
+    if not food_signup:
+        for p in user_perfs:
+            p_name = p.get("partner_name")
+            if p_name:
+                food_signup = db_service.get_food_signup_for_signer(p_name)
+                if food_signup:
+                    break
     counts = db_service.count_performances_for_performer(clean_name)
     all_food_items = db_service.get_all_food_items_with_signups()
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)
@@ -1105,45 +1119,25 @@ async def trigger_immediate_backup(_authorized: bool = Depends(verify_admin_pin)
 async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin)):
     """Returns all performances/participants directly from SQLite with food signup details."""
     perfs = db_service.get_all_performances()
-    food_map = db_service.get_all_food_signups_map()
     for p in perfs:
-        name_key = (p.get("performer_name") or "").strip().lower()
-        guardian_key = (p.get("guardian_name") or "").strip().lower()
-        first_name_key = name_key.split()[0] if name_key else ""
-        
-        # Try exact performer name, exact guardian name, first name, or matching food_map keys
-        food = food_map.get(name_key)
-        if not food and guardian_key:
-            food = food_map.get(guardian_key)
-        if not food and first_name_key:
-            food = food_map.get(first_name_key)
-        if not food:
-            # Check if any food_map key contains performer name or vice versa
-            for f_key, f_val in food_map.items():
-                if len(f_key) >= 3 and (f_key in name_key or (guardian_key and f_key in guardian_key)):
-                    food = f_val
-                    break
+        name = (p.get("performer_name") or "").strip()
+        guardian = (p.get("guardian_name") or "").strip()
+        partner = (p.get("partner_name") or "").strip()
+
+        # Primary performer food lookup
+        food = db_service.get_food_signup_for_signer(name)
+        if not food and guardian:
+            food = db_service.get_food_signup_for_signer(guardian)
         p["food_signup"] = food
 
         # Also resolve food signup for duet partner
-        partner_name = (p.get("partner_name") or "").strip()
         partner_food = None
-        if partner_name:
-            partner_key = partner_name.lower()
-            partner_first_name_key = partner_key.split()[0] if partner_key else ""
-            partner_food = food_map.get(partner_key)
-            if not partner_food and partner_first_name_key:
-                partner_food = food_map.get(partner_first_name_key)
-            if not partner_food:
-                for f_key, f_val in food_map.items():
-                    if len(f_key) >= 3 and (f_key in partner_key or partner_key in f_key):
-                        partner_food = f_val
-                        break
+        if partner:
+            partner_food = db_service.get_food_signup_for_signer(partner)
             if not partner_food and food:
-                signer_lower = (food.get("signer_name") or "").lower()
                 perf_phone = (p.get("contact_info") or p.get("guardian_phone") or "").replace("-", "").strip()
                 partner_phone = (p.get("partner_phone") or "").replace("-", "").strip()
-                if partner_key in signer_lower or partner_first_name_key in signer_lower or (perf_phone and partner_phone and perf_phone == partner_phone):
+                if perf_phone and partner_phone and perf_phone == partner_phone:
                     partner_food = food
         p["partner_food_signup"] = partner_food
     return perfs

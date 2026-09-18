@@ -101,3 +101,53 @@ def test_sync_food_from_sheet(client):
     assert note == "Plan for 50 people"
 
 
+def test_smart_food_resolution_and_performer_rename(client):
+    """Verifies that smart food lookup handles partial/parenthetical names and renames cascade."""
+    # 1. Setup food groups and items
+    gid = db_service.add_food_group("Test Smart Group")
+    item1 = db_service.add_food_item("Item Binu", gid)
+    item2 = db_service.add_food_item("Item Ishan", gid)
+    item3 = db_service.add_food_item("Item Reema", gid)
+    item4 = db_service.add_food_item("Item Dhyan", gid)
+
+    # Claim them with various realistic name formats
+    client.post("/api/signup/food", json={"signer_name": "Binu", "item_id": item1, "dish_description": "Shrimp"})
+    client.post("/api/signup/food", json={"signer_name": "Ishan (Sarina)", "item_id": item2, "dish_description": "Pulav"})
+    client.post("/api/signup/food", json={"signer_name": "Reema Aby", "item_id": item3, "dish_description": "Curry"})
+    client.post("/api/signup/food", json={"signer_name": "Dhyan Menon & Greeshma", "item_id": item4, "dish_description": "Bread"})
+
+    # 2. Test get_food_signup_for_signer matching
+    # Case A: Full name "Binu Pradeep" matches signup under "Binu"
+    fs_binu = db_service.get_food_signup_for_signer("Binu Pradeep")
+    assert fs_binu is not None
+    assert fs_binu["item_id"] == item1
+
+    # Case B: Performer "Ishan Ratheesh" matches signup under "Ishan (Sarina)"
+    fs_ishan = db_service.get_food_signup_for_signer("Ishan Ratheesh")
+    assert fs_ishan is not None
+    assert fs_ishan["item_id"] == item2
+
+    # Case C: Performer "Reema" matches signup under "Reema Aby"
+    fs_reema = db_service.get_food_signup_for_signer("Reema")
+    assert fs_reema is not None
+    assert fs_reema["item_id"] == item3
+
+    # Case D: "Dhyan Menon" matches, but "Dhyan Rakesh Madhavan" does NOT match
+    fs_dhyan_menon = db_service.get_food_signup_for_signer("Dhyan Menon")
+    assert fs_dhyan_menon is not None
+    assert fs_dhyan_menon["item_id"] == item4
+
+    fs_dhyan_other = db_service.get_food_signup_for_signer("Dhyan Rakesh Madhavan")
+    assert fs_dhyan_other is None
+
+    # 3. Test rename cascade: Renaming performer "Binu" to "Binu Pradeep" updates food signup
+    p_id = db_service.create_performance("Binu", "Solo", song_title="Test Song")
+    db_service.rename_performer("Binu", "Binu Pradeep")
+    
+    # Check that food signup was renamed
+    fs_renamed = db_service.get_food_signup_for_signer("Binu Pradeep")
+    assert fs_renamed is not None
+    assert fs_renamed["signer_name"] == "Binu Pradeep"
+
+
+

@@ -1125,7 +1125,12 @@ window.openEditParticipantModal = function(entryId) {
       const isTaken = Boolean(item.is_taken);
       const signerRaw = item.signer_name || "";
       const signers = signerRaw.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
-      const isCurrentSigner = isTaken && (signers.includes(perfName) || (partnerName && signers.includes(partnerName)));
+      const isCurrentSigner = isTaken && (
+        (currentItemId && item.item_id === currentItemId) ||
+        signers.includes(perfName) || 
+        (partnerName && signers.includes(partnerName)) ||
+        signers.some(s => (s.length >= 3 && perfName.includes(s)) || (perfName.length >= 3 && s.includes(perfName)))
+      );
 
       if (isCurrentSigner && !currentItemId) {
         currentItemId = item.item_id;
@@ -1149,7 +1154,10 @@ window.openEditParticipantModal = function(entryId) {
       const isTaken = selectedOpt?.getAttribute("data-taken") === "1";
       const signer = selectedOpt?.getAttribute("data-signer") || "";
       const signers = signer.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
-      const isCurrent = signers.includes(perfName) || (partnerName && signers.includes(partnerName));
+      const isCurrent = (currentItemId && selectedOpt?.value === currentItemId) ||
+        signers.includes(perfName) || 
+        (partnerName && signers.includes(partnerName)) ||
+        signers.some(s => (s.length >= 3 && perfName.includes(s)) || (perfName.length >= 3 && s.includes(perfName)));
 
       if (isTaken && !isCurrent) {
         if (shareText) shareText.textContent = `Already claimed by ${signer}. Saving will link this food item across both family members/participants.`;
