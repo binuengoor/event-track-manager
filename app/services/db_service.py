@@ -154,10 +154,20 @@ class DBService:
                     item_id          TEXT NOT NULL UNIQUE REFERENCES food_items(item_id),
                     signer_name      TEXT NOT NULL,
                     dish_description TEXT DEFAULT '',
+                    signer_phone     TEXT DEFAULT '',
                     created_at       TEXT DEFAULT (datetime('now')),
                     updated_at       TEXT DEFAULT (datetime('now'))
                 )
                 """)
+
+                # Migrations for existing food_signups table
+                for col_name, col_def in [
+                    ("signer_phone", "TEXT DEFAULT ''"),
+                ]:
+                    try:
+                        conn.execute(f"ALTER TABLE food_signups ADD COLUMN {col_name} {col_def}")
+                    except Exception:
+                        pass
 
                 # 7. Backup log
                 conn.execute("""
@@ -313,6 +323,7 @@ class DBService:
                     s.signup_id,
                     s.signer_name,
                     s.dish_description,
+                    s.signer_phone,
                     s.updated_at AS claimed_at
                 FROM food_items i
                 JOIN food_groups g ON i.group_id = g.group_id
@@ -346,6 +357,7 @@ class DBService:
                     s.signup_id,
                     s.signer_name,
                     s.dish_description,
+                    s.signer_phone,
                     s.updated_at AS claimed_at
                 FROM food_items i
                 JOIN food_groups g ON i.group_id = g.group_id
@@ -429,9 +441,10 @@ class DBService:
     # FOOD SIGNUPS
     # =========================================================================
 
-    def claim_food_item(self, item_id: str, signer_name: str, dish_description: str = "") -> str:
+    def claim_food_item(self, item_id: str, signer_name: str, dish_description: str = "", signer_phone: str = "") -> str:
         clean_signer = signer_name.strip()
         clean_desc = dish_description.strip()
+        clean_phone = signer_phone.strip()
         signup_id = f"fs_{uuid.uuid4().hex[:8]}"
 
         with self._get_connection() as conn:
@@ -447,9 +460,9 @@ class DBService:
 
             try:
                 conn.execute("""
-                INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, created_at, updated_at)
-                VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-                """, (signup_id, item_id, clean_signer, clean_desc))
+                INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, signer_phone, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                """, (signup_id, item_id, clean_signer, clean_desc, clean_phone))
                 conn.commit()
             except sqlite3.IntegrityError:
                 raise ValueError("This food item has already been claimed by someone else.")
@@ -460,7 +473,8 @@ class DBService:
         self,
         signup_id: str,
         item_id: Optional[str] = None,
-        dish_description: Optional[str] = None
+        dish_description: Optional[str] = None,
+        signer_phone: Optional[str] = None
     ) -> bool:
         with self._get_connection() as conn:
             cur = conn.execute("SELECT * FROM food_signups WHERE signup_id = ?", (signup_id,)).fetchone()
@@ -485,6 +499,10 @@ class DBService:
                 updates.append("dish_description = ?")
                 params.append(dish_description.strip())
 
+            if signer_phone is not None:
+                updates.append("signer_phone = ?")
+                params.append(signer_phone.strip())
+
             params.append(signup_id)
             cursor = conn.execute(f"UPDATE food_signups SET {', '.join(updates)} WHERE signup_id = ?", params)
             conn.commit()
@@ -505,6 +523,7 @@ class DBService:
                     s.item_id,
                     s.signer_name,
                     s.dish_description,
+                    s.signer_phone,
                     s.created_at,
                     s.updated_at,
                     i.name AS item_name,

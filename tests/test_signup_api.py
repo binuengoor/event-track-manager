@@ -251,3 +251,92 @@ def test_signup_duet_custom_partner_phone_mandatory(client):
     p = db_service.get_performance_by_id(eid)
     assert p["partner_name"] == partner
     assert p["partner_phone"] == "(555) 321-7654"
+
+def test_signup_food_only_attendee_success(client):
+    import uuid
+    # 1. Create a food group and item for testing
+    group_id = db_service.add_food_group(f"Potluck Group {uuid.uuid4().hex[:6]}")
+    item_id = db_service.add_food_item(f"Special Dish {uuid.uuid4().hex[:6]}", group_id)
+
+    attendee_name = f"Attendee {uuid.uuid4().hex[:6]}"
+    attendee_phone = "(555) 888-7777"
+
+    payload = {
+        "registration_type": "food_only",
+        "performer_name": attendee_name,
+        "contact_info": attendee_phone,
+        "performances": [],
+        "food_signup": {
+            "item_id": item_id,
+            "dish_description": "Homemade Payasam"
+        }
+    }
+
+    res = client.post("/api/signup", json=payload)
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["registration_type"] == "food_only"
+    assert data["performer_name"] == attendee_name
+    assert data["entry_ids"] == []
+    assert data["food_signup_id"] is not None
+
+    # Verify they are NOT in performances table
+    all_perfs = db_service.get_all_performances()
+    perf_names = {p["performer_name"] for p in all_perfs}
+    assert attendee_name not in perf_names
+
+    # Verify they are NOT in registered_performers config list
+    cfg_res = client.get("/api/signup/config")
+    assert cfg_res.status_code == 200
+    reg_performers = cfg_res.json()["registered_performers"]
+    assert attendee_name not in reg_performers
+
+    # Verify they ARE in food signups
+    food_signup = db_service.get_food_signup_for_signer(attendee_name)
+    assert food_signup is not None
+    assert food_signup["item_id"] == item_id
+    assert food_signup["dish_description"] == "Homemade Payasam"
+    assert food_signup["signer_phone"] == attendee_phone
+
+    # Clean up
+    db_service.delete_food_item(item_id, force=True)
+    db_service.delete_food_group(group_id)
+
+def test_signup_food_only_attendee_requires_food_item(client):
+    import uuid
+    attendee_name = f"Attendee No Food {uuid.uuid4().hex[:6]}"
+    payload = {
+        "registration_type": "food_only",
+        "performer_name": attendee_name,
+        "contact_info": "555-444-3333",
+        "performances": [],
+        "food_signup": None
+    }
+    res = client.post("/api/signup", json=payload)
+    assert res.status_code == 400
+    assert "potluck dish" in res.json()["detail"].lower()
+
+def test_signup_food_only_attendee_requires_valid_phone(client):
+    import uuid
+    group_id = db_service.add_food_group(f"Phone Group {uuid.uuid4().hex[:6]}")
+    item_id = db_service.add_food_item(f"Phone Dish {uuid.uuid4().hex[:6]}", group_id)
+
+    attendee_name = f"Attendee Bad Phone {uuid.uuid4().hex[:6]}"
+    payload = {
+        "registration_type": "food_only",
+        "performer_name": attendee_name,
+        "contact_info": "1234",
+        "performances": [],
+        "food_signup": {
+            "item_id": item_id,
+            "dish_description": "Dish"
+        }
+    }
+    res = client.post("/api/signup", json=payload)
+    assert res.status_code == 400
+    assert "phone" in res.json()["detail"].lower()
+
+    # Clean up
+    db_service.delete_food_item(item_id, force=True)
+    db_service.delete_food_group(group_id)

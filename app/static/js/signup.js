@@ -497,6 +497,59 @@ function findDuplicateSongSignup(title) {
 }
 
 function setupEventListeners() {
+  // Registration Role (Performer vs Food-Only Attendee)
+  const roleRadios = document.querySelectorAll('input[name="registration_role"]');
+  const rolePerformerCard = document.getElementById("role-performer-card");
+  const roleAttendeeCard = document.getElementById("role-attendee-card");
+  const perfSection = document.getElementById("perf-section");
+  const step3Num = document.getElementById("step-3-num");
+  const step1Title = document.getElementById("step-1-title");
+  const skipFoodWrap = document.getElementById("skip-food-wrap");
+  const skipFoodCheckbox = document.getElementById("skip-food-checkbox");
+  const attendeeFoodNotice = document.getElementById("attendee-food-notice");
+  const submitBtnText = document.getElementById("submit-btn-text");
+
+  function updateRoleUI(role) {
+    if (role === "food_only") {
+      if (roleAttendeeCard) {
+        roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 cursor-pointer transition";
+      }
+      if (rolePerformerCard) {
+        rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
+      }
+      if (perfSection) perfSection.classList.add("hidden");
+      if (step3Num) step3Num.textContent = "2";
+      if (step1Title) step1Title.textContent = "Attendee Information";
+      if (skipFoodWrap) skipFoodWrap.classList.add("hidden");
+      if (attendeeFoodNotice) attendeeFoodNotice.classList.remove("hidden");
+      if (skipFoodCheckbox) skipFoodCheckbox.checked = false;
+      if (submitBtnText && (!signupConfig || signupConfig.signup_enabled !== false)) {
+        submitBtnText.textContent = "Complete Potluck Sign-Up";
+      }
+    } else {
+      if (rolePerformerCard) {
+        rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-orange-500 bg-orange-500/10 cursor-pointer transition";
+      }
+      if (roleAttendeeCard) {
+        roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
+      }
+      if (perfSection) perfSection.classList.remove("hidden");
+      if (step3Num) step3Num.textContent = "3";
+      if (step1Title) step1Title.textContent = "Participant Information";
+      if (skipFoodWrap) skipFoodWrap.classList.remove("hidden");
+      if (attendeeFoodNotice) attendeeFoodNotice.classList.add("hidden");
+      if (submitBtnText && (!signupConfig || signupConfig.signup_enabled !== false)) {
+        submitBtnText.textContent = "Complete Registration";
+      }
+    }
+  }
+
+  roleRadios.forEach(radio => {
+    radio.addEventListener("change", (e) => {
+      updateRoleUI(e.target.value);
+    });
+  });
+
   // Add 2nd Performance
   const addPerfBtn = document.getElementById("add-perf-btn");
   const perfCard2 = document.getElementById("perf-card-2");
@@ -654,12 +707,70 @@ async function handleSignupSubmit(e) {
     return;
   }
 
+  const role = document.querySelector('input[name="registration_role"]:checked')?.value || "performer";
   const name = document.getElementById("performer-name").value.trim();
   const contact = document.getElementById("contact-info").value.trim();
   const ageGroup = document.querySelector('input[name="age_group"]:checked')?.value || "";
 
   if (!name) {
     showError("Please enter your full name.");
+    return;
+  }
+
+  // Attendee Potluck-Only registration path
+  if (role === "food_only") {
+    if (!contact) {
+      showError("Phone number is required for registration.");
+      return;
+    }
+    if (!isValidPhone(contact)) {
+      showError("Please enter a valid 10-digit phone number.");
+      return;
+    }
+
+    const foodRadio = document.querySelector('input[name="food_item_id"]:checked');
+    if (!foodRadio) {
+      showError("Please select an available dish from the potluck menu below to complete your registration.");
+      return;
+    }
+    const dishDesc = document.getElementById("dish-description")?.value.trim() || "";
+
+    const payload = {
+      registration_type: "food_only",
+      performer_name: name,
+      contact_info: contact,
+      age_group: ageGroup,
+      performances: [],
+      food_signup: {
+        item_id: foodRadio.value,
+        dish_description: dishDesc
+      }
+    };
+
+    const submitBtn = document.getElementById("submit-btn");
+    const submitText = document.getElementById("submit-btn-text");
+    submitBtn.disabled = true;
+    submitText.textContent = "Registering...";
+
+    try {
+      const res = await fetch("/api/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.detail || "Registration failed. Please try again.");
+      }
+
+      showSuccessModal(data, payload);
+    } catch (err) {
+      showError(err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitText.textContent = "Complete Potluck Sign-Up";
+    }
     return;
   }
 
@@ -835,6 +946,42 @@ function showSuccessModal(response, request) {
   const perfLink = document.getElementById("success-performer-link");
 
   if (!modal) return;
+
+  const isFoodOnly = request.registration_type === "food_only" || response.registration_type === "food_only";
+
+  if (isFoodOnly) {
+    msgEl.textContent = `Thank you, ${response.performer_name}! Your potluck contribution has been registered.`;
+    if (perfLink) {
+      perfLink.classList.add("hidden");
+    }
+
+    const itemName = document.getElementById("selected-food-item-name")?.textContent || "Selected Dish";
+    const itemDesc = request.food_signup?.dish_description || "";
+
+    let detailsHtml = `
+      <p class="font-bold text-white border-b border-slate-800 pb-1.5 mb-2 flex items-center gap-1.5">
+        <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
+        <span>Potluck Contribution Summary</span>
+      </p>
+      <div class="space-y-1.5 text-xs">
+        <p><strong class="text-slate-400">Contributor:</strong> <span class="text-white">${escapeHtml(response.performer_name)}</span></p>
+        <p><strong class="text-slate-400">Contact Phone:</strong> <span class="text-white">${escapeHtml(request.contact_info)}</span></p>
+        <p><strong class="text-emerald-400">Dish Slot:</strong> <span class="text-white font-semibold">${escapeHtml(itemName)}</span></p>
+        ${itemDesc ? `<p><strong class="text-slate-400">Specific Dish:</strong> <span class="text-white">${escapeHtml(itemDesc)}</span></p>` : ''}
+        <p class="text-[11px] text-emerald-300/80 pt-1 border-t border-slate-800/80 mt-2">
+          Your dish is confirmed and transparently displayed on the public food board.
+        </p>
+      </div>
+    `;
+    detailsBox.innerHTML = detailsHtml;
+    modal.classList.remove("hidden");
+    if (window.lucide) lucide.createIcons();
+    return;
+  }
+
+  if (perfLink) {
+    perfLink.classList.remove("hidden");
+  }
 
   msgEl.textContent = `Thank you, ${response.performer_name}! You are registered for Paattukoottam 2026.`;
   perfLink.href = `/performer?name=${encodeURIComponent(response.performer_name)}`;

@@ -126,6 +126,7 @@ class SignupRequest(BaseModel):
     age_group: Optional[str] = ""
     guardian_name: Optional[str] = ""
     guardian_phone: Optional[str] = ""
+    registration_type: Optional[str] = "performer"
     performances: List[PerformanceSignupItem] = []
     food_signup: Optional[FoodSignupItem] = None
 
@@ -181,6 +182,7 @@ class FoodClaimRequest(BaseModel):
     item_id: str
     signer_name: str
     dish_description: Optional[str] = ""
+    signer_phone: Optional[str] = ""
 
 class FoodUpdateRequest(BaseModel):
     item_id: Optional[str] = None
@@ -467,7 +469,45 @@ async def register_participant(payload: SignupRequest):
 
     clean_name = payload.performer_name.strip()
     if not clean_name:
-        raise HTTPException(status_code=400, detail="Performer name is required.")
+        raise HTTPException(status_code=400, detail="Name is required.")
+
+    reg_type = (payload.registration_type or "performer").strip().lower()
+    is_food_only = (reg_type == "food_only") or (not payload.performances and payload.food_signup and payload.food_signup.item_id)
+
+    contact_phone = (payload.contact_info or "").strip()
+
+    # Food-only attendee registration (bypasses song/stage requirements)
+    if is_food_only:
+        food_enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
+        if not food_enabled:
+            raise HTTPException(status_code=400, detail="Potluck food sign-up is currently disabled.")
+
+        if not contact_phone or not validate_phone(contact_phone):
+            raise HTTPException(status_code=400, detail="A valid 10-digit phone number is required for registration.")
+
+        if not payload.food_signup or not payload.food_signup.item_id:
+            raise HTTPException(status_code=400, detail="Please select an available potluck dish to complete attendee registration.")
+
+        try:
+            food_signup_id = db_service.claim_food_item(
+                item_id=payload.food_signup.item_id,
+                signer_name=clean_name,
+                dish_description=payload.food_signup.dish_description or "",
+                signer_phone=contact_phone
+            )
+        except ValueError as ex:
+            raise HTTPException(status_code=409, detail=str(ex))
+
+        backup_service.trigger_backup()
+
+        return {
+            "status": "success",
+            "registration_type": "food_only",
+            "performer_name": clean_name,
+            "entry_ids": [],
+            "food_signup_id": food_signup_id,
+            "message": f"Thank you, {clean_name}! Your potluck food contribution has been registered."
+        }
 
     if not payload.performances:
         raise HTTPException(status_code=400, detail="At least one performance is required.")
@@ -487,7 +527,6 @@ async def register_participant(payload: SignupRequest):
     if selected_group_config:
         requires_guardian = bool(selected_group_config.get("requires_guardian") if isinstance(selected_group_config, dict) else selected_group_config.requires_guardian)
 
-    contact_phone = (payload.contact_info or "").strip()
     guardian_phone = (payload.guardian_phone or "").strip()
     guardian_name = (payload.guardian_name or "").strip()
 
@@ -585,7 +624,8 @@ async def register_participant(payload: SignupRequest):
             food_signup_id = db_service.claim_food_item(
                 item_id=payload.food_signup.item_id,
                 signer_name=clean_name,
-                dish_description=payload.food_signup.dish_description or ""
+                dish_description=payload.food_signup.dish_description or "",
+                signer_phone=contact_phone
             )
         except ValueError as ex:
             raise HTTPException(status_code=409, detail=str(ex))
@@ -643,7 +683,8 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
         signup_id = db_service.claim_food_item(
             item_id=payload.item_id,
             signer_name=payload.signer_name,
-            dish_description=payload.dish_description or ""
+            dish_description=payload.dish_description or "",
+            signer_phone=payload.signer_phone or ""
         )
         backup_service.trigger_backup()
         return {"status": "success", "signup_id": signup_id}
