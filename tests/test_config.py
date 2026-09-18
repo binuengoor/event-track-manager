@@ -10,7 +10,9 @@ def test_load_default_config():
     assert cfg.columns.sequence_order == 6
     assert cfg.columns.track_status == 11
     assert cfg.columns.drive_file_id == 13
-    assert cfg.storage.max_upload_size_mb == 100
+    import os
+    expected_upload_mb = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
+    assert cfg.storage.max_upload_size_mb == expected_upload_mb
 
 def test_pin_override(monkeypatch):
     monkeypatch.setenv("ADMIN_PIN", "9999")
