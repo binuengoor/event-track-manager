@@ -110,3 +110,51 @@ def test_add_performance_flow(client):
     add_3rd_res = client.post("/api/performer/performances", json=add_payload)
     assert add_3rd_res.status_code == 400
     assert "Maximum performances limit" in add_3rd_res.json()["detail"]
+
+def test_admin_participants_duet_partner_food_and_edit(client):
+    import uuid
+    primary_name = f"Ryan Test {uuid.uuid4().hex[:4]}"
+    partner_name = f"Rohan Test {uuid.uuid4().hex[:4]}"
+
+    # Signup duet
+    signup_payload = {
+        "performer_name": primary_name,
+        "contact_info": "484-340-7359",
+        "age_group": "Junior",
+        "guardian_name": "Parent Test",
+        "guardian_phone": "484-340-7359",
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner_name,
+                "partner_phone": "484-340-7359",
+                "song_title": "Dil Ke Chain",
+                "movie_name": "Aap Ki Kasam",
+                "is_acoustic": False
+            }
+        ]
+    }
+    res = client.post("/api/signup", json=signup_payload)
+    assert res.status_code == 200
+
+    # Query admin participants
+    res_parts = client.get("/api/admin/participants")
+    assert res_parts.status_code == 200
+    all_parts = res_parts.json()
+    perf = next((p for p in all_parts if p["performer_name"] == primary_name), None)
+    assert perf is not None
+    assert perf["partner_name"] == partner_name
+    assert "partner_food_signup" in perf
+
+    # Update duet partner name via admin endpoint
+    new_partner_name = f"{partner_name} Jr"
+    put_res = client.put(f"/api/admin/participants/{perf['entry_id']}", json={
+        "partner_name": new_partner_name
+    })
+    assert put_res.status_code == 200
+
+    # Verify updated
+    res_parts2 = client.get("/api/admin/participants")
+    perf2 = next(p for p in res_parts2.json() if p["entry_id"] == perf["entry_id"])
+    assert perf2["partner_name"] == new_partner_name
+

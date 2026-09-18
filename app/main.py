@@ -1112,6 +1112,28 @@ async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin))
                     food = f_val
                     break
         p["food_signup"] = food
+
+        # Also resolve food signup for duet partner
+        partner_name = (p.get("partner_name") or "").strip()
+        partner_food = None
+        if partner_name:
+            partner_key = partner_name.lower()
+            partner_first_name_key = partner_key.split()[0] if partner_key else ""
+            partner_food = food_map.get(partner_key)
+            if not partner_food and partner_first_name_key:
+                partner_food = food_map.get(partner_first_name_key)
+            if not partner_food:
+                for f_key, f_val in food_map.items():
+                    if len(f_key) >= 3 and (f_key in partner_key or partner_key in f_key):
+                        partner_food = f_val
+                        break
+            if not partner_food and food:
+                signer_lower = (food.get("signer_name") or "").lower()
+                perf_phone = (p.get("contact_info") or p.get("guardian_phone") or "").replace("-", "").strip()
+                partner_phone = (p.get("partner_phone") or "").replace("-", "").strip()
+                if partner_key in signer_lower or partner_first_name_key in signer_lower or (perf_phone and partner_phone and perf_phone == partner_phone):
+                    partner_food = food
+        p["partner_food_signup"] = partner_food
     return perfs
 
 @app.put("/api/admin/participants/{entry_id}")
@@ -1130,6 +1152,15 @@ async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdat
             db_service.rename_performer(old_performer_name, new_performer_name)
         except ValueError as ex:
             raise HTTPException(status_code=400, detail=str(ex))
+
+    # Cascade rename for partner_name if partner name changed
+    old_partner_name = (old_perf.get("partner_name") or "").strip()
+    new_partner_name = (payload.partner_name or "").strip()
+    if old_partner_name and new_partner_name and new_partner_name.lower() != old_partner_name.lower():
+        try:
+            db_service.rename_performer(old_partner_name, new_partner_name)
+        except ValueError:
+            pass
 
     # Link/unlink food item if specified
     if payload.food_item_id is not None:

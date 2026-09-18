@@ -766,37 +766,90 @@ function setCategoryFilter(filter) {
 function groupPerformancesByParticipant(performances) {
   const map = new Map();
 
-  performances.forEach(perf => {
-    const normName = (perf.performer_name || "").trim();
-    if (!normName) return;
-    const key = normName.toLowerCase();
-
+  const getOrCreate = (name, initialData) => {
+    const key = name.trim().toLowerCase();
     if (!map.has(key)) {
       map.set(key, {
-        performer_name: normName,
-        age_group: perf.age_group || "Senior",
-        guardian_name: perf.guardian_name || "",
-        guardian_phone: perf.guardian_phone || perf.phone || "",
-        contact_info: perf.contact_info || "",
-        food_signup: perf.food_signup || null,
+        performer_name: name.trim(),
+        age_group: initialData.age_group || "Senior",
+        guardian_name: initialData.guardian_name || "",
+        guardian_phone: initialData.guardian_phone || "",
+        contact_info: initialData.contact_info || "",
+        food_signup: initialData.food_signup || null,
         performances: [],
-        min_seq: (perf.sequence_order && perf.sequence_order > 0) ? perf.sequence_order : 9999,
+        min_seq: (initialData.sequence_order && initialData.sequence_order > 0) ? initialData.sequence_order : 9999,
         seq_list: []
       });
     }
+    return map.get(key);
+  };
 
-    const p = map.get(key);
-    p.performances.push(perf);
+  performances.forEach(perf => {
+    const normName = (perf.performer_name || "").trim();
+    if (!normName) return;
+
+    // 1. Primary Performer
+    const primary = getOrCreate(normName, {
+      age_group: perf.age_group,
+      guardian_name: perf.guardian_name,
+      guardian_phone: perf.guardian_phone || perf.phone,
+      contact_info: perf.contact_info,
+      food_signup: perf.food_signup,
+      sequence_order: perf.sequence_order
+    });
+
+    primary.performances.push({
+      ...perf,
+      display_partner: perf.partner_name || ""
+    });
     if (perf.sequence_order && perf.sequence_order > 0) {
-      p.seq_list.push(perf.sequence_order);
-      if (perf.sequence_order < p.min_seq) {
-        p.min_seq = perf.sequence_order;
+      primary.seq_list.push(perf.sequence_order);
+      if (perf.sequence_order < primary.min_seq) {
+        primary.min_seq = perf.sequence_order;
       }
     }
-    if (!p.guardian_name && perf.guardian_name) p.guardian_name = perf.guardian_name;
-    if (!p.guardian_phone && (perf.guardian_phone || perf.phone)) p.guardian_phone = perf.guardian_phone || perf.phone;
-    if (!p.contact_info && perf.contact_info) p.contact_info = perf.contact_info;
-    if (!p.food_signup && perf.food_signup) p.food_signup = perf.food_signup;
+    if (!primary.guardian_name && perf.guardian_name) primary.guardian_name = perf.guardian_name;
+    if (!primary.guardian_phone && (perf.guardian_phone || perf.phone)) primary.guardian_phone = perf.guardian_phone || perf.phone;
+    if (!primary.contact_info && perf.contact_info) primary.contact_info = perf.contact_info;
+    if (!primary.food_signup && perf.food_signup) primary.food_signup = perf.food_signup;
+
+    // 2. Duet / Co-performer Partner(s)
+    const rawPartner = (perf.partner_name || "").trim();
+    if (rawPartner) {
+      const partnerTokens = rawPartner.split(/[&,]|(?:\band\b)/i).map(s => s.trim()).filter(Boolean);
+      partnerTokens.forEach(pName => {
+        if (pName.toLowerCase() === normName.toLowerCase()) return;
+
+        const partner = getOrCreate(pName, {
+          age_group: perf.partner_age_group || perf.age_group || "Senior",
+          guardian_name: "",
+          guardian_phone: "",
+          contact_info: perf.partner_phone || "",
+          food_signup: perf.partner_food_signup || perf.food_signup || null,
+          sequence_order: perf.sequence_order
+        });
+
+        partner.performances.push({
+          ...perf,
+          display_partner: normName
+        });
+        if (perf.sequence_order && perf.sequence_order > 0) {
+          partner.seq_list.push(perf.sequence_order);
+          if (perf.sequence_order < partner.min_seq) {
+            partner.min_seq = perf.sequence_order;
+          }
+        }
+        if (perf.partner_age_group && (!partner.age_group || partner.age_group === "Senior")) {
+          partner.age_group = perf.partner_age_group;
+        }
+        if (perf.partner_phone && !partner.contact_info) {
+          partner.contact_info = perf.partner_phone;
+        }
+        if (!partner.food_signup && (perf.partner_food_signup || perf.food_signup)) {
+          partner.food_signup = perf.partner_food_signup || perf.food_signup;
+        }
+      });
+    }
   });
 
   return Array.from(map.values()).map(p => {
@@ -968,8 +1021,7 @@ function renderParticipantsTable() {
             <div class="flex items-center justify-between gap-1.5 p-1 rounded bg-slate-900/60 border border-slate-800/60">
               <div class="truncate max-w-[160px]">
                 <span class="font-bold text-orange-400">${escapeHtml(perf.performance_type || 'Solo')}</span>: 
-                <span class="text-slate-300 font-medium">${perf.song_title ? escapeHtml(perf.song_title) : '<span class="italic text-slate-500">No song</span>'}</span>
-                ${perf.partner_name ? `<span class="text-[9px] text-amber-300 block truncate">+ ${escapeHtml(perf.partner_name)}${perf.partner_phone ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.partner_phone)})</span>` : ''}</span>` : ''}
+                ${perf.display_partner ? `<span class="text-[9px] text-amber-300 block truncate">w/ ${escapeHtml(perf.display_partner)}${perf.partner_phone && perf.display_partner === perf.partner_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.partner_phone)})</span>` : (perf.contact_info && perf.display_partner === perf.performer_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.contact_info)})</span>` : '')}</span>` : ''}
               </div>
               <div class="flex items-center gap-0.5 shrink-0">
                 <button type="button" data-action="edit-participant" data-entry-id="${escapeHtml(perf.entry_id)}" class="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Edit ${escapeHtml(perf.entry_id)}">
@@ -1064,14 +1116,15 @@ window.openEditParticipantModal = function(entryId) {
 
   if (foodSelect) {
     const perfName = (p.performer_name || "").trim().toLowerCase();
-    let currentItemId = p.food_signup ? p.food_signup.item_id : "";
+    const partnerName = (p.partner_name || "").trim().toLowerCase();
+    let currentItemId = (p.food_signup && p.food_signup.item_id) || (p.partner_food_signup && p.partner_food_signup.item_id) || "";
 
     let optionsHtml = `<option value="">-- None / No Potluck Sign-Up --</option>`;
     foodItems.forEach(item => {
       const isTaken = Boolean(item.is_taken);
       const signerRaw = item.signer_name || "";
       const signers = signerRaw.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
-      const isCurrentSigner = isTaken && signers.includes(perfName);
+      const isCurrentSigner = isTaken && (signers.includes(perfName) || (partnerName && signers.includes(partnerName)));
 
       if (isCurrentSigner && !currentItemId) {
         currentItemId = item.item_id;
@@ -1095,7 +1148,7 @@ window.openEditParticipantModal = function(entryId) {
       const isTaken = selectedOpt?.getAttribute("data-taken") === "1";
       const signer = selectedOpt?.getAttribute("data-signer") || "";
       const signers = signer.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
-      const isCurrent = signers.includes(perfName);
+      const isCurrent = signers.includes(perfName) || (partnerName && signers.includes(partnerName));
 
       if (isTaken && !isCurrent) {
         if (shareText) shareText.textContent = `Already claimed by ${signer}. Saving will link this food item across both family members/participants.`;
