@@ -267,6 +267,45 @@ async function cacheAllTracksOffline() {
   }
 }
 
+async function clearVaultStorage() {
+  const confirmed = window.confirm('Are you sure you want to clear all locally cached audio tracks from this browser?');
+  if (!confirmed) return;
+
+  const db = await getVaultDb();
+  if (!db) {
+    showToast('Vault database not available.', 'error');
+    return;
+  }
+
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readwrite');
+      const store = tx.objectStore(VAULT_STORE_NAME);
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+
+    cachedVaultEntryIds.clear();
+    await updateVaultStatusDisplay();
+
+    // Reset cued item vault badge if one is currently cued
+    if (currentCuedItem) {
+      const cuedVaultStatus = document.getElementById('cued-vault-status');
+      if (cuedVaultStatus) {
+        cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-slate-400';
+        cuedVaultStatus.innerHTML = '<i data-lucide="info" class="w-3 h-3 text-slate-400"></i><span>Streaming from Server (Not Cached)</span>';
+        if (window.lucide) lucide.createIcons();
+      }
+    }
+
+    showToast('✓ Local Vault cache cleared successfully!');
+  } catch (err) {
+    console.error('Failed to clear vault storage:', err);
+    showToast(`Could not clear Vault cache: ${err.message}`, 'error');
+  }
+}
+
 // =============================================================================
 // OFFLINE ACTIONS & NETWORK RECOVERY SYNC
 // =============================================================================
@@ -572,7 +611,7 @@ async function loadQueue(silent = false) {
   const refreshIcon = document.getElementById('refresh-icon');
 
   if (!silent) {
-    syncText.textContent = 'Syncing...';
+    if (syncText) syncText.textContent = 'Syncing...';
     if (refreshIcon) refreshIcon.classList.add('animate-spin');
   }
 
@@ -1765,6 +1804,14 @@ function setupActionButtons() {
   if (cacheAllBtn) {
     cacheAllBtn.addEventListener('click', async () => {
       await cacheAllTracksOffline();
+    });
+  }
+
+  // Clear Local Vault Cache button
+  const clearVaultBtn = document.getElementById('clear-vault-btn');
+  if (clearVaultBtn) {
+    clearVaultBtn.addEventListener('click', async () => {
+      await clearVaultStorage();
     });
   }
 

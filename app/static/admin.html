@@ -126,17 +126,6 @@
   <div class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2.5 text-xs flex-wrap">
-        <span class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-900 border border-slate-700 text-slate-300 font-semibold" title="SQLite database is the authoritative primary source of truth for all performances and food registrations">
-          <i data-lucide="database" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Event DB: Primary Source of Truth</span>
-        </span>
-
-        <!-- Live Outbound Mirror Status Indicator -->
-        <div id="sync-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20" title="Outbound mirror to Google Sheet">
-          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-          <span id="sync-status-text">Connected</span>
-        </div>
-
         <!-- Connection Status Indicator (Online / Offline Mode) -->
         <div id="network-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20" title="Internet connectivity status">
           <span class="w-2 h-2 rounded-full bg-emerald-500" id="network-dot"></span>
@@ -156,6 +145,11 @@
         <button id="cache-all-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition active:scale-95" title="Pre-download and store all ready audio tracks into local browser IndexedDB for offline playback">
           <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400" id="cache-all-icon"></i>
           <span id="cache-all-text">Cache All Offline</span>
+        </button>
+
+        <button id="clear-vault-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition active:scale-95" title="Clear all locally cached audio tracks from this browser">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Clear Cache</span>
         </button>
 
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
