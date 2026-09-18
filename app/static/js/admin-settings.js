@@ -1021,6 +1021,7 @@ function renderParticipantsTable() {
             <div class="flex items-center justify-between gap-1.5 p-1 rounded bg-slate-900/60 border border-slate-800/60">
               <div class="truncate max-w-[160px]">
                 <span class="font-bold text-orange-400">${escapeHtml(perf.performance_type || 'Solo')}</span>: 
+                <span class="text-slate-300 font-medium">${perf.song_title ? escapeHtml(perf.song_title) : '<span class="italic text-slate-500">No song</span>'}</span>
                 ${perf.display_partner ? `<span class="text-[9px] text-amber-300 block truncate">w/ ${escapeHtml(perf.display_partner)}${perf.partner_phone && perf.display_partner === perf.partner_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.partner_phone)})</span>` : (perf.contact_info && perf.display_partner === perf.performer_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.contact_info)})</span>` : '')}</span>` : ''}
               </div>
               <div class="flex items-center gap-0.5 shrink-0">
