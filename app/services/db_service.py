@@ -36,6 +36,19 @@ def is_placeholder_song_title(title: Optional[str]) -> bool:
     return False
 
 
+def split_signer_names(raw: Optional[str]) -> List[str]:
+    """Splits composite or family signer names (e.g. 'Bijoymon & Bhavatheertha', 'Ishan, Sarina')."""
+    if not raw:
+        return []
+    parts = re.split(r'\s*(?:&|,|\band\b)\s*', str(raw), flags=re.IGNORECASE)
+    cleaned = []
+    for p in parts:
+        p = p.strip()
+        if p and p not in cleaned:
+            cleaned.append(p)
+    return cleaned
+
+
 class DBService:
     def __init__(self):
         self._db_path = None
@@ -515,9 +528,12 @@ class DBService:
             return cursor.rowcount > 0
 
     def get_food_signup_for_signer(self, signer_name: str) -> Optional[Dict[str, Any]]:
+        clean_target = (signer_name or "").strip().lower()
+        if not clean_target:
+            return None
         try:
             with self._get_connection() as conn:
-                row = conn.execute("""
+                rows = conn.execute("""
                 SELECT 
                     s.signup_id,
                     s.item_id,
@@ -532,10 +548,21 @@ class DBService:
                 FROM food_signups s
                 JOIN food_items i ON s.item_id = i.item_id
                 JOIN food_groups g ON i.group_id = g.group_id
-                WHERE LOWER(TRIM(s.signer_name)) = LOWER(TRIM(?))
-                LIMIT 1
-                """, (signer_name,)).fetchone()
-                return dict(row) if row else None
+                """).fetchall()
+                for r in rows:
+                    d = dict(r)
+                    raw_signer = (d.get("signer_name") or "").strip().lower()
+                    if raw_signer == clean_target:
+                        return d
+                    for name in split_signer_names(raw_signer):
+                        clean_n = name.strip().lower()
+                        if clean_n == clean_target:
+                            return d
+                        m = re.match(r"^(.*?)\s*\((.*?)\)$", clean_n)
+                        if m:
+                            if m.group(1).strip().lower() == clean_target or m.group(2).strip().lower() == clean_target:
+                                return d
+                return None
         except Exception as ex:
             logger.error(f"Error fetching food signup for signer {signer_name}: {ex}")
             return None
@@ -550,6 +577,7 @@ class DBService:
                     s.item_id,
                     s.signer_name,
                     s.dish_description,
+                    s.signer_phone,
                     s.created_at,
                     i.name AS item_name,
                     g.group_id,
@@ -559,26 +587,198 @@ class DBService:
                 LEFT JOIN food_groups g ON i.group_id = g.group_id
                 """).fetchall()
                 result = {}
-                import re
                 for r in rows:
                     d = dict(r)
-                    raw_signer = (d.get("signer_name") or "").strip().lower()
+                    raw_signer = (d.get("signer_name") or "").strip()
                     if not raw_signer:
                         continue
-                    result[raw_signer] = d
-                    # If format is "Performer (Guardian)" or "Name (Parent)"
-                    m = re.match(r"^(.*?)\s*\((.*?)\)$", raw_signer)
-                    if m:
-                        part1 = m.group(1).strip().lower()
-                        part2 = m.group(2).strip().lower()
-                        if part1 and part1 not in result:
-                            result[part1] = d
-                        if part2 and part2 not in result:
-                            result[part2] = d
+                    # 1. Full raw name key
+                    result[raw_signer.lower()] = d
+
+                    # 2. Split composite signers (e.g. "Bijoymon & Bhavatheertha" -> "Bijoymon", "Bhavatheertha")
+                    sub_signers = split_signer_names(raw_signer)
+                    for sub in sub_signers:
+                        sub_clean = sub.strip().lower()
+                        if sub_clean and sub_clean not in result:
+                            result[sub_clean] = d
+
+                        # If format is "Performer (Guardian)" or "Name (Parent)"
+                        m = re.match(r"^(.*?)\s*\((.*?)\)$", sub_clean)
+                        if m:
+                            part1 = m.group(1).strip().lower()
+                            part2 = m.group(2).strip().lower()
+                            if part1 and part1 not in result:
+                                result[part1] = d
+                            if part2 and part2 not in result:
+                                result[part2] = d
+
                 return result
         except Exception as ex:
             logger.error(f"Error fetching all food signups map: {ex}")
             return {}
+
+    def link_participant_to_food_item(
+        self,
+        performer_name: str,
+        new_item_id: Optional[str],
+        phone: Optional[str] = None
+    ) -> bool:
+        """Links a participant to a food item (sharing with family if already claimed, or releasing if cleared)."""
+        clean_name = performer_name.strip()
+        if not clean_name:
+            return False
+
+        clean_new_item = new_item_id.strip() if new_item_id and new_item_id.strip().lower() not in ("none", "") else None
+
+        with self._get_connection() as conn:
+            # 1. Find any existing food signup this performer is currently associated with
+            current_signups = conn.execute("""
+                SELECT signup_id, item_id, signer_name, signer_phone, dish_description
+                FROM food_signups
+            """).fetchall()
+
+            old_signup_id = None
+            old_item_id = None
+            for s in current_signups:
+                signers = split_signer_names(s["signer_name"])
+                if any(sn.strip().lower() == clean_name.lower() for sn in signers):
+                    old_signup_id = s["signup_id"]
+                    old_item_id = s["item_id"]
+                    break
+
+            # If already linked to the target item, nothing to change
+            if clean_new_item and old_item_id == clean_new_item:
+                return True
+
+            # 2. If currently linked to another food item, unlink them
+            if old_signup_id and old_item_id != clean_new_item:
+                old_row = conn.execute("SELECT * FROM food_signups WHERE signup_id = ?", (old_signup_id,)).fetchone()
+                if old_row:
+                    signers = split_signer_names(old_row["signer_name"])
+                    remaining = [sn for sn in signers if sn.strip().lower() != clean_name.lower()]
+                    if not remaining:
+                        # Sole signer: release claim
+                        conn.execute("DELETE FROM food_signups WHERE signup_id = ?", (old_signup_id,))
+                    else:
+                        # Multi-signer: keep remaining signers
+                        conn.execute("""
+                            UPDATE food_signups 
+                            SET signer_name = ?, updated_at = datetime('now')
+                            WHERE signup_id = ?
+                        """, (" & ".join(remaining), old_signup_id))
+
+            # 3. If new_item_id is specified, link to the new item
+            if clean_new_item:
+                target_row = conn.execute("SELECT * FROM food_signups WHERE item_id = ?", (clean_new_item,)).fetchone()
+                if target_row:
+                    # Item already claimed: add this performer as a co-signer
+                    existing_signers = split_signer_names(target_row["signer_name"])
+                    if not any(sn.strip().lower() == clean_name.lower() for sn in existing_signers):
+                        combined = existing_signers + [clean_name]
+                        conn.execute("""
+                            UPDATE food_signups 
+                            SET signer_name = ?, updated_at = datetime('now')
+                            WHERE item_id = ?
+                        """, (" & ".join(combined), clean_new_item))
+                else:
+                    # Item is unclaimed: create a new claim
+                    signup_id = f"fs_{uuid.uuid4().hex[:8]}"
+                    conn.execute("""
+                        INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, signer_phone, created_at, updated_at)
+                        VALUES (?, ?, ?, '', ?, datetime('now'), datetime('now'))
+                    """, (signup_id, clean_new_item, clean_name, (phone or "").strip()))
+
+            conn.commit()
+            return True
+
+    def update_food_signup_admin(
+        self,
+        item_id: str,
+        name: Optional[str] = None,
+        group_id: Optional[str] = None,
+        signer_name: Optional[str] = None,
+        signer_phone: Optional[str] = None,
+        dish_description: Optional[str] = None,
+        release_claim: bool = False
+    ) -> bool:
+        """Admin update of food item details, claims, and cascades performer renames if applicable."""
+        with self._get_connection() as conn:
+            # 1. Update food_items if name or group_id provided
+            if name or group_id:
+                updates = []
+                params = []
+                if name:
+                    updates.append("name = ?")
+                    params.append(name.strip())
+                if group_id:
+                    updates.append("group_id = ?")
+                    params.append(group_id.strip())
+                params.append(item_id)
+                conn.execute(f"UPDATE food_items SET {', '.join(updates)} WHERE item_id = ?", params)
+
+            # 2. Release claim if requested
+            if release_claim:
+                conn.execute("DELETE FROM food_signups WHERE item_id = ?", (item_id,))
+                conn.commit()
+                return True
+
+            # 3. Update or create food signup
+            cur_signup = conn.execute("SELECT * FROM food_signups WHERE item_id = ?", (item_id,)).fetchone()
+            if cur_signup:
+                old_signer = cur_signup["signer_name"]
+                new_signer = signer_name.strip() if signer_name is not None else None
+
+                # Check if renaming an existing performer or reassigning
+                if new_signer and new_signer.lower() != old_signer.lower():
+                    new_perf_match = conn.execute(
+                        "SELECT 1 FROM performances WHERE LOWER(TRIM(performer_name)) = ? LIMIT 1",
+                        (new_signer.lower(),)
+                    ).fetchone()
+                    if not new_perf_match:
+                        # Only cascade rename if old_signer was a performer and new_signer is a name edit
+                        old_perf_match = conn.execute(
+                            "SELECT 1 FROM performances WHERE LOWER(TRIM(performer_name)) = ? LIMIT 1",
+                            (old_signer.strip().lower(),)
+                        ).fetchone()
+                        if old_perf_match:
+                            conn.commit()
+                            self.rename_performer(old_signer, new_signer)
+                        else:
+                            conn.execute("""
+                                UPDATE food_signups 
+                                SET signer_name = ?, updated_at = datetime('now')
+                                WHERE item_id = ?
+                            """, (new_signer, item_id))
+                    else:
+                        # Reassigning to an existing performer
+                        conn.execute("""
+                            UPDATE food_signups 
+                            SET signer_name = ?, updated_at = datetime('now')
+                            WHERE item_id = ?
+                        """, (new_signer, item_id))
+
+                updates = ["updated_at = datetime('now')"]
+                params = []
+                if dish_description is not None:
+                    updates.append("dish_description = ?")
+                    params.append(dish_description.strip())
+                if signer_phone is not None:
+                    updates.append("signer_phone = ?")
+                    params.append(signer_phone.strip())
+
+                if len(updates) > 1:
+                    params.append(item_id)
+                    conn.execute(f"UPDATE food_signups SET {', '.join(updates)} WHERE item_id = ?", params)
+            elif signer_name and signer_name.strip():
+                # Unclaimed item being claimed directly by admin
+                signup_id = f"fs_{uuid.uuid4().hex[:8]}"
+                conn.execute("""
+                    INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, signer_phone, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                """, (signup_id, item_id, signer_name.strip(), (dish_description or "").strip(), (signer_phone or "").strip()))
+
+            conn.commit()
+            return True
 
     def seed_food_catalog(self, seed_items: List[Any]):
         """Seeds food groups and items from configuration if tables are empty."""
@@ -892,11 +1092,16 @@ class DBService:
                 WHERE LOWER(TRIM(partner_name)) = ?
             """, (clean_new, now_iso, clean_old.lower()))
 
-            conn.execute("""
-                UPDATE food_signups 
-                SET signer_name = ?
-                WHERE LOWER(TRIM(signer_name)) = ?
-            """, (clean_new, clean_old.lower()))
+            # Update food signups (both exact match and composite token match)
+            for fs in conn.execute("SELECT signup_id, signer_name FROM food_signups").fetchall():
+                s_name = fs["signer_name"] or ""
+                if clean_old.lower() == s_name.strip().lower():
+                    conn.execute("UPDATE food_signups SET signer_name = ? WHERE signup_id = ?", (clean_new, fs["signup_id"]))
+                elif clean_old.lower() in s_name.lower():
+                    tokens = split_signer_names(s_name)
+                    updated_tokens = [clean_new if t.strip().lower() == clean_old.lower() else t for t in tokens]
+                    if updated_tokens != tokens:
+                        conn.execute("UPDATE food_signups SET signer_name = ? WHERE signup_id = ?", (" & ".join(updated_tokens), fs["signup_id"]))
 
             conn.commit()
         return True

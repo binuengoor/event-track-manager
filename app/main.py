@@ -162,6 +162,7 @@ class AdminParticipantUpdateRequest(BaseModel):
     track_status: Optional[str] = None
     performance_status: Optional[str] = None
     stage_notes: Optional[str] = None
+    food_item_id: Optional[str] = None
 
 class AddPerformanceRequest(BaseModel):
     performer_name: str
@@ -171,8 +172,8 @@ class AddPerformanceRequest(BaseModel):
     partner_name: Optional[str] = ""
     partner_age_group: Optional[str] = None
     partner_phone: Optional[str] = ""
-    is_acoustic: Optional[bool] = False
     stage_notes: Optional[str] = ""
+    is_acoustic: bool = False
 
 class PerformerRenameRequest(BaseModel):
     old_name: str
@@ -206,6 +207,10 @@ class FoodItemUpdateRequest(BaseModel):
     name: Optional[str] = None
     group_id: Optional[str] = None
     display_order: Optional[int] = None
+    signer_name: Optional[str] = None
+    signer_phone: Optional[str] = None
+    dish_description: Optional[str] = None
+    release_claim: bool = False
 
 class FoodServingNoteRequest(BaseModel):
     text: str
@@ -1005,7 +1010,18 @@ async def create_admin_food_item(payload: FoodItemCreateRequest, _authorized: bo
 
 @app.put("/api/admin/food-items/{item_id}")
 async def update_admin_food_item(item_id: str, payload: FoodItemUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
-    success = db_service.update_food_item(item_id, name=payload.name, group_id=payload.group_id, display_order=payload.display_order)
+    if payload.display_order is not None and payload.signer_name is None and not payload.release_claim:
+        success = db_service.update_food_item(item_id, name=payload.name, group_id=payload.group_id, display_order=payload.display_order)
+    else:
+        success = db_service.update_food_signup_admin(
+            item_id=item_id,
+            name=payload.name,
+            group_id=payload.group_id,
+            signer_name=payload.signer_name,
+            signer_phone=payload.signer_phone,
+            dish_description=payload.dish_description,
+            release_claim=payload.release_claim
+        )
     if not success:
         raise HTTPException(status_code=404, detail="Food item not found.")
     backup_service.trigger_backup()
@@ -1101,16 +1117,40 @@ async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin))
 @app.put("/api/admin/participants/{entry_id}")
 async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
     """Updates participant details directly in SQLite and triggers debounced backup."""
-    update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}
+    old_perf = db_service.get_performance(entry_id)
+    if not old_perf:
+        raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
+
+    old_performer_name = (old_perf.get("performer_name") or "").strip()
+    new_performer_name = (payload.performer_name or "").strip()
+
+    # Cascade rename across performances and food signups if performer name changed
+    if new_performer_name and new_performer_name.lower() != old_performer_name.lower():
+        try:
+            db_service.rename_performer(old_performer_name, new_performer_name)
+        except ValueError as ex:
+            raise HTTPException(status_code=400, detail=str(ex))
+
+    # Link/unlink food item if specified
+    if payload.food_item_id is not None:
+        effective_name = new_performer_name or old_performer_name
+        phone = payload.contact_info or payload.guardian_phone or old_perf.get("contact_info") or old_perf.get("guardian_phone")
+        db_service.link_participant_to_food_item(effective_name, payload.food_item_id, phone)
+
+    update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None and k != "food_item_id"}
     if "phone" in update_data:
         legacy_phone = update_data.pop("phone")
         if "guardian_phone" not in update_data and legacy_phone:
             update_data["guardian_phone"] = legacy_phone
         if "contact_info" not in update_data and legacy_phone:
             update_data["contact_info"] = legacy_phone
-    success = db_service.update_performance_details(entry_id, **update_data)
-    if not success:
-        raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
+    if update_data:
+        success = db_service.update_performance_details(entry_id, **update_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
+    else:
+        now_iso = datetime.now(timezone.utc).isoformat()
+        db_service.update_performance_field(entry_id, "last_updated", now_iso)
     backup_service.trigger_backup()
     return {"status": "success", "entry_id": entry_id, "message": "Participant updated successfully."}
 

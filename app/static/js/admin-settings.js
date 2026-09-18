@@ -334,11 +334,11 @@ function renderFoodItemsList() {
           <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold">${item.group_name}</span>
         </div>
         ${item.is_taken 
-          ? `<p class="text-[11px] text-slate-400 mt-1 pl-4">Taken by <strong class="text-orange-400">${item.signer_name}</strong> ${item.dish_description ? `— "${item.dish_description}"` : ''}</p>`
+          ? `<p class="text-[11px] text-slate-400 mt-1 pl-4">Taken by <strong class="text-orange-400">${escapeHtml(item.signer_name)}</strong> ${item.signer_phone ? `<span class="text-slate-500 font-mono text-[10px]">(${escapeHtml(item.signer_phone)})</span> ` : ''}${item.dish_description ? `— "${escapeHtml(item.dish_description)}"` : ''}</p>`
           : '<p class="text-[11px] text-emerald-400/80 mt-1 pl-4">Available for participant claim</p>'}
       </div>
       <div class="flex items-center gap-2">
-        <button onclick="editItem('${item.item_id}', '${escapeQuotes(item.name)}')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300" title="Edit"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
+        <button onclick="openAdminFoodModal('${item.item_id}')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300" title="Edit Item & Sign-Up"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
         <button onclick="deleteItem('${item.item_id}', '${escapeQuotes(item.name)}', ${item.is_taken})" class="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-rose-400" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
       </div>
     </div>
@@ -706,6 +706,14 @@ function setupActionHandlers() {
     await saveParticipantEdit();
   });
 
+  // Food Item Modal Listeners
+  document.getElementById("close-admin-food-modal-btn")?.addEventListener("click", closeAdminFoodModal);
+  document.getElementById("cancel-admin-food-btn")?.addEventListener("click", closeAdminFoodModal);
+  document.getElementById("admin-edit-food-form")?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await saveFoodItemModal();
+  });
+
   // Table action button clicks (Edit & Delete delegation)
   document.getElementById("participants-table-body")?.addEventListener("click", (e) => {
     const btn = e.target.closest("button[data-action]");
@@ -1048,6 +1056,56 @@ window.openEditParticipantModal = function(entryId) {
   document.getElementById("admin-edit-performance-status").value = p.performance_status || "Upcoming";
   document.getElementById("admin-edit-stage-notes").value = p.stage_notes || "";
 
+  // Food Item Contribution Dropdown
+  const foodSelect = document.getElementById("admin-edit-food-item");
+  const shareNotice = document.getElementById("admin-edit-food-share-notice");
+  const shareText = document.getElementById("admin-edit-food-share-text");
+  if (shareNotice) shareNotice.classList.add("hidden");
+
+  if (foodSelect) {
+    const perfName = (p.performer_name || "").trim().toLowerCase();
+    let currentItemId = p.food_signup ? p.food_signup.item_id : "";
+
+    let optionsHtml = `<option value="">-- None / No Potluck Sign-Up --</option>`;
+    foodItems.forEach(item => {
+      const isTaken = Boolean(item.is_taken);
+      const signerRaw = item.signer_name || "";
+      const signers = signerRaw.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
+      const isCurrentSigner = isTaken && signers.includes(perfName);
+
+      if (isCurrentSigner && !currentItemId) {
+        currentItemId = item.item_id;
+      }
+
+      let label = `[${item.group_name || 'Food'}] ${item.name}`;
+      if (isCurrentSigner) {
+        label += ` (Current: ${signerRaw})`;
+      } else if (isTaken) {
+        label += ` (Claimed by ${signerRaw})`;
+      } else {
+        label += ` (Available)`;
+      }
+      optionsHtml += `<option value="${item.item_id}" data-taken="${isTaken ? '1' : '0'}" data-signer="${escapeQuotes(signerRaw)}">${escapeHtml(label)}</option>`;
+    });
+    foodSelect.innerHTML = optionsHtml;
+    foodSelect.value = currentItemId || "";
+
+    foodSelect.onchange = function() {
+      const selectedOpt = foodSelect.options[foodSelect.selectedIndex];
+      const isTaken = selectedOpt?.getAttribute("data-taken") === "1";
+      const signer = selectedOpt?.getAttribute("data-signer") || "";
+      const signers = signer.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
+      const isCurrent = signers.includes(perfName);
+
+      if (isTaken && !isCurrent) {
+        if (shareText) shareText.textContent = `Already claimed by ${signer}. Saving will link this food item across both family members/participants.`;
+        if (shareNotice) shareNotice.classList.remove("hidden");
+      } else {
+        if (shareNotice) shareNotice.classList.add("hidden");
+      }
+    };
+  }
+
   document.getElementById("admin-edit-participant-modal").classList.remove("hidden");
   if (window.lucide) lucide.createIcons();
 };
@@ -1082,6 +1140,9 @@ async function saveParticipantEdit() {
   }
 
   const seqVal = document.getElementById("admin-edit-sequence-order").value;
+  const foodSelect = document.getElementById("admin-edit-food-item");
+  const foodItemIdVal = foodSelect ? foodSelect.value : null;
+
   const payload = {
     performer_name: document.getElementById("admin-edit-performer-name").value.trim(),
     contact_info: contactInfoVal || null,
@@ -1098,7 +1159,8 @@ async function saveParticipantEdit() {
     sequence_order: seqVal ? parseInt(seqVal, 10) : null,
     track_status: document.getElementById("admin-edit-track-status").value,
     performance_status: document.getElementById("admin-edit-performance-status").value,
-    stage_notes: document.getElementById("admin-edit-stage-notes").value.trim() || null
+    stage_notes: document.getElementById("admin-edit-stage-notes").value.trim() || null,
+    food_item_id: foodItemIdVal
   };
 
   try {
@@ -1110,7 +1172,7 @@ async function saveParticipantEdit() {
     if (res.ok) {
       closeAdminEditModal();
       showToast(`Updated ${payload.performer_name || entryId}`);
-      await Promise.all([loadParticipants(), loadSummary()]);
+      await Promise.all([loadParticipants(), loadFoodItems(), loadSummary()]);
     } else {
       const err = await res.json();
       showToast(`Update failed: ${err.detail || "Error"}`, true);
@@ -1199,22 +1261,106 @@ window.deleteGroup = async function(groupId, name) {
   }
 };
 
-window.editItem = async function(itemId, currentName) {
-  const newName = prompt("Edit food item name:", currentName);
-  if (!newName || newName.trim() === currentName) return;
+window.openAdminFoodModal = function(itemId) {
+  const item = foodItems.find(i => i.item_id === itemId);
+  if (!item) {
+    showToast("Food item not found", true);
+    return;
+  }
+
+  document.getElementById("admin-edit-food-item-id").value = item.item_id;
+  document.getElementById("admin-edit-food-id-badge").textContent = item.item_id;
+  document.getElementById("admin-edit-food-name").value = item.name || "";
+
+  // Populate categories
+  const groupSelect = document.getElementById("admin-edit-food-group");
+  if (groupSelect) {
+    groupSelect.innerHTML = foodGroups.map(g => `<option value="${g.group_id}">${escapeHtml(g.name)}</option>`).join("");
+    groupSelect.value = item.group_id || (foodGroups[0] ? foodGroups[0].group_id : "");
+  }
+
+  const pill = document.getElementById("admin-food-claim-status-pill");
+  const signerNameInput = document.getElementById("admin-edit-food-signer-name");
+  const signerPhoneInput = document.getElementById("admin-edit-food-signer-phone");
+  const dishDescInput = document.getElementById("admin-edit-food-dish-desc");
+  const releaseWrap = document.getElementById("admin-food-release-wrap");
+  const releaseCheckbox = document.getElementById("admin-edit-food-release");
+
+  if (item.is_taken) {
+    if (pill) {
+      pill.className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30";
+      pill.textContent = "CLAIMED";
+    }
+    signerNameInput.value = item.signer_name || "";
+    signerPhoneInput.value = item.signer_phone || "";
+    dishDescInput.value = item.dish_description || "";
+    if (releaseWrap) releaseWrap.classList.remove("hidden");
+    if (releaseCheckbox) releaseCheckbox.checked = false;
+  } else {
+    if (pill) {
+      pill.className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
+      pill.textContent = "AVAILABLE";
+    }
+    signerNameInput.value = "";
+    signerPhoneInput.value = "";
+    dishDescInput.value = "";
+    if (releaseWrap) releaseWrap.classList.add("hidden");
+    if (releaseCheckbox) releaseCheckbox.checked = false;
+  }
+
+  document.getElementById("admin-edit-food-modal").classList.remove("hidden");
+  if (window.lucide) lucide.createIcons();
+};
+
+window.closeAdminFoodModal = function() {
+  document.getElementById("admin-edit-food-modal").classList.add("hidden");
+};
+
+window.editItem = function(itemId) {
+  window.openAdminFoodModal(itemId);
+};
+
+window.saveFoodItemModal = async function() {
+  const itemId = document.getElementById("admin-edit-food-item-id").value;
+  if (!itemId) return;
+
+  const nameVal = document.getElementById("admin-edit-food-name").value.trim();
+  const groupIdVal = document.getElementById("admin-edit-food-group").value;
+  const signerNameVal = document.getElementById("admin-edit-food-signer-name").value.trim();
+  const signerPhoneVal = document.getElementById("admin-edit-food-signer-phone").value.trim();
+  const dishDescVal = document.getElementById("admin-edit-food-dish-desc").value.trim();
+  const releaseClaimVal = document.getElementById("admin-edit-food-release") ? document.getElementById("admin-edit-food-release").checked : false;
+
+  if (!nameVal) {
+    showToast("Food item name cannot be empty", true);
+    return;
+  }
+
+  const payload = {
+    name: nameVal,
+    group_id: groupIdVal,
+    signer_name: signerNameVal,
+    signer_phone: signerPhoneVal,
+    dish_description: dishDescVal,
+    release_claim: releaseClaimVal
+  };
 
   try {
     const res = await fetch(`/api/admin/food-items/${itemId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim() })
+      body: JSON.stringify(payload)
     });
     if (res.ok) {
-      await loadFoodItems();
-      showToast("Item updated!");
+      window.closeAdminFoodModal();
+      showToast("Food item & sign-up updated!");
+      await Promise.all([loadFoodItems(), loadParticipants(), loadSummary()]);
+    } else {
+      const err = await res.json();
+      showToast(`Update failed: ${err.detail || "Error"}`, true);
     }
   } catch (e) {
-    showToast("Update failed", true);
+    showToast("Network error updating food item", true);
   }
 };
 
