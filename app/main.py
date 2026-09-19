@@ -1176,6 +1176,8 @@ async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin))
         partner_food = None
         if partner:
             partner_food = db_service.get_food_signup_for_signer(partner)
+            if not partner_food and guardian:
+                partner_food = db_service.get_food_signup_for_signer(guardian)
         p["partner_food_signup"] = partner_food
     return perfs
 
@@ -1210,6 +1212,14 @@ async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdat
         effective_name = new_performer_name or old_performer_name
         phone = payload.contact_info or payload.guardian_phone or old_perf.get("contact_info") or old_perf.get("guardian_phone")
         db_service.link_participant_to_food_item(effective_name, payload.food_item_id, phone)
+
+        # If duet partner is part of the same junior family act, link them too
+        effective_partner = (payload.partner_name or old_perf.get("partner_name") or "").strip()
+        partner_age = (payload.partner_age_group or old_perf.get("partner_age_group") or payload.age_group or old_perf.get("age_group") or "").lower()
+        has_guard = bool((payload.guardian_name or old_perf.get("guardian_name") or "").strip())
+        if effective_partner and "junior" in partner_age and has_guard:
+            partner_phone = payload.partner_phone or old_perf.get("partner_phone") or phone
+            db_service.link_participant_to_food_item(effective_partner, payload.food_item_id, partner_phone)
 
     update_data = {k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None and k != "food_item_id"}
     if "phone" in update_data:

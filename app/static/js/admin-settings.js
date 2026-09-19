@@ -829,10 +829,11 @@ function groupPerformancesByParticipant(performances) {
       partnerTokens.forEach(pName => {
         if (pName.toLowerCase() === normName.toLowerCase()) return;
 
+        const isPartnerJunior = (perf.partner_age_group || perf.age_group || "").toLowerCase().includes("junior");
         const partner = getOrCreate(pName, {
           age_group: perf.partner_age_group || perf.age_group || "Senior",
-          guardian_name: "",
-          guardian_phone: "",
+          guardian_name: isPartnerJunior ? (perf.guardian_name || "") : "",
+          guardian_phone: isPartnerJunior ? (perf.partner_phone || perf.guardian_phone || perf.phone || "") : "",
           contact_info: perf.partner_phone || "",
           food_signup: perf.partner_food_signup || null,
           sequence_order: perf.sequence_order
@@ -855,6 +856,10 @@ function groupPerformancesByParticipant(performances) {
         }
         if (perf.partner_phone && !partner.contact_info) {
           partner.contact_info = perf.partner_phone;
+        }
+        if (!partner.guardian_name && (perf.partner_age_group || partner.age_group || "").toLowerCase().includes("junior") && perf.guardian_name) {
+          partner.guardian_name = perf.guardian_name;
+          partner.guardian_phone = perf.partner_phone || perf.guardian_phone || perf.phone || "";
         }
         if (!partner.food_signup && perf.partner_food_signup) {
           partner.food_signup = perf.partner_food_signup;

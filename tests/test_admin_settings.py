@@ -1,7 +1,9 @@
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
+from app.services.db_service import db_service
 
 @pytest.fixture
 def client():
@@ -257,6 +259,49 @@ def test_admin_summary_metrics(client):
     assert summary["total_performances"] == summary["junior_acts"] + summary["senior_acts"]
     assert summary["solo"] >= 2
     assert summary["duet"] >= 1
+
+
+def test_admin_junior_duet_partner_food_inheritance(client):
+    """Verifies that in /api/admin/participants, a junior duet partner inherits
+    their guardian's food signup if they don't have their own individual food signup."""
+    uid = uuid.uuid4().hex[:6]
+    guardian_name = f"Parent Tina {uid}"
+    child_primary = f"Ryan Child {uid}"
+    child_partner = f"Rohan Child {uid}"
+
+    group_id = db_service.add_food_group(f"Appetizers {uid}")
+    item_id = db_service.add_food_item(f"Chicken 65 {uid}", group_id)
+
+    # Guardian claims food
+    db_service.claim_food_item(item_id, guardian_name, dish_description="Crispy Chicken")
+
+    # Junior duet registered under guardian
+    res = client.post("/api/signup", json={
+        "performer_name": child_primary,
+        "age_group": "Junior",
+        "guardian_name": guardian_name,
+        "guardian_phone": "555-444-3333",
+        "performances": [{
+            "performance_type": "Duet",
+            "partner_name": child_partner,
+            "partner_phone": "555-444-3333",
+            "partner_age_group": "Junior",
+            "song_title": "Family Duet"
+        }]
+    })
+    assert res.status_code == 200
+
+    parts = client.get("/api/admin/participants").json()
+    perf = next(p for p in parts if p["performer_name"] == child_primary)
+
+    # Primary child inherits guardian food
+    assert perf["food_signup"] is not None
+    assert perf["food_signup"]["item_id"] == item_id
+
+    # Partner child also inherits guardian food in partner_food_signup
+    assert perf["partner_food_signup"] is not None
+    assert perf["partner_food_signup"]["item_id"] == item_id
+
 
 
 
