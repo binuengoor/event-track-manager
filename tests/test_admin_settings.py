@@ -158,3 +158,50 @@ def test_admin_participants_duet_partner_food_and_edit(client):
     perf2 = next(p for p in res_parts2.json() if p["entry_id"] == perf["entry_id"])
     assert perf2["partner_name"] == new_partner_name
 
+def test_duet_partner_does_not_inherit_primary_food(client):
+    import uuid
+    from app.services.db_service import db_service
+
+    primary_name = f"Singer Primary {uuid.uuid4().hex[:4]}"
+    partner_name = f"Singer Partner {uuid.uuid4().hex[:4]}"
+
+    # Fetch an available food item to claim
+    all_items = db_service.get_all_food_items_with_signups()
+    open_item = next((it for it in all_items if not it["is_taken"]), None)
+    food_payload = {"item_id": open_item["item_id"], "dish_description": "Family Dish"} if open_item else None
+
+    # Signup primary with duet and food
+    signup_payload = {
+        "performer_name": primary_name,
+        "contact_info": "484-555-0199",
+        "age_group": "Senior",
+        "food_signup": food_payload,
+        "performances": [
+            {
+                "performance_type": "Duet",
+                "partner_name": partner_name,
+                "partner_phone": "484-555-0198",
+                "song_title": "Duet Melody",
+                "is_acoustic": False
+            }
+        ]
+    }
+    res = client.post("/api/signup", json=signup_payload)
+    assert res.status_code == 200
+
+    # Query admin participants
+    parts = client.get("/api/admin/participants").json()
+    primary_perf = next((p for p in parts if p["performer_name"] == primary_name), None)
+    assert primary_perf is not None
+    if open_item:
+        assert primary_perf["food_signup"] is not None
+        assert primary_perf["food_signup"]["item_id"] == open_item["item_id"]
+
+    # Partner should NOT have primary's food in partner_food_signup
+    assert primary_perf["partner_food_signup"] is None
+
+    # Performer hub lookup for partner should be None for food
+    partner_profile = client.get(f"/api/performer/profile?name={partner_name}").json()
+    assert partner_profile["food_signup"] is None
+
+
