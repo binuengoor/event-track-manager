@@ -90,7 +90,8 @@ async function loadAllAdminData() {
     loadFoodItems(),
     loadParticipants(),
     loadSummary(),
-    loadBackupStatus()
+    loadBackupStatus(),
+    loadActivityLogs()
   ]);
   setupActionHandlers();
 }
@@ -489,7 +490,7 @@ async function loadActivityLogs() {
       return;
     }
     const data = await res.json();
-    allActivityLogs = data.logs || [];
+    allActivityLogs = Array.isArray(data) ? data : (data.logs || []);
     filterAndRenderActivityLogs();
   } catch (err) {
     console.error("Failed to load activity logs:", err);
