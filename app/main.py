@@ -752,13 +752,6 @@ async def get_performer_profile(name: str):
                 food_signup = db_service.get_food_signup_for_signer(g_name)
                 if food_signup:
                     break
-    if not food_signup:
-        for p in user_perfs:
-            p_name = p.get("partner_name")
-            if p_name:
-                food_signup = db_service.get_food_signup_for_signer(p_name)
-                if food_signup:
-                    break
     counts = db_service.count_performances_for_performer(clean_name)
     all_food_items = db_service.get_all_food_items_with_signups()
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)

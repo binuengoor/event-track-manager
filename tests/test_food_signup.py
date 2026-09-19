@@ -150,4 +150,79 @@ def test_smart_food_resolution_and_performer_rename(client):
     assert fs_renamed["signer_name"] == "Binu Pradeep"
 
 
+def test_duet_performers_food_isolation(client):
+    """Verifies that duet performers have completely independent food signups:
+    - If Performer A signs up for food, Performer B does NOT inherit it.
+    - If Performer B signs up for food, updating B's food does NOT overwrite A's food.
+    - Updating A's food does NOT overwrite B's food.
+    """
+    uid = uuid.uuid4().hex[:6]
+    performer_a = f"Niloufer Test {uid}"
+    performer_b = f"Reema Test {uid}"
+
+    # Create two food items
+    group_id = db_service.add_food_group(f"Curry Group {uid}")
+    item_veg = db_service.add_food_item(f"Veg Curry {uid}", group_id)
+    item_nonveg = db_service.add_food_item(f"Non-Veg Curry {uid}", group_id)
+    item_dessert = db_service.add_food_item(f"Dessert {uid}", group_id)
+
+    # Register duet performance with Performer A as primary and Performer B as partner
+    db_service.create_performance(
+        performer_name=performer_a,
+        performance_type="Duet",
+        partner_name=performer_b,
+        song_title=f"Duet Song {uid}",
+        age_group="Senior",
+        created_via="signup"
+    )
+
+    # Performer B claims Veg Curry
+    claim_b = client.post("/api/signup/food", json={
+        "signer_name": performer_b,
+        "item_id": item_veg,
+        "dish_description": "Mixed Veg Curry"
+    })
+    assert claim_b.status_code == 200
+    signup_b_id = claim_b.json()["signup_id"]
+
+    # Performer A views profile in Performer Hub: must NOT inherit Performer B's food
+    prof_a = client.get(f"/api/performer/profile?name={performer_a}").json()
+    assert prof_a["food_signup"] is None
+
+    # Performer B views profile: must see Veg Curry
+    prof_b = client.get(f"/api/performer/profile?name={performer_b}").json()
+    assert prof_b["food_signup"] is not None
+    assert prof_b["food_signup"]["signup_id"] == signup_b_id
+    assert prof_b["food_signup"]["item_id"] == item_veg
+
+    # Now Performer A claims Non-Veg Curry
+    claim_a = client.post("/api/signup/food", json={
+        "signer_name": performer_a,
+        "item_id": item_nonveg,
+        "dish_description": "Chicken Curry"
+    })
+    assert claim_a.status_code == 200
+    signup_a_id = claim_a.json()["signup_id"]
+    assert signup_a_id != signup_b_id
+
+    # Performer B's food should still be Veg Curry
+    prof_b_after = client.get(f"/api/performer/profile?name={performer_b}").json()
+    assert prof_b_after["food_signup"]["signup_id"] == signup_b_id
+    assert prof_b_after["food_signup"]["item_id"] == item_veg
+
+    # Performer A updates their food to Dessert
+    res_update_a = client.put(f"/api/signup/food/{signup_a_id}", json={
+        "item_id": item_dessert,
+        "dish_description": "Payasam"
+    })
+    assert res_update_a.status_code == 200
+
+    # Performer B's food is STILL Veg Curry, untouched!
+    prof_b_final = client.get(f"/api/performer/profile?name={performer_b}").json()
+    assert prof_b_final["food_signup"]["signup_id"] == signup_b_id
+    assert prof_b_final["food_signup"]["item_id"] == item_veg
+    assert prof_b_final["food_signup"]["dish_description"] == "Mixed Veg Curry"
+
+
+
 
