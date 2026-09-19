@@ -359,6 +359,12 @@ async function loadSummary() {
     document.getElementById("stat-solo").textContent = s.solo;
     document.getElementById("stat-duet").textContent = s.duet;
     document.getElementById("stat-group").textContent = s.group;
+    if (document.getElementById("stat-junior-acts")) {
+      document.getElementById("stat-junior-acts").textContent = s.junior_acts ?? 0;
+    }
+    if (document.getElementById("stat-senior-acts")) {
+      document.getElementById("stat-senior-acts").textContent = s.senior_acts ?? 0;
+    }
 
     document.getElementById("stat-food-claimed").textContent = s.food_taken;
     document.getElementById("stat-food-total").textContent = s.food_total;
@@ -808,6 +814,9 @@ function groupPerformancesByParticipant(performances) {
         primary.min_seq = perf.sequence_order;
       }
     }
+    if (perf.age_group && perf.age_group.toLowerCase().includes("junior")) {
+      primary.age_group = perf.age_group;
+    }
     if (!primary.guardian_name && perf.guardian_name) primary.guardian_name = perf.guardian_name;
     if (!primary.guardian_phone && (perf.guardian_phone || perf.phone)) primary.guardian_phone = perf.guardian_phone || perf.phone;
     if (!primary.contact_info && perf.contact_info) primary.contact_info = perf.contact_info;
@@ -839,8 +848,10 @@ function groupPerformancesByParticipant(performances) {
             partner.min_seq = perf.sequence_order;
           }
         }
-        if (perf.partner_age_group && (!partner.age_group || partner.age_group === "Senior")) {
+        if (perf.partner_age_group && (perf.partner_age_group.toLowerCase().includes("junior") || !partner.age_group || partner.age_group === "Senior")) {
           partner.age_group = perf.partner_age_group;
+        } else if (perf.age_group && perf.age_group.toLowerCase().includes("junior") && (!partner.age_group || partner.age_group === "Senior")) {
+          partner.age_group = perf.age_group;
         }
         if (perf.partner_phone && !partner.contact_info) {
           partner.contact_info = perf.partner_phone;

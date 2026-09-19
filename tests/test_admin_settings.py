@@ -205,3 +205,58 @@ def test_duet_partner_does_not_inherit_primary_food(client):
     assert partner_profile["food_signup"] is None
 
 
+def test_admin_summary_metrics(client):
+    """Verifies that /api/admin/summary accurately calculates unique participants,
+    distinguishes acts vs people, and counts duet partners."""
+    # Register 1 junior solo
+    res1 = client.post("/api/signup", json={
+        "performer_name": "Kid One",
+        "age_group": "Junior",
+        "guardian_name": "Parent One",
+        "guardian_phone": "555-111-0001",
+        "performances": [{"performance_type": "Solo", "song_title": "Kid Song 1"}]
+    })
+    assert res1.status_code == 200
+
+    # Register 1 junior duet with another junior partner
+    res2 = client.post("/api/signup", json={
+        "performer_name": "Kid Two",
+        "age_group": "Junior",
+        "guardian_name": "Parent Two",
+        "guardian_phone": "555-111-0002",
+        "performances": [{
+            "performance_type": "Duet",
+            "partner_name": "Kid Three",
+            "partner_age_group": "Junior",
+            "partner_phone": "555-111-0004",
+            "song_title": "Kid Duet"
+        }]
+    })
+    assert res2.status_code == 200
+
+    # Register 1 senior solo
+    res3 = client.post("/api/signup", json={
+        "performer_name": "Adult One",
+        "contact_info": "555-111-0003",
+        "age_group": "Senior",
+        "performances": [{"performance_type": "Solo", "song_title": "Adult Song 1"}]
+    })
+    assert res3.status_code == 200
+
+    summary = client.get("/api/admin/summary").json()
+
+    # Kid Three was only a partner, but must be counted in total_participants and juniors
+    assert summary["total_participants"] >= 4
+    assert summary["juniors"] >= 3  # Kid One, Kid Two, Kid Three
+    assert summary["seniors"] >= 1  # Adult One
+    assert summary["total_participants"] == summary["juniors"] + summary["seniors"]
+    assert "junior_acts" in summary
+    assert "senior_acts" in summary
+    assert summary["junior_acts"] >= 2
+    assert summary["senior_acts"] >= 1
+    assert summary["total_performances"] == summary["junior_acts"] + summary["senior_acts"]
+    assert summary["solo"] >= 2
+    assert summary["duet"] >= 1
+
+
+

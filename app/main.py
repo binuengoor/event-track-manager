@@ -1085,21 +1085,70 @@ async def update_admin_signup_toggle(payload: SignupToggleRequest, _authorized: 
 @app.get("/api/admin/summary")
 async def get_admin_summary(_authorized: bool = Depends(verify_admin_pin)):
     perfs = db_service.get_all_performances()
-    performers = {p["performer_name"] for p in perfs if p.get("performer_name")}
-    juniors = sum(1 for p in perfs if "junior" in (p.get("age_group") or "").lower() or any("junior" in t.lower() for t in p.get("extra_tags", [])))
-    seniors = sum(1 for p in perfs if "senior" in (p.get("age_group") or "").lower() or any("senior" in t.lower() for t in p.get("extra_tags", [])))
-    solo = sum(1 for p in perfs if "solo" in (p.get("performance_type") or "").lower())
-    duet = sum(1 for p in perfs if "duet" in (p.get("performance_type") or "").lower())
-    group = sum(1 for p in perfs if "group" in (p.get("performance_type") or "").lower())
+
+    participants_map = {}
+    junior_acts = 0
+    senior_acts = 0
+    solo = 0
+    duet = 0
+    group = 0
+
+    for p in perfs:
+        ptype = (p.get("performance_type") or "").lower()
+        if "solo" in ptype:
+            solo += 1
+        elif "duet" in ptype:
+            duet += 1
+        elif "group" in ptype:
+            group += 1
+
+        is_junior_act = "junior" in (p.get("age_group") or "").lower() or any("junior" in str(t).lower() for t in p.get("extra_tags", []))
+        if is_junior_act:
+            junior_acts += 1
+        else:
+            senior_acts += 1
+
+        norm_name = (p.get("performer_name") or "").strip()
+        if norm_name:
+            k = norm_name.lower()
+            if k not in participants_map:
+                participants_map[k] = {
+                    "name": norm_name,
+                    "age_group": p.get("age_group") or "Senior"
+                }
+            elif "junior" in (p.get("age_group") or "").lower():
+                participants_map[k]["age_group"] = p.get("age_group")
+
+        raw_partner = (p.get("partner_name") or "").strip()
+        if raw_partner:
+            parts = [s.strip() for s in re.split(r'[&,]|(?:\band\b)', raw_partner, flags=re.IGNORECASE) if s.strip()]
+            for p_name in parts:
+                if norm_name and p_name.lower() == norm_name.lower():
+                    continue
+                pk = p_name.lower()
+                partner_age = p.get("partner_age_group") or p.get("age_group") or "Senior"
+                if pk not in participants_map:
+                    participants_map[pk] = {
+                        "name": p_name,
+                        "age_group": partner_age
+                    }
+                elif "junior" in partner_age.lower():
+                    participants_map[pk]["age_group"] = partner_age
+
+    total_participants = len(participants_map)
+    juniors = sum(1 for p in participants_map.values() if "junior" in (p.get("age_group") or "").lower())
+    seniors = total_participants - juniors
 
     food_items = db_service.get_all_food_items_with_signups()
     food_taken = sum(1 for f in food_items if f.get("is_taken"))
 
     return {
-        "total_participants": len(performers),
+        "total_participants": total_participants,
         "total_performances": len(perfs),
         "juniors": juniors,
         "seniors": seniors,
+        "junior_acts": junior_acts,
+        "senior_acts": senior_acts,
         "solo": solo,
         "duet": duet,
         "group": group,
