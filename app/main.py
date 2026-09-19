@@ -1134,11 +1134,6 @@ async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin))
         partner_food = None
         if partner:
             partner_food = db_service.get_food_signup_for_signer(partner)
-            if not partner_food and food:
-                perf_phone = (p.get("contact_info") or p.get("guardian_phone") or "").replace("-", "").strip()
-                partner_phone = (p.get("partner_phone") or "").replace("-", "").strip()
-                if perf_phone and partner_phone and perf_phone == partner_phone:
-                    partner_food = food
         p["partner_food_signup"] = partner_food
     return perfs
 

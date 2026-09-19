@@ -229,6 +229,41 @@ class GoogleService:
 
         return entries
 
+    def get_sheet_row_mapping(self) -> Dict[str, int]:
+        """Returns a mapping from entry_id to 1-based row index in the target Google/Excel Sheet."""
+        if self.mock_mode:
+            return {}
+
+        tab_name = settings.google.sheet_tab_name or "Song Sign-Up"
+        row_map = {}
+        try:
+            if self.is_xlsx:
+                import openpyxl
+                content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+                ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
+                for idx, r in enumerate(ws.iter_rows(values_only=True)):
+                    if idx == 0:
+                        continue
+                    eid = str(r[0]).strip() if r and len(r) > 0 and r[0] is not None else ""
+                    if eid:
+                        row_map[eid] = idx + 1
+            else:
+                res = self.sheets.spreadsheets().values().get(
+                    spreadsheetId=settings.google.sheet_id,
+                    range=f"'{tab_name}'!A1:A100"
+                ).execute()
+                rows = res.get("values", [])
+                for idx, r in enumerate(rows):
+                    if idx == 0:
+                        continue
+                    eid = str(r[0]).strip() if r and len(r) > 0 else ""
+                    if eid:
+                        row_map[eid] = idx + 1
+        except Exception as ex:
+            logger.warning("Failed to fetch sheet row mapping: %s", ex)
+        return row_map
+
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
             try:
@@ -735,7 +770,10 @@ class GoogleService:
 
         performances = self.get_performances()
         target = next((p for p in performances if p.entry_id == entry_id), None)
-        if not target or not target.row_index or target.row_index <= 0:
+
+        row_map = self.get_sheet_row_mapping()
+        sheet_row = row_map.get(entry_id) or (target.row_index if target and target.row_index and target.row_index > 0 else None)
+        if not sheet_row:
             # If it's a web signup not yet in sheet or not assigned a row, it is updated in SQLite
             return True
 
@@ -750,7 +788,7 @@ class GoogleService:
             wb = openpyxl.load_workbook(io.BytesIO(content))
             ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
 
-            row = target.row_index
+            row = sheet_row
             # Col L: Track Uploaded = "Yes"
             ws.cell(row=row, column=cols.track_status + 1, value="Yes")
             if duration_str:
@@ -771,18 +809,18 @@ class GoogleService:
                 return chr(ord('A') + col_idx)
 
             updates = [
-                {"range": f"{tab_name}!{col_letter(cols.track_status)}{target.row_index}", "values": [["Yes"]]},
-                {"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{target.row_index}", "values": [[file_id]]},
-                {"range": f"{tab_name}!{col_letter(cols.last_updated)}{target.row_index}", "values": [[now_iso]]}
+                {"range": f"{tab_name}!{col_letter(cols.track_status)}{sheet_row}", "values": [["Yes"]]},
+                {"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{sheet_row}", "values": [[file_id]]},
+                {"range": f"{tab_name}!{col_letter(cols.last_updated)}{sheet_row}", "values": [[now_iso]]}
             ]
             if duration_str:
-                updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{target.row_index}", "values": [[duration_str]]})
+                updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{sheet_row}", "values": [[duration_str]]})
 
             self.sheets.spreadsheets().values().batchUpdate(
                 spreadsheetId=settings.google.sheet_id,
                 body={"valueInputOption": "USER_ENTERED", "data": updates}
             ).execute()
-            logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, target.row_index, file_id)
+            logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, sheet_row, file_id)
             return True
 
     def update_status(self, entry_id: str, status: str) -> bool:
@@ -798,6 +836,11 @@ class GoogleService:
         target = next((p for p in performances if p.entry_id == entry_id), None)
         if not target:
             raise ValueError(f"Performance entry {entry_id} not found in Google Sheet")
+
+        row_map = self.get_sheet_row_mapping()
+        sheet_row = row_map.get(entry_id) or (target.row_index if target.row_index and target.row_index > 0 else None)
+        if not sheet_row:
+            return True
 
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
@@ -828,27 +871,27 @@ class GoogleService:
             wb = openpyxl.load_workbook(io.BytesIO(content))
             ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
 
-            ws.cell(row=target.row_index, column=cols.performance_status + 1, value=val_to_write)
+            ws.cell(row=sheet_row, column=cols.performance_status + 1, value=val_to_write)
             out_buf = io.BytesIO()
             wb.save(out_buf)
             out_buf.seek(0)
 
             media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
             self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
-            logger.info("Updated performance status for %s (Row %d) to %s in Excel sheet", entry_id, target.row_index, val_to_write)
+            logger.info("Updated performance status for %s (Row %d) to %s in Excel sheet", entry_id, sheet_row, val_to_write)
             return True
         else:
             def col_letter(col_idx: int) -> str:
                 return chr(ord('A') + col_idx)
 
-            cell = f"{tab_name}!{col_letter(cols.performance_status)}{target.row_index}"
+            cell = f"{tab_name}!{col_letter(cols.performance_status)}{sheet_row}"
             self.sheets.spreadsheets().values().update(
                 spreadsheetId=settings.google.sheet_id,
                 range=cell,
                 valueInputOption="USER_ENTERED",
                 body={"values": [[val_to_write]]}
             ).execute()
-            logger.info("Updated performance status for %s (Row %d) to %s in Google Sheet", entry_id, target.row_index, val_to_write)
+            logger.info("Updated performance status for %s (Row %d) to %s in Google Sheet", entry_id, sheet_row, val_to_write)
             return True
 
     def update_sequence_orders(self, items: List[Dict[str, Any]], push_to_sheet: bool = True) -> int:
@@ -897,6 +940,7 @@ class GoogleService:
 
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
+        row_map = self.get_sheet_row_mapping()
 
         if self.is_xlsx:
             import openpyxl
@@ -908,7 +952,9 @@ class GoogleService:
 
             for p in performances:
                 if p.entry_id in item_map:
-                    ws.cell(row=p.row_index, column=cols.sequence_order + 1, value=item_map[p.entry_id])
+                    sheet_row = row_map.get(p.entry_id) or p.row_index
+                    if sheet_row and sheet_row > 0:
+                        ws.cell(row=sheet_row, column=cols.sequence_order + 1, value=item_map[p.entry_id])
 
             out_buf = io.BytesIO()
             wb.save(out_buf)
@@ -928,8 +974,9 @@ class GoogleService:
             for p in performances:
                 if p.entry_id in item_map:
                     new_seq = item_map[p.entry_id]
-                    if p.row_index and p.row_index > 0:
-                        cell = f"{tab_name}!{col_letter(cols.sequence_order)}{p.row_index}"
+                    sheet_row = row_map.get(p.entry_id) or p.row_index
+                    if sheet_row and sheet_row > 0:
+                        cell = f"{tab_name}!{col_letter(cols.sequence_order)}{sheet_row}"
                         updates.append({"range": cell, "values": [[new_seq]]})
 
                     # If this performance has a backing track in Drive, rename it with the new sequence prefix

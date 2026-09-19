@@ -825,7 +825,7 @@ function groupPerformancesByParticipant(performances) {
           guardian_name: "",
           guardian_phone: "",
           contact_info: perf.partner_phone || "",
-          food_signup: perf.partner_food_signup || perf.food_signup || null,
+          food_signup: perf.partner_food_signup || null,
           sequence_order: perf.sequence_order
         });
 
@@ -845,8 +845,8 @@ function groupPerformancesByParticipant(performances) {
         if (perf.partner_phone && !partner.contact_info) {
           partner.contact_info = perf.partner_phone;
         }
-        if (!partner.food_signup && (perf.partner_food_signup || perf.food_signup)) {
-          partner.food_signup = perf.partner_food_signup || perf.food_signup;
+        if (!partner.food_signup && perf.partner_food_signup) {
+          partner.food_signup = perf.partner_food_signup;
         }
       });
     }
@@ -1117,8 +1117,7 @@ window.openEditParticipantModal = function(entryId) {
 
   if (foodSelect) {
     const perfName = (p.performer_name || "").trim().toLowerCase();
-    const partnerName = (p.partner_name || "").trim().toLowerCase();
-    let currentItemId = (p.food_signup && p.food_signup.item_id) || (p.partner_food_signup && p.partner_food_signup.item_id) || "";
+    let currentItemId = (p.food_signup && p.food_signup.item_id) || "";
 
     let optionsHtml = `<option value="">-- None / No Potluck Sign-Up --</option>`;
     foodItems.forEach(item => {
@@ -1128,7 +1127,6 @@ window.openEditParticipantModal = function(entryId) {
       const isCurrentSigner = isTaken && (
         (currentItemId && item.item_id === currentItemId) ||
         signers.includes(perfName) || 
-        (partnerName && signers.includes(partnerName)) ||
         signers.some(s => (s.length >= 3 && perfName.includes(s)) || (perfName.length >= 3 && s.includes(perfName)))
       );
 
@@ -1156,7 +1154,6 @@ window.openEditParticipantModal = function(entryId) {
       const signers = signer.split(/[&,]|(?:\band\b)/i).map(s => s.trim().toLowerCase());
       const isCurrent = (currentItemId && selectedOpt?.value === currentItemId) ||
         signers.includes(perfName) || 
-        (partnerName && signers.includes(partnerName)) ||
         signers.some(s => (s.length >= 3 && perfName.includes(s)) || (perfName.length >= 3 && s.includes(perfName)));
 
       if (isTaken && !isCurrent) {
