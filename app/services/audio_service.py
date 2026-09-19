@@ -82,10 +82,17 @@ class AudioService:
                     purged = True
                 except Exception as e:
                     logger.warning("Error purging cache %s: %s", p, e)
+            meta_p = p + ".meta.json"
+            if os.path.isfile(meta_p):
+                try:
+                    os.remove(meta_p)
+                except Exception:
+                    pass
         return purged
 
     def ensure_local_cache(self, entry_id: str, drive_file_id: Optional[str] = None) -> Optional[str]:
         cache_path = self.get_cache_path(entry_id)
+        meta_path = cache_path + ".meta.json"
 
         # If no drive_file_id and not mock mode, the file was deleted from Drive: purge cache!
         is_mock = settings.mock_google_api or getattr(google_service, "mock_mode", False)
@@ -94,7 +101,26 @@ class AudioService:
             return None
 
         if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
-            return cache_path
+            if drive_file_id and not is_mock:
+                try:
+                    if os.path.isfile(meta_path):
+                        import json
+                        with open(meta_path, "r") as mf:
+                            cached_meta = json.load(mf)
+                        if cached_meta.get("drive_file_id") == drive_file_id:
+                            return cache_path
+                        logger.info("Drive file ID mismatch for %s (%s vs %s). Invalidate local cache.", entry_id, cached_meta.get("drive_file_id"), drive_file_id)
+                        self.purge_cache(entry_id)
+                    else:
+                        import json
+                        with open(meta_path, "w") as mf:
+                            json.dump({"drive_file_id": drive_file_id}, mf)
+                        return cache_path
+                except Exception as ex:
+                    logger.warning("Error checking audio cache metadata for %s: %s", entry_id, ex)
+                    return cache_path
+            else:
+                return cache_path
 
         # If not cached locally, attempt to download from Google Drive
         if drive_file_id:
@@ -103,6 +129,12 @@ class AudioService:
             if audio_bytes:
                 with open(cache_path, "wb") as f:
                     f.write(audio_bytes)
+                try:
+                    import json
+                    with open(meta_path, "w") as mf:
+                        json.dump({"drive_file_id": drive_file_id}, mf)
+                except Exception:
+                    pass
                 logger.info("Cached %d bytes to %s", len(audio_bytes), cache_path)
                 return cache_path
 

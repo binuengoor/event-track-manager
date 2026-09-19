@@ -1523,6 +1523,12 @@ async def stream_audio(entry_id: str, request: Request, range: Optional[str] = H
 
     file_size = os.path.getsize(cache_path)
 
+    no_cache_headers = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
     if request.method == "HEAD":
         return Response(
             status_code=200,
@@ -1530,6 +1536,7 @@ async def stream_audio(entry_id: str, request: Request, range: Optional[str] = H
                 "Accept-Ranges": "bytes",
                 "Content-Length": str(file_size),
                 "Content-Type": "audio/mpeg",
+                **no_cache_headers,
             }
         )
 
@@ -1557,10 +1564,11 @@ async def stream_audio(entry_id: str, request: Request, range: Optional[str] = H
                 "Accept-Ranges": "bytes",
                 "Content-Length": str(length),
                 "Content-Type": "audio/mpeg",
+                **no_cache_headers,
             }
             return StreamingResponse(iter_file(), status_code=206, headers=headers)
 
-    return FileResponse(cache_path, media_type="audio/mpeg", headers={"Accept-Ranges": "bytes"})
+    return FileResponse(cache_path, media_type="audio/mpeg", headers={"Accept-Ranges": "bytes", **no_cache_headers})
 
 @app.patch("/api/status/{entry_id}")
 async def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):

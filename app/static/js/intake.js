@@ -1317,7 +1317,7 @@ async function updateActiveTrackPreview(song) {
 
         initPreviewWaveSurfer();
         if (previewWavesurfer) {
-          previewWavesurfer.load(data.stream_url);
+          previewWavesurfer.load(`${data.stream_url}?t=${Date.now()}`);
         }
 
         if (window.lucide) lucide.createIcons();

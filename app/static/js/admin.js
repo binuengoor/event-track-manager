@@ -146,13 +146,15 @@ async function handleSingleTrackCache(entryId, btn) {
   if (window.lucide) lucide.createIcons();
 
   try {
-    const res = await fetch(`/api/stream/${entryId}`);
+    const res = await fetch(`/api/stream/${entryId}?t=${Date.now()}`);
     if (!res.ok) throw new Error('Download failed from server');
     const blob = await res.blob();
     await saveCachedTrack(entryId, blob, {
       song_title: item.song_title,
       performer_name: item.performer_name,
-      sequence_order: item.sequence_order
+      sequence_order: item.sequence_order,
+      drive_file_id: item.drive_file_id,
+      last_updated: item.last_updated
     });
     cachedVaultEntryIds.add(entryId);
     await updateVaultStatusDisplay();
@@ -228,13 +230,15 @@ async function cacheAllTracksOffline() {
     if (text) text.textContent = `Caching ${i + 1}/${readyTracks.length}...`;
 
     try {
-      const res = await fetch(`/api/stream/${item.entry_id}`);
+      const res = await fetch(`/api/stream/${item.entry_id}?t=${Date.now()}`);
       if (res.ok) {
         const blob = await res.blob();
         await saveCachedTrack(item.entry_id, blob, {
           song_title: item.song_title,
           performer_name: item.performer_name,
-          sequence_order: item.sequence_order
+          sequence_order: item.sequence_order,
+          drive_file_id: item.drive_file_id,
+          last_updated: item.last_updated
         });
         cachedCount++;
       } else {
@@ -1446,7 +1450,13 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
       // 1. Check IndexedDB Audio Vault
       const cached = await getCachedTrack(item.entry_id);
-      if (cached && cached.blob) {
+      const isStale = cached && (
+        (item.drive_file_id && cached.drive_file_id && cached.drive_file_id !== item.drive_file_id) ||
+        (item.last_updated && cached.last_updated && cached.last_updated !== item.last_updated) ||
+        (item.song_title && cached.song_title && cached.song_title !== item.song_title)
+      );
+
+      if (cached && cached.blob && !isStale) {
         isVaultCached = true;
         if (currentCuedObjectUrl) {
           URL.revokeObjectURL(currentCuedObjectUrl);
@@ -1460,20 +1470,24 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
           if (window.lucide) lucide.createIcons();
         }
       } else if (navigator.onLine) {
-        // 2. Online & not yet cached: Fetch and store in Vault!
+        // 2. Online & not yet cached or stale: Fetch fresh and store in Vault!
         if (cuedVaultStatus) {
           cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-400 animate-pulse';
-          cuedVaultStatus.innerHTML = '<i data-lucide="hard-drive-download" class="w-3 h-3 text-cyan-400"></i><span>Caching track to Vault...</span>';
+          cuedVaultStatus.innerHTML = isStale
+            ? '<i data-lucide="refresh-cw" class="w-3 h-3 text-cyan-400 animate-spin"></i><span>Updating stale Vault cache...</span>'
+            : '<i data-lucide="hard-drive-download" class="w-3 h-3 text-cyan-400"></i><span>Caching track to Vault...</span>';
           if (window.lucide) lucide.createIcons();
         }
 
         try {
-          const res = await fetch(`/api/stream/${item.entry_id}`);
+          const res = await fetch(`/api/stream/${item.entry_id}?t=${Date.now()}`);
           if (res.ok) {
             const blob = await res.blob();
             await saveCachedTrack(item.entry_id, blob, {
               song_title: item.song_title,
-              performer_name: item.performer_name
+              performer_name: item.performer_name,
+              drive_file_id: item.drive_file_id,
+              last_updated: item.last_updated
             });
             isVaultCached = true;
             if (currentCuedObjectUrl) {
