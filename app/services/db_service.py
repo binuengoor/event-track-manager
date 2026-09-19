@@ -5,7 +5,7 @@ import json
 import logging
 import uuid
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from app.config import settings
 
 logger = logging.getLogger("db-service")
@@ -273,6 +273,29 @@ class DBService:
                     rows_backed  INTEGER DEFAULT 0,
                     error_msg    TEXT
                 )
+                """)
+
+                # 8. Activity logs / Audit trail
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS activity_logs (
+                    log_id         TEXT PRIMARY KEY,
+                    timestamp      TEXT NOT NULL,
+                    action_type    TEXT NOT NULL,
+                    performer_name TEXT NOT NULL,
+                    entry_id       TEXT DEFAULT '',
+                    summary        TEXT NOT NULL,
+                    details        TEXT DEFAULT '',
+                    source         TEXT DEFAULT 'system'
+                )
+                """)
+                conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_logs_ts ON activity_logs (timestamp DESC)
+                """)
+                conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs (action_type)
+                """)
+                conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_activity_logs_name ON activity_logs (performer_name)
                 """)
 
                 conn.commit()
@@ -1490,6 +1513,79 @@ class DBService:
             logger.error(f"Error fetching last backup info: {ex}")
             return None
 
+    # =========================================================================
+    # ACTIVITY / AUDIT LOGS
+    # =========================================================================
+
+    def log_activity(
+        self,
+        action_type: str,
+        performer_name: str,
+        summary: str,
+        entry_id: str = "",
+        details: str = "",
+        source: str = "system"
+    ) -> str:
+        """Records an event in activity_logs."""
+        try:
+            log_id = f"act_{uuid.uuid4().hex[:10]}"
+            now_iso = datetime.now(timezone.utc).isoformat()
+            with self._get_connection() as conn:
+                conn.execute("""
+                INSERT INTO activity_logs (log_id, timestamp, action_type, performer_name, entry_id, summary, details, source)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    log_id,
+                    now_iso,
+                    action_type.strip().lower(),
+                    performer_name.strip(),
+                    entry_id.strip() if entry_id else "",
+                    summary.strip(),
+                    details.strip() if details else "",
+                    source.strip().lower()
+                ))
+                conn.commit()
+            return log_id
+        except Exception as ex:
+            logger.error(f"Failed to log activity: {ex}")
+            return ""
+
+    def get_activity_logs(
+        self,
+        days: Optional[int] = 7,
+        limit: int = 300,
+        search: str = "",
+        action_type: str = ""
+    ) -> List[Dict[str, Any]]:
+        """Retrieves activity logs ordered newest to oldest, with optional day range, search, and action filters."""
+        try:
+            with self._get_connection() as conn:
+                query = "SELECT log_id, timestamp, action_type, performer_name, entry_id, summary, details, source FROM activity_logs WHERE 1=1"
+                params = []
+
+                if days and days > 0:
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+                    query += " AND timestamp >= ?"
+                    params.append(cutoff)
+
+                if action_type and action_type.strip() and action_type.strip().lower() != "all":
+                    query += " AND action_type = ?"
+                    params.append(action_type.strip().lower())
+
+                if search and search.strip():
+                    term = f"%{search.strip().lower()}%"
+                    query += " AND (LOWER(performer_name) LIKE ? OR LOWER(summary) LIKE ? OR LOWER(entry_id) LIKE ? OR LOWER(details) LIKE ?)"
+                    params.extend([term, term, term, term])
+
+                query += " ORDER BY timestamp DESC LIMIT ?"
+                params.append(limit)
+
+                rows = conn.execute(query, params).fetchall()
+                return [dict(r) for r in rows]
+        except Exception as ex:
+            logger.error(f"Failed to fetch activity logs: {ex}")
+            return []
+
     def reset_database(self):
         """Drops and re-creates tables cleanly on user request."""
         with self._get_connection() as conn:
@@ -1500,6 +1596,7 @@ class DBService:
             conn.execute("DROP TABLE IF EXISTS food_items")
             conn.execute("DROP TABLE IF EXISTS food_groups")
             conn.execute("DROP TABLE IF EXISTS backup_log")
+            conn.execute("DROP TABLE IF EXISTS activity_logs")
             conn.commit()
         self._ensure_db()
 

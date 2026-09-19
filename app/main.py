@@ -517,6 +517,20 @@ async def register_participant(payload: SignupRequest):
 
         backup_service.trigger_backup()
 
+        dish_text = f" ({payload.food_signup.dish_description})" if payload.food_signup and payload.food_signup.dish_description else ""
+        item_name = payload.food_signup.item_id
+        for it in db_service.get_all_food_items_with_signups():
+            if it.get("item_id") == payload.food_signup.item_id:
+                item_name = it.get("name", item_name)
+                break
+        db_service.log_activity(
+            action_type="signup",
+            performer_name=clean_name,
+            summary=f"Signed up for potluck: {item_name}{dish_text}",
+            details=json.dumps({"role": "attendee", "item": item_name, "dish": payload.food_signup.dish_description or "", "phone": contact_phone}),
+            source="public_signup"
+        )
+
         return {
             "status": "success",
             "registration_type": "food_only",
@@ -649,6 +663,29 @@ async def register_participant(payload: SignupRequest):
 
     backup_service.trigger_backup()
 
+    acts_summary = ", ".join([f"{p.performance_type}: {p.song_title or 'Song TBD'}" for p in payload.performances])
+    db_service.log_activity(
+        action_type="signup",
+        performer_name=clean_name,
+        summary=f"Registered as performer ({len(payload.performances)} act{'s' if len(payload.performances) > 1 else ''}: {acts_summary})",
+        details=json.dumps({"entry_ids": entry_ids, "age_group": payload.age_group, "phone": contact_phone}),
+        source="public_signup"
+    )
+    if food_signup_id and payload.food_signup:
+        item_name = payload.food_signup.item_id
+        for it in db_service.get_all_food_items_with_signups():
+            if it.get("item_id") == payload.food_signup.item_id:
+                item_name = it.get("name", item_name)
+                break
+        dish_text = f" ({payload.food_signup.dish_description})" if payload.food_signup.dish_description else ""
+        db_service.log_activity(
+            action_type="food_claim",
+            performer_name=clean_name,
+            summary=f"Claimed potluck dish: {item_name}{dish_text}",
+            details=json.dumps({"item_name": item_name, "dish_description": payload.food_signup.dish_description or ""}),
+            source="public_signup"
+        )
+
     return {
         "status": "success",
         "performer_name": clean_name,
@@ -659,6 +696,7 @@ async def register_participant(payload: SignupRequest):
 
 @app.put("/api/signup/performance/{entry_id}")
 async def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
+    old_perf = db_service.get_performance(entry_id) or {}
     update_kwargs = {
         "song_title": payload.song_title,
         "movie_name": payload.movie_name,
@@ -685,6 +723,26 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
         raise HTTPException(status_code=404, detail=f"Performance entry {entry_id} not found")
 
     backup_service.trigger_backup()
+
+    changes = []
+    if payload.song_title is not None and payload.song_title != (old_perf.get("song_title") or ""):
+        changes.append(f"Song: '{old_perf.get('song_title') or 'TBD'}' -> '{payload.song_title}'")
+    if payload.movie_name is not None and payload.movie_name != (old_perf.get("movie_name") or ""):
+        changes.append(f"Movie: '{payload.movie_name}'")
+    if payload.partner_name is not None and payload.partner_name != (old_perf.get("partner_name") or ""):
+        changes.append(f"Partner: '{payload.partner_name}'")
+    if payload.stage_notes is not None and payload.stage_notes != (old_perf.get("stage_notes") or ""):
+        changes.append("Stage notes updated")
+    change_summary = "; ".join(changes) if changes else f"Performance details updated for {entry_id}"
+    db_service.log_activity(
+        action_type="performance_update",
+        performer_name=old_perf.get("performer_name", "Participant"),
+        entry_id=entry_id,
+        summary=change_summary,
+        details=json.dumps({k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}),
+        source="performer_hub"
+    )
+
     return {"status": "success", "entry_id": entry_id}
 
 @app.post("/api/signup/food")
@@ -704,12 +762,31 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
             signer_phone=payload.signer_phone or ""
         )
         backup_service.trigger_backup()
+
+        item_name = payload.item_id
+        for it in db_service.get_all_food_items_with_signups():
+            if it.get("item_id") == payload.item_id:
+                item_name = it.get("name", item_name)
+                break
+        dish_text = f" ({payload.dish_description})" if payload.dish_description else ""
+        db_service.log_activity(
+            action_type="food_claim",
+            performer_name=payload.signer_name,
+            summary=f"Claimed potluck dish '{item_name}'{dish_text}",
+            details=json.dumps(payload.dict()),
+            source="performer_hub"
+        )
+
         return {"status": "success", "signup_id": signup_id}
     except ValueError as ex:
         raise HTTPException(status_code=409, detail=str(ex))
 
 @app.put("/api/signup/food/{signup_id}")
 async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest):
+    all_items_before = db_service.get_all_food_items_with_signups()
+    target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
+    signer = target_before.get("signer_name", "Participant") if target_before else "Participant"
+
     try:
         success = db_service.update_food_signup(
             signup_id=signup_id,
@@ -719,16 +796,45 @@ async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest
         if not success:
             raise HTTPException(status_code=404, detail="Food sign-up not found.")
         backup_service.trigger_backup()
+
+        new_item_name = ""
+        if payload.item_id:
+            new_it = next((it for it in all_items_before if it.get("item_id") == payload.item_id), None)
+            if new_it:
+                new_item_name = new_it.get("name", "")
+        dish_txt = f" ({payload.dish_description})" if payload.dish_description else ""
+        db_service.log_activity(
+            action_type="food_update",
+            performer_name=signer,
+            summary=f"Updated food sign-up to '{new_item_name or (target_before.get('name') if target_before else 'dish')}'{dish_txt}",
+            details=json.dumps(payload.dict(exclude_unset=True)),
+            source="performer_hub"
+        )
+
         return {"status": "success"}
     except ValueError as ex:
         raise HTTPException(status_code=409, detail=str(ex))
 
 @app.delete("/api/signup/food/{signup_id}")
 async def release_food_signup_endpoint(signup_id: str):
+    all_items_before = db_service.get_all_food_items_with_signups()
+    target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
+    signer = target_before.get("signer_name", "Participant") if target_before else "Participant"
+    item_name = target_before.get("name", "potluck dish") if target_before else "potluck dish"
+
     success = db_service.release_food_signup(signup_id)
     if not success:
         raise HTTPException(status_code=404, detail="Food sign-up not found.")
     backup_service.trigger_backup()
+
+    db_service.log_activity(
+        action_type="food_release",
+        performer_name=signer,
+        summary=f"Released potluck dish '{item_name}'",
+        details=json.dumps({"signup_id": signup_id, "item_name": item_name}),
+        source="performer_hub"
+    )
+
     return {"status": "success", "message": "Food item released."}
 
 @app.get("/api/performer/profile")
@@ -850,6 +956,16 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         created_via="performer_hub"
     )
     backup_service.trigger_backup()
+
+    db_service.log_activity(
+        action_type="performance_update",
+        performer_name=clean_name,
+        entry_id=entry_id,
+        summary=f"Added performance {entry_id} ({perf_type}: '{payload.song_title or 'Song TBD'}')",
+        details=json.dumps(payload.dict()),
+        source="performer_hub"
+    )
+
     return {"status": "success", "entry_id": entry_id, "message": "Performance added successfully."}
 
 @app.put("/api/performer/rename")
@@ -862,6 +978,15 @@ async def rename_performer_endpoint(payload: PerformerRenameRequest):
     try:
         db_service.rename_performer(old_name, new_name)
         backup_service.trigger_backup()
+
+        db_service.log_activity(
+            action_type="rename",
+            performer_name=new_name,
+            summary=f"Name changed from '{old_name}' to '{new_name}'",
+            details=json.dumps({"old_name": old_name, "new_name": new_name}),
+            source="performer_hub"
+        )
+
         return {
             "status": "success",
             "old_name": old_name,
@@ -1044,6 +1169,10 @@ async def update_admin_food_item(item_id: str, payload: FoodItemUpdateRequest, _
     if not success:
         raise HTTPException(status_code=404, detail="Food item not found.")
     backup_service.trigger_backup()
+    if payload.release_claim:
+        db_service.log_activity("food_release", payload.signer_name or "Admin", f"Admin released food slot {item_id}", source="admin")
+    elif payload.signer_name:
+        db_service.log_activity("food_update", payload.signer_name, f"Admin updated potluck slot {item_id} -> {payload.signer_name}", source="admin")
     return {"status": "success"}
 
 @app.delete("/api/admin/food-items/{item_id}")
@@ -1236,16 +1365,54 @@ async def update_admin_participant(entry_id: str, payload: AdminParticipantUpdat
         now_iso = datetime.now(timezone.utc).isoformat()
         db_service.update_performance_field(entry_id, "last_updated", now_iso)
     backup_service.trigger_backup()
+
+    perf_name = payload.performer_name or old_perf.get("performer_name", "Participant")
+    db_service.log_activity(
+        action_type="admin_edit",
+        performer_name=perf_name,
+        entry_id=entry_id,
+        summary=f"Admin updated participant details for {entry_id} ({perf_name})",
+        details=json.dumps({k: v for k, v in payload.dict(exclude_unset=True).items() if v is not None}),
+        source="admin"
+    )
+
     return {"status": "success", "entry_id": entry_id, "message": "Participant updated successfully."}
 
 @app.delete("/api/admin/participants/{entry_id}")
 async def delete_admin_participant(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
     """Deletes a participant performance from SQLite and triggers backup."""
+    target_perf = db_service.get_performance(entry_id) or {}
     success = db_service.delete_performance(entry_id)
     if not success:
         raise HTTPException(status_code=404, detail="Participant/performance entry not found.")
     backup_service.trigger_backup()
+
+    db_service.log_activity(
+        action_type="delete",
+        performer_name=target_perf.get("performer_name", "Participant"),
+        entry_id=entry_id,
+        summary=f"Admin deleted performance {entry_id} ({target_perf.get('performer_name', '')} - '{target_perf.get('song_title', '')}')",
+        details=json.dumps(dict(target_perf)),
+        source="admin"
+    )
+
     return {"status": "success", "entry_id": entry_id, "message": "Participant entry deleted."}
+
+@app.get("/api/admin/activity-logs")
+async def get_admin_activity_logs(
+    days: Optional[int] = 7,
+    limit: int = 200,
+    search: str = "",
+    action_type: str = "",
+    _authorized: bool = Depends(verify_admin_pin)
+):
+    """Returns activity audit log entries with optional days, search, and action filters."""
+    return db_service.get_activity_logs(
+        days=days,
+        limit=limit,
+        search=search,
+        action_type=action_type
+    )
 
 
 # =============================================================================
@@ -1493,6 +1660,25 @@ async def upload_track(
         raise HTTPException(status_code=500, detail="Track uploaded to Drive, but failed to update Google Sheet row")
 
     backup_service.trigger_backup()
+
+    if submission_type == "youtube":
+        db_service.log_activity(
+            action_type="track_upload",
+            performer_name=target_entry.performer_name,
+            entry_id=entry_id,
+            summary=f"Downloaded track from YouTube for {entry_id} ('{target_entry.song_title}')",
+            details=json.dumps({"youtube_url": youtube_url, "duration": duration_str}),
+            source="youtube"
+        )
+    else:
+        db_service.log_activity(
+            action_type="track_upload",
+            performer_name=target_entry.performer_name,
+            entry_id=entry_id,
+            summary=f"Uploaded audio track file '{canonical_filename}' for {entry_id} ('{target_entry.song_title}')",
+            details=json.dumps({"filename": getattr(file, "filename", canonical_filename) if file else canonical_filename, "duration": duration_str}),
+            source="upload"
+        )
 
     return {
         "status": "success",

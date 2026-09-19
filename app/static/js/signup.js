@@ -531,6 +531,7 @@ function setupEventListeners() {
         contactInfoWrap.classList.add("sm:col-span-2");
       }
       if (familyNote) familyNote.classList.remove("hidden");
+      toggleGuardianRequirement(false);
       if (guardianContainer) guardianContainer.classList.add("hidden");
       if (nameLabel) nameLabel.textContent = "Contact / Family Name *";
       if (nameInput) nameInput.placeholder = "e.g. Maya Suresh or Suresh Family";
