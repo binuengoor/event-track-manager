@@ -193,6 +193,7 @@ class DBService:
                     ("partner_age_group", "TEXT DEFAULT ''"),
                     ("partner_phone", "TEXT DEFAULT ''"),
                     ("created_via", "TEXT DEFAULT 'sheet'"),
+                    ("participant_id", "TEXT DEFAULT ''"),
                 ]:
                     try:
                         conn.execute(f"ALTER TABLE performances ADD COLUMN {col_name} {col_def}")
@@ -257,6 +258,7 @@ class DBService:
                 # Migrations for existing food_signups table
                 for col_name, col_def in [
                     ("signer_phone", "TEXT DEFAULT ''"),
+                    ("participant_id", "TEXT DEFAULT ''"),
                 ]:
                     try:
                         conn.execute(f"ALTER TABLE food_signups ADD COLUMN {col_name} {col_def}")
@@ -298,9 +300,145 @@ class DBService:
                 CREATE INDEX IF NOT EXISTS idx_activity_logs_name ON activity_logs (performer_name)
                 """)
 
+                # 9. Participants table (canonical participant registry)
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS participants (
+                    participant_id TEXT PRIMARY KEY,
+                    name           TEXT NOT NULL UNIQUE,
+                    phone          TEXT DEFAULT '',
+                    age_group      TEXT DEFAULT 'Senior',
+                    guardian_name  TEXT DEFAULT '',
+                    guardian_phone TEXT DEFAULT '',
+                    created_at     TEXT DEFAULT (datetime('now')),
+                    updated_at     TEXT DEFAULT (datetime('now'))
+                )
+                """)
+                conn.execute("""
+                CREATE INDEX IF NOT EXISTS idx_participants_name ON participants (name)
+                """)
+
+                # Idempotent backfill for relational integrity
+                self._backfill_participants(conn)
+
                 conn.commit()
         except Exception as ex:
             logger.error(f"Error initializing SQLite database at {self.db_path}: {ex}")
+
+    def _get_or_create_participant_conn(
+        self,
+        conn: sqlite3.Connection,
+        name: str,
+        phone: str = "",
+        age_group: str = "Senior",
+        guardian_name: str = "",
+        guardian_phone: str = ""
+    ) -> str:
+        clean_name = name.strip()
+        if not clean_name:
+            return ""
+
+        row = conn.execute(
+            "SELECT participant_id, phone, age_group, guardian_name, guardian_phone FROM participants WHERE LOWER(TRIM(name)) = LOWER(TRIM(?))",
+            (clean_name,)
+        ).fetchone()
+
+        if row:
+            part_id = row["participant_id"]
+            updates = []
+            params = []
+            if phone and not row["phone"]:
+                updates.append("phone = ?")
+                params.append(phone)
+            if age_group and age_group != "Senior" and row["age_group"] == "Senior":
+                updates.append("age_group = ?")
+                params.append(age_group)
+            if guardian_name and not row["guardian_name"]:
+                updates.append("guardian_name = ?")
+                params.append(guardian_name)
+            if guardian_phone and not row["guardian_phone"]:
+                updates.append("guardian_phone = ?")
+                params.append(guardian_phone)
+
+            if updates:
+                updates.append("updated_at = datetime('now')")
+                params.append(part_id)
+                conn.execute(f"UPDATE participants SET {', '.join(updates)} WHERE participant_id = ?", params)
+
+            return part_id
+
+        # Insert new participant
+        part_id = f"pt_{uuid.uuid4().hex[:8]}"
+        conn.execute("""
+        INSERT INTO participants (participant_id, name, phone, age_group, guardian_name, guardian_phone, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        """, (part_id, clean_name, phone or "", age_group or "Senior", guardian_name or "", guardian_phone or ""))
+        return part_id
+
+    def _backfill_participants(self, conn: sqlite3.Connection):
+        """Idempotently backfills participants table from existing performances and food signups."""
+        try:
+            # 1. Primary performers from performances
+            rows = conn.execute("""
+                SELECT entry_id, performer_name, contact_info, age_group, guardian_name, guardian_phone, participant_id
+                FROM performances
+            """).fetchall()
+
+            for r in rows:
+                name = (r["performer_name"] or "").strip()
+                if not name:
+                    continue
+                part_id = r["participant_id"] if "participant_id" in r.keys() and r["participant_id"] else None
+                if not part_id:
+                    part_id = self._get_or_create_participant_conn(
+                        conn,
+                        name=name,
+                        phone=(r["contact_info"] or "").strip(),
+                        age_group=(r["age_group"] or "Senior").strip(),
+                        guardian_name=(r["guardian_name"] or "").strip(),
+                        guardian_phone=(r["guardian_phone"] or "").strip()
+                    )
+                    conn.execute("UPDATE performances SET participant_id = ? WHERE entry_id = ?", (part_id, r["entry_id"]))
+
+            # 2. Partners from performances
+            partner_rows = conn.execute("""
+                SELECT partner_name, partner_phone, partner_age_group, guardian_name, guardian_phone
+                FROM performances
+                WHERE partner_name IS NOT NULL AND partner_name != ''
+            """).fetchall()
+
+            for r in partner_rows:
+                raw_partner = (r["partner_name"] or "").strip()
+                if not raw_partner:
+                    continue
+                tokens = re.split(r'\s*(?:&|,|\band\b)\s*', raw_partner, flags=re.IGNORECASE)
+                for token in tokens:
+                    p_name = token.strip()
+                    if p_name and len(p_name) >= 2:
+                        p_age = (r["partner_age_group"] or "Senior").strip()
+                        is_junior = "junior" in p_age.lower()
+                        self._get_or_create_participant_conn(
+                            conn,
+                            name=p_name,
+                            phone=(r["partner_phone"] or "").strip(),
+                            age_group=p_age,
+                            guardian_name=(r["guardian_name"] or "").strip() if is_junior else "",
+                            guardian_phone=(r["guardian_phone"] or "").strip() if is_junior else ""
+                        )
+
+            # 3. Signers from food_signups
+            food_rows = conn.execute("SELECT signup_id, signer_name, signer_phone, participant_id FROM food_signups").fetchall()
+            for fr in food_rows:
+                s_name = (fr["signer_name"] or "").strip()
+                part_id = fr["participant_id"] if "participant_id" in fr.keys() and fr["participant_id"] else None
+                if s_name and not part_id:
+                    p_id = self._get_or_create_participant_conn(
+                        conn,
+                        name=s_name,
+                        phone=(fr["signer_phone"] or "").strip()
+                    )
+                    conn.execute("UPDATE food_signups SET participant_id = ? WHERE signup_id = ?", (p_id, fr["signup_id"]))
+        except Exception as ex:
+            logger.warning("Error backfilling participants: %s", ex)
 
     # =========================================================================
     # APP SETTINGS
@@ -575,11 +713,17 @@ class DBService:
             if existing:
                 raise ValueError(f"This food item has already been claimed by {existing['signer_name']}.")
 
+            participant_id = self._get_or_create_participant_conn(
+                conn,
+                name=clean_signer,
+                phone=clean_phone
+            )
+
             try:
                 conn.execute("""
-                INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, signer_phone, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-                """, (signup_id, item_id, clean_signer, clean_desc, clean_phone))
+                INSERT INTO food_signups (signup_id, item_id, signer_name, dish_description, signer_phone, participant_id, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+                """, (signup_id, item_id, clean_signer, clean_desc, clean_phone, participant_id))
                 conn.commit()
             except sqlite3.IntegrityError:
                 raise ValueError("This food item has already been claimed by someone else.")
@@ -1094,14 +1238,35 @@ class DBService:
 
             is_missing = 1 if is_placeholder_song_title(song_title) else 0
 
+            # Ensure participant records exist in canonical participants table
+            participant_id = self._get_or_create_participant_conn(
+                conn,
+                name=performer_name.strip(),
+                phone=contact_info.strip() if contact_info else "",
+                age_group=age_group.strip() if age_group else "Senior",
+                guardian_name=guardian_name.strip() if guardian_name else "",
+                guardian_phone=guardian_phone.strip() if guardian_phone else ""
+            )
+            if partner_name:
+                p_age = partner_age_group.strip() if partner_age_group else "Senior"
+                is_junior = "junior" in p_age.lower()
+                self._get_or_create_participant_conn(
+                    conn,
+                    name=partner_name.strip(),
+                    phone=partner_phone.strip() if partner_phone else "",
+                    age_group=p_age,
+                    guardian_name=guardian_name.strip() if is_junior else "",
+                    guardian_phone=guardian_phone.strip() if is_junior else ""
+                )
+
             conn.execute("""
             INSERT INTO performances (
                 entry_id, performer_name, performance_type, partner_name, partner_age_group, contact_info,
                 partner_phone, song_title, movie_name, sequence_order, performance_status, track_status,
                 duration, drive_file_id, drive_file_name, last_updated, row_index,
                 is_song_name_missing, extra_tags_json, stage_notes, age_group,
-                guardian_name, guardian_phone, created_via
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                guardian_name, guardian_phone, created_via, participant_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry_id,
                 performer_name.strip(),
@@ -1126,7 +1291,8 @@ class DBService:
                 age_group or "",
                 guardian_name.strip() if guardian_name else "",
                 guardian_phone.strip() if guardian_phone else "",
-                created_via
+                created_via,
+                participant_id
             ))
             conn.commit()
 
@@ -1202,6 +1368,14 @@ class DBService:
                 raise ValueError(f"A participant named '{clean_new}' is already registered.")
 
             now_iso = datetime.now(timezone.utc).isoformat()
+
+            # Update canonical participants table
+            conn.execute("""
+                UPDATE participants 
+                SET name = ?, updated_at = datetime('now')
+                WHERE LOWER(TRIM(name)) = ?
+            """, (clean_new, clean_old.lower()))
+
             conn.execute("""
                 UPDATE performances 
                 SET performer_name = ?, last_updated = ?
@@ -1586,10 +1760,101 @@ class DBService:
             logger.error(f"Failed to fetch activity logs: {ex}")
             return []
 
+    # =========================================================================
+    # PARTICIPANTS (CANONICAL ROSTER)
+    # =========================================================================
+
+    def get_or_create_participant(
+        self,
+        name: str,
+        phone: str = "",
+        age_group: str = "Senior",
+        guardian_name: str = "",
+        guardian_phone: str = ""
+    ) -> str:
+        with self._get_connection() as conn:
+            part_id = self._get_or_create_participant_conn(
+                conn,
+                name=name,
+                phone=phone,
+                age_group=age_group,
+                guardian_name=guardian_name,
+                guardian_phone=guardian_phone
+            )
+            conn.commit()
+            return part_id
+
+    def get_participant(self, identifier: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a participant record by participant_id or exact name."""
+        clean = identifier.strip()
+        if not clean:
+            return None
+        with self._get_connection() as conn:
+            row = conn.execute("""
+                SELECT * FROM participants 
+                WHERE participant_id = ? OR LOWER(TRIM(name)) = LOWER(TRIM(?))
+                LIMIT 1
+            """, (clean, clean)).fetchone()
+            return dict(row) if row else None
+
+    def get_all_participants(self) -> List[Dict[str, Any]]:
+        """Returns all participants with attached performances and food signup details."""
+        with self._get_connection() as conn:
+            participants = [dict(r) for r in conn.execute("SELECT * FROM participants ORDER BY name COLLATE NOCASE ASC").fetchall()]
+            perfs = self.get_all_performances()
+            food_items = self.get_all_food_items_with_signups()
+
+            for pt in participants:
+                pt_name_lower = pt["name"].strip().lower()
+                pt_perfs = []
+                for p in perfs:
+                    p1 = (p.get("performer_name") or "").strip().lower()
+                    p2 = (p.get("partner_name") or "").strip().lower()
+                    if p1 == pt_name_lower:
+                        pt_perfs.append({**p, "role": "primary"})
+                    elif p2 and (pt_name_lower in p2 or any(token.strip().lower() == pt_name_lower for token in re.split(r'[&,]|(?:\band\b)', p2))):
+                        pt_perfs.append({**p, "role": "partner"})
+
+                pt["performances"] = pt_perfs
+                pt["total_performances"] = len(pt_perfs)
+
+                # Food signup lookup
+                food = None
+                for fi in food_items:
+                    s_name = (fi.get("signer_name") or "").strip()
+                    if s_name and (s_name.lower() == pt_name_lower or names_match(pt["name"], s_name)):
+                        food = fi
+                        break
+                pt["food_signup"] = food
+
+            return participants
+
+    def update_participant(self, participant_id: str, **fields) -> bool:
+        """Updates participant details."""
+        allowed_fields = {"name", "phone", "age_group", "guardian_name", "guardian_phone"}
+        updates = []
+        params = []
+        for k, v in fields.items():
+            if k in allowed_fields and v is not None:
+                updates.append(f"{k} = ?")
+                params.append(str(v).strip())
+
+        if not updates:
+            return False
+
+        updates.append("updated_at = datetime('now')")
+        params.append(participant_id)
+
+        with self._get_connection() as conn:
+            cursor = conn.execute(f"UPDATE participants SET {', '.join(updates)} WHERE participant_id = ?", params)
+            conn.commit()
+            return cursor.rowcount > 0
+
     def reset_database(self):
         """Drops and re-creates tables cleanly on user request."""
         with self._get_connection() as conn:
             conn.execute("DROP TABLE IF EXISTS performances")
+            conn.execute("DROP TABLE IF EXISTS participants")
             conn.execute("DROP TABLE IF EXISTS sync_meta")
             conn.execute("DROP TABLE IF EXISTS app_settings")
             conn.execute("DROP TABLE IF EXISTS food_signups")

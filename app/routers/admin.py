@@ -165,6 +165,12 @@ async def trigger_immediate_backup(_authorized: bool = Depends(verify_admin_pin)
     return await backup_service.backup_now()
 
 
+@router.get("/api/admin/roster")
+async def list_admin_roster(_authorized: bool = Depends(verify_admin_pin)):
+    """Returns canonical participants roster with attached performances and food signups."""
+    return db_service.get_all_participants()
+
+
 @router.get("/api/admin/participants")
 async def list_admin_participants(_authorized: bool = Depends(verify_admin_pin)):
     """Returns all performances/participants directly from SQLite with food signup details."""
