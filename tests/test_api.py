@@ -433,6 +433,16 @@ def test_stage_service_live_status():
     assert "gallery_images" in status
 
 
+def test_sync_endpoint_requires_admin_pin():
+    client = TestClient(app)
+    # Unauthenticated request must fail
+    res_unauth = client.post("/api/sync")
+    assert res_unauth.status_code == 401
 
-
-
+    # Authenticated request succeeds
+    res_auth = client.post(
+        "/api/sync",
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert res_auth.status_code == 200
+    assert res_auth.json()["status"] == "success"

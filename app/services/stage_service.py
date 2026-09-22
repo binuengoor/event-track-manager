@@ -83,7 +83,7 @@ class StageService:
         performed = []
         on_hold = []
 
-        active_id = google_service.active_entry_id
+        active_id = db_service.get_active_entry_id()
         if active_id:
             now_performing = next((p for p in queue if p.entry_id == active_id), None)
 

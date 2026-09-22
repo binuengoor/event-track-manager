@@ -14,6 +14,64 @@ let isSequenceDirty = false;
 let lastSyncedAt = null;
 
 // =============================================================================
+// POP-OUT STAGE CONFIDENCE MONITOR (BroadcastChannel Sync)
+// =============================================================================
+const stageMonitorChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('stage_monitor_channel') : null;
+
+function broadcastStageMonitor(eventType = 'SYNC') {
+  if (!stageMonitorChannel) return;
+  if (!currentCuedItem) {
+    stageMonitorChannel.postMessage({ type: 'UNCUE' });
+    return;
+  }
+  const isAcoustic = currentCuedItem.track_status === 'Acoustic';
+  const isVideo = (currentCuedItem.media_type === 'video') || (currentCuedItem.drive_file_name && currentCuedItem.drive_file_name.endsWith('.mp4'));
+  const curTime = (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') ? wavesurfer.getCurrentTime() : 0;
+  const isPlayingNow = (typeof isAudioPlaying === 'function') ? isAudioPlaying() : false;
+
+  stageMonitorChannel.postMessage({
+    type: eventType,
+    entryId: currentCuedItem.entry_id,
+    performerName: currentCuedItem.performer_name,
+    partnerName: currentCuedItem.partner_name || '',
+    songTitle: currentCuedItem.song_title,
+    mediaType: isAcoustic ? 'acoustic' : (isVideo ? 'video' : 'audio'),
+    streamUrl: `/api/stream/${currentCuedItem.entry_id}`,
+    currentTime: curTime,
+    isPlaying: isPlayingNow
+  });
+}
+
+if (stageMonitorChannel) {
+  stageMonitorChannel.onmessage = (event) => {
+    if (event.data && event.data.type === 'REQUEST_STATE') {
+      broadcastStageMonitor(currentCuedItem ? 'CUE' : 'UNCUE');
+    }
+  };
+}
+
+function openStageMonitor() {
+  window.open('/console/stage-monitor', 'StageMonitor', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+}
+
+function syncConsolePreviewVideo(play) {
+  const previewVid = document.getElementById('console-preview-video');
+  if (!previewVid) return;
+  previewVid.muted = true;
+  if (play) {
+    if (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') {
+      previewVid.currentTime = wavesurfer.getCurrentTime();
+    }
+    previewVid.play().catch(() => {});
+  } else {
+    previewVid.pause();
+    if (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') {
+      previewVid.currentTime = wavesurfer.getCurrentTime();
+    }
+  }
+}
+
+// =============================================================================
 // INDEXEDDB AUDIO VAULT FOR 100% OFFLINE STAGE PLAYBACK
 // =============================================================================
 const VAULT_DB_NAME = 'PaattukoottamAudioVault';
@@ -479,6 +537,7 @@ async function fetchEventInfo() {
     const res = await fetch('/api/event-info');
     if (res.ok) {
       const data = await res.json();
+      window.eventInfo = data;
       if (data.header_brand_title) {
         const titleEl = document.getElementById('admin-event-title');
         if (titleEl) titleEl.textContent = data.header_brand_title;
@@ -487,6 +546,27 @@ async function fetchEventInfo() {
       if (data.header_brand_subtitle) {
         const subEl = document.getElementById('admin-event-subtitle');
         if (subEl) subEl.textContent = data.header_brand_subtitle;
+      }
+
+      const isConsoleEnabled = Boolean(data.console_enabled !== false);
+      const inactiveCard = document.getElementById('console-inactive-card');
+      const activeContent = document.getElementById('console-active-content');
+      const authModal = document.getElementById('auth-modal');
+
+      if (window.adaptNavigationForEventConfig) {
+        window.adaptNavigationForEventConfig(data);
+      }
+
+      if (!isConsoleEnabled) {
+        if (inactiveCard) inactiveCard.classList.remove('hidden');
+        if (activeContent) activeContent.classList.add('hidden');
+        if (authModal) authModal.classList.add('hidden');
+        if (autoSyncInterval) clearInterval(autoSyncInterval);
+        if (window.lucide) lucide.createIcons();
+        return;
+      } else {
+        if (inactiveCard) inactiveCard.classList.add('hidden');
+        if (activeContent) activeContent.classList.remove('hidden');
       }
     }
   } catch (e) {
@@ -1088,28 +1168,53 @@ function initWaveSurfer() {
       normalize: true
     });
 
+    let lastBroadcastSyncTime = 0;
+
     wavesurfer.on('play', () => {
       isPlaying = true;
       updatePlayPauseButton();
+      broadcastStageMonitor('PLAY');
+      syncConsolePreviewVideo(true);
     });
 
     wavesurfer.on('pause', () => {
       isPlaying = false;
       updatePlayPauseButton();
+      broadcastStageMonitor('PAUSE');
+      syncConsolePreviewVideo(false);
+    });
+
+    wavesurfer.on('seeking', () => {
+      broadcastStageMonitor('SEEK');
+      const cur = wavesurfer.getCurrentTime();
+      const previewVid = document.getElementById('console-preview-video');
+      if (previewVid) previewVid.currentTime = cur;
     });
 
     wavesurfer.on('timeupdate', (currentTime) => {
       document.getElementById('player-current-time').textContent = formatTime(currentTime);
+      const previewVid = document.getElementById('console-preview-video');
+      if (previewVid && !previewVid.paused && Math.abs(previewVid.currentTime - currentTime) > 0.3) {
+        previewVid.currentTime = currentTime;
+      }
+      const now = Date.now();
+      if (now - lastBroadcastSyncTime > 2000) {
+        lastBroadcastSyncTime = now;
+        broadcastStageMonitor('SYNC');
+      }
     });
 
     wavesurfer.on('ready', (duration) => {
       document.getElementById('player-duration').textContent = formatTime(duration);
       document.getElementById('waveform-placeholder').classList.add('hidden');
+      broadcastStageMonitor('CUE');
     });
 
     wavesurfer.on('finish', () => {
       isPlaying = false;
       updatePlayPauseButton();
+      broadcastStageMonitor('PAUSE');
+      syncConsolePreviewVideo(false);
     });
 
   } catch (e) {
@@ -1335,6 +1440,17 @@ function resetPlayerBar() {
     placeholder.classList.remove('hidden');
   }
 
+  const previewContainer = document.getElementById('player-video-preview');
+  if (previewContainer) previewContainer.classList.add('hidden');
+  const previewVid = document.getElementById('console-preview-video');
+  if (previewVid) {
+    previewVid.pause();
+    previewVid.src = '';
+  }
+  if (playerBadge) playerBadge.classList.remove('hidden');
+
+  broadcastStageMonitor('UNCUE');
+
   renderQueueList();
 }
 
@@ -1405,14 +1521,34 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     updatePlayerBarNotes(item.stage_notes || '');
 
     const isAcoustic = item.track_status === 'Acoustic';
+    const isVideo = (item.media_type === 'video') || (item.drive_file_name && item.drive_file_name.endsWith('.mp4'));
 
-    if (playerBadge) {
-      if (isAcoustic) {
-        playerBadge.className = 'w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/40';
-        playerBadge.innerHTML = '<i data-lucide="guitar" class="w-5 h-5"></i>';
-      } else {
-        playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
-        playerBadge.innerHTML = '<i data-lucide="music-2" class="w-5 h-5"></i>';
+    const previewContainer = document.getElementById('player-video-preview');
+    const previewVid = document.getElementById('console-preview-video');
+
+    if (isVideo) {
+      if (playerBadge) playerBadge.classList.add('hidden');
+      if (previewContainer) previewContainer.classList.remove('hidden');
+      if (previewVid) {
+        previewVid.muted = true;
+        previewVid.src = `/api/stream/${item.entry_id}`;
+        previewVid.load();
+      }
+    } else {
+      if (previewContainer) previewContainer.classList.add('hidden');
+      if (previewVid) {
+        previewVid.pause();
+        previewVid.src = '';
+      }
+      if (playerBadge) {
+        playerBadge.classList.remove('hidden');
+        if (isAcoustic) {
+          playerBadge.className = 'w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/40';
+          playerBadge.innerHTML = '<i data-lucide="guitar" class="w-5 h-5"></i>';
+        } else {
+          playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
+          playerBadge.innerHTML = '<i data-lucide="music-2" class="w-5 h-5"></i>';
+        }
       }
     }
 
@@ -1593,6 +1729,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     isPlaying = false;
     updatePlayPauseButton();
     renderQueueList();
+    broadcastStageMonitor('CUE');
 
     // Notify Live View of currently cued / active performer (skip during page reload restoration)
     if (!isRestoration) {
@@ -1966,6 +2103,22 @@ function setupActionButtons() {
         if (window.lucide) lucide.createIcons();
       }
     });
+  }
+
+  // Pop-out Stage Confidence Monitor buttons
+  const openStageMonitorBtn = document.getElementById('open-stage-monitor-btn');
+  if (openStageMonitorBtn) {
+    openStageMonitorBtn.addEventListener('click', openStageMonitor);
+  }
+
+  const btnStageMonitorPlayer = document.getElementById('btn-stage-monitor-player');
+  if (btnStageMonitorPlayer) {
+    btnStageMonitorPlayer.addEventListener('click', openStageMonitor);
+  }
+
+  const playerVideoPreview = document.getElementById('player-video-preview');
+  if (playerVideoPreview) {
+    playerVideoPreview.addEventListener('click', openStageMonitor);
   }
 }
 

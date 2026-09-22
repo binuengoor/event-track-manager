@@ -60,6 +60,27 @@
   <!-- Main Container -->
   <main class="flex-1 max-w-5xl lg:max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
 
+    <!-- INACTIVE LIVE DISPLAY NOTICE (When live_display_enabled is False) -->
+    <div id="live-inactive-card" class="hidden p-8 sm:p-12 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-4 max-w-lg mx-auto my-8">
+      <div class="w-14 h-14 rounded-3xl bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+        <i data-lucide="radio" class="w-7 h-7"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-white">Live Stage Display Inactive</h3>
+        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+          The audience live stage display is currently inactive for this event. Please check back during scheduled stage hours or contact the organizers.
+        </p>
+      </div>
+      <div class="pt-2">
+        <a href="/" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
+          <i data-lucide="home" class="w-3.5 h-3.5"></i>
+          <span>Return Home</span>
+        </a>
+      </div>
+    </div>
+
+    <div id="live-active-content" class="space-y-6">
+
     <!-- Section 1: COUNTDOWN (Pre-Show) or NOW ON STAGE (Live) -->
     <div class="space-y-2">
       <div class="flex items-center justify-between text-xs text-slate-400 px-1">
@@ -224,6 +245,7 @@
         <!-- Dynamically populated -->
       </div>
     </div>
+  </div>
 
   </main>
 
@@ -389,6 +411,18 @@
 
     function renderLiveStatus(data) {
       latestData = data;
+
+      const inactiveCard = document.getElementById('live-inactive-card');
+      const activeContent = document.getElementById('live-active-content');
+      if (data.live_display_enabled === false) {
+        if (inactiveCard) inactiveCard.classList.remove('hidden');
+        if (activeContent) activeContent.classList.add('hidden');
+        if (window.lucide) lucide.createIcons();
+        return;
+      } else {
+        if (inactiveCard) inactiveCard.classList.add('hidden');
+        if (activeContent) activeContent.classList.remove('hidden');
+      }
 
       const titleEl = document.getElementById('live-event-title');
       if (titleEl) {

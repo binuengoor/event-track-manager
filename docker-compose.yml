@@ -3,10 +3,6 @@ services:
   app:
     # Reference pre-built multi-architecture image from GitHub Container Registry
     image: ghcr.io/binuengoor/event-track-manager-app:latest
-    # To build locally from source instead of pulling from GHCR, uncomment the build block below:
-    # build:
-    #   context: .
-    #   dockerfile: app/Dockerfile
     container_name: event_track_manager_app
     restart: unless-stopped
     env_file:
@@ -15,6 +11,7 @@ services:
     ports:
       - "${PORT:-8088}:8000"
     environment:
+      - RUNTIME_ENV=docker
       - CONFIG_PATH=/app/config.yaml
       - ADMIN_PIN=${ADMIN_PIN:-2026}
       - DOWNLOADER_SERVICE_URL=http://downloader:8001
@@ -23,8 +20,6 @@ services:
       - MOCK_GOOGLE_API=${MOCK_GOOGLE_API:-false}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./app:/app/app
-      - ./tests:/app/tests
       - ./secrets:/secrets:ro
       - ./data:/data
       - audio_cache:/data/cache
@@ -35,13 +30,10 @@ services:
   downloader:
     # Reference pre-built multi-architecture image from GitHub Container Registry
     image: ghcr.io/binuengoor/event-track-manager-downloader:latest
-    # To build locally from source instead of pulling from GHCR, uncomment the build block below:
-    # build:
-    #   context: ./downloader
-    #   dockerfile: Dockerfile
     container_name: event_track_manager_downloader
     restart: unless-stopped
     environment:
+      - RUNTIME_ENV=docker
       - CACHE_DIR=/data/cache
       - COOKIES_PATH=/secrets/yt_cookies.txt
     volumes:

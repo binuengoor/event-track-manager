@@ -46,18 +46,6 @@ async def serve_performer_page():
     with open(index_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
-    payment_url = get_setting("payment_url") or settings.event.payment_url
-
-    if payment_url:
-        html = re.sub(r'(id="payment-page-link"[^>]*href=")[^"]*(")', rf'\g<1>{payment_url}\2', html)
-        html = re.sub(r'(id="payment-page-link"[^>]*class="[^"]*)\bhidden\b\s*', r'\1', html)
-        html = re.sub(r'(id="payment-page-placeholder"[^>]*class=")', r'\1hidden ', html)
-
-    if sheet_url:
-        html = re.sub(r'(id="signup-sheet-link"[^>]*href=")[^"]*(")', rf'\g<1>{sheet_url}\2', html)
-        html = re.sub(r'(id="open-sheet-link"[^>]*href=")[^"]*(")', rf'\g<1>{sheet_url}\2', html)
-
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
 
@@ -123,6 +111,27 @@ async def serve_console_page():
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@router.get("/console/stage-monitor", response_class=HTMLResponse)
+async def serve_stage_monitor_page():
+    stage_path = os.path.join(STATIC_DIR, "stage-monitor.html")
+    if not os.path.isfile(stage_path):
+        raise HTTPException(status_code=404, detail="Stage monitor page not found")
+    with open(stage_path, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    version = int(datetime.now(timezone.utc).timestamp())
+    html = html.replace('/static/js/stage-monitor.js', f'/static/js/stage-monitor.js?v={version}')
+
+    response = HTMLResponse(content=html)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@router.get("/stage-monitor")
+async def redirect_stage_monitor():
+    return RedirectResponse(url="/console/stage-monitor", status_code=302)
 
 
 @router.get("/live", response_class=HTMLResponse)

@@ -163,3 +163,31 @@ class SequenceItem(BaseModel):
 class ReorderRequest(BaseModel):
     items: List[SequenceItem]
     push_to_sheet: bool = False
+
+
+class PerformanceEntry(BaseModel):
+    entry_id: str
+    performer_name: str
+    performance_type: str = "Solo"
+    partner_name: Optional[str] = None
+    contact_info: Optional[str] = None
+    song_title: str
+    movie_name: Optional[str] = None
+    sequence_order: Optional[int] = None
+    performance_status: str = "Upcoming"
+    track_status: str = "Pending"
+    duration: Optional[str] = None
+    drive_file_id: Optional[str] = None
+    drive_file_name: Optional[str] = None
+    last_updated: Optional[str] = None
+    row_index: int = 0
+    is_song_name_missing: bool = False
+    extra_tags: List[str] = []
+    stage_notes: Optional[str] = ""
+    age_group: Optional[str] = ""
+    guardian_name: Optional[str] = ""
+    guardian_phone: Optional[str] = ""
+    partner_age_group: Optional[str] = ""
+    partner_phone: Optional[str] = ""
+    created_via: Optional[str] = "sheet"
+    media_type: Optional[str] = "audio"

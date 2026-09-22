@@ -1,42 +1,28 @@
 import os
 import io
+import re
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel
 
 from app.config import settings
+from app.schemas import PerformanceEntry
 from app.services.db_service import db_service, is_placeholder_song_title
+from app.services.google.auth import init_google_clients
+from app.services.google.drive_client import GoogleDriveClient
+from app.services.google.sheet_client import GoogleSheetClient
+from app.services.google.sync import create_or_update_backup_sheet
 
 logger = logging.getLogger("google-service")
 
-class PerformanceEntry(BaseModel):
-    entry_id: str
-    performer_name: str
-    performance_type: str = "Solo"
-    partner_name: Optional[str] = None
-    contact_info: Optional[str] = None
-    song_title: str
-    movie_name: Optional[str] = None
-    sequence_order: Optional[int] = None
-    performance_status: str = "Upcoming" # Col K: Upcoming, On Stage, Performed, On Hold
-    track_status: str = "Pending"        # Col L: Uploaded, Pending, Acoustic
-    duration: Optional[str] = None      # Col M: Duration (Minutes)
-    drive_file_id: Optional[str] = None # Col N: Drive File ID
-    drive_file_name: Optional[str] = None # Actual file name in Google Drive
-    last_updated: Optional[str] = None  # Col O: Last Updated
-    row_index: int = 0
-    is_song_name_missing: bool = False
-    extra_tags: List[str] = []
-    stage_notes: Optional[str] = ""
-    age_group: Optional[str] = ""
-    guardian_name: Optional[str] = ""
-    guardian_phone: Optional[str] = ""
-    partner_age_group: Optional[str] = ""
-    partner_phone: Optional[str] = ""
-    created_via: Optional[str] = "sheet"
 
 class GoogleService:
+    """
+    Facade managing Google Sheets and Drive synchronization.
+    Delegates Drive operations to GoogleDriveClient, Sheet operations to GoogleSheetClient,
+    and auth to init_google_clients. Maintains full backward compatibility.
+    """
+
     def __init__(self):
         self.mock_mode = settings.mock_google_api
         self.sheets = None
@@ -49,6 +35,9 @@ class GoogleService:
             self._init_mock_data()
         else:
             self._init_real_clients()
+
+        self._drive_client = GoogleDriveClient(self.drive, mock_mode=self.mock_mode)
+        self._sheet_client = GoogleSheetClient(self.sheets, self.drive, is_xlsx=self.is_xlsx, mock_mode=self.mock_mode)
 
     @property
     def active_entry_id(self) -> Optional[str]:
@@ -127,150 +116,74 @@ class GoogleService:
         ]
 
     def _init_real_clients(self):
-        try:
-            from google.oauth2 import service_account
-            from googleapiclient.discovery import build
-
-            scopes = [
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive"
-            ]
-
-            if settings.google.service_account_json:
-                import json
-                info = json.loads(settings.google.service_account_json)
-                creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
-            else:
-                creds_path = settings.google.service_account_json_path
-                if not os.path.isfile(creds_path):
-                    raise FileNotFoundError(f"Service account file not found at {creds_path}")
-                creds = service_account.Credentials.from_service_account_file(creds_path, scopes=scopes)
-
-            self.sheets = build("sheets", "v4", credentials=creds)
-            self.drive = build("drive", "v3", credentials=creds)
-
-            meta = self.drive.files().get(
-                fileId=settings.google.sheet_id,
-                supportsAllDrives=True,
-                fields="id, name, mimeType"
-            ).execute()
-            mime = meta.get("mimeType", "")
-            self.is_xlsx = ("spreadsheetml.sheet" in mime or meta.get("name", "").endswith(".xlsx"))
-            logger.info("Connected to target sheet: %s (Type: %s, is_xlsx=%s)", meta.get("name"), mime, self.is_xlsx)
-            self._last_drive_reconcile = 0.0
-        except Exception as e:
-            logger.error("Failed to initialize Google clients (%s). Falling back to MOCK MODE.", e)
+        self.sheets, self.drive, self.is_xlsx = init_google_clients()
+        if not self.sheets or not self.drive:
             self.mock_mode = True
             self._init_mock_data()
+        self._drive_client = GoogleDriveClient(self.drive, mock_mode=self.mock_mode)
+        self._sheet_client = GoogleSheetClient(self.sheets, self.drive, is_xlsx=self.is_xlsx, mock_mode=self.mock_mode)
+
+    # --------------------------------------------------------------------------
+    # Google Drive Operations (Delegated to GoogleDriveClient)
+    # --------------------------------------------------------------------------
 
     def _reconcile_drive_tracks(self, entries: List[PerformanceEntry], force: bool = False) -> List[PerformanceEntry]:
-        """Reconciles Google Drive Active folder backing tracks against performance entries directly in SQLite."""
-        if self.mock_mode or not self.drive:
-            return entries
+        return self._drive_client.reconcile_drive_tracks(entries, force=force)
 
-        import time
-        now = time.time()
-        if not force and (now - getattr(self, "_last_drive_reconcile", 0.0)) < 15.0:
-            return entries
-        self._last_drive_reconcile = now
+    def archive_all_active_files_for_entry(self, entry_id: str) -> List[str]:
+        return self._drive_client.archive_all_active_files_for_entry(entry_id)
 
-        try:
-            folder_id = settings.google.drive_folders.active_folder_id
-            if not folder_id:
-                return entries
+    def upload_file_to_active(self, file_path: str, filename: str, entry_id: Optional[str] = None, mime_type: str = "audio/mpeg") -> str:
+        return self._drive_client.upload_file_to_active(file_path, filename, entry_id=entry_id, mime_type=mime_type)
 
-            q = f"'{folder_id}' in parents and trashed = false"
-            res = self.drive.files().list(
-                q=q,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-                fields="files(id, name)"
-            ).execute()
-            active_files = res.get("files", [])
-            active_file_ids = {f["id"] for f in active_files}
+    def archive_previous_file(self, file_id: str, original_filename: str) -> bool:
+        return self._drive_client.archive_previous_file(file_id, original_filename)
 
-            prefix = getattr(settings, "entry_id_prefix", "PK") or "PK"
-            active_by_entry = {}
-            for f in active_files:
-                fname = f.get("name", "")
-                for part in fname.split("_"):
-                    if part.startswith(f"{prefix}-") or part.startswith("PK-"):
-                        active_by_entry[part] = f
-                        break
+    def download_file_bytes(self, file_id: str) -> Optional[bytes]:
+        return self._drive_client.download_file_bytes(file_id)
 
-            for p in entries:
-                matched_file = None
-                if p.drive_file_id and p.drive_file_id in active_file_ids:
-                    matched_file = next((f for f in active_files if f["id"] == p.drive_file_id), None)
-                elif p.entry_id in active_by_entry:
-                    matched_file = active_by_entry[p.entry_id]
+    def get_drive_file_metadata(self, file_id: str) -> Optional[dict]:
+        return self._drive_client.get_file_metadata(file_id)
 
-                if matched_file:
-                    target_status = "Acoustic" if p.track_status == "Acoustic" else "Uploaded"
-                    if p.drive_file_id != matched_file["id"] or p.drive_file_name != matched_file.get("name") or p.track_status != target_status:
-                        p.drive_file_id = matched_file["id"]
-                        p.drive_file_name = matched_file.get("name")
-                        p.track_status = target_status
-                        db_service.update_performance_field(p.entry_id, "drive_file_id", p.drive_file_id)
-                        db_service.update_performance_field(p.entry_id, "drive_file_name", p.drive_file_name)
-                        db_service.update_performance_field(p.entry_id, "track_status", p.track_status)
-                else:
-                    if p.track_status == "Uploaded" and p.drive_file_id and p.drive_file_id not in active_file_ids:
-                        p.drive_file_id = None
-                        p.drive_file_name = None
-                        p.track_status = "Pending"
-                        db_service.update_performance_field(p.entry_id, "drive_file_id", None)
-                        db_service.update_performance_field(p.entry_id, "drive_file_name", None)
-                        db_service.update_performance_field(p.entry_id, "track_status", "Pending")
-        except Exception as ex:
-            logger.warning("Drive track reconciliation failed: %s", ex)
+    def create_or_update_backup_sheet(
+        self,
+        folder_id: str,
+        title: str,
+        performances: List[Dict[str, Any]],
+        food_items: List[Dict[str, Any]],
+        target_sheet_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        return create_or_update_backup_sheet(
+            sheets_service=self.sheets,
+            drive_service=self.drive,
+            folder_id=folder_id,
+            title=title,
+            performances=performances,
+            food_items=food_items,
+            target_sheet_id=target_sheet_id,
+            mock_mode=self.mock_mode
+        )
 
-        return entries
+    # --------------------------------------------------------------------------
+    # Google Sheets Reading & Ingestion
+    # --------------------------------------------------------------------------
 
     def get_sheet_row_mapping(self) -> Dict[str, int]:
         """Returns a mapping from entry_id to 1-based row index in the target Google/Excel Sheet."""
-        if self.mock_mode:
-            return {}
-
-        tab_name = settings.google.sheet_tab_name or "Song Sign-Up"
-        row_map = {}
-        try:
-            if self.is_xlsx:
-                import openpyxl
-                content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
-                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-                ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-                for idx, r in enumerate(ws.iter_rows(values_only=True)):
-                    if idx == 0:
-                        continue
-                    eid = str(r[0]).strip() if r and len(r) > 0 and r[0] is not None else ""
-                    if eid:
-                        row_map[eid] = idx + 1
-            else:
-                res = self.sheets.spreadsheets().values().get(
-                    spreadsheetId=settings.google.sheet_id,
-                    range=f"'{tab_name}'!A1:A100"
-                ).execute()
-                rows = res.get("values", [])
-                for idx, r in enumerate(rows):
-                    if idx == 0:
-                        continue
-                    eid = str(r[0]).strip() if r and len(r) > 0 else ""
-                    if eid:
-                        row_map[eid] = idx + 1
-        except Exception as ex:
-            logger.warning("Failed to fetch sheet row mapping: %s", ex)
-        return row_map
+        return self._sheet_client.get_sheet_row_mapping()
 
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
             try:
                 db_entries = db_service.get_all_performances()
                 if db_entries:
-                    mock_ids = {p.entry_id for p in self._mock_data}
-                    extras = [PerformanceEntry(**row) for row in db_entries if row["entry_id"] not in mock_ids]
-                    if extras:
-                        return self._mock_data + extras
+                    db_map = {row["entry_id"]: PerformanceEntry(**row) for row in db_entries}
+                    db_ids = set(db_map.keys())
+                    merged = list(db_map.values())
+                    for m in self._mock_data:
+                        if m.entry_id not in db_ids:
+                            merged.append(m)
+                    return merged
             except Exception:
                 pass
             return self._mock_data
@@ -290,35 +203,12 @@ class GoogleService:
     def _fetch_and_cache_from_google(self) -> List[PerformanceEntry]:
         cols = settings.columns
         names = settings.column_names
-        tab_name = settings.google.sheet_tab_name or "Song Sign-Up"
 
         try:
-            raw_header = []
-            raw_rows = []
-            if self.is_xlsx:
-                import openpyxl
-                content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
-                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
-                ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-                all_rows = []
-                for r in ws.iter_rows(values_only=True):
-                    all_rows.append([str(c).strip() if c is not None else "" for c in r])
-                if all_rows:
-                    raw_header = all_rows[0]
-                    raw_rows = all_rows[1:]
-            else:
-                result = self.sheets.spreadsheets().values().get(
-                    spreadsheetId=settings.google.sheet_id,
-                    range=f"{tab_name}!A1:Z"
-                ).execute()
-                all_rows = result.get("values", [])
-                if all_rows:
-                    raw_header = all_rows[0]
-                    raw_rows = all_rows[1:]
+            raw_header, raw_rows = self._sheet_client.fetch_raw_sheet_data()
 
             # Dynamically resolve column indices by matching column header names
             if raw_header:
-                import re
                 def find_col_idx(expected_name: str, fallback: int) -> int:
                     exp_clean = re.sub(r'[^a-zA-Z0-9]', '', expected_name.lower())
                     for idx, h in enumerate(raw_header):
@@ -342,7 +232,7 @@ class GoogleService:
                 cols.drive_file_id = find_col_idx(names.drive_file_id, cols.drive_file_id)
                 cols.last_updated = find_col_idx(names.last_updated, cols.last_updated)
 
-            # Find column indices for extra generic console columns (e.g. Age Group, Category)
+            # Extra generic console columns (e.g. Age Group, Category)
             extra_col_indices: List[int] = []
             if raw_header and getattr(settings, "console_extra_columns", None):
                 target_names = [n.strip().lower() for n in settings.console_extra_columns if n.strip()]
@@ -392,7 +282,6 @@ class GoogleService:
                 if not entry_id:
                     entry_id = f"{prefix}-{row_index:03d}"
 
-                # Parse sequence order if already set
                 seq_str = get_col(cols.sequence_order)
                 seq_val = None
                 if seq_str:
@@ -401,7 +290,6 @@ class GoogleService:
                     except ValueError:
                         seq_val = None
 
-                # Song title
                 raw_song_title = get_col(cols.song_title)
                 movie_name = get_col(cols.movie_name)
                 is_missing = is_placeholder_song_title(raw_song_title)
@@ -411,11 +299,10 @@ class GoogleService:
                 elif movie_name:
                     song_title = f"{movie_name} (Song title missing)"
                 else:
-                    song_title = f"Performance (Song title missing)"
+                    song_title = "Performance (Song title missing)"
 
                 perf_type = get_col(cols.performance_type) or "Solo"
 
-                # Performance Status (Col K)
                 raw_perf_status = get_col(cols.performance_status)
                 if not raw_perf_status or raw_perf_status.startswith("http"):
                     perf_status = "Upcoming"
@@ -428,7 +315,6 @@ class GoogleService:
                 else:
                     perf_status = "Upcoming"
 
-                # Track Status (Col L)
                 raw_track_status = get_col(cols.track_status)
                 if raw_track_status.lower() in ("yes", "uploaded", "true"):
                     track_status = "Uploaded"
@@ -445,7 +331,6 @@ class GoogleService:
                 drive_id = get_col(cols.drive_file_id) or None
                 last_up = get_col(cols.last_updated) or None
 
-                # Reconcile with Google Drive Active/ folder ground truth
                 if not self.mock_mode and self.drive:
                     matched_file = None
                     if drive_id and drive_id in active_file_ids:
@@ -460,7 +345,6 @@ class GoogleService:
                             track_status = "Uploaded"
                     else:
                         drive_file_name = None
-                        # If a file was recorded in the sheet but is missing from Drive Active/ folder
                         if drive_id or track_status == "Uploaded":
                             stale_sheet_clears.append(row_index)
                         drive_id = None
@@ -476,6 +360,8 @@ class GoogleService:
 
                 age_group_val = get_col(cols.age_group) if hasattr(cols, "age_group") and cols.age_group >= 0 else None
                 contact_val = get_col(cols.contact_info) if hasattr(cols, "contact_info") and cols.contact_info >= 0 else None
+
+                media_type_val = "video" if (drive_file_name and drive_file_name.lower().endswith(".mp4")) else "audio"
 
                 entries.append(PerformanceEntry(
                     entry_id=entry_id,
@@ -495,7 +381,8 @@ class GoogleService:
                     last_updated=last_up,
                     row_index=row_index,
                     is_song_name_missing=is_missing or is_placeholder_song_title(song_title),
-                    extra_tags=extra_tags
+                    extra_tags=extra_tags,
+                    media_type=media_type_val
                 ))
 
             # Invalidate local audio caches for performances with no active Drive file
@@ -508,25 +395,10 @@ class GoogleService:
                 logger.warning("Error purging audio caches: %s", ex)
 
             # Sync back cleared status to Google Sheet if files were deleted from Drive
-            if stale_sheet_clears and not self.mock_mode and self.sheets:
-                try:
-                    tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
-                    def col_letter(col_idx: int) -> str:
-                        return chr(ord('A') + col_idx)
-                    sheet_updates = []
-                    for r_idx in stale_sheet_clears:
-                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.track_status)}{r_idx}", "values": [["Pending"]]})
-                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{r_idx}", "values": [[""]]})
-                        sheet_updates.append({"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{r_idx}", "values": [[""]]})
-                    self.sheets.spreadsheets().values().batchUpdate(
-                        spreadsheetId=settings.google.sheet_id,
-                        body={"valueInputOption": "USER_ENTERED", "data": sheet_updates}
-                    ).execute()
-                except Exception as ex:
-                    logger.warning("Could not clear stale file rows in Google Sheet: %s", ex)
+            if stale_sheet_clears and not self.mock_mode:
+                self._sheet_client.clear_stale_file_rows(stale_sheet_clears)
 
-            # Sequence backfill logic:
-            # If any rows are missing sequence numbers, fill them from top to bottom
+            # Sequence backfill logic
             used_seqs = set(p.sequence_order for p in entries if p.sequence_order is not None)
             missing_items = []
             next_seq = 1
@@ -538,12 +410,10 @@ class GoogleService:
                     used_seqs.add(next_seq)
                     missing_items.append({"entry_id": p.entry_id, "sequence_order": next_seq})
 
-            # Fix song titles for missing titles with their sequence
             for p in entries:
                 if p.is_song_name_missing and "Performance (Song" in p.song_title:
                     p.song_title = f"Performance #{p.sequence_order} (Song title missing)"
 
-            # Save to SQLite database cache
             try:
                 db_service.save_performances(entries)
             except Exception as ex:
@@ -554,25 +424,17 @@ class GoogleService:
             logger.error("Error fetching performances from Google Sheet: %s", e)
             raise
 
+    # --------------------------------------------------------------------------
+    # Queue, Stage & Live State
+    # --------------------------------------------------------------------------
+
     def get_stage_queue(self) -> List[PerformanceEntry]:
         performances = self.get_performances()
-        # Sort all entries by sequence_order
         performances.sort(key=lambda x: x.sequence_order if x.sequence_order is not None else 9999)
         return performances
 
-    def get_gallery_images(self) -> List[str]:
-        """Scans the configured gallery directory and returns web-accessible URLs."""
-        from app.services.stage_service import stage_service
-        return stage_service.get_gallery_images()
-
-    def get_live_status(self) -> Dict[str, Any]:
-        from app.services.stage_service import stage_service
-        return stage_service.get_live_status()
-
-
     def set_active_performance(self, entry_id: str) -> bool:
         self.active_entry_id = entry_id
-        # Update performance_status in sheet & db
         self.update_status(entry_id, "On Stage")
         return True
 
@@ -587,7 +449,6 @@ class GoogleService:
         return True
 
     def update_stage_notes(self, entry_id: str, notes: str) -> bool:
-        """Updates stage notes for a performance in local SQLite cache."""
         clean_notes = (notes or "").strip()
         if self.mock_mode:
             for item in self._mock_data:
@@ -599,16 +460,21 @@ class GoogleService:
         logger.info("Updated stage notes for %s in SQLite: %s", entry_id, clean_notes)
         return True
 
-    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None) -> bool:
+    # --------------------------------------------------------------------------
+    # Sheet & Performance Updates
+    # --------------------------------------------------------------------------
+
+    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None, media_type: Optional[str] = None) -> bool:
         now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Update SQLite database immediately
         try:
             db_service.update_performance_field(entry_id, "track_status", status)
             if file_id:
                 db_service.update_performance_field(entry_id, "drive_file_id", file_id)
             if duration_str:
                 db_service.update_performance_field(entry_id, "duration", duration_str)
+            if media_type:
+                db_service.update_performance_field(entry_id, "media_type", media_type)
             db_service.update_performance_field(entry_id, "last_updated", now_iso)
         except Exception as ex:
             logger.warning("Error updating track metadata in SQLite: %s", ex)
@@ -619,6 +485,8 @@ class GoogleService:
                     item.drive_file_id = file_id
                     item.track_status = status
                     item.duration = duration_str or item.duration
+                    if media_type:
+                        item.media_type = media_type
                     item.last_updated = now_iso
                     return True
             return True
@@ -629,58 +497,14 @@ class GoogleService:
         row_map = self.get_sheet_row_mapping()
         sheet_row = row_map.get(entry_id) or (target.row_index if target and target.row_index and target.row_index > 0 else None)
         if not sheet_row:
-            # If it's a web signup not yet in sheet or not assigned a row, it is updated in SQLite
             return True
 
-        cols = settings.columns
-        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
-
-        if self.is_xlsx:
-            import openpyxl
-            from googleapiclient.http import MediaIoBaseUpload
-
-            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
-            wb = openpyxl.load_workbook(io.BytesIO(content))
-            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-
-            row = sheet_row
-            # Col L: Track Uploaded = "Yes"
-            ws.cell(row=row, column=cols.track_status + 1, value="Yes")
-            if duration_str:
-                ws.cell(row=row, column=cols.duration + 1, value=duration_str)
-            ws.cell(row=row, column=cols.drive_file_id + 1, value=file_id)
-            ws.cell(row=row, column=cols.last_updated + 1, value=now_iso)
-
-            out_buf = io.BytesIO()
-            wb.save(out_buf)
-            out_buf.seek(0)
-
-            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
-            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
-            logger.info("Updated Excel sheet for %s (Row %d) with file_id: %s, duration: %s", entry_id, row, file_id, duration_str)
-            return True
-        else:
-            def col_letter(col_idx: int) -> str:
-                return chr(ord('A') + col_idx)
-
-            updates = [
-                {"range": f"{tab_name}!{col_letter(cols.track_status)}{sheet_row}", "values": [["Yes"]]},
-                {"range": f"{tab_name}!{col_letter(cols.drive_file_id)}{sheet_row}", "values": [[file_id]]},
-                {"range": f"{tab_name}!{col_letter(cols.last_updated)}{sheet_row}", "values": [[now_iso]]}
-            ]
-            if duration_str:
-                updates.append({"range": f"{tab_name}!{col_letter(cols.duration)}{sheet_row}", "values": [[duration_str]]})
-
-            self.sheets.spreadsheets().values().batchUpdate(
-                spreadsheetId=settings.google.sheet_id,
-                body={"valueInputOption": "USER_ENTERED", "data": updates}
-            ).execute()
-            logger.info("Updated Google Sheet for %s (Row %d) with file_id: %s", entry_id, sheet_row, file_id)
-            return True
+        self._sheet_client.update_track_metadata(sheet_row, file_id, duration_str, now_iso)
+        logger.info("Updated track metadata for %s (Row %d) with file_id: %s", entry_id, sheet_row, file_id)
+        return True
 
     def update_status(self, entry_id: str, status: str) -> bool:
         """Updates Performance Status (Col K) and optionally Track Status (Col L)."""
-        # Determine value to write to Col K (Performance Status)
         val_to_write = status
         if status in ("Uploaded", "Upcoming", "Reset"):
             val_to_write = "Upcoming"
@@ -708,51 +532,19 @@ class GoogleService:
         if not sheet_row:
             return True
 
-        cols = settings.columns
-        tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
-
-        # Update SQLite database immediately
         try:
             db_service.update_performance_field(entry_id, "performance_status", val_to_write)
         except Exception as ex:
             logger.warning("Error updating status in SQLite: %s", ex)
 
-        if self.is_xlsx:
-            import openpyxl
-            from googleapiclient.http import MediaIoBaseUpload
-
-            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
-            wb = openpyxl.load_workbook(io.BytesIO(content))
-            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-
-            ws.cell(row=sheet_row, column=cols.performance_status + 1, value=val_to_write)
-            out_buf = io.BytesIO()
-            wb.save(out_buf)
-            out_buf.seek(0)
-
-            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
-            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
-            logger.info("Updated performance status for %s (Row %d) to %s in Excel sheet", entry_id, sheet_row, val_to_write)
-            return True
-        else:
-            def col_letter(col_idx: int) -> str:
-                return chr(ord('A') + col_idx)
-
-            cell = f"{tab_name}!{col_letter(cols.performance_status)}{sheet_row}"
-            self.sheets.spreadsheets().values().update(
-                spreadsheetId=settings.google.sheet_id,
-                range=cell,
-                valueInputOption="USER_ENTERED",
-                body={"values": [[val_to_write]]}
-            ).execute()
-            logger.info("Updated performance status for %s (Row %d) to %s in Google Sheet", entry_id, sheet_row, val_to_write)
-            return True
+        self._sheet_client.update_performance_status(sheet_row, val_to_write)
+        logger.info("Updated performance status for %s (Row %d) to %s", entry_id, sheet_row, val_to_write)
+        return True
 
     def update_sequence_orders(self, items: List[Dict[str, Any]], push_to_sheet: bool = True) -> int:
         """Updates sequence numbers in local SQLite database, and optionally pushes to Google Sheet & Drive."""
         item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
-        
-        # 1. Always update SQLite database immediately
+
         try:
             for eid, seq in item_map.items():
                 db_service.update_performance_field(eid, "sequence_order", seq)
@@ -770,12 +562,10 @@ class GoogleService:
             return len(item_map)
 
         if not push_to_sheet:
-            # Mark SQLite sequence order as ahead/dirty compared to Google Sheet
             db_service.set_dirty_sequence(True)
             logger.info("Updated sequence order for %d items in local database (sync pending)", len(item_map))
             return len(item_map)
 
-        # Full sync to Google Sheet & Drive
         return self.sync_sequence_to_google(item_map=item_map)
 
     def sync_sequence_to_google(self, item_map: Optional[Dict[str, int]] = None) -> int:
@@ -787,7 +577,6 @@ class GoogleService:
 
         performances = self.get_performances()
         if not item_map:
-            # Read from SQLite to get current sequence orders
             item_map = {p.entry_id: p.sequence_order for p in performances if p.sequence_order is not None}
 
         cols = settings.columns
@@ -795,25 +584,14 @@ class GoogleService:
         row_map = self.get_sheet_row_mapping()
 
         if self.is_xlsx:
-            import openpyxl
-            from googleapiclient.http import MediaIoBaseUpload
-
-            content = self.drive.files().get_media(fileId=settings.google.sheet_id, supportsAllDrives=True).execute()
-            wb = openpyxl.load_workbook(io.BytesIO(content))
-            ws = wb[tab_name] if tab_name in wb.sheetnames else wb.active
-
+            row_seq_map = {}
             for p in performances:
                 if p.entry_id in item_map:
                     sheet_row = row_map.get(p.entry_id) or p.row_index
                     if sheet_row and sheet_row > 0:
-                        ws.cell(row=sheet_row, column=cols.sequence_order + 1, value=item_map[p.entry_id])
+                        row_seq_map[sheet_row] = item_map[p.entry_id]
 
-            out_buf = io.BytesIO()
-            wb.save(out_buf)
-            out_buf.seek(0)
-
-            media = MediaIoBaseUpload(out_buf, mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", resumable=True)
-            self.drive.files().update(fileId=settings.google.sheet_id, media_body=media, supportsAllDrives=True).execute()
+            self._sheet_client.update_xlsx_sequence_orders(row_seq_map)
             logger.info("Updated sequence order for %d items in Excel sheet", len(item_map))
             db_service.set_dirty_sequence(False)
             db_service.set_last_sync_time()
@@ -831,8 +609,7 @@ class GoogleService:
                         cell = f"{tab_name}!{col_letter(cols.sequence_order)}{sheet_row}"
                         updates.append({"range": cell, "values": [[new_seq]]})
 
-                    # If this performance has a backing track in Drive, rename it with the new sequence prefix
-                    if p.drive_file_id:
+                    if p.drive_file_id and self.drive:
                         try:
                             clean_p = "".join(c for c in p.performer_name.split("(")[0].strip() if c.isalnum() or c in (" ", "_", "-")).replace(" ", "_")
                             clean_s = "".join(c for c in p.song_title if c.isalnum() or c in (" ", "_", "-")).replace(" ", "_")
@@ -847,271 +624,12 @@ class GoogleService:
                             logger.warning("Could not rename Drive file %s for sequence update: %s", p.drive_file_id, ex)
 
             if updates:
-                self.sheets.spreadsheets().values().batchUpdate(
-                    spreadsheetId=settings.google.sheet_id,
-                    body={"valueInputOption": "USER_ENTERED", "data": updates}
-                ).execute()
+                self._sheet_client.batch_update_sequence_orders(updates)
 
             db_service.set_dirty_sequence(False)
             db_service.set_last_sync_time()
             logger.info("Synced sequence order for %d items to Google Sheet & Drive", len(item_map))
             return len(item_map)
 
-    def archive_all_active_files_for_entry(self, entry_id: str) -> List[str]:
-        """Finds any active file in the Active/ folder matching this entry and moves it to Archive/."""
-        if self.mock_mode:
-            return []
-
-        active_id = settings.google.drive_folders.active_folder_id
-        archive_id = settings.google.drive_folders.archive_folder_id
-
-        try:
-            q = f"'{active_id}' in parents and trashed = false and name contains '{entry_id}'"
-            res = self.drive.files().list(
-                q=q,
-                supportsAllDrives=True,
-                includeItemsFromAllDrives=True,
-                fields="files(id, name)"
-            ).execute()
-
-            archived = []
-            timestamp_str = datetime.now().strftime("%Y%m%d-%H%M%S")
-            for f in res.get("files", []):
-                fid = f["id"]
-                old_name = f["name"]
-                base, ext = os.path.splitext(old_name)
-                new_name = f"{base}_archived_{timestamp_str}{ext}" if "_archived_" not in old_name else old_name
-                self.drive.files().update(
-                    fileId=fid,
-                    addParents=archive_id,
-                    removeParents=active_id,
-                    body={"name": new_name},
-                    supportsAllDrives=True
-                ).execute()
-                archived.append(fid)
-                logger.info("Archived active file %s (%s -> %s) to Archive/ folder", fid, old_name, new_name)
-            return archived
-        except Exception as e:
-            logger.warning("Error during archive_all_active_files_for_entry for %s: %s", entry_id, e)
-            return []
-
-    def upload_file_to_active(self, file_path: str, filename: str, entry_id: Optional[str] = None, mime_type: str = "audio/mpeg") -> str:
-        if self.mock_mode:
-            mock_id = f"mock_drive_{os.path.basename(file_path)}"
-            logger.info("MOCK DRIVE: Uploaded %s to Active folder (mock ID: %s)", filename, mock_id)
-            return mock_id
-
-        # Guarantee at any given point in time, there is ONLY ONE file in Active/ for this performance
-        if entry_id:
-            self.archive_all_active_files_for_entry(entry_id)
-
-        from googleapiclient.http import MediaFileUpload
-
-        file_metadata = {
-            "name": filename,
-            "parents": [settings.google.drive_folders.active_folder_id]
-        }
-        media = MediaFileUpload(file_path, mimetype=mime_type, resumable=True)
-        uploaded = self.drive.files().create(
-            body=file_metadata,
-            media_body=media,
-            supportsAllDrives=True,
-            fields="id, name"
-        ).execute()
-
-        file_id = uploaded.get("id")
-        logger.info("Uploaded %s to Google Drive Active/ folder (ID: %s)", filename, file_id)
-        return file_id
-
-    def archive_previous_file(self, file_id: str, original_filename: str) -> bool:
-        if self.mock_mode:
-            logger.info("MOCK DRIVE: Moved file %s to Archive folder", file_id)
-            return True
-
-        timestamp_str = datetime.now().strftime("%Y%m%d-%H%M%S")
-        base, ext = os.path.splitext(original_filename)
-        archived_name = f"{base}_archived_{timestamp_str}{ext}"
-
-        active_id = settings.google.drive_folders.active_folder_id
-        archive_id = settings.google.drive_folders.archive_folder_id
-
-        try:
-            self.drive.files().update(
-                fileId=file_id,
-                addParents=archive_id,
-                removeParents=active_id,
-                body={"name": archived_name},
-                supportsAllDrives=True
-            ).execute()
-            logger.info("Archived file %s -> %s in Archive/ folder", file_id, archived_name)
-            return True
-        except Exception as e:
-            logger.warning("Could not archive file %s: %s", file_id, e)
-            return False
-
-    def download_file_bytes(self, file_id: str) -> Optional[bytes]:
-        if self.mock_mode:
-            return None
-
-        from googleapiclient.http import MediaIoBaseDownload
-        try:
-            request = self.drive.files().get_media(fileId=file_id, supportsAllDrives=True)
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request)
-            done = False
-            while not done:
-                _, done = downloader.next_chunk()
-            return fh.getvalue()
-        except Exception as e:
-            logger.error("Failed to download file %s from Google Drive: %s", file_id, e)
-            return None
-
-    def create_or_update_backup_sheet(
-        self,
-        folder_id: str,
-        title: str,
-        performances: List[Dict[str, Any]],
-        food_items: List[Dict[str, Any]],
-        target_sheet_id: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Creates or updates a Google Sheet containing performances and food signups from the App DB."""
-        total_rows = len(performances) + len(food_items)
-        if self.mock_mode:
-            logger.info("Mock backup: %d performances and %d food items backed up", len(performances), len(food_items))
-            return {
-                "file_id": "mock_backup_sheet_id",
-                "title": title,
-                "rows_backed": total_rows,
-                "url": f"https://docs.google.com/spreadsheets/d/mock_backup_sheet_id/edit"
-            }
-
-        try:
-            spreadsheet_id = target_sheet_id
-            if not spreadsheet_id:
-                # 1. Find existing backup file in target Drive folder or create a new one
-                q = f"name = '{title}' and '{folder_id}' in parents and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false"
-                res = self.drive.files().list(
-                    q=q,
-                    supportsAllDrives=True,
-                    includeItemsFromAllDrives=True,
-                    fields="files(id, name)"
-                ).execute()
-                files = res.get("files", [])
-
-                if files:
-                    spreadsheet_id = files[0]["id"]
-                    logger.info("Found existing backup spreadsheet %s (%s)", title, spreadsheet_id)
-                else:
-                    body = {
-                        "name": title,
-                        "mimeType": "application/vnd.google-apps.spreadsheet",
-                        "parents": [folder_id]
-                    }
-                    created = self.drive.files().create(
-                        body=body,
-                        supportsAllDrives=True,
-                        fields="id, name"
-                    ).execute()
-                    spreadsheet_id = created["id"]
-                    logger.info("Created new backup spreadsheet %s (%s)", title, spreadsheet_id)
-
-            # 2. Ensure tabs exist
-            meta = self.sheets.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
-            existing_sheets = [s["properties"]["title"] for s in meta.get("sheets", [])]
-
-            # Determine performances tab name: use configured tab name (e.g. Song Sign-Up) or Performances
-            perf_tab = settings.google.sheet_tab_name or "Song Sign-Up"
-            if perf_tab not in existing_sheets and "Performances" in existing_sheets:
-                perf_tab = "Performances"
-
-            requests = []
-            if perf_tab not in existing_sheets:
-                requests.append({"addSheet": {"properties": {"title": perf_tab}}})
-            if "Food Sign-Ups" not in existing_sheets and "Food Sign-Up" not in existing_sheets:
-                requests.append({"addSheet": {"properties": {"title": "Food Sign-Up"}}})
-
-            food_tab = "Food Sign-Up" if "Food Sign-Up" in existing_sheets else ("Food Sign-Ups" if "Food Sign-Ups" in existing_sheets else "Food Sign-Up")
-
-            if requests:
-                self.sheets.spreadsheets().batchUpdate(
-                    spreadsheetId=spreadsheet_id,
-                    body={"requests": requests}
-                ).execute()
-
-            # 3. Format performance data
-            perf_headers = [
-                "Entry ID", "Performer Name", "Age Group", "Performance Type",
-                "Duet Partner", "Partner Phone", "Song Name", "Movie/Album", "Sequence",
-                "Guardian Name", "Guardian Phone", "Contact Info", "Track Status",
-                "Duration", "Drive File ID", "Created Via", "Last Updated"
-            ]
-            perf_rows = [perf_headers]
-            for p in performances:
-                perf_rows.append([
-                    p.get("entry_id", ""),
-                    p.get("performer_name", ""),
-                    p.get("age_group", ""),
-                    p.get("performance_type", "Solo"),
-                    p.get("partner_name", "") or "",
-                    p.get("partner_phone", "") or "",
-                    p.get("song_title", "") or "",
-                    p.get("movie_name", "") or "",
-                    str(p.get("sequence_order", "") or ""),
-                    p.get("guardian_name", "") or "",
-                    p.get("guardian_phone", "") or "",
-                    p.get("contact_info", "") or "",
-                    p.get("track_status", "Pending") or "",
-                    p.get("duration", "") or "",
-                    p.get("drive_file_id", "") or "",
-                    p.get("created_via", "sheet") or "",
-                    p.get("last_updated", "") or ""
-                ])
-
-            # 4. Format food data
-            food_headers = [
-                "Item ID", "Food Group", "Item Name", "Status",
-                "Signer Name", "Dish Description", "Claimed At"
-            ]
-            food_rows = [food_headers]
-            for f in food_items:
-                food_rows.append([
-                    f.get("item_id", ""),
-                    f.get("group_name", ""),
-                    f.get("name", ""),
-                    "Taken" if f.get("is_taken") else "Open",
-                    f.get("signer_name", "") or "",
-                    f.get("dish_description", "") or "",
-                    f.get("claimed_at", "") or ""
-                ])
-
-            # 5. Clear and write data
-            data_payload = [
-                {"range": f"'{perf_tab}'!A1:Q", "values": perf_rows},
-                {"range": f"'{food_tab}'!A1:G", "values": food_rows}
-            ]
-
-            # Clear older rows first to avoid trailing data
-            try:
-                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{perf_tab}'!A1:Q1000").execute()
-                self.sheets.spreadsheets().values().clear(spreadsheetId=spreadsheet_id, range=f"'{food_tab}'!A1:G1000").execute()
-            except Exception:
-                pass
-
-            self.sheets.spreadsheets().values().batchUpdate(
-                spreadsheetId=spreadsheet_id,
-                body={"valueInputOption": "USER_ENTERED", "data": data_payload}
-            ).execute()
-
-            logger.info("Successfully backed up %d rows to Sheet %s", total_rows, spreadsheet_id)
-            return {
-                "file_id": spreadsheet_id,
-                "title": title,
-                "rows_backed": total_rows,
-                "url": f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
-            }
-        except Exception as e:
-            logger.error("Failed to backup to Google Sheet: %s", e)
-            raise
 
 google_service = GoogleService()
-

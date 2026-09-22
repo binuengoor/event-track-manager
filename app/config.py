@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import yaml
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
@@ -56,11 +57,12 @@ def load_dotenv_file(filepath: str = ".env") -> None:
 load_dotenv_file(".env")
 load_dotenv_file(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
+import zoneinfo
 from datetime import datetime
 
-def parse_event_datetime(dt_str: Optional[str]) -> Optional[str]:
-    """Parses flexible date-time strings (e.g. 09-19-2026 05:00PM) to ISO format with EDT offset."""
-    if not dt_str:
+def parse_event_datetime(dt_str: Optional[str], tz_name: str = "America/New_York") -> Optional[str]:
+    """Parses event start time string into ISO 8601 with configurable timezone."""
+    if not dt_str or not dt_str.strip():
         return None
     val = dt_str.strip()
     if "T" in val and ("+" in val or "-" in val[10:] or val.endswith("Z")):
@@ -75,11 +77,16 @@ def parse_event_datetime(dt_str: Optional[str]) -> Optional[str]:
         "%Y-%m-%dT%H:%M:%S",   # 2026-09-19T17:00:00
         "%Y-%m-%dT%H:%M",      # 2026-09-19T17:00
     ]
+    try:
+        tz = zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        tz = zoneinfo.ZoneInfo("America/New_York")
+
     for fmt in formats:
         try:
             dt = datetime.strptime(val, fmt)
-            # Default to EDT (-04:00) since event is in Exton, PA (EDT in September)
-            return dt.strftime("%Y-%m-%dT%H:%M:%S-04:00")
+            dt_localized = dt.replace(tzinfo=tz)
+            return dt_localized.isoformat()
         except ValueError:
             continue
     return val
@@ -90,6 +97,7 @@ class EventConfig(BaseModel):
     header_brand_subtitle: str = "Musical Night"
     name: str = "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
     subtitle: str = "Musical Night • September 19, 2026"
+    timezone: str = "America/New_York"
     start_time: Optional[str] = "09-19-2026 05:00PM"
     start_time_iso: Optional[str] = "2026-09-19T17:00:00-04:00"
     poster_url: Optional[str] = "/data/paattukoottam_animated.gif"
@@ -159,8 +167,16 @@ class AgeGroupConfig(BaseModel):
     requires_guardian: bool = False
 
 class SignupConfig(BaseModel):
+    stage_performances_enabled: bool = True
     signup_enabled: bool = True
     food_signup_enabled: bool = True
+    track_upload_enabled: bool = True
+    allow_duets: bool = True
+    performer_edits_enabled: bool = True
+    live_display_enabled: bool = True
+    dashboard_enabled: bool = True
+    console_enabled: bool = True
+    payment_enabled: bool = True
     food_serving_note: str = "Half-Tray or Above (15+ servings)"
     age_groups: List[AgeGroupConfig] = Field(default_factory=lambda: [
         AgeGroupConfig(name="Junior", requires_guardian=True),
@@ -218,11 +234,13 @@ def load_config() -> AppConfig:
         config.event.subtitle = os.getenv("APP_SUBTITLE")
     if os.getenv("EVENT_ID"):
         config.event.id = os.getenv("EVENT_ID")
+    if os.getenv("EVENT_TIMEZONE"):
+        config.event.timezone = os.getenv("EVENT_TIMEZONE")
     if os.getenv("EVENT_START_TIME"):
         config.event.start_time = os.getenv("EVENT_START_TIME")
-        config.event.start_time_iso = parse_event_datetime(config.event.start_time)
+        config.event.start_time_iso = parse_event_datetime(config.event.start_time, tz_name=config.event.timezone)
     elif config.event.start_time and not config.event.start_time_iso:
-        config.event.start_time_iso = parse_event_datetime(config.event.start_time)
+        config.event.start_time_iso = parse_event_datetime(config.event.start_time, tz_name=config.event.timezone)
 
     if os.getenv("EVENT_POSTER_URL"):
         config.event.poster_url = os.getenv("EVENT_POSTER_URL")
@@ -366,14 +384,15 @@ def load_config() -> AppConfig:
     if os.getenv("FOOD_SERVING_NOTE"):
         config.signup.food_serving_note = os.getenv("FOOD_SERVING_NOTE")
 
+    is_docker = os.getenv("RUNTIME_ENV") == "docker" or os.path.exists("/.dockerenv")
     if os.getenv("CACHE_DIR"):
         config.storage.cache_dir = os.getenv("CACHE_DIR")
-    elif not os.path.exists("/.dockerenv") and config.storage.cache_dir.startswith("/data"):
+    elif not is_docker and config.storage.cache_dir.startswith("/data"):
         config.storage.cache_dir = "./data/cache"
 
     if os.getenv("GALLERY_DIR"):
         config.storage.gallery_dir = os.getenv("GALLERY_DIR")
-    elif not os.path.exists("/.dockerenv") and config.storage.gallery_dir.startswith("/data"):
+    elif not is_docker and config.storage.gallery_dir.startswith("/data"):
         config.storage.gallery_dir = "./data/gallery"
 
     try:
@@ -397,8 +416,8 @@ settings = load_config()
 def get_setting(key: str, default: Any = None) -> Any:
     """Reads from app_settings DB first, falls back to config/env."""
     try:
-        from app.services.db_service import db_service
-        db_val = db_service.get_app_setting(key)
+        from app.repositories.settings_repo import SettingsRepository
+        db_val = SettingsRepository().get_setting(key)
         if db_val is not None:
             if db_val.lower() == "false":
                 return False
@@ -437,6 +456,12 @@ def get_setting(key: str, default: Any = None) -> Any:
         "signup_sheet_url": settings.event.signup_sheet_url,
         "signup_enabled": settings.signup.signup_enabled,
         "food_signup_enabled": settings.signup.food_signup_enabled,
+        "track_upload_enabled": settings.signup.track_upload_enabled,
+        "allow_duets": settings.signup.allow_duets,
+        "performer_edits_enabled": settings.signup.performer_edits_enabled,
+        "live_display_enabled": settings.signup.live_display_enabled,
+        "dashboard_enabled": settings.signup.dashboard_enabled,
+        "payment_enabled": settings.signup.payment_enabled,
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,
         "max_solo_per_participant": settings.signup.max_solo_per_participant,

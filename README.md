@@ -2,6 +2,10 @@
 
 A high-reliability, cloud-native event production and stage playback system built for **EMA Paattukoottam** (Exton Malayali Association) and adaptable to any stage musical night, talent show, or concert.
 
+> [!IMPORTANT]
+> **Community Use & Design Philosophy**:
+> This application is built for community gatherings and trusted group events among friends and neighbors. As a core architectural principle, **performer-facing self-service features (such as song registration, performer name edits, potluck dish signups, and track uploads) are intentionally designed with minimal friction and no onerous authentication (no phone OTPs, login passwords, or per-user access tokens)**. Any participant who knows an entry or performer name can easily adjust details. Administrative controls (stage sequencing, event presets, settings, database resets) remain protected by the Admin PIN (`ADMIN_PIN`). Future refactors and contributions must preserve this low-friction community ethos.
+
 It connects directly to **Google Sheets** for performer registration and live stage sequencing, uses **Google Shared Drive** as the ground truth for backing tracks and automated versioned archival, features an isolated **YouTube audio extraction worker** with JavaScript challenge solving, and delivers a low-latency stage sound playback console, performer intake portal, and live public audience schedule.
 
 ---

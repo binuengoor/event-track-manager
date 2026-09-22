@@ -3,6 +3,7 @@ let performances = [];
 let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
+let currentMediaType = 'audio'; // 'audio' or 'video'
 let sheetUrl = 'https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit';
 let maxUploadSizeMb = 100;
 let performerFoodSignup = null;
@@ -61,15 +62,36 @@ async function initEventInfo() {
     const res = await fetch('/api/event-info');
     if (res.ok) {
       const data = await res.json();
+      window.eventInfo = data;
       if (data.header_brand_title) {
         const titleEl = document.getElementById('event-title');
         if (titleEl) titleEl.textContent = data.header_brand_title;
-        document.title = `${data.header_brand_title} - Performer Hub`;
+        document.title = data.stage_performances_enabled === false
+          ? `${data.header_brand_title} - Attendee Hub`
+          : `${data.header_brand_title} - Performer Hub`;
       }
       if (data.header_brand_subtitle) {
         const subEl = document.getElementById('event-subtitle');
         if (subEl) subEl.textContent = data.header_brand_subtitle;
       }
+
+      if (data.stage_performances_enabled === false) {
+        const hubTitle = document.getElementById('performer-hub-title');
+        if (hubTitle) hubTitle.textContent = "Attendee Portal & Food Sign-Up";
+        const hubDesc = document.getElementById('performer-hub-desc');
+        if (hubDesc) hubDesc.textContent = "Select your name to manage and review your community potluck dish contribution.";
+        const selectLabel = document.getElementById('performer-select-label-text');
+        if (selectLabel) selectLabel.textContent = "Select Attendee";
+        const potluckNotice = document.getElementById('potluck-only-event-notice');
+        if (potluckNotice) potluckNotice.classList.remove('hidden');
+        const othersSection = document.getElementById('others-songs-section');
+        if (othersSection) othersSection.classList.add('hidden');
+      }
+
+      if (window.adaptNavigationForEventConfig) {
+        window.adaptNavigationForEventConfig(data);
+      }
+
       if (data.mock_mode) {
         document.getElementById('mock-banner').classList.remove('hidden');
       }
@@ -112,18 +134,30 @@ async function initEventInfo() {
 async function loadPerformances() {
   const badge = document.getElementById('performer-count-badge');
   try {
+    let sortedPerformers = [];
+    try {
+      const namesRes = await fetch('/api/performer/names');
+      if (namesRes.ok) {
+        sortedPerformers = await namesRes.json();
+      }
+    } catch (e) {}
+
     const res = await fetch('/api/performances');
-    if (!res.ok) throw new Error('Failed to load sign-ups');
-    performances = await res.json();
+    if (res.ok) {
+      performances = await res.json();
+    } else if (!sortedPerformers.length) {
+      throw new Error('Failed to load sign-ups');
+    }
 
-    // Extract unique performer and partner names
-    const performerSet = new Set();
-    performances.forEach(p => {
-      if (p.performer_name) performerSet.add(p.performer_name.trim());
-      if (p.partner_name) performerSet.add(p.partner_name.trim());
-    });
+    if (!sortedPerformers.length) {
+      const performerSet = new Set();
+      performances.forEach(p => {
+        if (p.performer_name) performerSet.add(p.performer_name.trim());
+        if (p.partner_name) performerSet.add(p.partner_name.trim());
+      });
+      sortedPerformers = Array.from(performerSet).sort((a, b) => a.localeCompare(b));
+    }
 
-    const sortedPerformers = Array.from(performerSet).sort((a, b) => a.localeCompare(b));
     const select = document.getElementById('performer-select');
     const currentSelected = select.value;
     select.innerHTML = '<option value="">-- Choose your name from the sign-up list --</option>';
@@ -137,7 +171,12 @@ async function loadPerformances() {
     });
 
     badge.textContent = `${sortedPerformers.length} registered participants`;
-    renderOthersSongs();
+    if (window.eventInfo && window.eventInfo.stage_performances_enabled === false) {
+      const othersSection = document.getElementById('others-songs-section');
+      if (othersSection) othersSection.classList.add('hidden');
+    } else {
+      renderOthersSongs();
+    }
   } catch (err) {
     badge.textContent = 'Error loading names';
     showError(err.message || 'Could not connect to database backend');
@@ -237,6 +276,16 @@ function setupEventListeners() {
   // Refresh Data buttons
   const refreshBtn = document.getElementById('refresh-data-btn');
   if (refreshBtn) refreshBtn.addEventListener('click', handleRefreshClick);
+
+  // Media Type Switching (Audio MP3 vs Video MP4 with Lyrics)
+  const typeAudioBtn = document.getElementById('type-audio-btn');
+  const typeVideoBtn = document.getElementById('type-video-btn');
+  if (typeAudioBtn) {
+    typeAudioBtn.addEventListener('click', () => setMediaType('audio'));
+  }
+  if (typeVideoBtn) {
+    typeVideoBtn.addEventListener('click', () => setMediaType('video'));
+  }
 
   // Tab switching
   const tabFile = document.getElementById('tab-file');
@@ -704,6 +753,13 @@ function openEditSongModal(song) {
   songTitleInput.value = isPlaceholder ? '' : (song.song_title || '');
   
   const perfTypeSelect = document.getElementById('edit-perf-type');
+  if (perfTypeSelect) {
+    const allowDuets = !window.performerProfileData || window.performerProfileData.allow_duets !== false;
+    const duetOpt = perfTypeSelect.querySelector('option[value="Duet"]');
+    const groupOpt = perfTypeSelect.querySelector('option[value="Group"]');
+    if (duetOpt) duetOpt.disabled = !allowDuets;
+    if (groupOpt) groupOpt.disabled = !allowDuets;
+  }
   perfTypeSelect.value = song.performance_type || 'Solo';
   document.getElementById('edit-partner-name').value = song.partner_name || '';
   const partnerPhoneInput = document.getElementById('edit-partner-phone');
@@ -905,6 +961,23 @@ async function handlePerformerSelected(name) {
   // Load food status
   await checkPerformerFoodStatus(name);
 
+  // When stage performances are disabled (e.g. potluck-only event), suppress performance & upload UI completely
+  const isStageEnabled = !window.performerProfileData || window.performerProfileData.stage_performances_enabled !== false;
+  if (!isStageEnabled) {
+    songSection.classList.add('hidden');
+    uploadSection.classList.add('hidden');
+    const acousticNotice = document.getElementById('acoustic-event-notice-card');
+    if (acousticNotice) acousticNotice.classList.add('hidden');
+    const othersSection = document.getElementById('others-songs-section');
+    if (othersSection) othersSection.classList.add('hidden');
+    const addPerfBtn = document.getElementById('add-performance-btn');
+    if (addPerfBtn) addPerfBtn.classList.add('hidden');
+    const editNameBtn = document.getElementById('edit-performer-name-btn');
+    if (editNameBtn) editNameBtn.classList.add('hidden');
+    selectedEntry = null;
+    return;
+  }
+
   // Find all performances for this person
   const userSongs = performances.filter(p => 
     p.performer_name.trim().toLowerCase() === name.toLowerCase() ||
@@ -972,10 +1045,12 @@ async function handlePerformerSelected(name) {
         <span class="text-xs px-2.5 py-1 rounded-full border ${statusClass} font-medium">
           ${statusLabel}
         </span>
-        <button type="button" class="edit-song-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition" title="Edit song details">
-          <i data-lucide="edit-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Edit</span>
-        </button>
+        ${(window.performerProfileData && window.performerProfileData.edits_enabled === false)
+          ? `<span class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-500 text-xs font-semibold flex items-center gap-1 border border-slate-800" title="Edits are currently locked"><i data-lucide="lock" class="w-3.5 h-3.5"></i><span>Locked</span></span>`
+          : `<button type="button" class="edit-song-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition" title="Edit song details">
+              <i data-lucide="edit-2" class="w-3.5 h-3.5 text-orange-400"></i>
+              <span>Edit</span>
+            </button>`}
       </div>
     `;
 
@@ -987,24 +1062,47 @@ async function handlePerformerSelected(name) {
       updateSelectedSong(song);
     });
 
-    card.querySelector('.edit-song-btn').addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      openEditSongModal(song);
-    });
+    const editBtn = card.querySelector('.edit-song-btn');
+    if (editBtn) {
+      editBtn.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+        openEditSongModal(song);
+      });
+    }
 
     songContainer.appendChild(card);
   });
 
   songSection.classList.remove('hidden');
-  uploadSection.classList.remove('hidden');
+
+  const uploadsEnabled = !window.performerProfileData || window.performerProfileData.track_upload_enabled !== false;
+  const acousticNotice = document.getElementById('acoustic-event-notice-card');
+  if (!uploadsEnabled) {
+    if (acousticNotice) acousticNotice.classList.remove('hidden');
+    if (uploadSection) uploadSection.classList.add('hidden');
+  } else {
+    if (acousticNotice) acousticNotice.classList.add('hidden');
+    if (uploadSection) uploadSection.classList.remove('hidden');
+  }
 
   const addPerfBtn = document.getElementById('add-performance-btn');
   if (addPerfBtn) {
-    if (userSongs.length < maxPerformancesPerParticipant) {
+    if (window.performerProfileData && window.performerProfileData.edits_enabled === false) {
+      addPerfBtn.classList.add('hidden');
+    } else if (userSongs.length < maxPerformancesPerParticipant) {
       addPerfBtn.classList.remove('hidden');
     } else {
       addPerfBtn.classList.add('hidden');
+    }
+  }
+
+  const editNameBtn = document.getElementById('edit-performer-name-btn');
+  if (editNameBtn) {
+    if (window.performerProfileData && window.performerProfileData.edits_enabled === false) {
+      editNameBtn.classList.add('hidden');
+    } else {
+      editNameBtn.classList.remove('hidden');
     }
   }
 
@@ -1017,6 +1115,14 @@ async function checkPerformerFoodStatus(name) {
     const res = await fetch(`/api/performer/profile?name=${encodeURIComponent(name)}`);
     if (res.ok) {
       const data = await res.json();
+      window.performerProfileData = data;
+
+      if (data.food_enabled === false) {
+        ctaSection.classList.add('hidden');
+        document.getElementById('food-selector-card')?.classList.add('hidden');
+        return;
+      }
+
       performerFoodSignup = data.food_signup;
 
       if (performerFoodSignup && performerFoodSignup.item_id) {
@@ -1206,11 +1312,72 @@ function updateSelectedSong(song) {
   updateActiveTrackPreview(song);
 }
 
+function setMediaType(type) {
+  currentMediaType = type;
+  const audioBtn = document.getElementById('type-audio-btn');
+  const videoBtn = document.getElementById('type-video-btn');
+  const badge = document.getElementById('media-type-badge');
+  const hint = document.getElementById('media-type-hint');
+  const fileInput = document.getElementById('audio-file-input');
+  const label = document.getElementById('file-select-label');
+  const sizeHint = document.getElementById('max-size-hint');
+
+  if (type === 'video') {
+    if (audioBtn) {
+      audioBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition';
+    }
+    if (videoBtn) {
+      videoBtn.className = 'py-2.5 px-3 rounded-lg bg-purple-600 text-white flex items-center justify-center gap-1.5 transition shadow';
+    }
+    if (badge) {
+      badge.textContent = '🎬 Video with Lyrics (MP4)';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-500/40 font-medium';
+    }
+    if (hint) {
+      hint.textContent = 'Video plays on stage confidence monitor (720p H.264). Pristine audio quality preserved untouched.';
+    }
+    if (fileInput) {
+      fileInput.accept = 'video/*,.mp4,.mov,.mkv,.webm,audio/*';
+    }
+    if (label && label.textContent.includes('audio')) {
+      label.textContent = 'Tap to select or drag video file here';
+    }
+    if (sizeHint) {
+      sizeHint.textContent = 'Supports MP4, MOV, MKV (Max 500MB)';
+    }
+  } else {
+    if (audioBtn) {
+      audioBtn.className = 'py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow';
+    }
+    if (videoBtn) {
+      videoBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition';
+    }
+    if (badge) {
+      badge.textContent = '🎵 Audio Track (MP3)';
+      badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium';
+    }
+    if (hint) {
+      hint.textContent = 'Standard studio-grade audio backing track for venue PA sound.';
+    }
+    if (fileInput) {
+      fileInput.accept = 'audio/*,.mp3,.m4a,.wav,.aac';
+    }
+    if (label && label.textContent.includes('video')) {
+      label.textContent = 'Tap to select or drag audio file here';
+    }
+    if (sizeHint) {
+      sizeHint.textContent = `Supports MP3, M4A, WAV (Max ${maxUploadSizeMb}MB)`;
+    }
+  }
+  updateSubmitButtonText();
+  if (window.lucide) lucide.createIcons();
+}
+
 function updateSubmitButtonText() {
   const submitBtn = document.getElementById('submit-btn');
   const submitText = document.getElementById('submit-text');
 
-  if (!selectedEntry) return;
+  if (!submitBtn || !submitText || !selectedEntry) return;
 
   if (isSongTitleMissing(selectedEntry)) {
     submitBtn.disabled = false;
@@ -1224,11 +1391,16 @@ function updateSubmitButtonText() {
   submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed';
 
   const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id;
+  const isVideo = currentMediaType === 'video';
 
   if (currentMethod === 'youtube') {
-    submitText.textContent = isReplacing ? 'Extract & Replace Track' : 'Extract & Upload Track';
+    submitText.textContent = isReplacing
+      ? (isVideo ? 'Extract & Replace Video Track' : 'Extract & Replace Track')
+      : (isVideo ? 'Extract Video Track from YouTube' : 'Extract & Upload Track');
   } else {
-    submitText.textContent = isReplacing ? 'Replace Existing Track' : 'Upload Track to Google Drive';
+    submitText.textContent = isReplacing
+      ? (isVideo ? 'Replace with New Video Track' : 'Replace Existing Track')
+      : (isVideo ? 'Upload Video Track to Google Drive' : 'Upload Track to Google Drive');
   }
   if (window.lucide) lucide.createIcons();
 }
@@ -1294,11 +1466,18 @@ function initPreviewWaveSurfer() {
 async function updateActiveTrackPreview(song) {
   const existingCard = document.getElementById('existing-track-card');
   const actionTitle = document.getElementById('upload-action-title');
+  const audioContainer = document.getElementById('preview-audio-container');
+  const videoContainer = document.getElementById('preview-video-container');
+  const videoPlayer = document.getElementById('preview-video-player');
 
   if (song.track_status !== 'Uploaded' && !song.drive_file_id) {
     existingCard.classList.add('hidden');
     if (previewWavesurfer) {
       try { previewWavesurfer.stop(); } catch (e) {}
+    }
+    if (videoPlayer) {
+      videoPlayer.pause();
+      videoPlayer.src = '';
     }
     actionTitle.textContent = 'Provide Backing Track';
     return;
@@ -1315,9 +1494,29 @@ async function updateActiveTrackPreview(song) {
         existingCard.classList.remove('hidden');
         actionTitle.textContent = 'Replace Existing Track (Optional)';
 
-        initPreviewWaveSurfer();
-        if (previewWavesurfer) {
-          previewWavesurfer.load(`${data.stream_url}?t=${Date.now()}`);
+        const isVideo = (data.media_type === 'video') || (data.filename && data.filename.endsWith('.mp4'));
+        if (isVideo) {
+          if (audioContainer) audioContainer.classList.add('hidden');
+          if (videoContainer) videoContainer.classList.remove('hidden');
+          if (videoPlayer) {
+            videoPlayer.src = `${data.stream_url}?t=${Date.now()}`;
+          }
+          if (previewWavesurfer) {
+            try { previewWavesurfer.stop(); } catch (e) {}
+          }
+          setMediaType('video');
+        } else {
+          if (videoContainer) videoContainer.classList.add('hidden');
+          if (videoPlayer) {
+            videoPlayer.pause();
+            videoPlayer.src = '';
+          }
+          if (audioContainer) audioContainer.classList.remove('hidden');
+          initPreviewWaveSurfer();
+          if (previewWavesurfer) {
+            previewWavesurfer.load(`${data.stream_url}?t=${Date.now()}`);
+          }
+          setMediaType('audio');
         }
 
         if (window.lucide) lucide.createIcons();
@@ -1356,12 +1555,14 @@ function handleFileSelected(file) {
   const fileInput = document.getElementById('audio-file-input');
 
   if (file) {
-    const maxBytes = maxUploadSizeMb * 1024 * 1024;
+    const isVideo = currentMediaType === 'video';
+    const effectiveMaxMb = isVideo ? 500 : maxUploadSizeMb;
+    const maxBytes = effectiveMaxMb * 1024 * 1024;
     if (file.size > maxBytes) {
       if (fileInput) fileInput.value = '';
       if (infoBar) infoBar.classList.add('hidden');
-      if (label) label.textContent = 'Tap to select or drag audio file here';
-      showError(`File size (${formatBytes(file.size)}) exceeds the maximum upload limit of ${maxUploadSizeMb}MB. Uncompressed WAV files can be very large—please convert the track to MP3 (320kbps) or M4A and try again.`);
+      if (label) label.textContent = isVideo ? 'Tap to select or drag video file here' : 'Tap to select or drag audio file here';
+      showError(`File size (${formatBytes(file.size)}) exceeds the maximum upload limit of ${effectiveMaxMb}MB.`);
       return;
     }
 
@@ -1388,20 +1589,24 @@ async function handleFormSubmit(e) {
     return;
   }
 
+  const isVideo = currentMediaType === 'video';
+  const effectiveMaxMb = isVideo ? 500 : maxUploadSizeMb;
+
   const formData = new FormData();
   formData.append('entry_id', selectedEntry.entry_id);
   formData.append('submission_type', currentMethod);
+  formData.append('media_type', currentMediaType);
 
   if (currentMethod === 'file') {
     const fileInput = document.getElementById('audio-file-input');
     if (!fileInput.files || fileInput.files.length === 0) {
-      showError('Please select an audio file to upload.');
+      showError(`Please select a ${isVideo ? 'video' : 'audio'} file to upload.`);
       return;
     }
     const file = fileInput.files[0];
-    const maxBytes = maxUploadSizeMb * 1024 * 1024;
+    const maxBytes = effectiveMaxMb * 1024 * 1024;
     if (file.size > maxBytes) {
-      showError(`File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of ${maxUploadSizeMb}MB. Please convert this file to MP3 (320kbps) or M4A before uploading.`);
+      showError(`File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of ${effectiveMaxMb}MB.`);
       return;
     }
     formData.append('file', file);
@@ -1427,7 +1632,9 @@ async function handleFormSubmit(e) {
   submitBtn.disabled = true;
   progressContainer.classList.remove('hidden');
   progressBar.style.width = '35%';
-  progressText.textContent = currentMethod === 'youtube' ? 'Extracting audio from YouTube with yt-dlp...' : 'Uploading audio to server...';
+  progressText.textContent = currentMethod === 'youtube'
+    ? (isVideo ? 'Extracting 720p video from YouTube with yt-dlp...' : 'Extracting audio from YouTube with yt-dlp...')
+    : (isVideo ? 'Uploading & optimizing video for stage monitor...' : 'Uploading audio to server...');
 
   try {
     const res = await fetch('/api/upload', {
@@ -1583,13 +1790,23 @@ function setupAddPerformanceModal() {
       (p.partner_name && p.partner_name.trim().toLowerCase() === selectedPerformer.toLowerCase())
     );
     const soloCount = userSongs.filter(p => (p.performance_type || '').trim().toLowerCase() === 'solo').length;
-    const soloOption = typeSelect.querySelector('option[value="Solo"]');
+    const allowDuets = !window.performerProfileData || window.performerProfileData.allow_duets !== false;
+    const duetOption = typeSelect.querySelector('option[value="Duet"]');
+    const groupOption = typeSelect.querySelector('option[value="Group"]');
+    if (duetOption) duetOption.disabled = !allowDuets;
+    if (groupOption) groupOption.disabled = !allowDuets;
 
     if (soloCount >= maxSoloPerParticipant) {
       if (soloOption) soloOption.disabled = true;
-      typeSelect.value = 'Duet';
-      partnerRow.classList.remove('hidden');
-      soloWarning.classList.remove('hidden');
+      if (allowDuets) {
+        typeSelect.value = 'Duet';
+        partnerRow.classList.remove('hidden');
+        soloWarning.classList.remove('hidden');
+      } else {
+        showToast('Maximum solo performances reached. Duets are disabled for this event.');
+        modal.classList.add('hidden');
+        return;
+      }
     } else {
       if (soloOption) soloOption.disabled = false;
       typeSelect.value = 'Solo';

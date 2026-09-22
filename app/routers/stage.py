@@ -1,6 +1,8 @@
+import json
+import hashlib
 import logging
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.config import settings, get_setting
 from app.services.stage_service import stage_service
@@ -22,30 +24,45 @@ router = APIRouter(tags=["stage"])
 
 
 @router.get("/api/live-status")
-async def get_live_status():
+def get_live_status(request: Request):
     status = stage_service.get_live_status()
     # Ensure live event names stay in sync with runtime settings
     status["header_brand_title"] = get_setting("header_brand_title", getattr(settings.event, "header_brand_title", "EMA Paattukoottam"))
     status["header_brand_subtitle"] = get_setting("header_brand_subtitle", getattr(settings.event, "header_brand_subtitle", "Musical Night"))
     status["event_name"] = get_setting("event_name", status.get("event_name"))
     status["event_subtitle"] = get_setting("event_subtitle", status.get("event_subtitle"))
-    return status
+    status["live_display_enabled"] = bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True)))
+
+    from fastapi.encoders import jsonable_encoder
+
+    serializable_status = jsonable_encoder(status)
+    body = json.dumps(serializable_status, sort_keys=True)
+    etag = f'"{hashlib.sha1(body.encode()).hexdigest()}"'
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "public, max-age=1"})
+
+    return Response(
+        content=body,
+        media_type="application/json",
+        headers={"ETag": etag, "Cache-Control": "public, max-age=1"}
+    )
 
 
 @router.post("/api/set-active/{entry_id}")
-async def set_active_performance(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+def set_active_performance(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
     google_service.set_active_performance(entry_id)
     return {"status": "success", "active_entry_id": entry_id}
 
 
 @router.post("/api/clear-active")
-async def clear_active_performance(_authorized: bool = Depends(verify_admin_pin)):
+def clear_active_performance(_authorized: bool = Depends(verify_admin_pin)):
     google_service.clear_active_performance()
     return {"status": "success", "message": "Performance uncued and returned to queue"}
 
 
 @router.get("/api/track-info/{entry_id}")
-async def get_track_info(entry_id: str):
+def get_track_info(entry_id: str):
     performances = google_service.get_performances()
     target = next((p for p in performances if p.entry_id == entry_id), None)
     if not target:
@@ -66,7 +83,7 @@ async def get_track_info(entry_id: str):
 
 
 @router.get("/api/performances", response_model=List[PerformanceEntry])
-async def list_performances():
+def list_performances():
     try:
         return google_service.get_performances()
     except Exception as e:
@@ -75,7 +92,7 @@ async def list_performances():
 
 
 @router.post("/api/sync")
-async def sync_data():
+def sync_data(_authorized: bool = Depends(verify_admin_pin)):
     """One-way sync: Exports App DB (the source of truth) directly into Google Sheet."""
     try:
         performances = db_service.get_all_performances()
@@ -112,7 +129,7 @@ async def sync_data():
 
 
 @router.get("/api/stage-queue", response_model=List[PerformanceEntry])
-async def stage_queue():
+def stage_queue():
     try:
         return google_service.get_stage_queue()
     except Exception as e:
@@ -121,7 +138,7 @@ async def stage_queue():
 
 
 @router.patch("/api/status/{entry_id}")
-async def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
     try:
         google_service.update_status(entry_id, payload.status)
         backup_service.trigger_backup()
@@ -132,7 +149,7 @@ async def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized
 
 
 @router.patch("/api/performance-notes/{entry_id}")
-async def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _authorized: bool = Depends(verify_admin_pin)):
     try:
         db_service.update_performance_field(entry_id, "stage_notes", payload.notes.strip())
         backup_service.trigger_backup()
@@ -143,7 +160,7 @@ async def update_performance_notes(entry_id: str, payload: PerformanceNotesReque
 
 
 @router.post("/api/reorder-queue")
-async def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
+def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
     try:
         updated = google_service.update_sequence_orders(
             [i.model_dump() for i in payload.items],
@@ -162,7 +179,7 @@ async def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(ver
 
 
 @router.post("/api/push-sequence")
-async def push_sequence(_authorized: bool = Depends(verify_admin_pin)):
+def push_sequence(_authorized: bool = Depends(verify_admin_pin)):
     try:
         updated = google_service.sync_sequence_to_google()
         backup_service.trigger_backup()

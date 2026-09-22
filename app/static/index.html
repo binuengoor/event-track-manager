@@ -69,14 +69,14 @@
     <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
       <div class="flex items-center justify-between mb-2">
         <h2 class="text-xl font-bold text-white flex items-center gap-2">
-          <span>Performer Hub</span>
+          <span id="performer-hub-title">Performer Hub</span>
         </h2>
         <a href="/signup" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
           <span>Not registered yet?</span>
           <i data-lucide="arrow-right" class="w-3 h-3"></i>
         </a>
       </div>
-      <p class="text-sm text-slate-400 leading-relaxed">
+      <p id="performer-hub-desc" class="text-sm text-slate-400 leading-relaxed">
         Select your name to manage your performances, update song titles, upload karaoke backing tracks, and sign up for potluck food items.
       </p>
 
@@ -98,12 +98,21 @@
       </div>
     </div>
 
+    <!-- Potluck Only Event Banner (when stage_performances_enabled is false) -->
+    <div id="potluck-only-event-notice" class="hidden p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-center space-y-2">
+      <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
+        <i data-lucide="utensils" class="w-5 h-5"></i>
+      </div>
+      <h4 class="text-sm font-bold text-white">Community Potluck Gathering</h4>
+      <p class="text-xs text-slate-300 max-w-md mx-auto">This event is dedicated to food and community dinner (no stage performances). Check or update your potluck food contribution below.</p>
+    </div>
+
     <!-- 1. Performer Selection -->
     <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
       <label for="performer-select" class="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
         <span class="flex items-center gap-2">
           <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
-          <span>Select Performer</span>
+          <span id="performer-select-label-text">Select Performer</span>
         </span>
         <span id="performer-count-badge" class="text-xs text-slate-400 font-normal">Loading participants...</span>
       </label>
@@ -208,6 +217,15 @@
         </div>
       </div>
 
+      <!-- Acoustic Event Notice (when track_upload_enabled is false) -->
+      <div id="acoustic-event-notice-card" class="hidden p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
+        <div class="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-400 mx-auto flex items-center justify-center">
+          <i data-lucide="guitar" class="w-5 h-5"></i>
+        </div>
+        <h4 class="text-sm font-bold text-white">Live / Acoustic Performance Event</h4>
+        <p class="text-xs text-slate-400 max-w-sm mx-auto">Backing track audio uploads are disabled for this event. Your song is marked for live on-stage performance.</p>
+      </div>
+
       <!-- 4. Track Upload Tabs (appears once song selected) -->
       <div id="upload-methods-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-4">
         
@@ -225,7 +243,7 @@
               <span id="track-filename-display" class="truncate font-mono text-slate-200 font-medium">song.mp3</span>
               <span id="track-duration-display" class="shrink-0 text-slate-400 font-mono ml-2">--:--</span>
             </div>
-            <div class="flex items-center gap-3 pt-1">
+            <div id="preview-audio-container" class="flex items-center gap-3 pt-1">
               <button type="button" id="preview-play-btn" class="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shrink-0 shadow shadow-orange-500/30 transition active:scale-95">
                 <i data-lucide="play" class="w-4 h-4 ml-0.5" id="preview-play-icon"></i>
               </button>
@@ -233,9 +251,13 @@
                 <div id="preview-waveform-inner" class="w-full h-full"></div>
               </div>
             </div>
+            <!-- Video Track Preview Element -->
+            <div id="preview-video-container" class="hidden rounded-xl overflow-hidden bg-black border border-slate-800">
+              <video id="preview-video-player" class="w-full max-h-56 object-contain" controls playsinline></video>
+            </div>
           </div>
-          <p class="text-[11px] text-slate-400 leading-normal">
-            Listen above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.
+          <p class="text-[11px] text-slate-400 leading-normal" id="existing-track-hint">
+            Listen/watch above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.
           </p>
         </div>
 
@@ -262,6 +284,25 @@
           </span>
           <span id="active-track-badge" class="text-xs"></span>
         </label>
+
+        <!-- Media Format Choice: Audio MP3 vs Video MP4 with Lyrics -->
+        <div class="space-y-1.5">
+          <label class="block text-xs font-semibold text-slate-300 flex items-center justify-between">
+            <span>Choose Track Format</span>
+            <span id="media-type-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium">🎵 Audio Track (MP3)</span>
+          </label>
+          <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
+            <button type="button" id="type-audio-btn" class="py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow">
+              <i data-lucide="music-2" class="w-3.5 h-3.5"></i>
+              <span>🎵 Audio Track (MP3)</span>
+            </button>
+            <button type="button" id="type-video-btn" class="py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition">
+              <i data-lucide="video" class="w-3.5 h-3.5 text-purple-400"></i>
+              <span>🎬 Video with Lyrics (MP4)</span>
+            </button>
+          </div>
+          <p id="media-type-hint" class="text-[11px] text-slate-400">Standard studio-grade audio backing track for on-stage sound.</p>
+        </div>
 
         <!-- Method Tabs -->
         <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-sm font-medium">
@@ -376,7 +417,7 @@
     </div>
 
     <!-- Others' Registered Songs Section (Transparency Preview) -->
-    <div class="pt-6 border-t border-slate-800/80 space-y-3">
+    <div id="others-songs-section" class="pt-6 border-t border-slate-800/80 space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
           <i data-lucide="music-2" class="w-4 h-4 text-orange-400"></i>

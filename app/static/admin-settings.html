@@ -94,6 +94,10 @@
         <i data-lucide="mic" class="w-4 h-4"></i>
         <span>Sign-Up Rules</span>
       </button>
+      <button data-tab="features" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="sliders" class="w-4 h-4"></i>
+        <span>Features & Presets</span>
+      </button>
       <button data-tab="food" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
         <i data-lucide="utensils" class="w-4 h-4"></i>
         <span>Food & Potluck</span>
@@ -305,6 +309,108 @@
             <i data-lucide="check" class="w-4 h-4"></i>
             <span>Save Rules</span>
           </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: FEATURES & PRESETS -->
+    <section id="panel-features" class="admin-panel hidden space-y-5">
+      <!-- 1-Click Presets Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="sparkles" class="w-5 h-5 text-amber-400"></i>
+              <span>1-Click Event Presets</span>
+            </h3>
+            <p class="text-xs text-slate-400">Instantly reconfigure feature modules for your event type. No data is ever deleted.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">PRESETS</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+          <!-- Musical Night -->
+          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-orange-500/50 text-left transition group" data-preset="musical_night">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
+                <i data-lucide="music" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white group-hover:text-orange-400 transition">Musical Night</h4>
+                <p class="text-[11px] text-slate-400">All features on: tracks, duets, food & live screen.</p>
+              </div>
+            </div>
+          </button>
+
+          <!-- Acoustic Session -->
+          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-sky-500/50 text-left transition group" data-preset="acoustic">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+                <i data-lucide="guitar" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white group-hover:text-sky-400 transition">Acoustic / Live Band</h4>
+                <p class="text-[11px] text-slate-400">No backing tracks required. Live instruments only.</p>
+              </div>
+            </div>
+          </button>
+
+          <!-- Solo Competition -->
+          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/50 text-left transition group" data-preset="competition">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+                <i data-lucide="trophy" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white group-hover:text-purple-400 transition">Solo Competition</h4>
+                <p class="text-[11px] text-slate-400">Solo acts only. Hidden public setlist transparency.</p>
+              </div>
+            </div>
+          </button>
+
+          <!-- Potluck Picnic -->
+          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 text-left transition group" data-preset="potluck">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                <i data-lucide="utensils" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white group-hover:text-emerald-400 transition">Potluck / Social</h4>
+                <p class="text-[11px] text-slate-400">Community dinner focus. Song sign-ups disabled.</p>
+              </div>
+            </div>
+          </button>
+
+          <!-- Event-Day Freeze -->
+          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-rose-500/50 text-left transition group" data-preset="freeze">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                <i data-lucide="lock" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <h4 class="text-xs font-bold text-white group-hover:text-rose-400 transition">Event-Day Freeze</h4>
+                <p class="text-[11px] text-slate-400">Locks new sign-ups & edits. Stage queue active.</p>
+              </div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Individual Feature Modules Toggles Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="toggle-left" class="w-5 h-5 text-orange-400"></i>
+              <span>Modular Feature Toggles</span>
+            </h3>
+            <p class="text-xs text-slate-400">Enable or disable specific capabilities individually. Existing data remains safe in the database.</p>
+          </div>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">ZERO DATA LOSS</span>
+        </div>
+
+        <div id="feature-modules-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+          <!-- Populated by admin-settings.js renderFeatureToggles() -->
         </div>
       </div>
     </section>

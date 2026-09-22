@@ -122,6 +122,32 @@
     </div>
   </header>
 
+  <!-- Sound Console Inactive State Card -->
+  <div id="console-inactive-card" class="hidden flex-1 max-w-lg mx-auto my-16 px-4">
+    <div class="p-8 sm:p-10 text-center bg-slate-900/90 border border-slate-800 rounded-3xl space-y-4 shadow-2xl">
+      <div class="w-14 h-14 rounded-3xl bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
+        <i data-lucide="sliders" class="w-7 h-7 text-amber-400"></i>
+      </div>
+      <div>
+        <h3 class="text-lg font-bold text-white">Sound Console Inactive</h3>
+        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
+          The sound desk and playback console are disabled for this event (e.g. Potluck Social / Community Dinner). No audio playback or stage cueing operations are active.
+        </p>
+      </div>
+      <div class="pt-2 flex items-center justify-center gap-3">
+        <a href="/" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
+          <i data-lucide="home" class="w-3.5 h-3.5"></i>
+          <span>Return Home</span>
+        </a>
+        <a href="/admin" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-semibold transition shadow-md shadow-orange-500/20">
+          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
+          <span>Admin Settings</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <div id="console-active-content" class="flex-1 flex flex-col">
   <!-- Dedicated Sub-Header: Database Single Source of Truth, Mirror Status & Action Controls -->
   <div class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
@@ -155,6 +181,11 @@
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
           <i data-lucide="archive" class="w-3.5 h-3.5"></i>
           <span>Offline ZIP</span>
+        </button>
+
+        <button id="open-stage-monitor-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 transition active:scale-95 shadow-sm" title="Launch Pop-out Stage Confidence Monitor on second screen / projector">
+          <i data-lucide="tv" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>Stage Monitor</span>
         </button>
 
         <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Event Database">
@@ -232,7 +263,12 @@
         <!-- Current Track Info -->
         <div class="flex items-center gap-3 w-full md:w-1/3 overflow-hidden">
           <div id="player-badge" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
-            <i data-lucide="music-2" class="w-5 h-5"></i>
+            <i data-lucide="music-2" class="w-5 h-5" id="player-badge-icon"></i>
+          </div>
+          <!-- Mini Video Preview Tile (shown when cued track is video) -->
+          <div id="player-video-preview" class="hidden relative w-16 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-purple-500/50 cursor-pointer shadow group" title="Video Track with Lyrics - Click to pop out Stage Monitor">
+            <video id="console-preview-video" class="w-full h-full object-contain" muted playsinline></video>
+            <div class="absolute bottom-0 inset-x-0 bg-purple-950/80 text-[8px] text-center text-purple-300 font-mono">STAGE</div>
           </div>
           <div class="overflow-hidden flex-1">
             <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
@@ -285,6 +321,10 @@
             <i data-lucide="pause-circle" class="w-4 h-4"></i>
             <span>Hold</span>
           </button>
+          <button id="btn-stage-monitor-player" class="px-3 py-2 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 hover:text-purple-200 font-semibold text-xs border border-purple-500/40 flex items-center gap-1.5 transition" title="Pop out Stage Confidence Monitor on second screen">
+            <i data-lucide="tv" class="w-4 h-4 text-purple-400"></i>
+            <span class="hidden sm:inline">Stage</span>
+          </button>
           <button id="btn-uncue" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-rose-200 font-semibold text-xs border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Uncue Track & Return to Queue">
             <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
             <span>Uncue</span>
@@ -307,6 +347,7 @@
 
     </div>
   </div>
+  </div><!-- /#console-active-content -->
 
   <!-- Footer -->
   <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">

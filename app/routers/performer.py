@@ -42,34 +42,73 @@ async def get_performer_profile(name: str):
     all_food_items = db_service.get_all_food_items_with_signups()
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)
     food_enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
+    stage_performances_enabled = bool(get_setting("stage_performances_enabled", getattr(settings.signup, "stage_performances_enabled", True)))
+    track_upload_enabled = bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True)))
+    edits_enabled = bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True)))
+    allow_duets = bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True)))
 
-    # Other songs list for transparency
-    user_ids = {up["entry_id"] for up in user_perfs}
-    other_songs = [
-        {
-            "entry_id": p["entry_id"],
-            "performer_name": p["performer_name"],
-            "song_title": p.get("song_title") or "",
-            "movie_name": p.get("movie_name") or "",
-            "performance_type": p.get("performance_type", "Solo")
-        }
-        for p in all_perfs if p["entry_id"] not in user_ids and not is_placeholder_song_title(p.get("song_title"))
-    ]
+    # When stage performances are disabled (e.g. potluck-only event), suppress performances & songs completely
+    if not stage_performances_enabled:
+        effective_perfs = []
+        other_songs = []
+    else:
+        effective_perfs = user_perfs
+        # Other songs list for transparency
+        user_ids = {up["entry_id"] for up in user_perfs}
+        other_songs = [
+            {
+                "entry_id": p["entry_id"],
+                "performer_name": p["performer_name"],
+                "song_title": p.get("song_title") or "",
+                "movie_name": p.get("movie_name") or "",
+                "performance_type": p.get("performance_type", "Solo")
+            }
+            for p in all_perfs if p["entry_id"] not in user_ids and not is_placeholder_song_title(p.get("song_title"))
+        ]
 
     return {
         "performer_name": clean_name,
-        "performances": user_perfs,
+        "performances": effective_perfs,
         "food_signup": food_signup,
         "counts": counts,
+        "stage_performances_enabled": stage_performances_enabled,
         "food_enabled": food_enabled,
         "food_serving_note": serving_note,
+        "track_upload_enabled": track_upload_enabled,
+        "edits_enabled": edits_enabled,
+        "allow_duets": allow_duets,
         "all_food_items": all_food_items,
         "other_songs": other_songs
     }
 
 
+@router.get("/api/performer/names")
+async def get_registered_participant_names():
+    """Returns unique, sorted names of all registered participants (performers, partners, attendees)."""
+    participants = db_service.get_all_participants()
+    names = set()
+    for p in participants:
+        n = (p.get("name") or "").strip()
+        if n:
+            names.add(n)
+
+    perfs = db_service.get_all_performances()
+    for perf in perfs:
+        pname = (perf.get("performer_name") or "").strip()
+        if pname:
+            names.add(pname)
+        partner = (perf.get("partner_name") or "").strip()
+        if partner:
+            names.add(partner)
+
+    return sorted(list(names), key=lambda x: x.lower())
+
+
 @router.post("/api/performer/performances")
 async def add_performer_performance(payload: AddPerformanceRequest):
+    if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
+        raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
+
     clean_name = payload.performer_name.strip()
     if not clean_name:
         raise HTTPException(status_code=400, detail="Performer name is required.")
@@ -82,6 +121,11 @@ async def add_performer_performance(payload: AddPerformanceRequest):
     ]
     if not user_perfs:
         raise HTTPException(status_code=404, detail=f"No registration found for {clean_name}. Please sign up first.")
+
+    perf_type = payload.performance_type.strip().capitalize() if payload.performance_type else "Solo"
+    allow_duets = bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True)))
+    if not allow_duets and perf_type != "Solo":
+        raise HTTPException(status_code=400, detail="Duet and group performances are currently disabled for this event (Solo only).")
 
     max_perf = int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant))
     if len(user_perfs) >= max_perf:
@@ -153,6 +197,9 @@ async def add_performer_performance(payload: AddPerformanceRequest):
 
 @router.put("/api/performer/rename")
 async def rename_performer_endpoint(payload: PerformerRenameRequest):
+    if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
+        raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
+
     old_name = payload.old_name.strip()
     new_name = payload.new_name.strip()
     if not old_name or not new_name:

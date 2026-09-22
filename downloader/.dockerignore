@@ -1,0 +1,13 @@
+.git
+.venv
+__pycache__
+*.pyc
+tests/
+.pytest_cache
+*.mp3
+*.mp4
+*.zip
+data/
+cache/
+downloads/
+secrets/

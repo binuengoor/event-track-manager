@@ -5,8 +5,8 @@ import zipfile
 import logging
 from datetime import datetime
 from typing import Optional, Generator, Tuple
-from fastapi import HTTPException
-from fastapi.responses import StreamingResponse
+
+from app.exceptions import AudioNotFoundError, InvalidByteRangeError, AudioTranscodeError
 
 from app.config import settings
 from app.services.db_service import db_service
@@ -18,20 +18,214 @@ def sanitize_filename(text: str) -> str:
     cleaned = re.sub(r'[^\w\s-]', '', text).strip()
     return re.sub(r'[-\s]+', '_', cleaned)
 
+import time
+
 class AudioService:
     def __init__(self):
         self.cache_dir = settings.storage.cache_dir
         os.makedirs(self.cache_dir, exist_ok=True)
 
-    def get_cache_path(self, entry_id: str) -> str:
+    def prune_cache_if_needed(self, max_size_mb: int = 2048, target_size_mb: int = 1536) -> int:
+        """
+        Evicts oldest cached files (LRU by mtime) if total cache exceeds max_size_mb,
+        bringing it down to target_size_mb. Also cleans up orphan temporary transcode files.
+        Returns the number of files deleted.
+        """
+        deleted_count = 0
+        if not os.path.exists(self.cache_dir):
+            return 0
+
+        # 1. Clean up stale transcode / temp artifacts older than 1 hour
+        now = time.time()
+        for fname in os.listdir(self.cache_dir):
+            if fname.endswith(".transcode.mp4") or "_temp." in fname or fname.endswith(".part"):
+                fpath = os.path.join(self.cache_dir, fname)
+                try:
+                    if os.path.isfile(fpath) and (now - os.path.getmtime(fpath) > 3600):
+                        os.remove(fpath)
+                        deleted_count += 1
+                except Exception:
+                    pass
+
+        # 2. Check total cache size
+        files_with_stats = []
+        total_bytes = 0
+        for fname in os.listdir(self.cache_dir):
+            fpath = os.path.join(self.cache_dir, fname)
+            try:
+                if os.path.isfile(fpath):
+                    size = os.path.getsize(fpath)
+                    mtime = os.path.getmtime(fpath)
+                    total_bytes += size
+                    files_with_stats.append((fpath, size, mtime))
+            except Exception:
+                pass
+
+        max_bytes = max_size_mb * 1024 * 1024
+        target_bytes = target_size_mb * 1024 * 1024
+
+        if total_bytes > max_bytes:
+            # Sort files by oldest mtime first
+            files_with_stats.sort(key=lambda x: x[2])
+            for fpath, size, _ in files_with_stats:
+                try:
+                    os.remove(fpath)
+                    deleted_count += 1
+                    total_bytes -= size
+                    if total_bytes <= target_bytes:
+                        break
+                except Exception as ex:
+                    logger.warning("Error pruning cache file %s: %s", fpath, ex)
+
+        return deleted_count
+
+    def get_cache_path(self, entry_id: str, ext: Optional[str] = None) -> str:
         safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
+        if ext:
+            e = ext if ext.startswith(".") else f".{ext}"
+            return os.path.join(self.cache_dir, f"{safe_id}{e}")
+        # Default: if .mp4 exists in cache, return .mp4; else .mp3
+        mp4_path = os.path.join(self.cache_dir, f"{safe_id}.mp4")
+        if os.path.isfile(mp4_path):
+            return mp4_path
         return os.path.join(self.cache_dir, f"{safe_id}.mp3")
 
-    def save_upload_to_cache(self, entry_id: str, content: bytes) -> str:
-        cache_path = self.get_cache_path(entry_id)
+    def get_media_type(self, entry_id: str) -> str:
+        safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
+        mp4_path = os.path.join(self.cache_dir, f"{safe_id}.mp4")
+        if os.path.isfile(mp4_path):
+            return "video"
+        return "audio"
+
+    def save_upload_to_cache(self, entry_id: str, content: bytes, ext: str = ".mp3") -> str:
+        self.prune_cache_if_needed()
+        cache_path = self.get_cache_path(entry_id, ext=ext)
         with open(cache_path, "wb") as f:
             f.write(content)
         return cache_path
+
+    async def async_transcode_video_to_720p(self, input_path: str, output_path: str) -> bool:
+        """
+        Transcodes video file to max 720p H.264 MP4 with untouched audio quality (-c:a copy).
+        If audio copy fails due to container/codec incompatibility, falls back to pristine 320k AAC.
+        """
+        import asyncio
+        tmp_output = output_path + ".transcode.mp4"
+        try:
+            # First attempt: -c:a copy to keep audio stream 100% untouched
+            cmd = [
+                "ffmpeg", "-y", "-i", input_path,
+                "-vf", "scale='min(1280,iw)':-2",
+                "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+                "-c:a", "copy",
+                "-movflags", "+faststart",
+                tmp_output
+            ]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.warning("FFmpeg video transcoding timed out for %s", input_path)
+                return False
+
+            if proc.returncode == 0 and os.path.isfile(tmp_output) and os.path.getsize(tmp_output) > 0:
+                if os.path.isfile(output_path):
+                    os.remove(output_path)
+                os.rename(tmp_output, output_path)
+                logger.info("Successfully transcoded video %s to 720p MP4 (audio untouched) -> %s", input_path, output_path)
+                return True
+
+            logger.warning("FFmpeg video transcode with audio copy failed (%s). Retrying with 320k AAC transcode...", stderr.decode(errors="ignore"))
+
+            # Fallback attempt: re-encode audio to high quality 320k AAC
+            cmd_fallback = [
+                "ffmpeg", "-y", "-i", input_path,
+                "-vf", "scale='min(1280,iw)':-2",
+                "-c:v", "libx264", "-crf", "23", "-preset", "fast",
+                "-c:a", "aac", "-b:a", "320k",
+                "-movflags", "+faststart",
+                tmp_output
+            ]
+            proc_fb = await asyncio.create_subprocess_exec(
+                *cmd_fallback,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc_fb.communicate(), timeout=300.0)
+            except asyncio.TimeoutError:
+                proc_fb.kill()
+                await proc_fb.communicate()
+                logger.warning("FFmpeg fallback video transcoding timed out for %s", input_path)
+                return False
+
+            if proc_fb.returncode == 0 and os.path.isfile(tmp_output) and os.path.getsize(tmp_output) > 0:
+                if os.path.isfile(output_path):
+                    os.remove(output_path)
+                os.rename(tmp_output, output_path)
+                logger.info("Successfully transcoded video %s with 320k AAC to 720p MP4 -> %s", input_path, output_path)
+                return True
+            else:
+                logger.warning("FFmpeg fallback video transcode failed: %s", stderr.decode(errors="ignore"))
+        except Exception as e:
+            logger.warning("FFmpeg video transcoding exception: %s", e)
+        finally:
+            if os.path.isfile(tmp_output):
+                try:
+                    os.remove(tmp_output)
+                except Exception:
+                    pass
+        return False
+
+    async def async_transcode_to_standard_mp3(self, input_path: str, output_path: str, bitrate: str = "320k") -> bool:
+        """
+        Asynchronously uses ffmpeg to transcode audio without blocking the event loop.
+        """
+        import asyncio
+        tmp_output = output_path + ".transcode.mp3"
+        try:
+            cmd = [
+                "ffmpeg", "-y", "-i", input_path,
+                "-vn", "-acodec", "libmp3lame",
+                "-b:a", bitrate, "-ar", "44100",
+                tmp_output
+            ]
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=45.0)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.warning("FFmpeg transcoding timed out for %s", input_path)
+                return False
+
+            if proc.returncode == 0 and os.path.isfile(tmp_output) and os.path.getsize(tmp_output) > 0:
+                if os.path.isfile(output_path):
+                    os.remove(output_path)
+                os.rename(tmp_output, output_path)
+                logger.info("Successfully transcoded %s to %s MP3 (%s)", input_path, bitrate, output_path)
+                return True
+            else:
+                logger.warning("FFmpeg transcode non-zero exit: %s", stderr.decode(errors="ignore"))
+        except Exception as e:
+            logger.warning("FFmpeg transcoding exception: %s", e)
+        finally:
+            if os.path.isfile(tmp_output):
+                try:
+                    os.remove(tmp_output)
+                except Exception:
+                    pass
+        return False
 
     def transcode_to_standard_mp3(self, input_path: str, output_path: str, bitrate: str = "320k") -> bool:
         """
@@ -72,6 +266,9 @@ class AudioService:
             f"{safe_id}.mp3",
             f"{safe_id.replace('-', '_')}.mp3",
             f"{safe_id.replace('_', '-')}.mp3",
+            f"{safe_id}.mp4",
+            f"{safe_id.replace('-', '_')}.mp4",
+            f"{safe_id.replace('_', '-')}.mp4",
         }
         purged = False
         for v in variations:
@@ -79,7 +276,7 @@ class AudioService:
             if os.path.isfile(p):
                 try:
                     os.remove(p)
-                    logger.info("Purged local audio cache: %s", p)
+                    logger.info("Purged local audio/video cache: %s", p)
                     purged = True
                 except Exception as e:
                     logger.warning("Error purging cache %s: %s", p, e)
@@ -92,57 +289,80 @@ class AudioService:
         return purged
 
     def ensure_local_cache(self, entry_id: str, drive_file_id: Optional[str] = None) -> Optional[str]:
-        cache_path = self.get_cache_path(entry_id)
-        meta_path = cache_path + ".meta.json"
+        safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
+        is_mock = settings.mock_google_api or getattr(google_service, "mock_mode", False)
 
         # If no drive_file_id and not mock mode, the file was deleted from Drive: purge cache!
-        is_mock = settings.mock_google_api or getattr(google_service, "mock_mode", False)
         if not drive_file_id and not is_mock:
             self.purge_cache(entry_id)
             return None
 
-        if os.path.isfile(cache_path) and os.path.getsize(cache_path) > 0:
-            if drive_file_id and not is_mock:
-                try:
-                    if os.path.isfile(meta_path):
-                        import json
-                        with open(meta_path, "r") as mf:
-                            cached_meta = json.load(mf)
-                        if cached_meta.get("drive_file_id") == drive_file_id:
-                            return cache_path
-                        logger.info("Drive file ID mismatch for %s (%s vs %s). Invalidate local cache.", entry_id, cached_meta.get("drive_file_id"), drive_file_id)
-                        self.purge_cache(entry_id)
-                    else:
-                        import json
-                        with open(meta_path, "w") as mf:
-                            json.dump({"drive_file_id": drive_file_id}, mf)
-                        return cache_path
-                except Exception as ex:
-                    logger.warning("Error checking audio cache metadata for %s: %s", entry_id, ex)
-                    return cache_path
-            else:
-                return cache_path
+        # Check existing candidates (.mp4 or .mp3)
+        for ext in [".mp4", ".mp3"]:
+            candidate_path = os.path.join(self.cache_dir, f"{safe_id}{ext}")
+            meta_path = candidate_path + ".meta.json"
+            if os.path.isfile(candidate_path) and os.path.getsize(candidate_path) > 0:
+                if drive_file_id and not is_mock:
+                    try:
+                        if os.path.isfile(meta_path):
+                            import json
+                            with open(meta_path, "r") as mf:
+                                cached_meta = json.load(mf)
+                            if cached_meta.get("drive_file_id") == drive_file_id:
+                                return candidate_path
+                        else:
+                            import json
+                            with open(meta_path, "w") as mf:
+                                json.dump({"drive_file_id": drive_file_id}, mf)
+                            return candidate_path
+                    except Exception as ex:
+                        logger.warning("Error checking cache metadata for %s: %s", entry_id, ex)
+                        return candidate_path
+                else:
+                    return candidate_path
+
+        # If mismatch or not found, purge cache before downloading
+        if drive_file_id and not is_mock:
+            self.purge_cache(entry_id)
 
         # If not cached locally, attempt to download from Google Drive
-        if drive_file_id:
+        if drive_file_id and not is_mock:
             logger.info("Cache miss for %s. Downloading from Google Drive (file_id: %s)...", entry_id, drive_file_id)
-            audio_bytes = google_service.download_file_bytes(drive_file_id)
-            if audio_bytes:
+            drive_meta = google_service.get_drive_file_metadata(drive_file_id)
+            is_video = False
+            if drive_meta:
+                name = (drive_meta.get("name") or "").lower()
+                mime = (drive_meta.get("mimeType") or "").lower()
+                if name.endswith(".mp4") or "video" in mime:
+                    is_video = True
+
+            ext = ".mp4" if is_video else ".mp3"
+            cache_path = os.path.join(self.cache_dir, f"{safe_id}{ext}")
+            meta_path = cache_path + ".meta.json"
+
+            file_bytes = google_service.download_file_bytes(drive_file_id)
+            if file_bytes:
                 with open(cache_path, "wb") as f:
-                    f.write(audio_bytes)
+                    f.write(file_bytes)
                 try:
                     import json
                     with open(meta_path, "w") as mf:
                         json.dump({"drive_file_id": drive_file_id}, mf)
                 except Exception:
                     pass
-                logger.info("Cached %d bytes to %s", len(audio_bytes), cache_path)
+                logger.info("Cached %d bytes to %s", len(file_bytes), cache_path)
                 return cache_path
 
-        # If in mock mode or file doesn't exist, create a tiny silent MP3 placeholder if needed
-        if is_mock and not os.path.isfile(cache_path):
-            self._create_mock_mp3(cache_path)
-            return cache_path
+        # If in mock mode or file doesn't exist
+        if is_mock:
+            mp4_p = os.path.join(self.cache_dir, f"{safe_id}.mp4")
+            mp3_p = os.path.join(self.cache_dir, f"{safe_id}.mp3")
+            if os.path.isfile(mp4_p) and os.path.getsize(mp4_p) > 0:
+                return mp4_p
+            if os.path.isfile(mp3_p) and os.path.getsize(mp3_p) > 0:
+                return mp3_p
+            self._create_mock_mp3(mp3_p)
+            return mp3_p
 
         return None
 
@@ -153,6 +373,7 @@ class AudioService:
 
         size_bytes = os.path.getsize(cache_path)
         duration_sec = None
+        media_type = "video" if cache_path.lower().endswith(".mp4") else "audio"
 
         try:
             from mutagen import File as MutagenFile
@@ -160,7 +381,7 @@ class AudioService:
             if audio and audio.info and hasattr(audio.info, "length"):
                 duration_sec = round(audio.info.length, 1)
         except Exception as e:
-            logger.warning("Could not read audio duration for %s: %s", entry_id, e)
+            logger.warning("Could not read media duration for %s: %s", entry_id, e)
 
         def fmt_duration(sec: Optional[float]) -> str:
             if not sec:
@@ -180,6 +401,7 @@ class AudioService:
         return {
             "exists": True,
             "filename": canonical_name,
+            "media_type": media_type,
             "size_bytes": size_bytes,
             "size_formatted": fmt_size(size_bytes),
             "duration_seconds": duration_sec,
@@ -196,67 +418,35 @@ class AudioService:
         with open(path, "wb") as f:
             f.write(silent_mp3_header)
 
-    def stream_file_range(self, filepath: str, range_header: Optional[str]) -> StreamingResponse:
-        if not os.path.isfile(filepath):
-            raise HTTPException(status_code=404, detail="Audio file not found on server")
+    def _create_mock_mp4(self, path: str):
+        # Minimal valid MP4 header for mock testing
+        with open(path, "wb") as f:
+            f.write(b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2mp41\x00\x00\x00\x08free")
 
-        file_size = os.path.getsize(filepath)
-        start = 0
-        end = file_size - 1
+    def stream_file_range(self, filepath: str, range_header: Optional[str] = None):
+        """Streams byte-range requests for a local audio file via streaming utility."""
+        from app.utils.streaming import stream_file_range
+        return stream_file_range(filepath, range_header)
 
-        if range_header:
-            match = re.match(r"bytes=(\d+)-(\d*)", range_header.strip())
-            if match:
-                start = int(match.group(1))
-                if match.group(2):
-                    end = int(match.group(2))
-
-        if start >= file_size or end >= file_size or start > end:
-            raise HTTPException(
-                status_code=416,
-                detail="Requested Range Not Satisfiable",
-                headers={"Content-Range": f"bytes */{file_size}"}
-            )
-
-        chunk_size = end - start + 1
-
-        def file_iterator() -> Generator[bytes, None, None]:
-            with open(filepath, "rb") as f:
-                f.seek(start)
-                bytes_remaining = chunk_size
-                while bytes_remaining > 0:
-                    read_len = min(65536, bytes_remaining)
-                    chunk = f.read(read_len)
-                    if not chunk:
-                        break
-                    bytes_remaining -= len(chunk)
-                    yield chunk
-
-        status_code = 206 if range_header else 200
-        headers = {
-            "Content-Range": f"bytes {start}-{end}/{file_size}",
-            "Accept-Ranges": "bytes",
-            "Content-Length": str(chunk_size),
-            "Content-Type": "audio/mpeg",
-            "Cache-Control": "public, max-age=3600"
-        }
-
-        return StreamingResponse(file_iterator(), status_code=status_code, headers=headers)
-
-    def export_sequenced_zip(self) -> Tuple[io.BytesIO, str]:
+    def generate_sequenced_zip_file(self) -> Tuple[str, str]:
+        """Builds offline sequenced ZIP file on disk using tempfile to prevent RAM exhaustion."""
+        import tempfile
         queue = google_service.get_stage_queue()
         if not queue:
             db_perfs = db_service.get_all_performances()
-            # Convert db records to objects with attribute access
             class SimplePerf:
                 def __init__(self, d):
                     for k, v in d.items():
                         setattr(self, k, v)
             queue = [SimplePerf(p) for p in sorted(db_perfs, key=lambda x: x.get("sequence_order") if x.get("sequence_order") is not None else 9999)]
 
-        zip_buffer = io.BytesIO()
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
+        zip_filename = f"Paattukoottam_Stage_Tracks_{timestamp_str}.zip"
 
-        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             run_sheet_lines = [
                 "EMA Paattukoottam - Live Stage Show Run Sheet",
                 f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
@@ -282,7 +472,6 @@ class AudioService:
                 line = f"#{seq_num:<4} | {performer_display:<35} | {(getattr(item, 'song_title', '') or '-'):<30} | {perf_type:<8} | {track_status:<10} | {stage_notes}"
                 run_sheet_lines.append(line)
 
-                # Skip if acoustic or no track
                 drive_id = getattr(item, "drive_file_id", None)
                 if track_status in ("Acoustic", "Pending") and not drive_id:
                     continue
@@ -298,9 +487,20 @@ class AudioService:
             zf.writestr("00_Show_Run_Sheet.txt", manifest_content)
             zf.writestr("00_SEQUENCE_MANIFEST.txt", manifest_content)
 
-        zip_buffer.seek(0)
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
-        zip_filename = f"Paattukoottam_Stage_Tracks_{timestamp_str}.zip"
-        return zip_buffer, zip_filename
+        return tmp_path, zip_filename
+
+    def export_sequenced_zip(self) -> Tuple[io.BytesIO, str]:
+        """Backward-compatible helper returning in-memory buffer."""
+        tmp_path, filename = self.generate_sequenced_zip_file()
+        try:
+            with open(tmp_path, "rb") as f:
+                buf = io.BytesIO(f.read())
+            return buf, filename
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
 audio_service = AudioService()

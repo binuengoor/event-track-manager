@@ -41,3 +41,30 @@ def test_export_sequenced_zip():
     with zipfile.ZipFile(buf, "r") as zf:
         namelist = zf.namelist()
         assert "00_SEQUENCE_MANIFEST.txt" in namelist
+
+
+def test_prune_cache_if_needed(tmp_path, monkeypatch):
+    import time
+    monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
+
+    # 1. Create a stale transcode artifact
+    stale_transcode = tmp_path / "PK-OLD.transcode.mp4"
+    stale_transcode.write_bytes(b"temp transcode data")
+    # artificially set mtime to 2 hours ago
+    past_time = time.time() - 7200
+    os.utime(str(stale_transcode), (past_time, past_time))
+
+    # 2. Create normal cache files
+    f1 = tmp_path / "PK-001.mp3"
+    f1.write_bytes(b"x" * 1024 * 1024)  # 1MB
+    os.utime(str(f1), (past_time, past_time))
+
+    f2 = tmp_path / "PK-002.mp3"
+    f2.write_bytes(b"y" * 1024 * 1024)  # 1MB
+
+    # Prune with a low max_size of 1.5MB and target 0.5MB
+    deleted = audio_service.prune_cache_if_needed(max_size_mb=1, target_size_mb=1)
+    assert deleted >= 1
+    # stale transcode must have been removed
+    assert not stale_transcode.exists()
+

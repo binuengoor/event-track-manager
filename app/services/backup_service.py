@@ -10,6 +10,8 @@ from app.services.google_service import google_service
 logger = logging.getLogger("backup-service")
 
 
+import time
+
 class BackupService:
     def __init__(self):
         self._backup_task: Optional[asyncio.Task] = None
@@ -43,8 +45,7 @@ class BackupService:
             return
 
         self._pending_backup = True
-        loop = asyncio.get_event_loop()
-        self._last_trigger_time = loop.time()
+        self._last_trigger_time = time.time()
         logger.debug("Backup triggered; debounce timer reset.")
 
     async def _debounce_loop(self):
@@ -56,7 +57,7 @@ class BackupService:
                     continue
 
                 debounce_secs = getattr(settings.backup, "debounce_seconds", 10)
-                now = asyncio.get_event_loop().time()
+                now = time.time()
                 if self._last_trigger_time and (now - self._last_trigger_time) >= debounce_secs:
                     self._pending_backup = False
                     await self.backup_now()
@@ -88,8 +89,9 @@ class BackupService:
             performances = db_service.get_all_performances()
             food_items = db_service.get_all_food_items_with_signups()
 
-            # Execute write via google_service
-            res = google_service.create_or_update_backup_sheet(
+            # Execute write via google_service in thread pool to prevent blocking asyncio loop
+            res = await asyncio.to_thread(
+                google_service.create_or_update_backup_sheet,
                 folder_id=folder_id,
                 title=sheet_title,
                 performances=performances,

@@ -21,8 +21,19 @@ def isolate_test_db(tmp_path, monkeypatch):
     original_db_path = db_service._db_path
     db_service._db_path = str(test_db_file)
     db_service._ensure_db()
+
+    from app.events.listeners import register_default_listeners
+    register_default_listeners()
+
+    # Ensure google_service mock_mode is enabled for isolated tests
+    from app.services.google_service import google_service
+    original_mock_mode = google_service.mock_mode
+    google_service.mock_mode = True
+    if not google_service._mock_data:
+        google_service._init_mock_data()
     
     yield
     
-    # Restore original db_path
+    # Restore original states
     db_service._db_path = original_db_path
+    google_service.mock_mode = original_mock_mode

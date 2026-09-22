@@ -8,6 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from app.config import settings
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
+from app.services.downloader_client import downloader_client
+from app.events import register_default_listeners
 
 # Re-exports for backward compatibility
 from app.schemas import (
@@ -55,6 +57,9 @@ logger = logging.getLogger("event-track-manager")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 0. Register in-process domain event listeners
+    register_default_listeners()
+
     # 1. Seed runtime app_settings in DB on first run from .env / config.yaml
     defaults = {
         "event_name": settings.event.name,
@@ -67,6 +72,13 @@ async def lifespan(app: FastAPI):
         "payment_url": settings.event.payment_url or "",
         "signup_sheet_url": settings.event.signup_sheet_url or "",
         "food_signup_enabled": settings.signup.food_signup_enabled,
+        "signup_enabled": settings.signup.signup_enabled,
+        "track_upload_enabled": settings.signup.track_upload_enabled,
+        "allow_duets": settings.signup.allow_duets,
+        "performer_edits_enabled": settings.signup.performer_edits_enabled,
+        "live_display_enabled": settings.signup.live_display_enabled,
+        "dashboard_enabled": settings.signup.dashboard_enabled,
+        "payment_enabled": settings.signup.payment_enabled,
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,
         "max_solo_per_participant": settings.signup.max_solo_per_participant,
@@ -82,12 +94,14 @@ async def lifespan(app: FastAPI):
     # 2. Seed initial food catalog if tables are empty
     db_service.seed_food_catalog(settings.food_items_seed)
 
-    # 3. Start background backup debounce loop
+    # 3. Start background backup debounce loop & pooled downloader client
     backup_service.start()
+    await downloader_client.start()
 
     yield
 
     # Shutdown
+    await downloader_client.close()
     await backup_service.stop()
 
 

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stage Confidence Monitor - EMA Paattukoottam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <style>
+    body {
+      background-color: #000000;
+      color: #ffffff;
+      overflow: hidden;
+      user-select: none;
+    }
+    .fade-overlay {
+      transition: opacity 0.5s ease;
+    }
+    .idle-fade {
+      opacity: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body class="bg-black text-white h-screen w-screen flex flex-col items-center justify-center relative font-sans">
+
+  <!-- Stage Video Playback Container -->
+  <div id="video-container" class="absolute inset-0 w-full h-full flex items-center justify-center bg-black hidden z-10">
+    <!-- MUST ALWAYS REMAIN MUTED TO PREVENT SOUNDBOARD FEEDBACK / HDMI AUDIO HIJACK -->
+    <video
+      id="stage-video"
+      class="w-full h-full object-contain"
+      muted
+      playsinline
+      preload="auto"
+    ></video>
+  </div>
+
+  <!-- Standby Stage Presentation Card (Visible when idle, acoustic, or audio-only track) -->
+  <div id="standby-card" class="relative z-20 flex flex-col items-center justify-center text-center p-8 max-w-4xl w-full mx-auto space-y-6">
+    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/80 text-xs uppercase tracking-widest text-amber-400 font-semibold shadow-lg">
+      <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+      <span id="standby-badge">Stage Confidence Monitor</span>
+    </div>
+
+    <div class="space-y-3">
+      <h1 id="stage-performer-name" class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-md">
+        EMA Paattukoottam
+      </h1>
+      <p id="stage-song-title" class="text-2xl sm:text-3xl md:text-4xl font-medium text-slate-300 drop-shadow">
+        Live Music & Stage Program
+      </p>
+    </div>
+
+    <div id="stage-act-type-container" class="pt-2">
+      <span id="stage-act-type" class="text-sm px-4 py-1.5 rounded-full bg-slate-800/80 text-orange-400 border border-slate-700 font-medium">
+        Ready for Next Act
+      </span>
+    </div>
+  </div>
+
+  <!-- Floating Utility Header (disappears after 3s of mouse inactivity) -->
+  <header id="control-overlay" class="fade-overlay absolute top-0 inset-x-0 z-30 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
+    <div class="flex items-center gap-2">
+      <div id="sync-status-indicator" class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        <span id="sync-status-text">Connected to Console</span>
+      </div>
+      <div class="text-[11px] text-slate-400 hidden sm:block">
+        Muted on Stage &bull; Master Audio on Sound Console
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <span class="text-xs text-slate-400 font-mono hidden md:inline">Press [F] or Double-Click for Fullscreen</span>
+      <button id="fullscreen-btn" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white text-xs border border-slate-700 transition flex items-center gap-1.5">
+        <i data-lucide="maximize-2" class="w-4 h-4" id="fullscreen-icon"></i>
+        <span>Fullscreen</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Bottom Floating Timer / Progress Pill (optional subtle visual queue) -->
+  <footer id="progress-overlay" class="fade-overlay absolute bottom-0 inset-x-0 z-30 p-4 flex items-center justify-between text-xs text-slate-400 bg-gradient-to-t from-black/80 to-transparent">
+    <div id="cued-track-summary" class="truncate font-medium text-slate-300">
+      Standing by...
+    </div>
+    <div id="time-display" class="font-mono text-slate-200 font-bold shrink-0 ml-4">
+      0:00
+    </div>
+  </footer>
+
+  <script src="/static/js/stage-monitor.js"></script>
+</body>
+</html>

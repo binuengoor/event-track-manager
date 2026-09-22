@@ -1,37 +1,50 @@
-FROM python:3.11-slim
+# === Stage 1: Builder ===
+FROM python:3.11.9-slim AS builder
+WORKDIR /build
+COPY requirements.txt .
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+# === Stage 2: Runtime ===
+FROM python:3.11.9-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    DENO_VERSION=v2.2.3
 
 WORKDIR /app
 
-# Install system dependencies: ffmpeg for audio transcoding, curl, unzip & ca-certificates, and install Deno
+# Install system dependencies: ffmpeg for media transcoding, curl, ca-certificates, tini
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ffmpeg \
         curl \
-        unzip \
-        ca-certificates && \
+        ca-certificates \
+        tini && \
     ARCH=$(uname -m) && \
     if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
         DENO_ARCH="aarch64-unknown-linux-gnu"; \
     else \
         DENO_ARCH="x86_64-unknown-linux-gnu"; \
     fi && \
-    curl -fsSL "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}.zip" -o /tmp/deno.zip && \
-    unzip /tmp/deno.zip -d /usr/local/bin && \
+    curl -fsSL "https://github.com/denoland/deno/releases/download/${DENO_VERSION}/deno-${DENO_ARCH}.zip" -o /tmp/deno.zip && \
+    python3 -c "import zipfile; zipfile.ZipFile('/tmp/deno.zip').extractall('/usr/local/bin')" && \
     rm /tmp/deno.zip && \
     chmod +x /usr/local/bin/deno && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+COPY --from=builder /install /usr/local
 COPY main.py .
+
+RUN useradd -r -u 1000 -s /bin/false appuser && \
+    mkdir -p /data/cache /tmp && \
+    chown -R appuser:appuser /app /data /tmp
+
+USER appuser
 
 EXPOSE 8001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
+ENTRYPOINT ["tini", "--"]
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

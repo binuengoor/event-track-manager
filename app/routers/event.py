@@ -10,7 +10,7 @@ router = APIRouter(tags=["event"])
 
 
 @router.get("/api/event-info")
-async def get_event_info():
+def get_event_info():
     sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
     payment_url = get_setting("payment_url") or settings.event.payment_url
     poster_url = get_setting("event_poster_url") or settings.event.poster_url
@@ -25,6 +25,9 @@ async def get_event_info():
 
     hero_tag_primary = get_setting("hero_tag_primary") or getattr(settings.event, "hero_tag_primary", "Musical Evening")
     hero_tag_status = get_setting("hero_tag_status") or getattr(settings.event, "hero_tag_status", "Stage Ready")
+
+    payment_enabled = bool(get_setting("payment_enabled", getattr(settings.signup, "payment_enabled", True)))
+    effective_payment_url = payment_url if payment_enabled else ""
 
     return {
         "event_id": get_setting("event_id") or settings.event.id,
@@ -41,7 +44,17 @@ async def get_event_info():
         "general_notes": general_notes,
         "hero_tag_primary": hero_tag_primary,
         "hero_tag_status": hero_tag_status,
-        "payment_url": payment_url,
+        "payment_url": effective_payment_url,
+        "payment_enabled": payment_enabled,
+        "stage_performances_enabled": bool(get_setting("stage_performances_enabled", getattr(settings.signup, "stage_performances_enabled", True))),
+        "signup_enabled": bool(get_setting("signup_enabled", getattr(settings.signup, "signup_enabled", True))),
+        "food_signup_enabled": bool(get_setting("food_signup_enabled", getattr(settings.signup, "food_signup_enabled", True))),
+        "track_upload_enabled": bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))),
+        "allow_duets": bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True))),
+        "performer_edits_enabled": bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))),
+        "live_display_enabled": bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True))),
+        "dashboard_enabled": bool(get_setting("dashboard_enabled", getattr(settings.signup, "dashboard_enabled", True))),
+        "console_enabled": bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))),
         "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
         "sheet_url": sheet_url

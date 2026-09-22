@@ -63,12 +63,12 @@
     <!-- Header Section -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl">
       <div>
-        <h2 class="text-xl sm:text-2xl font-black text-white">Event Dashboard</h2>
-        <p class="text-xs sm:text-sm text-slate-400 mt-0.5">Live view of all registered performances, track readiness, and potluck food contributions.</p>
+        <h2 id="dashboard-header-title" class="text-xl sm:text-2xl font-black text-white">Event Dashboard</h2>
+        <p id="dashboard-header-desc" class="text-xs sm:text-sm text-slate-400 mt-0.5">Live view of all registered performances, track readiness, and potluck food contributions.</p>
       </div>
 
       <!-- Tab Switcher -->
-      <div class="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto shrink-0">
+      <div id="dashboard-tabs-container" class="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto shrink-0">
         <button id="tab-songs-btn" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow">
           <i data-lucide="mic" class="w-4 h-4"></i>
           <span>Songs & Acts</span>

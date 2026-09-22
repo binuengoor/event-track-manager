@@ -4,8 +4,9 @@ let activeTab = "songs";
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
+  await loadEventInfo();
   setupTabs();
-  await Promise.all([loadEventInfo(), loadPerformances(), loadFood()]);
+  await Promise.all([loadPerformances(), loadFood()]);
   setupFilters();
 });
 
@@ -14,6 +15,7 @@ async function loadEventInfo() {
     const res = await fetch("/api/event-info");
     if (res.ok) {
       const data = await res.json();
+      window.eventInfo = data;
       if (data.header_brand_title) {
         const titleEl = document.getElementById("nav-event-title");
         if (titleEl) titleEl.textContent = data.header_brand_title;
@@ -22,6 +24,51 @@ async function loadEventInfo() {
       if (data.header_brand_subtitle) {
         const subEl = document.getElementById("nav-event-subtitle");
         if (subEl) subEl.textContent = data.header_brand_subtitle;
+      }
+      const isStageEnabled = Boolean(data.stage_performances_enabled !== false);
+      const isFoodEnabled = Boolean(data.food_signup_enabled !== false);
+
+      const tabSongs = document.getElementById("tab-songs-btn");
+      const tabFood = document.getElementById("tab-food-btn");
+      const secSongs = document.getElementById("section-songs");
+      const secFood = document.getElementById("section-food");
+      const headerTitle = document.getElementById("dashboard-header-title");
+      const headerDesc = document.getElementById("dashboard-header-desc");
+      const tabsContainer = document.getElementById("dashboard-tabs-container");
+
+      // Case 1: Potluck-Only Event (Stage performances disabled, Food enabled)
+      if (!isStageEnabled && isFoodEnabled) {
+        if (headerTitle) headerTitle.textContent = "Community Potluck Board";
+        if (headerDesc) headerDesc.textContent = "Coordination board for community potluck dishes, commitments, and needed food items.";
+        if (tabsContainer) tabsContainer.classList.add("hidden");
+        if (tabSongs) tabSongs.classList.add("hidden");
+        if (secSongs) secSongs.classList.add("hidden");
+        if (secFood) secFood.classList.remove("hidden");
+        activeTab = "food";
+      }
+      // Case 2: Performance-Only Event (Food disabled, Stage performances enabled)
+      else if (isStageEnabled && !isFoodEnabled) {
+        if (headerTitle) headerTitle.textContent = "Performance Setlist Dashboard";
+        if (headerDesc) headerDesc.textContent = "Live view of all registered stage performances, acts, and audio track statuses.";
+        if (tabsContainer) tabsContainer.classList.add("hidden");
+        if (tabFood) tabFood.classList.add("hidden");
+        if (secFood) secFood.classList.add("hidden");
+        if (secSongs) secSongs.classList.remove("hidden");
+        activeTab = "songs";
+      }
+      // Case 3: Both enabled (Full Event)
+      else if (isStageEnabled && isFoodEnabled) {
+        if (tabsContainer) tabsContainer.classList.remove("hidden");
+        if (tabSongs) tabSongs.classList.remove("hidden");
+        if (tabFood) tabFood.classList.remove("hidden");
+        if (data.dashboard_enabled === false) {
+          // Private setlists mode (e.g. competition)
+          if (tabFood) tabFood.click();
+        }
+      }
+
+      if (window.adaptNavigationForEventConfig) {
+        window.adaptNavigationForEventConfig(data);
       }
     }
   } catch (e) {
@@ -57,11 +104,34 @@ function setupTabs() {
 }
 
 async function loadPerformances() {
+  if (window.eventInfo && window.eventInfo.stage_performances_enabled === false) {
+    return;
+  }
   try {
     const res = await fetch("/api/dashboard/performances");
     if (!res.ok) throw new Error("Failed to fetch performances");
     performancesData = await res.json();
     
+    if (window.eventInfo && window.eventInfo.dashboard_enabled === false) {
+      const badge = document.getElementById("songs-count-badge");
+      if (badge) badge.textContent = "Locked";
+      document.getElementById("songs-table-body").innerHTML = `
+        <tr>
+          <td colspan="6" class="px-5 py-12 text-center">
+            <div class="max-w-md mx-auto space-y-2">
+              <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+                <i data-lucide="lock" class="w-5 h-5"></i>
+              </div>
+              <h4 class="text-sm font-bold text-white">Private Setlist Mode</h4>
+              <p class="text-xs text-slate-400 leading-relaxed">Performance setlist transparency is currently locked for this event (e.g. Solo Competition Mode). Songs remain private until stage time.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
     document.getElementById("songs-count-badge").textContent = performancesData.length;
     renderSongsTable();
   } catch (err) {
@@ -177,6 +247,13 @@ async function loadFood() {
     const res = await fetch("/api/dashboard/food");
     if (!res.ok) throw new Error("Failed to fetch food dashboard");
     foodData = await res.json();
+
+    const tabFoodBtn = document.getElementById("tab-food-btn");
+    if (foodData.enabled === false) {
+      if (tabFoodBtn) tabFoodBtn.classList.add("hidden");
+    } else {
+      if (tabFoodBtn) tabFoodBtn.classList.remove("hidden");
+    }
 
     document.getElementById("dashboard-serving-note").textContent = foodData.serving_note || "Bring one dish to share";
     document.getElementById("food-stats-pill").textContent = `${foodData.taken_items} / ${foodData.total_items} Taken`;

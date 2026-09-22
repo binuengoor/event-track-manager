@@ -4,8 +4,8 @@ let hasPerf2 = false;
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
-  await loadSignupConfig();
   setupEventListeners();
+  await loadSignupConfig();
 });
 
 async function loadSignupConfig() {
@@ -29,26 +29,21 @@ async function loadSignupConfig() {
       if (noteEl) noteEl.textContent = signupConfig.food_serving_note;
     }
 
-    if (!signupConfig.food_signup_enabled) {
-      const foodSec = document.getElementById("food-section");
-      if (foodSec) foodSec.classList.add("hidden");
-    }
-
-    if (signupConfig.signup_enabled === false) {
-      const closedBanner = document.getElementById("signup-closed-banner");
-      if (closedBanner) closedBanner.classList.remove("hidden");
-      const submitBtnText = document.getElementById("submit-btn-text");
-      if (submitBtnText) submitBtnText.textContent = "Sign-Ups Closed";
-      const submitBtn = document.getElementById("submit-btn");
-      if (submitBtn) {
-        submitBtn.className = "w-full py-4 rounded-2xl bg-slate-800 text-slate-400 font-bold text-sm shadow-md flex items-center justify-center gap-2 transition hover:bg-slate-700 cursor-pointer";
-      }
+    let availablePerfTypes = signupConfig.performance_types || ["Solo", "Duet", "Group"];
+    if (signupConfig.allow_duets === false) {
+      availablePerfTypes = ["Solo"];
     }
 
     renderAgeGroups(signupConfig.age_groups || []);
-    renderPerformanceTypes(signupConfig.performance_types || ["Solo", "Duet", "Group"]);
+    renderPerformanceTypes(availablePerfTypes);
     renderPartnerOptions(signupConfig.registered_performers || []);
     renderFoodGroups(signupConfig.food_groups || [], signupConfig.food_items || []);
+
+    applyRegistrationModules(signupConfig);
+
+    if (window.adaptNavigationForEventConfig) {
+      window.adaptNavigationForEventConfig(signupConfig);
+    }
 
     if (window.lucide) lucide.createIcons();
   } catch (err) {
@@ -96,6 +91,20 @@ function toggleGuardianRequirement(requires) {
   const nameInput = document.getElementById("guardian-name");
   const phoneInput = document.getElementById("guardian-phone");
   if (!container) return;
+
+  const activeRole = document.querySelector('input[name="registration_role"]:checked')?.value;
+  if (activeRole === "food_only") {
+    container.classList.add("hidden");
+    if (nameInput) {
+      nameInput.required = false;
+      nameInput.value = "";
+    }
+    if (phoneInput) {
+      phoneInput.required = false;
+      phoneInput.value = "";
+    }
+    return;
+  }
 
   if (requires) {
     container.classList.remove("hidden");
@@ -496,9 +505,7 @@ function findDuplicateSongSignup(title) {
   return null;
 }
 
-function setupEventListeners() {
-  // Registration Role (Performer vs Food-Only Attendee)
-  const roleRadios = document.querySelectorAll('input[name="registration_role"]');
+function updateRoleUI(role) {
   const rolePerformerCard = document.getElementById("role-performer-card");
   const roleAttendeeCard = document.getElementById("role-attendee-card");
   const perfSection = document.getElementById("perf-section");
@@ -508,70 +515,151 @@ function setupEventListeners() {
   const skipFoodCheckbox = document.getElementById("skip-food-checkbox");
   const attendeeFoodNotice = document.getElementById("attendee-food-notice");
   const submitBtnText = document.getElementById("submit-btn-text");
+  const ageGroupWrap = document.getElementById("age-group-wrap");
+  const contactInfoWrap = document.getElementById("contact-info-wrap");
+  const familyNote = document.getElementById("family-signup-note");
+  const nameLabel = document.getElementById("performer-name-label");
+  const nameInput = document.getElementById("performer-name");
+  const guardianContainer = document.getElementById("guardian-container");
 
-  function updateRoleUI(role) {
-    const ageGroupWrap = document.getElementById("age-group-wrap");
-    const contactInfoWrap = document.getElementById("contact-info-wrap");
-    const familyNote = document.getElementById("family-signup-note");
-    const nameLabel = document.getElementById("performer-name-label");
-    const nameInput = document.getElementById("performer-name");
-    const guardianContainer = document.getElementById("guardian-container");
+  if (role === "food_only") {
+    if (roleAttendeeCard) {
+      roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 cursor-pointer transition";
+    }
+    if (rolePerformerCard) {
+      rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
+    }
+    if (perfSection) perfSection.classList.add("hidden");
+    if (ageGroupWrap) ageGroupWrap.classList.add("hidden");
+    if (contactInfoWrap) {
+      contactInfoWrap.classList.remove("sm:col-span-1");
+      contactInfoWrap.classList.add("sm:col-span-2");
+    }
+    if (familyNote) familyNote.classList.remove("hidden");
+    toggleGuardianRequirement(false);
+    if (guardianContainer) guardianContainer.classList.add("hidden");
+    if (nameLabel) nameLabel.textContent = "Contact / Family Name *";
+    if (nameInput) nameInput.placeholder = "e.g. Maya Suresh or Suresh Family";
+    if (step3Num) step3Num.textContent = "2";
+    if (step1Title) step1Title.textContent = "Family & Contact Information";
+    if (skipFoodWrap) skipFoodWrap.classList.add("hidden");
+    if (attendeeFoodNotice) attendeeFoodNotice.classList.remove("hidden");
+    if (skipFoodCheckbox) skipFoodCheckbox.checked = false;
+    if (submitBtnText) submitBtnText.textContent = "Complete Potluck Sign-Up";
+  } else {
+    if (rolePerformerCard) {
+      rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-orange-500 bg-orange-500/10 cursor-pointer transition";
+    }
+    if (roleAttendeeCard) {
+      roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
+    }
+    if (perfSection) perfSection.classList.remove("hidden");
+    if (ageGroupWrap) ageGroupWrap.classList.remove("hidden");
+    if (contactInfoWrap) {
+      contactInfoWrap.classList.remove("sm:col-span-2");
+      contactInfoWrap.classList.add("sm:col-span-1");
+    }
+    if (familyNote) familyNote.classList.add("hidden");
+    if (nameLabel) nameLabel.textContent = "Full Name *";
+    if (nameInput) nameInput.placeholder = "e.g. Maya Suresh";
+    if (step3Num) step3Num.textContent = "3";
+    if (step1Title) step1Title.textContent = "Participant Information";
+    if (skipFoodWrap) skipFoodWrap.classList.remove("hidden");
+    if (attendeeFoodNotice) attendeeFoodNotice.classList.add("hidden");
+    if (submitBtnText) submitBtnText.textContent = "Complete Registration";
+    if (selectedAgeGroup) {
+      toggleGuardianRequirement(selectedAgeGroup.requires_guardian);
+    }
+  }
+}
 
-    if (role === "food_only") {
-      if (roleAttendeeCard) {
-        roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 cursor-pointer transition";
-      }
-      if (rolePerformerCard) {
-        rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
-      }
-      if (perfSection) perfSection.classList.add("hidden");
-      if (ageGroupWrap) ageGroupWrap.classList.add("hidden");
-      if (contactInfoWrap) {
-        contactInfoWrap.classList.remove("sm:col-span-1");
-        contactInfoWrap.classList.add("sm:col-span-2");
-      }
-      if (familyNote) familyNote.classList.remove("hidden");
-      toggleGuardianRequirement(false);
-      if (guardianContainer) guardianContainer.classList.add("hidden");
-      if (nameLabel) nameLabel.textContent = "Contact / Family Name *";
-      if (nameInput) nameInput.placeholder = "e.g. Maya Suresh or Suresh Family";
-      if (step3Num) step3Num.textContent = "2";
-      if (step1Title) step1Title.textContent = "Family & Contact Information";
-      if (skipFoodWrap) skipFoodWrap.classList.add("hidden");
-      if (attendeeFoodNotice) attendeeFoodNotice.classList.remove("hidden");
-      if (skipFoodCheckbox) skipFoodCheckbox.checked = false;
-      if (submitBtnText && (!signupConfig || signupConfig.signup_enabled !== false)) {
-        submitBtnText.textContent = "Complete Potluck Sign-Up";
-      }
+function applyRegistrationModules(config) {
+  if (!config) return;
+  const perfEnabled = Boolean(config.signup_enabled !== false);
+  const foodEnabled = Boolean(config.food_signup_enabled !== false);
+
+  const roleSelectorSection = document.getElementById("role-selector-section");
+  const rolePerformerCard = document.getElementById("role-performer-card");
+  const roleAttendeeCard = document.getElementById("role-attendee-card");
+  const rolePerformer = document.getElementById("role-performer");
+  const roleAttendee = document.getElementById("role-attendee");
+  const closedBanner = document.getElementById("signup-closed-banner");
+  const bannerTitle = document.getElementById("signup-banner-title");
+  const bannerDesc = document.getElementById("signup-banner-desc");
+  const submitBtn = document.getElementById("submit-btn");
+  const submitBtnText = document.getElementById("submit-btn-text");
+  const addPerfBtn = document.getElementById("add-perf-btn");
+
+  if (addPerfBtn) {
+    if (config.allow_duets === false) {
+      addPerfBtn.classList.add("hidden");
     } else {
-      if (rolePerformerCard) {
-        rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-orange-500 bg-orange-500/10 cursor-pointer transition";
-      }
-      if (roleAttendeeCard) {
-        roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
-      }
-      if (perfSection) perfSection.classList.remove("hidden");
-      if (ageGroupWrap) ageGroupWrap.classList.remove("hidden");
-      if (contactInfoWrap) {
-        contactInfoWrap.classList.remove("sm:col-span-2");
-        contactInfoWrap.classList.add("sm:col-span-1");
-      }
-      if (familyNote) familyNote.classList.add("hidden");
-      if (nameLabel) nameLabel.textContent = "Full Name *";
-      if (nameInput) nameInput.placeholder = "e.g. Maya Suresh";
-      if (step3Num) step3Num.textContent = "3";
-      if (step1Title) step1Title.textContent = "Participant Information";
-      if (skipFoodWrap) skipFoodWrap.classList.remove("hidden");
-      if (attendeeFoodNotice) attendeeFoodNotice.classList.add("hidden");
-      if (submitBtnText && (!signupConfig || signupConfig.signup_enabled !== false)) {
-        submitBtnText.textContent = "Complete Registration";
-      }
-      if (selectedAgeGroup) {
-        toggleGuardianRequirement(selectedAgeGroup.requires_guardian);
-      }
+      addPerfBtn.classList.remove("hidden");
     }
   }
 
+  // Case 1: Both disabled -> Entire registration closed (e.g. Event-Day Freeze)
+  if (!perfEnabled && !foodEnabled) {
+    if (closedBanner) closedBanner.classList.remove("hidden");
+    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
+    const perfSection = document.getElementById("perf-section");
+    if (perfSection) perfSection.classList.add("hidden");
+    const foodSection = document.getElementById("food-section");
+    if (foodSection) foodSection.classList.add("hidden");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.className = "w-full py-4 rounded-2xl bg-slate-800 text-slate-500 font-bold text-sm shadow-none flex items-center justify-center gap-2 cursor-not-allowed";
+    }
+    if (submitBtnText) submitBtnText.textContent = "Sign-Ups Closed";
+    return;
+  }
+
+  // Active registration: ensure banner hidden and button enabled
+  if (closedBanner) closedBanner.classList.add("hidden");
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.className = "w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition hover:scale-[1.01] active:scale-[0.99] cursor-pointer";
+  }
+
+  // Case 2: Potluck / Food ONLY (Performances disabled) -> e.g. Potluck Preset
+  if (!perfEnabled && foodEnabled) {
+    if (bannerTitle) bannerTitle.textContent = "Potluck Food Sign-Up";
+    if (bannerDesc) bannerDesc.textContent = "Choose a dish to bring for our community potluck dinner. One registration per family/household.";
+    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
+    if (roleAttendee) {
+      roleAttendee.checked = true;
+    }
+    updateRoleUI("food_only");
+    return;
+  }
+
+  // Case 3: Performance ONLY (Food disabled) -> e.g. Solo Competition
+  if (perfEnabled && !foodEnabled) {
+    if (bannerTitle) bannerTitle.textContent = "Stage Performer Sign-Up";
+    if (bannerDesc) bannerDesc.textContent = "Register your performance for the stage lineup.";
+    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
+    const foodSec = document.getElementById("food-section");
+    if (foodSec) foodSec.classList.add("hidden");
+    if (rolePerformer) {
+      rolePerformer.checked = true;
+    }
+    updateRoleUI("performer");
+    return;
+  }
+
+  // Case 4: Both enabled -> Full Event (e.g. Musical Night)
+  if (bannerTitle) bannerTitle.textContent = "Performer & Food Sign-Up";
+  if (bannerDesc) bannerDesc.textContent = "Register your performances for the stage lineup and choose a dish to bring for our community potluck dinner.";
+  if (roleSelectorSection) roleSelectorSection.classList.remove("hidden");
+  if (rolePerformerCard) rolePerformerCard.classList.remove("hidden");
+  if (roleAttendeeCard) roleAttendeeCard.classList.remove("hidden");
+  const activeRole = document.querySelector('input[name="registration_role"]:checked')?.value || "performer";
+  updateRoleUI(activeRole);
+}
+
+function setupEventListeners() {
+  // Registration Role (Performer vs Food-Only Attendee)
+  const roleRadios = document.querySelectorAll('input[name="registration_role"]');
   roleRadios.forEach(radio => {
     radio.addEventListener("change", (e) => {
       updateRoleUI(e.target.value);

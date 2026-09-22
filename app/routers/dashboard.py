@@ -11,7 +11,10 @@ router = APIRouter(tags=["dashboard"])
 
 
 @router.get("/api/dashboard/performances")
-async def dashboard_performances():
+def dashboard_performances():
+    if not bool(get_setting("dashboard_enabled", getattr(settings.signup, "dashboard_enabled", True))):
+        return []
+
     perfs = db_service.get_all_performances()
     results = []
     for p in perfs:
@@ -34,7 +37,7 @@ async def dashboard_performances():
 
 
 @router.get("/api/dashboard/food")
-async def dashboard_food():
+def dashboard_food():
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)
     enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
     groups = [g for g in db_service.get_food_groups() if g.get("item_count", 0) > 0]

@@ -18,3 +18,21 @@ def test_pin_override(monkeypatch):
     monkeypatch.setenv("ADMIN_PIN", "9999")
     cfg = load_config()
     assert cfg.admin_pin == "9999"
+
+def test_parse_event_datetime_timezones():
+    from app.config import parse_event_datetime
+    # EDT is -04:00 in September
+    iso_edt = parse_event_datetime("09-19-2026 05:00PM", tz_name="America/New_York")
+    assert iso_edt == "2026-09-19T17:00:00-04:00"
+
+    # PDT is -07:00 in September
+    iso_pdt = parse_event_datetime("09-19-2026 05:00PM", tz_name="America/Los_Angeles")
+    assert iso_pdt == "2026-09-19T17:00:00-07:00"
+
+def test_runtime_env_docker_detection(monkeypatch):
+    monkeypatch.setenv("RUNTIME_ENV", "docker")
+    monkeypatch.delenv("CACHE_DIR", raising=False)
+    monkeypatch.setattr("os.makedirs", lambda *args, **kwargs: None)
+    cfg = load_config()
+    # In docker, /data/cache is preserved when directory creation succeeds
+    assert cfg.storage.cache_dir == "/data/cache"
