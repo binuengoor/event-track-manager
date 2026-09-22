@@ -16,7 +16,6 @@ class PerformanceEntry(BaseModel):
     performance_type: str = "Solo"
     partner_name: Optional[str] = None
     contact_info: Optional[str] = None
-    age_group: Optional[str] = None
     song_title: str
     movie_name: Optional[str] = None
     sequence_order: Optional[int] = None
@@ -33,6 +32,8 @@ class PerformanceEntry(BaseModel):
     age_group: Optional[str] = ""
     guardian_name: Optional[str] = ""
     guardian_phone: Optional[str] = ""
+    partner_age_group: Optional[str] = ""
+    partner_phone: Optional[str] = ""
     created_via: Optional[str] = "sheet"
 
 class GoogleService:
