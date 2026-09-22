@@ -407,5 +407,32 @@ def test_status_update_and_stage_queue_reflection():
     assert matched_undone["performance_status"] == "Upcoming"
 
 
+def test_utils_js_served_and_linked_in_pages():
+    client = TestClient(app)
+    # Check static asset is served
+    res = client.get("/static/js/utils.js")
+    assert res.status_code == 200
+    assert "window.escapeHtml" in res.text
+    assert "window.isValidPhone" in res.text
+
+    # Check that HTML pages include utils.js
+    for path in ["/console", "/live", "/signup", "/performer", "/admin", "/dashboard"]:
+        r = client.get(path)
+        assert r.status_code == 200
+        assert "/static/js/utils.js" in r.text
+
+
+def test_stage_service_live_status():
+    from app.services.stage_service import stage_service
+    status = stage_service.get_live_status()
+    assert "now_performing" in status
+    assert "up_next" in status
+    assert "upcoming" in status
+    assert "performed" in status
+    assert "on_hold" in status
+    assert "gallery_images" in status
+
+
+
 
 
