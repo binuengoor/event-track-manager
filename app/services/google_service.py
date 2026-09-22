@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
 from app.config import settings
-from app.services.db_service import is_placeholder_song_title
+from app.services.db_service import db_service, is_placeholder_song_title
 
 logger = logging.getLogger("google-service")
 
@@ -52,12 +52,10 @@ class GoogleService:
 
     @property
     def active_entry_id(self) -> Optional[str]:
-        from app.services.db_service import db_service
         return db_service.get_active_entry_id()
 
     @active_entry_id.setter
     def active_entry_id(self, val: Optional[str]):
-        from app.services.db_service import db_service
         db_service.set_active_entry_id(val)
 
     def _init_mock_data(self):
@@ -200,7 +198,6 @@ class GoogleService:
                         active_by_entry[part] = f
                         break
 
-            from app.services.db_service import db_service
             for p in entries:
                 matched_file = None
                 if p.drive_file_id and p.drive_file_id in active_file_ids:
@@ -268,7 +265,6 @@ class GoogleService:
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
         if self.mock_mode:
             try:
-                from app.services.db_service import db_service
                 db_entries = db_service.get_all_performances()
                 if db_entries:
                     mock_ids = {p.entry_id for p in self._mock_data}
@@ -280,7 +276,6 @@ class GoogleService:
             return self._mock_data
 
         try:
-            from app.services.db_service import db_service
             cached = db_service.get_all_performances()
             if cached:
                 entries = [PerformanceEntry(**row) for row in cached]
@@ -550,7 +545,6 @@ class GoogleService:
 
             # Save to SQLite database cache
             try:
-                from app.services.db_service import db_service
                 db_service.save_performances(entries)
             except Exception as ex:
                 logger.warning("Could not save performances to SQLite: %s", ex)
@@ -601,7 +595,6 @@ class GoogleService:
                     item.stage_notes = clean_notes
                     return True
 
-        from app.services.db_service import db_service
         db_service.update_performance_field(entry_id, "stage_notes", clean_notes)
         logger.info("Updated stage notes for %s in SQLite: %s", entry_id, clean_notes)
         return True
@@ -611,7 +604,6 @@ class GoogleService:
 
         # Update SQLite database immediately
         try:
-            from app.services.db_service import db_service
             db_service.update_performance_field(entry_id, "track_status", status)
             if file_id:
                 db_service.update_performance_field(entry_id, "drive_file_id", file_id)
@@ -721,7 +713,6 @@ class GoogleService:
 
         # Update SQLite database immediately
         try:
-            from app.services.db_service import db_service
             db_service.update_performance_field(entry_id, "performance_status", val_to_write)
         except Exception as ex:
             logger.warning("Error updating status in SQLite: %s", ex)
@@ -759,7 +750,6 @@ class GoogleService:
 
     def update_sequence_orders(self, items: List[Dict[str, Any]], push_to_sheet: bool = True) -> int:
         """Updates sequence numbers in local SQLite database, and optionally pushes to Google Sheet & Drive."""
-        from app.services.db_service import db_service
         item_map = {it["entry_id"]: int(it["sequence_order"]) for it in items if "entry_id" in it and "sequence_order" in it}
         
         # 1. Always update SQLite database immediately
@@ -790,7 +780,6 @@ class GoogleService:
 
     def sync_sequence_to_google(self, item_map: Optional[Dict[str, int]] = None) -> int:
         """Pushes current SQLite sequence order to Google Sheet and renames Drive files."""
-        from app.services.db_service import db_service
         if self.mock_mode:
             db_service.set_dirty_sequence(False)
             db_service.set_last_sync_time()

@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.config import settings
+from app.services.db_service import db_service
 from app.services.google_service import google_service, PerformanceEntry
 
 logger = logging.getLogger("audio-service")
@@ -243,7 +244,6 @@ class AudioService:
         return StreamingResponse(file_iterator(), status_code=status_code, headers=headers)
 
     def export_sequenced_zip(self) -> Tuple[io.BytesIO, str]:
-        from app.services.db_service import db_service
         queue = google_service.get_stage_queue()
         if not queue:
             db_perfs = db_service.get_all_performances()
