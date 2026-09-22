@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.config import settings, get_setting
-from app.services.google_service import google_service, PerformanceEntry
+from app.services.stage_service import stage_service
 from app.services.audio_service import audio_service, sanitize_filename
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
@@ -14,6 +14,8 @@ from app.schemas import (
     ReorderRequest,
 )
 
+from app.services.google_service import google_service, PerformanceEntry
+
 logger = logging.getLogger("stage-router")
 
 router = APIRouter(tags=["stage"])
@@ -21,7 +23,7 @@ router = APIRouter(tags=["stage"])
 
 @router.get("/api/live-status")
 async def get_live_status():
-    status = google_service.get_live_status()
+    status = stage_service.get_live_status()
     # Ensure live event names stay in sync with runtime settings
     status["header_brand_title"] = get_setting("header_brand_title", getattr(settings.event, "header_brand_title", "EMA Paattukoottam"))
     status["header_brand_subtitle"] = get_setting("header_brand_subtitle", getattr(settings.event, "header_brand_subtitle", "Musical Night"))
