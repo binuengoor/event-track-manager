@@ -143,7 +143,8 @@ class AudioWorkflowService:
                 drive_file_id,
                 status="Uploaded",
                 duration_str=duration_str,
-                media_type="video" if is_video else "audio"
+                media_type="video" if is_video else "audio",
+                drive_file_name=canonical_filename
             )
         except Exception as e:
             logger.error("Failed to update Google Sheet for %s: %s", entry_id, e)

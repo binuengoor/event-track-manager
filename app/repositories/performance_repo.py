@@ -130,7 +130,7 @@ class PerformanceRepository(BaseRepository):
         allowed_fields = {
             "performer_name", "song_title", "movie_name", "partner_name", "partner_age_group", "partner_phone", "performance_type",
             "age_group", "guardian_name", "guardian_phone", "contact_info",
-            "stage_notes", "track_status", "performance_status", "sequence_order"
+            "stage_notes", "track_status", "performance_status", "sequence_order", "media_type"
         }
         updates = []
         params = []
@@ -363,7 +363,7 @@ class PerformanceRepository(BaseRepository):
         allowed_fields = {
             "performance_status", "track_status", "sequence_order", "duration",
             "drive_file_id", "drive_file_name", "last_updated", "song_title",
-            "stage_notes", "age_group", "guardian_name", "guardian_phone"
+            "stage_notes", "age_group", "guardian_name", "guardian_phone", "media_type"
         }
         if field_name not in allowed_fields:
             raise ValueError(f"Field {field_name} not allowed for direct update")

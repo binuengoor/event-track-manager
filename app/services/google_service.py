@@ -464,7 +464,7 @@ class GoogleService:
     # Sheet & Performance Updates
     # --------------------------------------------------------------------------
 
-    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None, media_type: Optional[str] = None) -> bool:
+    def update_track_metadata(self, entry_id: str, file_id: str, status: str = "Uploaded", duration_str: Optional[str] = None, media_type: Optional[str] = None, drive_file_name: Optional[str] = None) -> bool:
         now_iso = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         try:
@@ -475,6 +475,8 @@ class GoogleService:
                 db_service.update_performance_field(entry_id, "duration", duration_str)
             if media_type:
                 db_service.update_performance_field(entry_id, "media_type", media_type)
+            if drive_file_name:
+                db_service.update_performance_field(entry_id, "drive_file_name", drive_file_name)
             db_service.update_performance_field(entry_id, "last_updated", now_iso)
         except Exception as ex:
             logger.warning("Error updating track metadata in SQLite: %s", ex)
