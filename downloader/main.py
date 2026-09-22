@@ -68,6 +68,19 @@ def validate_media_url(raw_url: str) -> str:
             status_code=400,
             detail=f"Domain '{hostname}' is not supported for media extraction. Only YouTube and SoundCloud are allowed."
         )
+
+    # Sanitize YouTube URLs: strip radio mix, playlist, and tracking query params
+    # to avoid bot triggers and unintended playlist downloads
+    if "youtube.com" in hostname:
+        from urllib.parse import parse_qs
+        qs = parse_qs(parsed.query)
+        if "v" in qs and qs["v"]:
+            clean_url = f"https://www.youtube.com/watch?v={qs['v'][0]}"
+    elif hostname == "youtu.be":
+        video_id = parsed.path.strip("/")
+        if video_id:
+            clean_url = f"https://youtu.be/{video_id}"
+
     return clean_url
 
 

@@ -9,7 +9,7 @@ FROM python:3.11.9-slim AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
-    DENO_VERSION=v2.2.3
+    DENO_VERSION=v2.9.7
 
 WORKDIR /app
 
@@ -35,9 +35,9 @@ RUN apt-get update && \
 COPY --from=builder /install /usr/local
 COPY main.py .
 
-RUN useradd -r -u 1000 -s /bin/false appuser && \
-    mkdir -p /data/cache /tmp && \
-    chown -R appuser:appuser /app /data /tmp
+RUN useradd -r -u 1000 -m -d /home/appuser -s /bin/false appuser && \
+    mkdir -p /data/cache /tmp /home/appuser/.cache && \
+    chown -R appuser:appuser /app /data /tmp /home/appuser
 
 USER appuser
 

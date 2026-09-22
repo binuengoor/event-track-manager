@@ -5,8 +5,10 @@ from downloader.main import validate_media_url, ytdl_match_filter
 
 def test_validate_media_url_valid():
     assert validate_media_url("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-    assert validate_media_url("https://youtu.be/dQw4w9WgXcQ") == "https://youtu.be/dQw4w9WgXcQ"
-    assert validate_media_url("https://music.youtube.com/watch?v=12345") == "https://music.youtube.com/watch?v=12345"
+    # Strips radio mix, playlist, and tracking params
+    assert validate_media_url("https://www.youtube.com/watch?v=5oRYneJLu-M&list=RD5oRYneJLu-M&start_radio=1") == "https://www.youtube.com/watch?v=5oRYneJLu-M"
+    assert validate_media_url("https://youtu.be/dQw4w9WgXcQ?si=abc123xyz") == "https://youtu.be/dQw4w9WgXcQ"
+    assert validate_media_url("https://music.youtube.com/watch?v=12345&feature=share") == "https://www.youtube.com/watch?v=12345"
     assert validate_media_url("https://soundcloud.com/artist/track") == "https://soundcloud.com/artist/track"
 
 

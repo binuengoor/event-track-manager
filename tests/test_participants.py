@@ -86,3 +86,42 @@ def test_participant_lifecycle_and_roster(client):
     # Clean up
     db_service.delete_performance(entry_id)
     db_service.delete_performance(entry_id_2)
+
+
+def test_performer_names_excludes_food_signups(client):
+    # 1. Sign up performer
+    res_signup = client.post("/api/signup", json={
+        "performer_name": "Rajiv TestPerformer",
+        "contact_info": "484-555-4321",
+        "age_group": "Senior",
+        "performances": [
+            {"performance_type": "Solo", "song_title": "Rajiv Test Song"}
+        ]
+    })
+    assert res_signup.status_code == 200
+    entry_id = res_signup.json()["entry_ids"][0]
+
+    # 2. Add food item and sign up under a family grouping
+    group_id = db_service.add_food_group("Test Category Group")
+    item_id = db_service.add_food_item("Test Curry Dish", group_id)
+    food_res = client.post("/api/signup/food", json={
+        "signer_name": "Rajiv & Anjana Family",
+        "item_id": item_id,
+        "dish_description": "Curry"
+    })
+    assert food_res.status_code == 200
+
+    # 3. Call /api/performer/names
+    names_res = client.get("/api/performer/names")
+    assert names_res.status_code == 200
+    names = names_res.json()
+
+    # Performer MUST be present
+    assert "Rajiv TestPerformer" in names
+    # Food family grouping MUST NOT be present in performer names dropdown
+    assert "Rajiv & Anjana Family" not in names
+
+    # Clean up
+    db_service.delete_performance(entry_id)
+    db_service.delete_food_item(item_id, force=True)
+    db_service.delete_food_group(group_id)

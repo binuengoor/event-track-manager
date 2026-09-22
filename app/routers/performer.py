@@ -84,14 +84,13 @@ async def get_performer_profile(name: str):
 
 @router.get("/api/performer/names")
 async def get_registered_participant_names():
-    """Returns unique, sorted names of all registered participants (performers, partners, attendees)."""
-    participants = db_service.get_all_participants()
-    names = set()
-    for p in participants:
-        n = (p.get("name") or "").strip()
-        if n:
-            names.add(n)
+    """Returns unique, sorted names of performers. When stage performances are enabled,
+    returns distinct performer and partner names from performances to prevent food signups
+    (e.g., family groupings like 'Rajiv & Anjana') from appearing in the performer dropdown.
+    If stage performances are disabled, falls back to registered participants (e.g. food/attendees)."""
+    stage_performances_enabled = bool(get_setting("stage_performances_enabled", getattr(settings.signup, "stage_performances_enabled", True)))
 
+    names = set()
     perfs = db_service.get_all_performances()
     for perf in perfs:
         pname = (perf.get("performer_name") or "").strip()
@@ -100,6 +99,13 @@ async def get_registered_participant_names():
         partner = (perf.get("partner_name") or "").strip()
         if partner:
             names.add(partner)
+
+    if not stage_performances_enabled:
+        participants = db_service.get_all_participants()
+        for p in participants:
+            n = (p.get("name") or "").strip()
+            if n:
+                names.add(n)
 
     return sorted(list(names), key=lambda x: x.lower())
 
