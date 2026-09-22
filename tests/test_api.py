@@ -370,5 +370,42 @@ def test_upload_blocked_when_song_title_missing_or_placeholder(tmp_path, monkeyp
     assert res3.status_code == 200
     assert res3.json()["status"] == "success"
 
+def test_status_update_and_stage_queue_reflection():
+    client = TestClient(app)
+    queue_res = client.get("/api/stage-queue")
+    assert queue_res.status_code == 200
+    queue = queue_res.json()
+    assert len(queue) > 0
+    target_entry = queue[0]
+    target_id = target_entry["entry_id"]
+
+    # 1. Update status to Performed
+    patch_res = client.patch(
+        f"/api/status/{target_id}",
+        json={"status": "Performed"},
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert patch_res.status_code == 200
+
+    # Verify stage queue reflects performance_status == "Performed"
+    queue_after = client.get("/api/stage-queue").json()
+    matched = next((p for p in queue_after if p["entry_id"] == target_id), None)
+    assert matched is not None
+    assert matched["performance_status"] == "Performed"
+
+    # 2. Undo: update status back to Upcoming
+    undo_res = client.patch(
+        f"/api/status/{target_id}",
+        json={"status": "Upcoming"},
+        headers={"X-Admin-PIN": settings.admin_pin}
+    )
+    assert undo_res.status_code == 200
+
+    queue_undone = client.get("/api/stage-queue").json()
+    matched_undone = next((p for p in queue_undone if p["entry_id"] == target_id), None)
+    assert matched_undone is not None
+    assert matched_undone["performance_status"] == "Upcoming"
+
+
 
 

@@ -607,6 +607,21 @@ async function testAuthAndLoad() {
   }
 }
 
+function updateQueueStatsSummary() {
+  const statsSummary = document.getElementById('stats-summary');
+  const countPill = document.getElementById('queue-count-pill');
+  if (!statsSummary || !countPill || !queue) return;
+
+  const total = queue.length;
+  const performed = queue.filter(q => q.performance_status === 'Performed' || q.track_status === 'Performed').length;
+  const skipped = queue.filter(q => (q.performance_status === 'On Hold' || q.track_status === 'Skipped') && q.performance_status !== 'Performed' && q.track_status !== 'Performed').length;
+  const uploaded = queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && (q.track_status === 'Uploaded' || Boolean(q.drive_file_id))).length;
+  const pending = queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && q.track_status !== 'Uploaded' && !q.drive_file_id && q.track_status !== 'Acoustic' && (q.performance_type || '').toLowerCase() !== 'acoustic').length;
+
+  statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
+  countPill.textContent = `${performed}/${total} completed`;
+}
+
 async function loadQueue(silent = false) {
   const container = document.getElementById('queue-container');
   const statsSummary = document.getElementById('stats-summary');
@@ -625,14 +640,7 @@ async function loadQueue(silent = false) {
     queue = await res.json();
     localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
 
-    const total = queue.length;
-    const uploaded = queue.filter(q => q.track_status === 'Uploaded').length;
-    const performed = queue.filter(q => q.track_status === 'Performed').length;
-    const skipped = queue.filter(q => q.track_status === 'Skipped').length;
-    const pending = queue.filter(q => q.track_status === 'Pending').length;
-
-    statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
-    countPill.textContent = `${performed}/${total} completed`;
+    updateQueueStatsSummary();
 
     // Fetch live status for dirty state, active performer, and sync timestamp
     let liveData = null;
@@ -651,8 +659,14 @@ async function loadQueue(silent = false) {
     applyFilter();
     updateVaultStatusDisplay();
 
-    // Auto-restore active / cued track on load if not already cued
-    if (!currentCuedItem && queue.length > 0) {
+    // Auto-restore active / cued track on load if not already cued, or refresh current cued item
+    if (currentCuedItem) {
+      const matchItem = queue.find(q => q.entry_id === currentCuedItem.entry_id);
+      if (matchItem) {
+        currentCuedItem = matchItem;
+        updatePlayerBarState();
+      }
+    } else if (queue.length > 0) {
       const serverActiveId = liveData ? liveData.active_entry_id : null;
       const candidateId = serverActiveId || localStorage.getItem('paattukoottam_cued_entry_id');
 
@@ -756,10 +770,10 @@ function renderQueueList() {
   container.innerHTML = '';
   filteredQueue.forEach((item, index) => {
     const isCued = currentCuedItem && currentCuedItem.entry_id === item.entry_id;
-    const isDone = item.track_status === 'Performed';
-    const isSkipped = item.track_status === 'Skipped';
-    const isAcoustic = item.track_status === 'Acoustic';
-    const isUploaded = item.track_status === 'Uploaded';
+    const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
+    const isSkipped = !isDone && (item.performance_status === 'On Hold' || item.track_status === 'Skipped');
+    const isAcoustic = !isDone && !isSkipped && (item.track_status === 'Acoustic' || (item.performance_type || '').toLowerCase().includes('acoustic'));
+    const isUploaded = !isDone && !isSkipped && (item.track_status === 'Uploaded' || Boolean(item.drive_file_id));
 
     const row = document.createElement('div');
     row.id = `queue-row-${item.entry_id}`;
@@ -946,9 +960,9 @@ function renderQueueList() {
     if (holdBtn) {
       holdBtn.addEventListener('click', () => {
         const action = () => {
-          const nextStatus = isSkipped ? 'Uploaded' : 'Skipped';
+          const nextStatus = isSkipped ? 'Upcoming' : 'On Hold';
           updateStatus(item.entry_id, nextStatus).then(() => {
-            if (nextStatus === 'Uploaded') {
+            if (nextStatus === 'Upcoming') {
               cueTrack(item, false);
             } else if (isCued) {
               cueNextTrack(false);
@@ -965,7 +979,7 @@ function renderQueueList() {
 
     row.querySelector('.btn-done-row').addEventListener('click', () => {
       const action = () => {
-        const nextStatus = isDone ? (item.drive_file_id ? 'Uploaded' : 'Pending') : 'Performed';
+        const nextStatus = isDone ? 'Upcoming' : 'Performed';
         updateStatus(item.entry_id, nextStatus).then(() => {
           if (nextStatus === 'Performed' && isCued) {
             cueNextTrack(false);
@@ -1220,6 +1234,42 @@ function setupDisruptionModal() {
   });
 }
 
+function updatePlayerBarState() {
+  if (!currentCuedItem) return;
+  const markDoneBtn = document.getElementById('btn-mark-done');
+  const holdBtn = document.getElementById('btn-hold-skip');
+  const isCuedDone = currentCuedItem.performance_status === 'Performed' || currentCuedItem.track_status === 'Performed';
+  const isCuedSkipped = currentCuedItem.performance_status === 'On Hold' || currentCuedItem.track_status === 'Skipped';
+
+  if (markDoneBtn) {
+    markDoneBtn.disabled = false;
+    if (isCuedDone) {
+      markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.title = 'Undo completed status [Enter]';
+      markDoneBtn.innerHTML = '<i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Undo</span>';
+    } else {
+      markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.title = 'Mark as Performed [Enter]';
+      markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
+    }
+  }
+
+  if (holdBtn) {
+    holdBtn.disabled = false;
+    if (isCuedSkipped) {
+      holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-xs border border-amber-500/50 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      holdBtn.title = 'Return performer to queue';
+      holdBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i><span>Re-Queue</span>';
+    } else {
+      holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      holdBtn.title = 'No-Show / Put On Hold';
+      holdBtn.innerHTML = '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Hold</span>';
+    }
+  }
+
+  if (window.lucide) lucide.createIcons();
+}
+
 function resetPlayerBar() {
   currentCuedItem = null;
   localStorage.removeItem('paattukoottam_cued_entry_id');
@@ -1250,9 +1300,20 @@ function resetPlayerBar() {
   if (notesBar) notesBar.classList.add('hidden');
 
   if (playBtn) playBtn.disabled = true;
-  if (markDoneBtn) markDoneBtn.disabled = true;
-  if (holdBtn) holdBtn.disabled = true;
+  if (markDoneBtn) {
+    markDoneBtn.disabled = true;
+    markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+    markDoneBtn.title = 'Mark as Performed [Enter]';
+    markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
+  }
+  if (holdBtn) {
+    holdBtn.disabled = true;
+    holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+    holdBtn.title = 'No-Show / Put On Hold';
+    holdBtn.innerHTML = '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Hold</span>';
+  }
   if (uncueBtn) uncueBtn.disabled = true;
+  if (window.lucide) lucide.createIcons();
   if (downloadBtn) {
     downloadBtn.classList.add('opacity-40', 'pointer-events-none');
     downloadBtn.onclick = null;
@@ -1356,8 +1417,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
     }
 
     if (playBtn) playBtn.disabled = isAcoustic;
-    if (markDoneBtn) markDoneBtn.disabled = false;
-    if (holdBtn) holdBtn.disabled = false;
+    updatePlayerBarState();
     if (uncueBtn) uncueBtn.disabled = false;
 
     // Configure 1-Click Track Download for Local Playback
@@ -1612,17 +1672,32 @@ function cueNextTrack(autoPlay = false) {
 }
 
 async function updateStatus(entryId, newStatus) {
+  let normalizedPerfStatus = 'Upcoming';
+  if (newStatus === 'Performed' || newStatus === 'Done') {
+    normalizedPerfStatus = 'Performed';
+  } else if (newStatus === 'Skipped' || newStatus === 'On Hold') {
+    normalizedPerfStatus = 'On Hold';
+  } else if (newStatus === 'On Stage' || newStatus === 'Live') {
+    normalizedPerfStatus = 'On Stage';
+  } else {
+    normalizedPerfStatus = 'Upcoming';
+  }
+
   const target = queue.find(q => q.entry_id === entryId);
   if (target) {
-    target.track_status = newStatus;
-    target.performance_status = newStatus;
+    target.performance_status = normalizedPerfStatus;
   }
+  if (currentCuedItem && currentCuedItem.entry_id === entryId) {
+    currentCuedItem.performance_status = normalizedPerfStatus;
+    updatePlayerBarState();
+  }
+  updateQueueStatsSummary();
   applyFilter();
   localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
 
   if (!navigator.onLine) {
-    enqueueOfflineAction('update_status', entryId, { status: newStatus });
-    showToast(`✓ Marked ${newStatus} locally (will sync when online)`, 'info');
+    enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus });
+    showToast(`✓ Marked ${normalizedPerfStatus} locally (will sync when online)`, 'info');
     return;
   }
 
@@ -1633,13 +1708,13 @@ async function updateStatus(entryId, newStatus) {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ status: newStatus })
+      body: JSON.stringify({ status: normalizedPerfStatus })
     });
 
     if (!res.ok) throw new Error('Status update failed');
-    showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${newStatus}`);
+    showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${normalizedPerfStatus}`);
   } catch (err) {
-    enqueueOfflineAction('update_status', entryId, { status: newStatus });
+    enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus });
     showToast(`Saved locally (network error, will sync when online)`, 'warning');
   }
 }
@@ -1725,9 +1800,16 @@ function setupKeyboardHotkeys() {
     } else if (e.code === 'Enter') {
       e.preventDefault();
       if (currentCuedItem) {
-        confirmIfPlaying('Marking current track as completed', async () => {
-          await updateStatus(currentCuedItem.entry_id, 'Performed');
-          cueNextTrack(false);
+        const isCuedDone = currentCuedItem.performance_status === 'Performed' || currentCuedItem.track_status === 'Performed';
+        const promptMsg = isCuedDone ? 'Restoring track as upcoming' : 'Marking current track as completed';
+        confirmIfPlaying(promptMsg, async () => {
+          const nextStatus = isCuedDone ? 'Upcoming' : 'Performed';
+          await updateStatus(currentCuedItem.entry_id, nextStatus);
+          if (nextStatus === 'Performed') {
+            cueNextTrack(false);
+          } else {
+            updatePlayerBarState();
+          }
         });
       }
     }
@@ -1758,18 +1840,32 @@ function setupActionButtons() {
 
   document.getElementById('btn-mark-done').addEventListener('click', async () => {
     if (currentCuedItem) {
-      confirmIfPlaying('Marking track as completed', async () => {
-        await updateStatus(currentCuedItem.entry_id, 'Performed');
-        cueNextTrack(false);
+      const isCuedDone = currentCuedItem.performance_status === 'Performed' || currentCuedItem.track_status === 'Performed';
+      const promptMsg = isCuedDone ? 'Restoring track as upcoming' : 'Marking track as completed';
+      confirmIfPlaying(promptMsg, async () => {
+        const nextStatus = isCuedDone ? 'Upcoming' : 'Performed';
+        await updateStatus(currentCuedItem.entry_id, nextStatus);
+        if (nextStatus === 'Performed') {
+          cueNextTrack(false);
+        } else {
+          updatePlayerBarState();
+        }
       });
     }
   });
 
   document.getElementById('btn-hold-skip').addEventListener('click', async () => {
     if (currentCuedItem) {
-      confirmIfPlaying('Putting current track on hold', async () => {
-        await updateStatus(currentCuedItem.entry_id, 'Skipped');
-        cueNextTrack(false);
+      const isCuedSkipped = currentCuedItem.performance_status === 'On Hold' || currentCuedItem.track_status === 'Skipped';
+      const promptMsg = isCuedSkipped ? 'Returning track to upcoming queue' : 'Putting current track on hold';
+      confirmIfPlaying(promptMsg, async () => {
+        const nextStatus = isCuedSkipped ? 'Upcoming' : 'On Hold';
+        await updateStatus(currentCuedItem.entry_id, nextStatus);
+        if (nextStatus === 'On Hold') {
+          cueNextTrack(false);
+        } else {
+          updatePlayerBarState();
+        }
       });
     }
   });

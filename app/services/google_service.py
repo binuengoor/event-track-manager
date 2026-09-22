@@ -825,10 +825,21 @@ class GoogleService:
 
     def update_status(self, entry_id: str, status: str) -> bool:
         """Updates Performance Status (Col K) and optionally Track Status (Col L)."""
+        # Determine value to write to Col K (Performance Status)
+        val_to_write = status
+        if status in ("Uploaded", "Upcoming", "Reset"):
+            val_to_write = "Upcoming"
+        elif status in ("Performed", "Done"):
+            val_to_write = "Performed"
+        elif status in ("Skipped", "On Hold"):
+            val_to_write = "On Hold"
+        elif status in ("On Stage", "Live"):
+            val_to_write = "On Stage"
+
         if self.mock_mode:
             for item in self._mock_data:
                 if item.entry_id == entry_id:
-                    item.performance_status = status
+                    item.performance_status = val_to_write
                     return True
             return False
 
@@ -844,17 +855,6 @@ class GoogleService:
 
         cols = settings.columns
         tab_name = settings.google.sheet_range.split("!")[0] if "!" in settings.google.sheet_range else "Song Sign-Up"
-
-        # Determine value to write to Col K (Performance Status)
-        val_to_write = status
-        if status in ("Uploaded", "Upcoming", "Reset"):
-            val_to_write = "Upcoming"
-        elif status == "Performed":
-            val_to_write = "Performed"
-        elif status in ("Skipped", "On Hold"):
-            val_to_write = "On Hold"
-        elif status in ("On Stage", "Live"):
-            val_to_write = "On Stage"
 
         # Update SQLite database immediately
         try:
