@@ -1,12 +1,14 @@
 /**
- * Google Gemini Aurora Fluid Light Effect
- * Authentic Google Gemini signature ambient glow (iOS, Android & Web).
- * Spatially separated spectral waves:
- * - Electric Blue & Vivid Cyan (Left to Center)
- * - Radiant Violet & Deep Purple (Center)
- * - Neon Pink & Warm Amber Crest (Right)
- * Luminous high-saturation screen blending, liquid simplex domain warping,
- * and seamless feathering into pure OLED black (#000000).
+ * Google Gemini iOS Ambient Aurora Effect
+ * Modeled directly after the Gemini iOS app ambient light:
+ * - Minimal, ethereal, breathing ambient light that comes and goes.
+ * - Periodic intervals of pure OLED black (#000000) where the light completely rests.
+ * - Single/dual harmonized color moods that slowly transition over time:
+ *     * Mood 1: Deep Emerald & Luminous Teal (iOS Screen 1)
+ *     * Mood 2: Deep Sapphire & Royal Blue (iOS Screen 2 & 4)
+ *     * Mood 3: Radiant Purple & Electric Violet (iOS Screen 5)
+ *     * Mood 4: Warm Rose Magenta & Amber Gold (iOS Screen 3)
+ * - Ultra-soft Gaussian atmospheric diffusion with zero harsh lines or rainbow bands.
  */
 
 (function () {
@@ -65,78 +67,101 @@
     void main() {
       vec2 uv = gl_FragCoord.xy / u_resolution.xy;
       float aspect = u_resolution.x / max(u_resolution.y, 1.0);
-      
+
+      // Coordinate space: (0,0) at top-left, y increasing downwards
       float x = uv.x;
-      float y = 1.0 - uv.y; // 0.0 at top, 1.0 at bottom
+      float y = 1.0 - uv.y;
 
-      // Slow celestial cycle
-      float t = u_time * 0.038;
+      // Slow, hypnotic time base
+      float t = u_time * 0.032;
 
-      // Domain warping for organic liquid silk waves
+      // Ultra-wide organic simplex warp (liquid celestial cloud)
       vec2 warp = vec2(
-        snoise(vec2(x * 1.6 + t * 0.22, y * 2.0 - t * 0.16)),
-        snoise(vec2(x * 1.9 - t * 0.18, y * 1.7 + t * 0.20))
-      ) * 0.09;
+        snoise(vec2(x * 1.1 + t * 0.18, y * 1.3 - t * 0.14)),
+        snoise(vec2(x * 1.3 - t * 0.15, y * 1.2 + t * 0.16))
+      ) * 0.14;
 
-      float xw = x + warp.x;
-      float yw = y + warp.y;
+      vec2 p = vec2(x * aspect, y) + warp;
 
-      // Google Gemini Signature Colors (High Saturation & Vibrancy)
-      vec3 colBlue   = vec3(0.10, 0.46, 0.98); // Electric Azure Blue #1a75fa
-      vec3 colCyan   = vec3(0.00, 0.88, 0.96); // Vivid Cyan Aqua #00e0f5
-      vec3 colViolet = vec3(0.60, 0.16, 0.98); // Rich Electric Violet #9929fa
-      vec3 colPink   = vec3(1.00, 0.18, 0.52); // Luminous Neon Rose #ff2e85
-      vec3 colAmber  = vec3(1.00, 0.65, 0.15); // Golden Core Accent #ffa626
+      // -----------------------------------------------------------------------
+      // 1. Color Mood Cross-Fading (Smoothly evolves every ~25-35s)
+      // -----------------------------------------------------------------------
+      float moodCycle = fract(t * 0.06); // 0.0 to 1.0
+      float moodPhase = moodCycle * 4.0; // 0 to 4
+      int moodIndex = int(floor(moodPhase));
+      float moodFrac = smoothstep(0.0, 1.0, fract(moodPhase));
 
-      // Spatial distribution across the viewport width:
-      // Left is Blue & Cyan, Center is Violet, Right is Pink & Amber
-      float shift = sin(t * 0.4) * 0.12;
-      float wCyan   = smoothstep(0.55 + shift, 0.05 + shift, xw);
-      float wBlue   = smoothstep(0.05 + shift, 0.35 + shift, xw) * smoothstep(0.70 + shift, 0.35 + shift, xw);
-      float wViolet = smoothstep(0.25 + shift, 0.55 + shift, xw) * smoothstep(0.85 + shift, 0.55 + shift, xw);
-      float wPink   = smoothstep(0.45 + shift, 0.95 + shift, xw);
+      // Palettes sampled directly from Gemini iOS app:
+      // Mood 0: Emerald / Deep Teal
+      vec3 c0_a = vec3(0.015, 0.480, 0.320); // Emerald
+      vec3 c0_b = vec3(0.010, 0.360, 0.420); // Deep Teal
+      // Mood 1: Royal Sapphire / Deep Azure
+      vec3 c1_a = vec3(0.060, 0.280, 0.820); // Royal Blue
+      vec3 c1_b = vec3(0.020, 0.180, 0.600); // Sapphire
+      // Mood 2: Rich Violet / Purple
+      vec3 c2_a = vec3(0.460, 0.140, 0.740); // Radiant Purple
+      vec3 c2_b = vec3(0.240, 0.100, 0.620); // Deep Indigo
+      // Mood 3: Warm Rose / Amber
+      vec3 c3_a = vec3(0.780, 0.160, 0.420); // Warm Rose
+      vec3 c3_b = vec3(0.720, 0.400, 0.080); // Amber Gold
 
-      // Undulating Wave Heights
-      float h1 = 0.07 + 0.08 * sin(xw * 2.8 + t * 0.65) + 0.04 * cos(xw * 5.2 - t * 0.45);
-      float h2 = 0.12 + 0.09 * cos(xw * 2.4 - t * 0.55) + 0.05 * sin(xw * 4.8 + t * 0.40);
-      float h3 = 0.05 + 0.07 * sin(xw * 3.4 + t * 0.75 + 1.6) + 0.04 * cos(xw * 6.0 - t * 0.50);
+      vec3 colA;
+      vec3 colB;
 
-      // Gaussian Energy Profiles for each wave
-      float d1 = abs(yw - h1);
-      float d2 = abs(yw - h2);
-      float d3 = abs(yw - h3);
+      if (moodIndex == 0) {
+        colA = mix(c0_a, c1_a, moodFrac);
+        colB = mix(c0_b, c1_b, moodFrac);
+      } else if (moodIndex == 1) {
+        colA = mix(c1_a, c2_a, moodFrac);
+        colB = mix(c1_b, c2_b, moodFrac);
+      } else if (moodIndex == 2) {
+        colA = mix(c2_a, c3_a, moodFrac);
+        colB = mix(c2_b, c3_b, moodFrac);
+      } else {
+        colA = mix(c3_a, c0_a, moodFrac);
+        colB = mix(c3_b, c0_b, moodFrac);
+      }
 
-      float e1 = exp(-d1 * 9.5) * 1.35 + exp(-d1 * 2.8) * 0.55;
-      float e2 = exp(-d2 * 8.5) * 1.25 + exp(-d2 * 2.4) * 0.50;
-      float e3 = exp(-d3 * 10.0) * 1.30 + exp(-d3 * 3.0) * 0.45;
+      // -----------------------------------------------------------------------
+      // 2. "Come and Go, and Sometimes Just Be Black" Breathing Cycles
+      // -----------------------------------------------------------------------
+      // Blob 1 breathing envelope: spends ~35% of the time fully in 0.0 (pitch black)
+      float breath1 = sin(t * 1.10);
+      float b1 = clamp((breath1 - 0.15) / 0.85, 0.0, 1.0);
+      b1 = smoothstep(0.0, 1.0, b1);
 
-      // Soft ambient roof glow across the top navigation bar
-      float ceilingBleed = exp(-y * 5.5) * 0.65;
+      // Blob 2 breathing envelope: phase offset so they emerge independently
+      float breath2 = sin(t * 0.85 + 2.3);
+      float b2 = clamp((breath2 - 0.20) / 0.80, 0.0, 1.0);
+      b2 = smoothstep(0.0, 1.0, b2);
 
-      // Synthesize spatially coherent spectral light
-      vec3 light = colCyan   * (e1 * wCyan * 1.3 + ceilingBleed * wCyan * 0.45)
-                 + colBlue   * (e1 * wBlue * 1.2 + e2 * wBlue * 0.7)
-                 + colViolet * (e2 * wViolet * 1.35 + ceilingBleed * wViolet * 0.40)
-                 + colPink   * (e3 * wPink * 1.45 + e2 * wPink * 0.6);
+      // -----------------------------------------------------------------------
+      // 3. Gentle Celestial Wandering Paths (Anchored to top 25%-40%)
+      // -----------------------------------------------------------------------
+      vec2 center1 = vec2((0.30 + 0.18 * sin(t * 0.70)) * aspect, 0.14 + 0.10 * cos(t * 0.55));
+      vec2 center2 = vec2((0.70 + 0.20 * cos(t * 0.60)) * aspect, 0.18 + 0.12 * sin(t * 0.65));
 
-      // Subtle warm amber highlight at pink crest
-      float pinkCrest = e3 * wPink * 0.6;
-      light += colAmber * pinkCrest;
+      float d1 = length(p - center1);
+      float d2 = length(p - center2);
 
-      // Filmic tone map to maintain deep color saturation at high brightness
-      // Soft knee avoids washing out colors into flat white
-      vec3 toneMapped = light / (1.0 + light * 0.22);
+      // Ultra-wide Gaussian atmospheric diffusion (no sharp crests, pure velvet fog)
+      float energy1 = exp(-d1 * d1 * 2.8) * b1;
+      float energy2 = exp(-d2 * d2 * 2.5) * b2;
 
-      // Top 32% anchoring: Dissolves into pure pitch black (#000000)
-      float verticalDissipation = smoothstep(0.34, 0.01, y);
-      verticalDissipation = pow(verticalDissipation, 1.30);
+      // Soft ambient light synthesis (1 or 2 subtle tones only)
+      vec3 light = colA * energy1 * 1.45 + colB * energy2 * 1.35;
 
-      vec3 finalColor = toneMapped * verticalDissipation * u_intensity;
+      // Smooth vertical dissipation: completely pure OLED black past top 40%
+      float vertFade = smoothstep(0.48, 0.02, y);
+      vertFade = pow(vertFade, 1.5);
+
+      vec3 finalColor = light * vertFade * u_intensity;
 
       // Micro-dither
       float dither = (hash(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
       finalColor = max(vec3(0.0), finalColor + dither);
 
+      // Alpha: 0.0 during rest periods (pure OLED black), gentle luminescence during peaks
       float alpha = clamp(length(finalColor) * 1.5, 0.0, 1.0);
 
       gl_FragColor = vec4(finalColor, alpha);
@@ -152,8 +177,8 @@
       this.options = Object.assign(
         {
           speed: 1.0,
-          intensity: 1.05,
-          activeSpeed: 2.3,
+          intensity: 0.95,
+          activeSpeed: 2.0,
           activeIntensity: 1.35,
         },
         options
@@ -415,8 +440,8 @@
   class AuroraBackgroundElement extends HTMLElement {
     connectedCallback() {
       const speed = parseFloat(this.getAttribute('speed')) || 1.0;
-      const intensity = parseFloat(this.getAttribute('intensity')) || 1.05;
-      const activeSpeed = parseFloat(this.getAttribute('active-speed')) || 2.3;
+      const intensity = parseFloat(this.getAttribute('intensity')) || 0.95;
+      const activeSpeed = parseFloat(this.getAttribute('active-speed')) || 2.0;
       const activeIntensity = parseFloat(this.getAttribute('active-intensity')) || 1.35;
 
       this.controller = new AuroraController(this, {
