@@ -13,6 +13,7 @@ async function loadSignupConfig() {
     const res = await fetch("/api/signup/config");
     if (!res.ok) throw new Error("Failed to load registration configuration");
     signupConfig = await res.json();
+    window.auroraEffect?.setActive(true, 1200);
 
     if (signupConfig.header_brand_title) {
       const titleEl = document.getElementById("nav-event-title");
