@@ -1,67 +1,58 @@
 /* ==========================================================================
-   Aurora Fluid Light Effect Styling & Fallbacks
-   Deep OLED Dark Theme (#000000 to #0a0d14)
+   Google Gemini Aurora Fluid Light Effect Styling & Fallbacks
+   Deep OLED Dark Theme (#000000 to #030712)
    ========================================================================== */
 
 :root {
-  --aurora-height: clamp(260px, 32vh, 440px);
-  --aurora-base-bg: #030712;
-  --aurora-indigo: rgba(67, 56, 202, 0.55);
-  --aurora-violet: rgba(139, 92, 246, 0.50);
-  --aurora-cyan: rgba(6, 182, 212, 0.45);
-  --aurora-rose: rgba(244, 63, 94, 0.40);
+  --aurora-blue: rgba(27, 115, 232, 0.55);
+  --aurora-violet: rgba(147, 51, 234, 0.50);
+  --aurora-cyan: rgba(0, 229, 255, 0.45);
+  --aurora-pink: rgba(255, 59, 129, 0.40);
 }
 
-/* Custom element wrapper */
+/* Custom element wrapper: Fixed full-bleed viewport layer behind all content */
 aurora-background,
 .aurora-container {
   display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: var(--aurora-height);
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
-  contain: layout paint style;
+  contain: strict;
   user-select: none;
   -webkit-user-select: none;
 }
 
-/* Canvas hardware-accelerated layer */
+/* Canvas hardware-accelerated WebGL layer */
 .aurora-canvas {
   position: absolute;
-  top: 0;
-  left: 0;
+  inset: 0;
   width: 100%;
   height: 100%;
   display: block;
   pointer-events: none;
   opacity: 1;
-  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.9) 45%, rgba(0, 0, 0, 0) 100%);
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.9) 45%, rgba(0, 0, 0, 0) 100%);
+  transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Fallback static or CSS mesh layer (used when WebGL is unavailable or reduced-motion is requested) */
+/* CSS Fallback: Multi-stop organic blurred mesh (used when WebGL is unavailable or reduced-motion is requested) */
 .aurora-fallback {
   position: absolute;
-  inset: -20% -10% 0 -10%;
+  inset: -15% -15% 20% -15%;
   display: none;
   pointer-events: none;
-  filter: blur(80px);
-  -webkit-filter: blur(80px);
+  filter: blur(110px);
+  -webkit-filter: blur(110px);
   transform: translateZ(0);
   will-change: transform, opacity;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 100%);
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 100%);
   background: 
-    radial-gradient(circle 380px at 18% 22%, var(--aurora-cyan), transparent 70%),
-    radial-gradient(circle 460px at 50% 15%, var(--aurora-indigo), transparent 75%),
-    radial-gradient(circle 420px at 82% 28%, var(--aurora-violet), transparent 70%),
-    radial-gradient(circle 320px at 68% 12%, var(--aurora-rose), transparent 65%);
+    radial-gradient(circle 520px at 20% 18%, var(--aurora-cyan), transparent 65%),
+    radial-gradient(circle 650px at 45% 12%, var(--aurora-blue), transparent 70%),
+    radial-gradient(circle 580px at 78% 22%, var(--aurora-violet), transparent 65%),
+    radial-gradient(circle 420px at 62% 8%, var(--aurora-pink), transparent 60%);
   mix-blend-mode: screen;
   opacity: 0.85;
 }
@@ -89,18 +80,24 @@ aurora-background,
   }
   .aurora-fallback {
     display: block !important;
-    filter: blur(90px);
-    -webkit-filter: blur(90px);
-    opacity: 0.70;
+    filter: blur(120px);
+    -webkit-filter: blur(120px);
+    opacity: 0.65;
     animation: none !important;
     transform: none !important;
   }
 }
 
 /* Glass header enhancement: ensure soft backdrop bleed through navbar */
-header.aurora-header-glass {
-  background-color: rgba(15, 23, 42, 0.50) !important;
-  backdrop-filter: blur(16px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-  border-bottom-color: rgba(51, 65, 85, 0.40) !important;
+header {
+  background-color: rgba(3, 7, 18, 0.60) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Content layer stacking */
+main, footer {
+  position: relative;
+  z-index: 10;
 }
