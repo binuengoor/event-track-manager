@@ -111,6 +111,7 @@ async function loadPerformances() {
     const res = await fetch("/api/dashboard/performances");
     if (!res.ok) throw new Error("Failed to fetch performances");
     performancesData = await res.json();
+    window.auroraEffect?.setActive(true, 1200);
     
     if (window.eventInfo && window.eventInfo.dashboard_enabled === false) {
       const badge = document.getElementById("songs-count-badge");

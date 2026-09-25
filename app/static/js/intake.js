@@ -1436,6 +1436,7 @@ function initPreviewWaveSurfer() {
   }
 
   previewWavesurfer.on('play', () => {
+    window.auroraEffect?.setActive(true);
     if (playBtn) {
       playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4 text-white fill-current"></i>';
       if (window.lucide) lucide.createIcons();
@@ -1443,6 +1444,7 @@ function initPreviewWaveSurfer() {
   });
 
   previewWavesurfer.on('pause', () => {
+    window.auroraEffect?.setActive(false);
     if (playBtn) {
       playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
       if (window.lucide) lucide.createIcons();
@@ -1450,6 +1452,7 @@ function initPreviewWaveSurfer() {
   });
 
   previewWavesurfer.on('finish', () => {
+    window.auroraEffect?.setActive(false);
     if (playBtn) {
       playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
       if (window.lucide) lucide.createIcons();

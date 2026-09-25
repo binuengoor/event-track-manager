@@ -1,0 +1,106 @@
+/* ==========================================================================
+   Aurora Fluid Light Effect Styling & Fallbacks
+   Deep OLED Dark Theme (#000000 to #0a0d14)
+   ========================================================================== */
+
+:root {
+  --aurora-height: clamp(260px, 32vh, 440px);
+  --aurora-base-bg: #030712;
+  --aurora-indigo: rgba(67, 56, 202, 0.55);
+  --aurora-violet: rgba(139, 92, 246, 0.50);
+  --aurora-cyan: rgba(6, 182, 212, 0.45);
+  --aurora-rose: rgba(244, 63, 94, 0.40);
+}
+
+/* Custom element wrapper */
+aurora-background,
+.aurora-container {
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: var(--aurora-height);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  contain: layout paint style;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Canvas hardware-accelerated layer */
+.aurora-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.9) 45%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.9) 45%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Fallback static or CSS mesh layer (used when WebGL is unavailable or reduced-motion is requested) */
+.aurora-fallback {
+  position: absolute;
+  inset: -20% -10% 0 -10%;
+  display: none;
+  pointer-events: none;
+  filter: blur(80px);
+  -webkit-filter: blur(80px);
+  transform: translateZ(0);
+  will-change: transform, opacity;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 100%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 0%, rgba(0, 0, 0, 0.8) 40%, rgba(0, 0, 0, 0) 100%);
+  background: 
+    radial-gradient(circle 380px at 18% 22%, var(--aurora-cyan), transparent 70%),
+    radial-gradient(circle 460px at 50% 15%, var(--aurora-indigo), transparent 75%),
+    radial-gradient(circle 420px at 82% 28%, var(--aurora-violet), transparent 70%),
+    radial-gradient(circle 320px at 68% 12%, var(--aurora-rose), transparent 65%);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+/* Active fallback class when WebGL is disabled or fails */
+.aurora-no-webgl .aurora-fallback {
+  display: block;
+}
+.aurora-no-webgl .aurora-canvas {
+  display: none;
+}
+
+/* Safe area support for notches and dynamic islands */
+@supports (padding-top: env(safe-area-inset-top)) {
+  aurora-background,
+  .aurora-container {
+    padding-top: env(safe-area-inset-top);
+  }
+}
+
+/* Reduced Motion Mode: strictly halt motion & render static snapshot */
+@media (prefers-reduced-motion: reduce) {
+  .aurora-canvas {
+    display: none !important;
+  }
+  .aurora-fallback {
+    display: block !important;
+    filter: blur(90px);
+    -webkit-filter: blur(90px);
+    opacity: 0.70;
+    animation: none !important;
+    transform: none !important;
+  }
+}
+
+/* Glass header enhancement: ensure soft backdrop bleed through navbar */
+header.aurora-header-glass {
+  background-color: rgba(15, 23, 42, 0.50) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border-bottom-color: rgba(51, 65, 85, 0.40) !important;
+}
