@@ -112,3 +112,20 @@ Logs: `docker compose logs -f app` and `docker compose logs -f downloader`.
 - Phone numbers are visible only in `/admin` and the Google Sheet/backup. Restrict Sheet sharing to organizers.
 - Do not paste phone numbers into stage notes, song titles or event notes; those fields are shown publicly.
 - Delete test registrations before announcing the signup link.
+
+## 9. Refreshing the README screenshots
+
+Uses real Chrome headless and the demo seed (fictional names; never run it against a real event).
+
+```bash
+# 1. start an isolated mock instance (separate data folders, port 8770)
+mkdir -p /tmp/etm/cache /tmp/etm/db
+MOCK_GOOGLE_API=true CACHE_DIR=/tmp/etm/cache DB_DIR=/tmp/etm/db DATA_DIR=/tmp/etm ADMIN_PIN=4321 \
+  .venv/bin/python -m uvicorn app.main:app --port 8770 &
+# 2. seed demo signups and cue one act
+.venv/bin/python docs/seed_demo_data.py
+# 3. capture (needs: npm i puppeteer-core, Google Chrome, ffmpeg for the GIF)
+mkdir -p out frames && node docs/screenshots.js
+ffmpeg -y -framerate 8 -i frames/f%03d.jpg -vf "scale=300:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" out/aurora.gif
+cp out/*.jpg out/aurora.gif docs/images/
+```

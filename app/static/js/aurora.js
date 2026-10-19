@@ -84,7 +84,7 @@
       float breath = 0.78 + 0.22 * sin(u_time * 0.35) + 0.12 * smoothstep(0.6, 1.0, sin(u_time * 0.13 + 1.0));
 
       // vertical reach: light fades to pure black well before the middle of the screen
-      float topReach = smoothstep(0.42, 0.0, yTop);
+      float topReach = smoothstep(0.38, 0.0, yTop);
       float botReach = smoothstep(0.18, 0.0, yBot);
 
       vec3 light = edgeLight(x, yTop, t, 1.0) * topReach;
@@ -115,7 +115,7 @@
       this.options = Object.assign(
         {
           speed: 1.0,
-          intensity: 0.85,
+          intensity: 0.72,
           activeSpeed: 1.8,
           activeIntensity: 1.3,
         },
@@ -379,7 +379,7 @@
   class AuroraBackgroundElement extends HTMLElement {
     connectedCallback() {
       const speed = parseFloat(this.getAttribute('speed')) || 1.0;
-      const intensity = parseFloat(this.getAttribute('intensity')) || 0.85;
+      const intensity = parseFloat(this.getAttribute('intensity')) || 0.72;
       const activeSpeed = parseFloat(this.getAttribute('active-speed')) || 1.8;
       const activeIntensity = parseFloat(this.getAttribute('active-intensity')) || 1.3;
 

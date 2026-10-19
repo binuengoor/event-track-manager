@@ -7,6 +7,33 @@ Self-hosted event system for community stage nights (built for **EMA Paattukoott
 
 Operator instructions for event day: **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
 
+<p align="center">
+  <img src="docs/images/landing.jpg" alt="Landing page with countdown" width="860">
+</p>
+
+## Screenshots
+
+All screenshots are the real app running in mock mode with sample (fictional) data. The glow behind every page is the Gemini-style ambient aurora (a WebGL shader with a CSS fallback), shown moving below.
+
+| Public | |
+|---|---|
+| **Sign Up**: performer or potluck-only attendee<br><img src="docs/images/signup.jpg" width="420"> | **Performer Hub**: edit songs, upload tracks, pick a dish<br><img src="docs/images/performer-hub.jpg" width="420"> |
+| **Live Program**: Now on Stage, Up Next, Upcoming<br><img src="docs/images/live.jpg" width="420"> | **Dashboard**: setlist and potluck board<br><img src="docs/images/dashboard-food.jpg" width="420"> |
+
+| Staff (Admin PIN) | |
+|---|---|
+| **Sound Console**: cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, presets, food, participants, backups<br><img src="docs/images/admin.jpg" width="420"> |
+
+**Phone layout.** One compact menu, and tables become cards.
+
+| Landing | Menu | Dashboard | Live | Sign Up |
+|---|---|---|---|---|
+| <img src="docs/images/m-landing.jpg" width="150"> | <img src="docs/images/m-menu.jpg" width="150"> | <img src="docs/images/m-dashboard.jpg" width="150"> | <img src="docs/images/m-live.jpg" width="150"> | <img src="docs/images/m-signup.jpg" width="150"> |
+
+<p align="center"><img src="docs/images/aurora.gif" alt="Aurora background in motion (sped up)" width="300"><br><sub>The aurora in motion (sped up about 4x).</sub></p>
+
+> To regenerate these images, run the app in mock mode, seed a few signups, and capture with headless Chrome. The capture script is described in [docs/RUNBOOK.md](docs/RUNBOOK.md#9-refreshing-the-readme-screenshots).
+
 ---
 
 ## Pages

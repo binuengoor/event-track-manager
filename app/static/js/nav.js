@@ -79,7 +79,8 @@
 
     const sheet = document.createElement('div');
     sheet.id = 'site-menu-sheet';
-    sheet.className = 'xl:hidden hidden absolute top-full inset-x-0 z-40 px-3 pb-3 pt-2 bg-slate-950/97 backdrop-blur-xl border-b border-slate-800 shadow-2xl shadow-black/50';
+    sheet.className = 'xl:hidden hidden absolute top-full inset-x-0 z-40 px-3 pb-3 pt-2 backdrop-blur-xl border-b border-slate-800 shadow-2xl shadow-black/50';
+    sheet.style.background = 'rgba(2, 6, 23, 0.97)'; // inline: Tailwind CDN has no /97 opacity step
     sheet.innerHTML = `
       <div class="grid grid-cols-2 gap-2">${PUBLIC_LINKS.map(tile).join('')}</div>
       <p class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-3 mb-1.5 px-1">Staff</p>
