@@ -66,6 +66,8 @@ async def lifespan(app: FastAPI):
 
     # 1-3. Make the active event ready: schema, default settings (first boot only), first-time potluck menu,
     #      tracks on disk aligned with the database, and the first export into the event folder
+    logger.info("Active event: %s  folder: %s  (switching %s)", event_manager.active_id(), settings.storage.event_dir,
+                "on" if event_manager.switching_enabled() else "off, EVENT_DIR pins one folder")
     try:
         event_manager.bootstrap(seed_food=True, migrate_legacy=True)
     except Exception as ex:

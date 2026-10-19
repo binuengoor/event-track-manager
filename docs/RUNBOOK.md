@@ -78,7 +78,7 @@ Rules of thumb:
 # first time
 git clone https://github.com/binuengoor/event-track-manager.git /opt/event-track-manager
 cd /opt/event-track-manager && cp .env.example .env && nano .env
-mkdir -p events && chown -R 1000:1000 events         # the container runs as uid 1000
+mkdir -p events                      # ownership is fixed by the container on start
 docker compose pull && docker compose up -d
 curl http://localhost:8088/api/health
 
@@ -113,7 +113,7 @@ Files are matched to acts by the **entry id** in the file name (the id shown in 
 |---|---|---|
 | "YouTube blocked automated download" | Bot detection | Add `secrets/yt_cookies.txt`, `docker compose restart downloader`; or ask for a file upload |
 | Readiness: "YouTube link extractor not reachable" | Downloader container down | `docker compose up -d downloader` (file uploads still work) |
-| Readiness: "Event folder not writable" | Permissions on the mapped folder | `chown -R 1000:1000 events` |
+| App exits at start with "event folder ... is not writable" | The mapped folder cannot be written (e.g. a network share, or a read-only mount) | Map a local, writable folder |
 | Dropped file stays in `incoming/` | Name has no entry id, or the id is unknown | Rename it to include the id (e.g. `PK-004_song.mp3`) |
 | Track shows "Pending" though I added it | File is not in `tracks/` or has no entry id in its name | Check the name; it must contain the id between underscores |
 | `signups.xlsx` looks out of date | Export is debounced (10 s) | **Export signups now** in Backup & Sync |

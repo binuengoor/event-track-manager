@@ -217,7 +217,7 @@ class EventManager:
         self.bootstrap(seed_food=False)
         db_service.log_activity(action_type="admin_edit", performer_name="Admin",
                                 summary=f"Activated event '{event_id}'", source="admin")
-        logger.warning("Active event is now %s", event_id)
+        logger.warning("Active event is now %s (%s)", event_id, folder)
         return {"id": event_id, "changed": True}
 
     @staticmethod
@@ -245,6 +245,11 @@ class EventManager:
         """Makes the (possibly just-activated) event ready: schema, default settings, tracks, first export."""
         from app.services.event_service import event_service
         from app.services.export_service import export_service
+        from app.services.audio_service import audio_service
+        try:
+            audio_service.prune_cache_if_needed()   # scratch hygiene: leftovers of failed uploads/downloads
+        except Exception as ex:
+            logger.debug("Scratch cleanup skipped: %s", ex)
         db_service._ensure_db()
         db_service.seed_app_settings(default_app_settings())
         if db_service.get_meta("food_seeded") != "1":

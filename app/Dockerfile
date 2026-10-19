@@ -19,23 +19,25 @@ RUN apt-get update && \
         curl \
         ffmpeg \
         ca-certificates \
+        gosu \
         tini && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 COPY app app
 COPY config.yaml .
+COPY app/docker-entrypoint.sh /docker-entrypoint.sh
 
 RUN useradd -r -u 1000 -s /bin/false appuser && \
     mkdir -p /data/cache /events /app/data && \
+    chmod +x /docker-entrypoint.sh && \
     chown -R appuser:appuser /app /data /events
 
-USER appuser
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/api/health || exit 1
 
-ENTRYPOINT ["tini", "--"]
+ENTRYPOINT ["tini", "--", "/docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

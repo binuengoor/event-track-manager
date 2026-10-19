@@ -1,3 +1,4 @@
+import io
 import os
 import pytest
 from fastapi.testclient import TestClient
@@ -245,3 +246,40 @@ def test_operator_pin_is_off_by_default_and_cannot_equal_admin_pin(monkeypatch, 
     monkeypatch.setattr(settings, "operator_pin", settings.admin_pin)
     res = client.post("/api/auth/login", json={"pin": settings.admin_pin})
     assert res.json()["role"] == "admin"
+
+
+# --------------------------------------------------------------------------- uploads: bounded memory, early rejection
+def test_oversized_upload_is_rejected_while_streaming_and_leaves_no_scratch_files(client, monkeypatch):
+    from app.services.audio_workflow_service import audio_workflow_service
+    from app.services.audio_service import audio_service
+    monkeypatch.setattr(audio_workflow_service, "max_upload_bytes", staticmethod(lambda is_video: 1024))
+    eid = _signup_junior(client)
+    res = client.post("/api/upload", data={"entry_id": eid, "submission_type": "file"},
+                      files={"file": ("big.mp3", io.BytesIO(b"x" * 5000), "audio/mpeg")})
+    assert res.status_code == 413 and "maximum allowed size" in res.json()["detail"]
+    assert os.listdir(audio_service.cache_dir) == []
+
+
+def test_upload_is_refused_before_reading_the_body_when_uploads_are_off(client, admin):
+    eid = _signup_junior(client)
+    admin.put("/api/admin/settings", json={"settings": {"track_upload_enabled": False}})
+    res = client.post("/api/upload", data={"entry_id": eid, "submission_type": "file"},
+                      files={"file": ("a.mp3", io.BytesIO(b"x" * 100), "audio/mpeg")})
+    assert res.status_code == 400 and "disabled" in res.json()["detail"]
+
+
+def test_scratch_cleanup_removes_stale_upload_leftovers(tmp_path, monkeypatch):
+    from app.services.audio_service import audio_service
+    import time
+    scratch = tmp_path / "scratch_only"
+    scratch.mkdir()
+    tmp_path = scratch
+    monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
+    old = time.time() - 7200
+    for name in ("PK-001.mp3.upload", "PK-002.incoming_123", "PK-003.mp3.transcode.mp3", "PK-004_temp.webm"):
+        p = tmp_path / name
+        p.write_bytes(b"x")
+        os.utime(p, (old, old))
+    (tmp_path / "PK-005.incoming_999").write_bytes(b"fresh")     # still being written: kept
+    audio_service.prune_cache_if_needed()
+    assert os.listdir(tmp_path) == ["PK-005.incoming_999"]

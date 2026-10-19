@@ -35,19 +35,24 @@ save a cookies export as `secrets/yt_cookies.txt` (mounted read-only into the do
 Why our own downloader image and not a stock one: YouTube needs ffmpeg plus a JavaScript challenge solver (deno), which no official
 yt-dlp image bundles; ours installs upstream yt-dlp and keeps it current.
 
-## One event, one folder
+## One volume, one folder per event
 
-Everything the app stores lives in `./events/<event id>/`. Map one volume and you are done.
+Map `./events` once. Every event gets its **own subfolder** (with its own tracks, database and exports), so events never mix and an old
+event can be archived, copied or deleted on its own.
 
 ```
-events/paattukoottam-2026/
-  event.db          the database (source of truth, never published or synced live)
-  signups.xlsx      generated automatically: Performances, Run Sheet, Potluck, Participants
-  signups.csv       same data as CSV (+ potluck.csv)
-  tracks/           backing tracks, named 02_PK-004_Maya_Nair_Kannalane.mp3  (tracks/_archive/ = replaced versions)
-  incoming/         drop files here (or let rclone deliver them); anything named with an entry id attaches itself
-  backups/          timestamped database snapshots (newest 30 kept)
-  gallery/          sponsor images for the live screen
+events/                         <- the one volume you map
+  .active_event                 which event the app is running right now
+  paattukoottam-2026/           one folder per event (created from /admin -> New event)
+    event.db                    database: sign-ups, potluck, payments, settings (source of truth)
+    signups.xlsx                generated: Songs, Singers, Run Sheet, Potluck (tabs follow the event type)
+    signups.csv singers.csv potluck.csv
+    tracks/                     backing tracks, named 02_PK-004_Maya_Nair_Kannalane.mp3  (tracks/_archive/ = replaced versions)
+    incoming/                   drop files here (or let rclone deliver them); anything named with an entry id attaches itself
+    backups/                    timestamped database snapshots (newest 30 kept)
+    gallery/                    sponsor images for the live screen
+  summer-talent-night-2027/     the next event, fully separate
+    ...
 ```
 
 - **Drop-in tracks:** put `PK-004_anything.mp3` into `tracks/` or `incoming/` and act PK-004 shows as ready within seconds.
@@ -153,7 +158,7 @@ from a template (Indian, BBQ, Thanksgiving, simple). Existing items and claims a
 git clone https://github.com/binuengoor/event-track-manager.git
 cd event-track-manager
 cp .env.example .env            # set ADMIN_PIN (and optionally OPERATOR_PIN)
-mkdir -p events && sudo chown -R 1000:1000 events    # Linux only: the app runs as uid 1000
+mkdir -p events                  # the app fixes folder ownership itself on start
 docker compose up -d
 ```
 
@@ -233,6 +238,14 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 On first start the app copies your database from the old `/db` volume (or the audio cache) into the new event folder, and copies cached tracks into
 `tracks/`. Old copies stay in place until you delete them. Then: remove `GOOGLE_*` settings and `secrets/credentials.json` (YouTube cookies
 `secrets/yt_cookies.txt` are still used by the downloader), map `./events:/events`, and optionally run the rclone sidecar to keep Drive in sync.
+
+## Good to know
+
+- Keep `./events` on a **local disk** (not SMB/NFS): the database uses SQLite, which needs a real filesystem for safe locking. Use the rclone sidecar to copy to the cloud or a NAS instead.
+- If the event folder is not writable, the app **stops with a clear message** instead of quietly saving somewhere that disappears.
+- Uploads are streamed to disk (a 500 MB video never sits in memory) and refused as soon as they exceed the limit.
+- Leftovers from failed uploads or downloads are cleaned up automatically.
+- Run one app instance (the default). The active event lives in that process.
 
 ## Testing
 

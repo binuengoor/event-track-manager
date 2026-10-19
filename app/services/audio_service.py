@@ -34,7 +34,7 @@ class AudioService:
         # 1. Clean up stale transcode / temp artifacts older than 1 hour
         now = time.time()
         for fname in os.listdir(self.cache_dir):
-            if fname.endswith(".transcode.mp4") or "_temp." in fname or fname.endswith(".part"):
+            if ".transcode." in fname or "_temp." in fname or fname.endswith(".part") or ".upload" in fname or ".incoming_" in fname:
                 fpath = os.path.join(self.cache_dir, fname)
                 try:
                     if os.path.isfile(fpath) and (now - os.path.getmtime(fpath) > 3600):

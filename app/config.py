@@ -320,7 +320,17 @@ def load_config() -> AppConfig:
             setattr(config.storage, path_attr, fallback)
             os.makedirs(fallback, exist_ok=True)
 
-    _make("event_dir", "./events/" + safe_event_id)
+    _hint = (f"Fix the permissions of the mapped folder (Linux: chown -R 1000:1000 events) or set EVENTS_DIR/EVENT_DIR.")
+    try:
+        os.makedirs(config.storage.event_dir, exist_ok=True)
+        if os.path.isdir(config.storage.event_dir):
+            _probe = os.path.join(config.storage.event_dir, ".write_probe")
+            with open(_probe, "w") as _f:
+                _f.write("ok")
+            os.remove(_probe)
+    except OSError as ex:
+        # Falling back to another folder would silently put the event data somewhere that disappears. Stop loudly instead.
+        raise RuntimeError(f"The event folder {config.storage.event_dir!r} is not writable ({ex}). {_hint}")
     for sub, attr in (("tracks", "tracks_dir"), ("gallery", "gallery_dir")):
         _make(attr, os.path.join(config.storage.event_dir, sub))
     for sub in ("incoming", "backups"):

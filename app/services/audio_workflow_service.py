@@ -27,6 +27,11 @@ logger = logging.getLogger("audio-workflow-service")
 class AudioWorkflowService:
     """Orchestrates track ingestion, validation, transcoding, and external synchronization."""
 
+    @staticmethod
+    def max_upload_bytes(is_video: bool) -> int:
+        max_mb = 500 if is_video else max(settings.storage.max_upload_size_mb, 200)
+        return max_mb * 1024 * 1024
+
     async def process_track_upload(
         self,
         entry_id: str,
@@ -35,6 +40,7 @@ class AudioWorkflowService:
         file_content: Optional[bytes] = None,
         original_filename: Optional[str] = None,
         media_type: str = "audio",
+        file_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Validates, transcodes, verifies, and synchronizes a backing track (audio or video) for a performance."""
         if not bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))):
@@ -97,31 +103,30 @@ class AudioWorkflowService:
                     shutil.copyfile(alt_path, cache_path)
 
         elif submission_type == "file":
-            if not file_content:
+            if not file_content and not file_path:
                 raise ValueError(f"{'Video' if is_video else 'Audio'} file is required for direct upload")
 
-            max_mb = 500 if is_video else max(settings.storage.max_upload_size_mb, 200)
-            max_bytes = max_mb * 1024 * 1024
-            if len(file_content) > max_bytes:
-                raise FileTooLargeError(
-                    f"File exceeds maximum allowed size of {max_mb}MB"
-                )
+            max_bytes = self.max_upload_bytes(is_video)
+            size = os.path.getsize(file_path) if file_path else len(file_content)
+            if size > max_bytes:
+                if file_path and os.path.exists(file_path):
+                    os.remove(file_path)
+                raise FileTooLargeError(f"File exceeds maximum allowed size of {max_bytes // (1024 * 1024)}MB")
 
             raw_upload_path = cache_path + ".upload"
-            with open(raw_upload_path, "wb") as f:
-                f.write(file_content)
+            if file_path:
+                os.replace(file_path, raw_upload_path)      # the router already streamed it to disk (no big RAM copy)
+            else:
+                with open(raw_upload_path, "wb") as f:
+                    f.write(file_content)
 
             if is_video:
                 transcoded = await audio_service.async_transcode_video_to_720p(raw_upload_path, cache_path)
-                if not transcoded and not os.path.exists(cache_path):
-                    with open(cache_path, "wb") as f:
-                        f.write(file_content)
             else:
                 bitrate = getattr(settings, "audio_bitrate", "320k")
                 transcoded = await audio_service.async_transcode_to_standard_mp3(raw_upload_path, cache_path, bitrate=bitrate)
-                if not transcoded and not os.path.exists(cache_path):
-                    with open(cache_path, "wb") as f:
-                        f.write(file_content)
+            if not transcoded and not os.path.exists(cache_path):
+                shutil.copyfile(raw_upload_path, cache_path)   # keep the original if conversion was not possible
 
             if os.path.exists(raw_upload_path):
                 try:
@@ -150,6 +155,10 @@ class AudioWorkflowService:
         )
 
         backup_service.trigger_backup()
+        try:
+            audio_service.prune_cache_if_needed()
+        except Exception:
+            pass
 
         track_type_label = "video" if is_video else "audio"
         if submission_type == "youtube":

@@ -34,15 +34,33 @@ async def upload_track(
     youtube_url: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
 ):
+    raw_path = None
     try:
-        file_content = await file.read() if file else None
+        from app.config import get_setting, settings as _settings
+        if not bool(get_setting("track_upload_enabled", getattr(_settings.signup, "track_upload_enabled", True))):
+            raise UploadDisabledError("Backing track uploads are currently disabled for this event.")
         original_filename = file.filename if file else None
+        if file:
+            # Stream to disk in 1 MB chunks and stop early when too big (a 500 MB video must not sit in RAM)
+            limit = audio_workflow_service.max_upload_bytes((media_type or "").strip().lower() == "video")
+            safe = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_"))[:60] or "upload"
+            raw_path = os.path.join(audio_service.cache_dir, f"{safe}.incoming_{os.getpid()}")
+            written = 0
+            with open(raw_path, "wb") as out:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    written += len(chunk)
+                    if written > limit:
+                        raise FileTooLargeError(f"File exceeds maximum allowed size of {limit // (1024 * 1024)}MB")
+                    out.write(chunk)
         return await audio_workflow_service.process_track_upload(
             entry_id=entry_id,
             submission_type=submission_type,
             media_type=media_type,
             youtube_url=youtube_url,
-            file_content=file_content,
+            file_path=raw_path,
             original_filename=original_filename,
         )
     except (UploadDisabledError, MissingSongTitleError, ValueError, InvalidAudioError) as ex:
@@ -55,6 +73,12 @@ async def upload_track(
         if "downloader" in str(ex).lower() or "extraction failed" in str(ex).lower():
             raise HTTPException(status_code=422, detail=str(ex))
         raise HTTPException(status_code=500, detail=str(ex))
+    finally:
+        if raw_path and os.path.exists(raw_path):
+            try:
+                os.remove(raw_path)
+            except OSError:
+                pass
 
 
 @router.get("/api/stream/{entry_id}")

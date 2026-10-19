@@ -15,7 +15,9 @@ version() { python -c "import yt_dlp; print(yt_dlp.version.__version__)" 2>/dev/
 update() {
   [ "$AUTO" = "true" ] || return 0
   echo "[downloader] checking for yt-dlp updates (current $(version))"
-  pip install --no-cache-dir --user --upgrade --quiet yt-dlp yt-dlp-ejs 2>&1 | tail -2 || echo "[downloader] update failed, keeping $(version)"
+  if ! out=$(pip install --no-cache-dir --user --upgrade --disable-pip-version-check --quiet "yt-dlp[default]" 2>&1); then
+    echo "[downloader] update failed, keeping $(version): $(echo "$out" | tail -2)"
+  fi
 }
 
 update

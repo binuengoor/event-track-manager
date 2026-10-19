@@ -36,7 +36,7 @@ COPY --from=builder /install /usr/local
 COPY main.py start.sh ./
 
 RUN useradd -r -u 1000 -m -d /home/appuser -s /bin/false appuser && \
-    mkdir -p /data/cache /tmp /home/appuser/.cache && \
+    mkdir -p /data/cache /tmp /home/appuser/.cache /home/appuser/.local && \
     chmod +x /app/start.sh && \
     chown -R appuser:appuser /app /data /tmp /home/appuser
 
