@@ -136,6 +136,9 @@
       <button type="button" onclick="this.parentElement.classList.add('hidden')"><i data-lucide="x" class="w-4 h-4"></i></button>
     </div>
 
+    <!-- Event readiness strip (filled by admin-setup.js) -->
+    <div id="readiness-card" class="hidden rounded-2xl border bg-slate-900/90 overflow-hidden"></div>
+
     <!-- TAB 1: EVENT DETAILS -->
     <section id="panel-event" class="admin-panel space-y-5">
       <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
@@ -281,12 +284,25 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div>
-            <label class="block font-semibold text-slate-300 mb-1">Max Performances Per Participant</label>
+            <label class="block font-semibold text-slate-300 mb-1">Songs per person (at most)</label>
             <input type="number" id="setting-max-perfs" min="1" max="10" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
           </div>
           <div>
-            <label class="block font-semibold text-slate-300 mb-1">Max Solo Performances Per Participant</label>
+            <label class="block font-semibold text-slate-300 mb-1">Of those, solos (at most)</label>
             <input type="number" id="setting-max-solo" min="0" max="5" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+
+          <!-- Allowed track types -->
+          <div class="sm:col-span-2 space-y-2">
+            <label class="block font-semibold text-slate-300">Backing track types people can upload</label>
+            <div class="flex flex-wrap gap-3">
+              <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="allowed-media-audio" class="rounded bg-slate-950 border-slate-700 text-orange-500"> <span>Audio (MP3, WAV, M4A, YouTube)</span>
+              </label>
+              <label class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 cursor-pointer">
+                <input type="checkbox" id="allowed-media-video" class="rounded bg-slate-950 border-slate-700 text-purple-500"> <span>Video (MP4 with lyrics, plays on the stage monitor)</span>
+              </label>
+            </div>
           </div>
 
           <!-- Performance Types Chips -->
@@ -338,70 +354,12 @@
           <span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">PRESETS</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-          <!-- Musical Night -->
-          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-orange-500/50 text-left transition group" data-preset="musical_night">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0">
-                <i data-lucide="music" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white group-hover:text-orange-400 transition">Musical Night</h4>
-                <p class="text-[11px] text-slate-400">All features on: tracks, duets, food & live screen.</p>
-              </div>
-            </div>
-          </button>
-
-          <!-- Acoustic Session -->
-          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-sky-500/50 text-left transition group" data-preset="acoustic">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
-                <i data-lucide="guitar" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white group-hover:text-sky-400 transition">Acoustic / Live Band</h4>
-                <p class="text-[11px] text-slate-400">No backing tracks required. Live instruments only.</p>
-              </div>
-            </div>
-          </button>
-
-          <!-- Solo Competition -->
-          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-purple-500/50 text-left transition group" data-preset="competition">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-                <i data-lucide="trophy" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white group-hover:text-purple-400 transition">Solo Competition</h4>
-                <p class="text-[11px] text-slate-400">Solo acts only. Hidden public setlist transparency.</p>
-              </div>
-            </div>
-          </button>
-
-          <!-- Potluck Picnic -->
-          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-emerald-500/50 text-left transition group" data-preset="potluck">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-                <i data-lucide="utensils" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white group-hover:text-emerald-400 transition">Potluck / Social</h4>
-                <p class="text-[11px] text-slate-400">Community dinner focus. Song sign-ups disabled.</p>
-              </div>
-            </div>
-          </button>
-
-          <!-- Event-Day Freeze -->
-          <button type="button" class="preset-apply-btn p-4 rounded-2xl bg-slate-950 hover:bg-slate-800/80 border border-slate-800 hover:border-rose-500/50 text-left transition group" data-preset="freeze">
-            <div class="flex items-center gap-3">
-              <div class="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
-                <i data-lucide="lock" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white group-hover:text-rose-400 transition">Event-Day Freeze</h4>
-                <p class="text-[11px] text-slate-400">Locks new sign-ups & edits. Stage queue active.</p>
-              </div>
-            </div>
+        <div id="preset-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1"></div>
+        <div id="preset-preview" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"></div>
+        <div class="flex items-center justify-between pt-1">
+          <p class="text-[11px] text-slate-500">Tip: presets only change what is switched on and the sign-up rules. Nothing is deleted.</p>
+          <button type="button" id="open-wizard-btn" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition flex items-center gap-1.5">
+            <i data-lucide="wand-2" class="w-3.5 h-3.5 text-amber-400"></i><span>Run setup wizard</span>
           </button>
         </div>
       </div>
@@ -444,6 +402,22 @@
           <button id="save-food-note-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition">
             Update Serving Note
           </button>
+        </div>
+      </div>
+
+      <!-- Quick Add Card -->
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="list-plus" class="w-5 h-5 text-emerald-400"></i><span>Quick add: paste your menu</span></h3>
+            <p class="text-xs text-slate-400">One item per line. A line ending in <code class="text-emerald-300">:</code> starts a group. Add <code class="text-emerald-300">x3</code> for several slots (Rice 1, Rice 2, Rice 3).</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5" id="food-template-buttons"></div>
+        </div>
+        <textarea id="bulk-food-text" rows="7" placeholder="Appetizers:&#10;Samosa x4&#10;Spring rolls&#10;Mains:&#10;Biryani x3&#10;Curry x2" class="w-full bg-slate-950 border border-slate-700 rounded-2xl px-3.5 py-3 text-xs text-white font-mono"></textarea>
+        <div class="flex items-center justify-between">
+          <span id="bulk-food-hint" class="text-[11px] text-slate-500">Existing items and claims are never changed. Duplicates are skipped.</span>
+          <button type="button" id="bulk-food-submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">Add these items</button>
         </div>
       </div>
 
@@ -980,7 +954,28 @@
     </div>
   </div>
 
+  
+  <!-- SETUP WIZARD -->
+  <div id="setup-wizard" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl">
+      <div class="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+        <div>
+          <h2 class="text-lg font-black text-white flex items-center gap-2"><i data-lucide="wand-2" class="w-5 h-5 text-amber-400"></i><span id="wizard-title">Set up your event</span></h2>
+          <p id="wizard-sub" class="text-xs text-slate-400">About two minutes. You can change everything later.</p>
+        </div>
+        <button type="button" id="wizard-close" class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="px-5 sm:px-6 pt-4"><div id="wizard-dots" class="flex gap-1.5"></div></div>
+      <div id="wizard-body" class="p-5 sm:p-6 space-y-4 text-xs"></div>
+      <div class="p-5 sm:p-6 border-t border-slate-800 flex items-center justify-between sticky bottom-0 bg-slate-900/95 backdrop-blur">
+        <button type="button" id="wizard-back" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-xs font-bold border border-slate-700">Back</button>
+        <button type="button" id="wizard-next" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow">Next</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/admin-settings.js?v=2.1"></script>
+  <script src="/static/js/admin-setup.js"></script>
 </body>
 </html>

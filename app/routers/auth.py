@@ -64,36 +64,64 @@ def client_key(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _session_token() -> str:
+def _token(role: str, pin: str) -> str:
     """Cookie value derived from the PIN, so the raw PIN is never stored in the cookie."""
-    return hmac.new(settings.admin_pin.encode(), b"event-track-manager-admin-session", hashlib.sha256).hexdigest()
+    return hmac.new(pin.encode(), f"event-track-manager-{role}-session".encode(), hashlib.sha256).hexdigest()
 
 
-def _pin_ok(pin: Optional[str]) -> bool:
-    return bool(pin) and hmac.compare_digest(pin.encode(), settings.admin_pin.encode())
+def _session_token() -> str:  # kept for tests/back-compat
+    return _token("admin", settings.admin_pin)
 
 
-def _credentials_valid(request: Request) -> bool:
-    if _pin_ok(request.headers.get("X-Admin-PIN")):
-        return True
-    cookie = request.cookies.get("admin_session")
-    return bool(cookie) and hmac.compare_digest(cookie.encode(), _session_token().encode())
+def _eq(a: Optional[str], b: Optional[str]) -> bool:
+    return bool(a) and bool(b) and hmac.compare_digest(a.encode(), b.encode())
+
+
+def _operator_pin() -> str:
+    pin = getattr(settings, "operator_pin", "") or ""
+    return pin if pin and pin != settings.admin_pin else ""
+
+
+def _role(request: Request) -> Optional[str]:
+    """'admin', 'operator' (sound console only) or None, from the PIN header or the signed session cookie."""
+    header = request.headers.get("X-Admin-PIN")
+    if _eq(header, settings.admin_pin):
+        return "admin"
+    if _operator_pin() and _eq(header, _operator_pin()):
+        return "operator"
+    if _eq(request.cookies.get("admin_session"), _token("admin", settings.admin_pin)):
+        return "admin"
+    if _operator_pin() and _eq(request.cookies.get("operator_session"), _token("operator", _operator_pin())):
+        return "operator"
+    return None
 
 
 def is_admin(request: Request) -> bool:
     """Non-raising check used by public endpoints to decide how much data to return."""
-    return _credentials_valid(request)
+    return _role(request) == "admin"
 
 
-def verify_admin_pin(request: Request) -> bool:
-    """Verifies the admin PIN (X-Admin-PIN header) or the signed session cookie."""
+def _guard(request: Request, allowed: tuple) -> bool:
     key = client_key(request)
     if failure_limiter.is_blocked(key):
         raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in a few minutes.")
-    if _credentials_valid(request):
+    role = _role(request)
+    if role in allowed:
         return True
-    failure_limiter.record_failure(key)
-    raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin PIN")
+    if role is None:
+        failure_limiter.record_failure(key)
+        raise HTTPException(status_code=401, detail="Unauthorized: Invalid Admin PIN")
+    raise HTTPException(status_code=403, detail="This PIN only opens the sound console. Use the admin PIN for settings.")
+
+
+def verify_admin_pin(request: Request) -> bool:
+    """Admin only: settings, roster, presets, food catalog, backups."""
+    return _guard(request, ("admin",))
+
+
+def verify_operator_pin(request: Request) -> bool:
+    """Admin or sound operator: cueing, status, order, track downloads, exports."""
+    return _guard(request, ("admin", "operator"))
 
 
 @router.post("/api/auth/login")
@@ -101,12 +129,17 @@ async def admin_login(login: LoginRequest, request: Request):
     key = client_key(request)
     if failure_limiter.is_blocked(key):
         raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in a few minutes.")
-    if _pin_ok(login.pin):
-        response = JSONResponse(content={"status": "success", "message": "Authenticated"})
+    role = None
+    if _eq(login.pin, settings.admin_pin):
+        role, pin = "admin", settings.admin_pin
+    elif _operator_pin() and _eq(login.pin, _operator_pin()):
+        role, pin = "operator", _operator_pin()
+    if role:
+        response = JSONResponse(content={"status": "success", "message": "Authenticated", "role": role})
         secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(
-            key="admin_session",
-            value=_session_token(),
+            key=f"{role}_session",
+            value=_token(role, pin),
             httponly=True,
             secure=secure,
             samesite="strict",

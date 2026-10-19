@@ -198,3 +198,49 @@ def test_cache_pruning_never_deletes_database_files(tmp_path, monkeypatch):
     (tmp_path / "PK-001.mp3").write_bytes(b"a" * 1024 * 1024)
     audio_service.prune_cache_if_needed(max_size_mb=1, target_size_mb=0)
     assert (tmp_path / "event_data.db").exists()
+
+
+# --------------------------------------------------------------------------- operator (sound console) PIN
+@pytest.fixture
+def operator_pin(monkeypatch):
+    monkeypatch.setattr(settings, "operator_pin", "7777")
+    return "7777"
+
+
+def test_operator_pin_runs_the_console_but_not_admin(operator_pin, client):
+    op = {"X-Admin-PIN": operator_pin}
+    eid = _signup_junior(client)
+    assert client.post(f"/api/set-active/{eid}", headers=op).status_code == 200
+    assert client.post("/api/clear-active", headers=op).status_code == 200
+    assert client.get("/api/admin/settings", headers=op).status_code == 403
+    assert client.get("/api/admin/roster", headers=op).status_code == 403
+    assert client.put("/api/admin/settings", headers=op, json={"settings": {"signup_enabled": False}}).status_code == 403
+    assert client.post("/api/admin/apply-preset", headers=op, json={"preset": "potluck"}).status_code == 403
+
+
+def test_operator_never_sees_phone_numbers(operator_pin, client):
+    _signup_junior(client)
+    queue = client.get("/api/stage-queue", headers={"X-Admin-PIN": operator_pin})
+    assert queue.status_code == 200 and PHONE not in queue.text
+
+
+def test_operator_login_sets_a_role_scoped_cookie(operator_pin, client):
+    res = client.post("/api/auth/login", json={"pin": operator_pin})
+    assert res.status_code == 200 and res.json()["role"] == "operator"
+    assert "operator_session" in res.headers["set-cookie"] and operator_pin not in res.headers["set-cookie"]
+    assert client.post("/api/clear-active").status_code == 200       # cookie opens the console
+    assert client.get("/api/admin/summary").status_code == 403         # but not admin
+
+
+def test_wrong_role_does_not_count_as_a_failed_guess(operator_pin, client):
+    for _ in range(auth_module.MAX_FAILS_PER_CLIENT + 2):
+        assert client.get("/api/admin/summary", headers={"X-Admin-PIN": operator_pin}).status_code == 403
+    assert client.get("/api/admin/summary", headers={"X-Admin-PIN": settings.admin_pin}).status_code == 200
+
+
+def test_operator_pin_is_off_by_default_and_cannot_equal_admin_pin(monkeypatch, client):
+    monkeypatch.setattr(settings, "operator_pin", "")
+    assert client.post("/api/auth/login", json={"pin": ""}).status_code == 401
+    monkeypatch.setattr(settings, "operator_pin", settings.admin_pin)
+    res = client.post("/api/auth/login", json={"pin": settings.admin_pin})
+    assert res.json()["role"] == "admin"

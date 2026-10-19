@@ -11,7 +11,7 @@ from app.services.event_service import event_service
 from app.services.audio_service import audio_service
 from app.services.audio_workflow_service import audio_workflow_service
 from app.services.db_service import db_service
-from app.routers.auth import verify_admin_pin
+from app.routers.auth import verify_operator_pin
 from app.exceptions import (
     UploadDisabledError,
     PerformanceNotFoundError,
@@ -94,7 +94,7 @@ async def stream_audio(entry_id: str, request: Request, range: Optional[str] = H
 @router.get("/api/admin/export-tracks-zip")
 @router.get("/api/export-sequenced-zip")
 @router.get("/api/export-zip")
-async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):
+async def export_offline_zip(_authorized: bool = Depends(verify_operator_pin)):
     try:
         import asyncio
         from starlette.background import BackgroundTask
@@ -112,7 +112,7 @@ async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):
 
 
 @router.get("/api/download-track/{entry_id}")
-async def download_track(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+async def download_track(entry_id: str, _authorized: bool = Depends(verify_operator_pin)):
     target = db_service.get_performance(entry_id)
     if not target:
         raise HTTPException(status_code=404, detail="Performance entry not found")

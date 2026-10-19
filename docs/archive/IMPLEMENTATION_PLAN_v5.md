@@ -1,3 +1,5 @@
+> **Historical document.** This is the original v5 design plan (Google Sheets era). It is kept for context only; the current design is in [docs/adr/0001-local-first-event-folder.md](../adr/0001-local-first-event-folder.md) and the README.
+
 # Self-Service Sign-Up, Food Potluck, Transparency & Backup — v5
 
 ## Changes From v4

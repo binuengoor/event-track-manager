@@ -1,5 +1,5 @@
 const puppeteer = require('puppeteer-core');
-const B = 'http://localhost:8770'; // demo instance, see docs/RUNBOOK.md section 9
+const B = process.env.ETM_URL || 'http://localhost:8770'; // demo instance, see docs/RUNBOOK.md section 9
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const fakeDate = (iso) => `(() => { const R = Date; const off = new R('${iso}').getTime() - R.now(); const F = class extends R { constructor(...a){ if(a.length===0){ super(R.now()+off);} else super(...a);} static now(){ return R.now()+off; } }; window.Date = F; })();`;
 
@@ -44,7 +44,11 @@ const fakeDate = (iso) => `(() => { const R = Date; const off = new R('${iso}').
   await login(c);
   await shot(c, '/console', 'console', { wait: 3500 });
   await shot(c, '/admin', 'admin', { wait: 3000 });
-  await shot(c, '/admin', 'admin-features', { wait: 2000, pre: async (p) => { const btns = await p.$$('button'); for (const b of btns) { const t = await p.evaluate(e => e.textContent, b); if (/Features/i.test(t)) { await b.click(); break; } } await settle(p, 1200); } });
+  const tab = (re) => async (p) => { const btns = await p.$$('button'); for (const b of btns) { const t = await p.evaluate(e => e.textContent, b); if (re.test(t)) { await b.click(); break; } } await settle(p, 1200); };
+  await shot(c, '/admin', 'admin-presets', { wait: 2500, pre: async (p) => { await tab(/Features/i)(p); await p.evaluate(() => document.querySelector('.preset-card[data-preset="show_no_potluck"]')?.click()); await settle(p, 800); } });
+  await shot(c, '/admin', 'admin-food', { wait: 2500, pre: async (p) => { await tab(/Food/i)(p); await p.evaluate(() => document.querySelector('.food-template-btn[data-t="indian"]')?.click()); await settle(p, 800); } });
+  await shot(c, '/admin', 'admin-wizard', { wait: 2500, pre: async (p) => { await tab(/Features/i)(p); await p.evaluate(() => document.getElementById('open-wizard-btn').click()); await settle(p, 800); } });
+  await shot(c, '/admin', 'admin-readiness', { wait: 2500, pre: async (p) => { await p.evaluate(() => document.getElementById('readiness-toggle')?.click()); await settle(p, 800); } });
   await c.close();
 
   // ---- Phone ----

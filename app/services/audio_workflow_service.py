@@ -40,6 +40,13 @@ class AudioWorkflowService:
         if not bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))):
             raise UploadDisabledError("Backing track uploads are currently disabled for this event.")
 
+        allowed = get_setting("allowed_media", ["audio", "video"])
+        if isinstance(allowed, str):
+            allowed = [allowed]
+        wanted = (media_type or "audio").strip().lower()
+        if wanted not in allowed:
+            raise UploadDisabledError(f"This event accepts {' and '.join(allowed)} tracks only.")
+
         row = db_service.get_performance(entry_id)
         if not row:
             raise PerformanceNotFoundError(f"Performance entry {entry_id} not found")

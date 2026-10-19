@@ -157,6 +157,8 @@ class AppConfig(BaseModel):
     entry_id_prefix: str = "PK"
 
     admin_pin: str = "2026"
+    # Optional second PIN that only opens the sound console (volunteer sound operators). Empty = disabled.
+    operator_pin: str = ""
 
 def load_config() -> AppConfig:
     config_file = os.getenv("CONFIG_PATH", "config.yaml")
@@ -244,6 +246,8 @@ def load_config() -> AppConfig:
     # 4. Security, Storage & Networking
     if os.getenv("ADMIN_PIN"):
         config.admin_pin = os.getenv("ADMIN_PIN")
+    if os.getenv("OPERATOR_PIN"):
+        config.operator_pin = os.getenv("OPERATOR_PIN")
 
     if os.getenv("MAX_UPLOAD_SIZE_MB"):
         try:

@@ -2,6 +2,7 @@ import json
 import hashlib
 import logging
 from typing import Optional, List, Dict, Any
+import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.config import settings, get_setting
@@ -9,8 +10,9 @@ from app.services.stage_service import stage_service
 from app.services.audio_service import audio_service
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
-from app.routers.auth import verify_admin_pin, is_admin
+from app.routers.auth import verify_admin_pin, verify_operator_pin, is_admin
 from app.privacy import strip_private
+from app.services.live_broadcaster import live_broadcaster
 from app.schemas import (
     StatusUpdateRequest,
     PerformanceNotesRequest,
@@ -25,8 +27,10 @@ logger = logging.getLogger("stage-router")
 
 router = APIRouter(tags=["stage"])
 
+SSE_KEEPALIVE_SECONDS = 15
 
-def require_console_enabled(_authorized: bool = Depends(verify_admin_pin)) -> bool:
+
+def require_console_enabled(_authorized: bool = Depends(verify_operator_pin)) -> bool:
     """Blocks stage-control actions when the organizer disabled the sound console (e.g. potluck preset)."""
     if not bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))):
         raise HTTPException(status_code=403, detail="The sound console is disabled for this event.")
@@ -73,6 +77,31 @@ def get_live_status(request: Request):
     )
 
 
+@router.get("/api/live-stream")
+async def live_stream(request: Request):
+    """Server-Sent Events: emits a version number whenever the live schedule changes."""
+    from fastapi.responses import StreamingResponse
+
+    async def events():
+        queue = live_broadcaster.subscribe()
+        try:
+            yield "retry: 3000\n\n"
+            yield f"data: {live_broadcaster.version}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    version = await asyncio.wait_for(queue.get(), timeout=SSE_KEEPALIVE_SECONDS)
+                    yield f"data: {version}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            live_broadcaster.unsubscribe(queue)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
 @router.post("/api/set-active/{entry_id}")
 def set_active_performance(entry_id: str, _authorized: bool = Depends(require_console_enabled)):
     _run_or_404(event_service.set_active_performance, entry_id)
@@ -110,7 +139,7 @@ def list_performances(request: Request):
 
 
 @router.post("/api/sync")
-def sync_data(_authorized: bool = Depends(verify_admin_pin)):
+def sync_data(_authorized: bool = Depends(verify_operator_pin)):
     """Writes signups.xlsx/csv and a database snapshot into the event folder (the database stays the source of truth)."""
     try:
         event_service.reconcile_tracks(force=True)

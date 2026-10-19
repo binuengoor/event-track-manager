@@ -1,28 +1,74 @@
 # Event & Track Manager
 
-Self-hosted event system for community stage nights (built for **EMA Paattukoottam**, adaptable to any talent show, concert or potluck). It handles performer signup, potluck food signup, backing-track upload, a sound-operator console, and a public live schedule.
+A self-hosted manager for **any event with a stage, tracks, a sound console, or a potluck**: talent nights, karaoke and
+video nights, concerts, competitions, rehearsals, community dinners. Run it with `docker compose up`. No cloud account,
+API keys or Google services needed.
 
-> [!IMPORTANT]
-> **Design philosophy.** Performer-facing self-service (signup, edits, dish claims, track upload) is intentionally login-free for friends-and-neighbors events. Anyone who knows a name can edit that entry. Administrative actions (sequencing, cueing, settings, presets, backups, deletes) require the **Admin PIN**. Contributions must preserve this low-friction model, but must not expose personal data (phone numbers) publicly. See [Security & privacy](#security--privacy).
-
-Operator instructions for event day: **[docs/RUNBOOK.md](docs/RUNBOOK.md)**.
+Built for **EMA Paattukoottam** (Exton Malayali Association) and designed to be re-skinned and re-ruled for any event
+from the admin page in a couple of minutes.
 
 <p align="center">
   <img src="docs/images/landing.jpg" alt="Landing page with countdown" width="860">
 </p>
 
+> [!IMPORTANT]
+> **Design philosophy.** Performer-facing self-service (sign-up, edits, dish claims, track upload) is intentionally login-free for
+> friends-and-neighbors events: anyone who knows a name can edit that entry. Administrative actions (settings, presets, roster,
+> backups) need the **Admin PIN**; running the sound console can use a separate **Operator PIN**. Personal data (phone numbers,
+> guardians) is never returned by public pages or APIs. See [Security & privacy](#security--privacy).
+
+Event-day instructions: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · Design decision: **[docs/adr/0001-local-first-event-folder.md](docs/adr/0001-local-first-event-folder.md)**
+
+---
+
+## One event, one folder
+
+Everything the app stores lives in `./events/<event id>/`. Map one volume and you are done.
+
+```
+events/paattukoottam-2026/
+  event.db          the database (source of truth, never published or synced live)
+  signups.xlsx      generated automatically: Performances, Run Sheet, Potluck, Participants
+  signups.csv       same data as CSV (+ potluck.csv)
+  tracks/           backing tracks, named 02_PK-004_Maya_Nair_Kannalane.mp3  (tracks/_archive/ = replaced versions)
+  incoming/         drop files here (or let rclone deliver them); anything named with an entry id attaches itself
+  backups/          timestamped database snapshots (newest 30 kept)
+  gallery/          sponsor images for the live screen
+```
+
+- **Drop-in tracks:** put `PK-004_anything.mp3` into `tracks/` or `incoming/` and act PK-004 shows as ready within seconds.
+- **Reordering** renames the files to their new running-order numbers. Replacing a track archives the old one. Nothing is hard-deleted.
+- **A new event** is a new folder. Archiving an event is zipping its folder.
+
+## Cloud sync is optional and lives outside the app
+
+The app never talks to Google or any cloud. If you want the folder mirrored (Google Drive, Dropbox, S3, a NAS...), start
+the **rclone sidecar**: it uploads the folder (never the live `event.db`; snapshots in `backups/` instead) and pulls a cloud
+`incoming/` inbox so organizers can drop tracks into Drive from their phones.
+
+```bash
+docker compose --profile sync run --rm --entrypoint rclone rclone-sync config   # one-time: create the remote
+# in .env: RCLONE_REMOTE=gdrive:EventTrackManager/paattukoottam-2026
+docker compose --profile sync up -d
+```
+
+Details and Google-Sheet conversion notes: [rclone/README.md](rclone/README.md).
+
 ## Screenshots
 
-All screenshots are the real app running in mock mode with sample (fictional) data. The glow behind every page is the Gemini-style ambient aurora (a WebGL shader with a CSS fallback), shown moving below.
+All screenshots are the real app with sample (fictional) data. The glow behind every page is the Gemini-style ambient aurora
+(a WebGL shader with a CSS fallback), shown moving at the bottom.
 
 | Public | |
 |---|---|
 | **Sign Up**: performer or potluck-only attendee<br><img src="docs/images/signup.jpg" width="420"> | **Performer Hub**: edit songs, upload tracks, pick a dish<br><img src="docs/images/performer-hub.jpg" width="420"> |
-| **Live Program**: Now on Stage, Up Next, Upcoming<br><img src="docs/images/live.jpg" width="420"> | **Dashboard**: setlist and potluck board<br><img src="docs/images/dashboard-food.jpg" width="420"> |
+| **Live Program**: Now on Stage, Up Next, Upcoming (updates instantly)<br><img src="docs/images/live.jpg" width="420"> | **Dashboard**: setlist and potluck board<br><img src="docs/images/dashboard-food.jpg" width="420"> |
 
-| Staff (Admin PIN) | |
+| Staff | |
 |---|---|
-| **Sound Console**: cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, presets, food, participants, backups<br><img src="docs/images/admin.jpg" width="420"> |
+| **Sound Console** (Admin or Operator PIN): cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, rules, food, participants, exports<br><img src="docs/images/admin.jpg" width="420"> |
+| **Presets with a change preview**<br><img src="docs/images/admin-presets.jpg" width="420"> | **Setup wizard**<br><img src="docs/images/admin-wizard.jpg" width="420"> |
+| **Potluck quick add**: paste a menu, `x3` makes three slots<br><img src="docs/images/admin-food.jpg" width="420"> | **Event readiness**: what to fix before doors open<br><img src="docs/images/admin-readiness.jpg" width="420"> |
 
 **Phone layout.** One compact menu, and tables become cards.
 
@@ -32,152 +78,140 @@ All screenshots are the real app running in mock mode with sample (fictional) da
 
 <p align="center"><img src="docs/images/aurora.gif" alt="Aurora background in motion (sped up)" width="300"><br><sub>The aurora in motion (sped up about 4x).</sub></p>
 
-> To regenerate these images, run the app in mock mode, seed a few signups, and capture with headless Chrome. The capture script is described in [docs/RUNBOOK.md](docs/RUNBOOK.md#9-refreshing-the-readme-screenshots).
+> To regenerate these images see [docs/RUNBOOK.md](docs/RUNBOOK.md#10-refreshing-the-readme-screenshots).
 
 ---
+
+## Pick an event type (presets)
+
+Open **Admin → Features & Presets** (or run the **setup wizard**, which also asks for the name, date, venue, potluck menu and
+rules). Each preset shows exactly what it will change before you apply it. Presets never delete data.
+
+| Preset | Use it for | Sign-up | Tracks | Console + live | Potluck | Rules it sets |
+|---|---|---|---|---|---|---|
+| **Full event** | Concert + dinner | on | audio + video | on | on | 2 songs, 1 solo |
+| **Show, no potluck** | Stage show only | on | audio + video | on | off | 2 songs, 1 solo |
+| **Potluck only** | Community dinner | off | off | off | on | none |
+| **Acoustic / live band** | Live instruments | on | off | on | on | 2 songs |
+| **Karaoke / video night** | Lyrics videos | on | audio + video | on | off | 4 songs |
+| **Solo competition** | Judged solos | on | on | on | off | 1 song, solo only, dashboard hidden |
+| **Rehearsal / sound check** | Console only | closed | on | console only | off | none |
+| **Show-day freeze** | Lock it down | closed | closed | on | closed | none |
+
+Everything is also an individual switch, and the rules are plain language: songs per person, solos, allowed track types
+(audio / video / both), performance types, and age groups with guardian requirements.
+
+**Potluck setup in seconds:** paste a menu into *Quick add* (`Appetizers:` starts a group, `Rice x3` makes Rice 1, 2, 3) or start
+from a template (Indian, BBQ, Thanksgiving, simple). Existing items and claims are never changed.
 
 ## Pages
 
 | Path | Audience | Purpose |
 |---|---|---|
-| `/` | Public | Landing page: event info, poster, countdown, links |
+| `/` | Public | Landing: event info, countdown (and an "event ended" state) |
 | `/signup` | Public | Register as performer (solo/duet/group) and/or claim a potluck dish |
-| `/performer` | Public (by name) | Performer Hub: edit song/partner/notes, add a performance, upload audio/video track or YouTube URL, pick/change/release a dish. `/tracks`, `/upload`, `/intake` redirect here |
-| `/dashboard` | Public | Read-only setlist board and potluck board (becomes "Food Board" for potluck-only events) |
-| `/live` | Public / venue screen | Countdown, Now on Stage, Up Next, stage notes, sponsor gallery. Polls every 5 s |
-| `/console` | Admin PIN | Sound console: queue, cue/uncue, waveform player, notes, drag-reorder, status, offline vault, ZIP export |
-| `/console/stage-monitor` | Admin PIN | Stage confidence monitor for video backing tracks (`/stage-monitor` redirects) |
-| `/admin` | Admin PIN | Event details, feature flags, presets, sign-up rules, food groups/items, participants roster, activity log, backups |
-| `/docs` | Public | Auto-generated OpenAPI (Swagger) reference of every endpoint |
+| `/performer` | Public (by name) | Performer Hub: edit songs, upload audio/video or paste a YouTube link, pick a dish |
+| `/dashboard` | Public | Read-only setlist and potluck board |
+| `/live` | Venue screen | Now on Stage, Up Next, notes, sponsor gallery. Pushed instantly (server-sent events) |
+| `/console` | Admin or Operator PIN | Queue, cue, waveform player, notes, reorder, status, offline vault, ZIP |
+| `/console/stage-monitor` | Admin or Operator PIN | Video confidence monitor for the stage |
+| `/admin` | Admin PIN | Setup wizard, presets, readiness, rules, potluck, roster, exports, activity log |
+| `/docs` | Public | OpenAPI reference |
 
-## Architecture
-
-```
- Browsers ──► app (FastAPI :8000)  ──HTTP──► downloader (:8001: yt-dlp + ffmpeg + deno)
-                │   │                              │
-                │   └── SQLite (WAL) ◄── source of truth
-                │         + audio cache  ◄── shared volume ──┘
-                └── Google Sheets (export/backup)  +  Google Drive (Active/ & Archive/ tracks)
-```
-
-**Source of truth is the app's SQLite database.** Google Sheets is a *one-way export* (App → Sheet) used for backup and for organizers who like spreadsheets. Edits made directly in the Sheet are not read back. Drive's `Active/` folder is the ground truth for which backing tracks exist; the app reconciles against it every ~15 s.
-
-Layers (`app/`):
-
-| Layer | Path | Role |
-|---|---|---|
-| Routers | `routers/` | HTTP only: `pages, auth, event, signup, food, performer, dashboard, admin, stage, audio` |
-| Services | `services/` | Business rules: registration, admin/presets, audio + workflow, stage/live status, backup, Google facade |
-| Repositories | `repositories/` | SQLite access and schema/migrations: performances, participants, food, settings, audit |
-| Events | `events/` | In-process pub/sub (`data.mutated`, `performer.renamed`, `performance.deleted`, …) for cascades and debounced backup |
-| Config | `config.py`, `config.yaml`, `.env` | Defaults; seeded into the `app_settings` table on first boot, then editable live in `/admin` |
-| Frontend | `static/` | Plain HTML + vanilla JS + Tailwind CDN. No build step |
-| Downloader | `downloader/` | Separate container so yt-dlp can be updated without touching the stage app |
-
-### Data model (SQLite, `event_data.db`)
-`performances`, `participants` (canonical roster), `food_groups`, `food_items`, `food_signups` (one person per item, enforced `UNIQUE`), `app_settings`, `sync_meta` (active cue, dirty-sequence flag, last sync), `backup_log`, `activity_logs`. Schema migrates in place on startup.
-
-### Configuration precedence
-1. `app_settings` table (edited in `/admin`) wins at runtime.
-2. Otherwise environment / `.env` → `config.yaml` → code defaults.
-
-Infrastructure values (Google IDs, credentials, `ADMIN_PIN`, `PORT`, `CACHE_DIR`, `DOWNLOADER_SERVICE_URL`, `MOCK_GOOGLE_API`) require a restart; event/business rules apply instantly.
-
-### Feature flags & presets
-Flags: `stage_performances_enabled, signup_enabled, food_signup_enabled, track_upload_enabled, allow_duets, performer_edits_enabled, live_display_enabled, dashboard_enabled, console_enabled, payment_enabled`.
-Presets (one click in `/admin`): `musical_night`, `acoustic` (no uploads), `competition` (solo only, no food, dashboard off), `potluck` (food only), `freeze` (lock signups/edits/food).
-
-## Quickstart (local preview, no Google needed)
+## Quickstart
 
 ```bash
 git clone https://github.com/binuengoor/event-track-manager.git
 cd event-track-manager
-cp .env.example .env          # set ADMIN_PIN to something other than 2026
-MOCK_GOOGLE_API=true docker compose up -d
+cp .env.example .env            # set ADMIN_PIN (and optionally OPERATOR_PIN)
+mkdir -p events && sudo chown -R 1000:1000 events    # Linux only: the app runs as uid 1000
+docker compose up -d
 ```
 
-Open <http://localhost:8088>. With `MOCK_GOOGLE_API=true` (or no credentials file) Drive/Sheets calls are simulated.
+Open <http://localhost:8088>. With no data yet, `/admin` opens the setup wizard.
 
-Run from source without Docker:
+Run from source:
 
 ```bash
 python -m venv .venv && . .venv/bin/activate
 pip install -r app/requirements-dev.txt
-MOCK_GOOGLE_API=true uvicorn app.main:app --port 8000
+uvicorn app.main:app --port 8000          # data goes to ./events/<event id>/
 ```
 
-Build images locally: `docker compose -f docker-compose.local.yml up -d --build`. Dev override with mock mode and live source mounts: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`.
+Build locally: `docker compose -f docker-compose.local.yml up -d --build`. Pre-built multi-arch images publish to GHCR:
+`ghcr.io/binuengoor/event-track-manager-app` and `...-downloader`.
 
-Pre-built multi-arch images (amd64/arm64) publish to GHCR on every push to `main`: `ghcr.io/binuengoor/event-track-manager-app` and `...-downloader`.
+## Architecture
 
-## Google Workspace setup (production)
-
-1. In Google Cloud Console create a project, enable **Google Sheets API** and **Google Drive API**.
-2. Create a **Service Account**, add a JSON key, save as `secrets/credentials.json`.
-3. Share the Google Sheet with the service-account email as **Editor**.
-4. In a Shared Drive create `Active` and `Archive` folders; add the service account as Content Manager/Contributor.
-5. Optional: create a backup folder for the `<event_id>_backup` sheet.
-6. Put the full URLs in `.env`:
-
-```env
-GOOGLE_SHEET_URL="https://docs.google.com/spreadsheets/d/<SHEET_ID>/edit"
-GOOGLE_DRIVE_ACTIVE_FOLDER="https://drive.google.com/drive/folders/<ID>"
-GOOGLE_DRIVE_ARCHIVE_FOLDER="https://drive.google.com/drive/folders/<ID>"
-BACKUP_DRIVE_FOLDER="https://drive.google.com/drive/folders/<ID>"
+```
+ Browsers ──► app (FastAPI :8000) ──HTTP──► downloader (:8001  yt-dlp + ffmpeg)
+                 │                              │ (hand-off through a scratch volume)
+                 ▼
+        ./events/<event id>/  ◄──── rclone sidecar (optional) ────► any cloud / NAS
+        event.db · signups.xlsx · tracks/ · incoming/ · backups/
 ```
 
-Optional YouTube cookies (avoids bot checks): save as `secrets/yt_cookies.txt`.
+| Layer | Path | Role |
+|---|---|---|
+| Routers | `app/routers/` | HTTP only |
+| Services | `app/services/` | `event_service` (queue, reconcile), `track_store`, `export_service`, `registration`, `admin`, `presets`, `readiness`, `live_broadcaster`, audio + workflow |
+| Repositories | `app/repositories/` | SQLite access and schema migrations |
+| Events | `app/events/` | In-process pub/sub (renames, deletes, debounced export) |
+| Frontend | `app/static/` | Plain HTML + vanilla JS + Tailwind CDN, no build step |
 
-Sheet columns are matched by header name (row 1), so reordering columns is safe. Override names with `COL_*` variables.
+The database is the source of truth; `signups.xlsx` is a one-way export. Edit data in the app, not in the spreadsheet.
 
-## Environment reference
+## Configuration
+
+Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after which event details, flags and rules are edited live in `/admin`.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `ADMIN_PIN` | `2026` | **Change it.** Protects console and admin |
-| `PORT` | `8088` | Host port mapped to the app |
-| `MOCK_GOOGLE_API` | auto | `true` forces mock; auto-on if no credentials |
-| `APP_TITLE`, `APP_SUBTITLE`, `EVENT_ID`, `EVENT_START_TIME` (`MM-DD-YYYY HH:MMAM`), `EVENT_TIMEZONE`, `EVENT_VENUE`, `EVENT_TIME_RANGE`, `EVENT_POSTER_URL`, `EVENT_PAYMENT_URL`, `EVENT_GENERAL_NOTES` | see `.env.example` | Seeded to `/admin` on first boot |
-| `ENTRY_ID_PREFIX` | `PK` | Entry IDs like `PK-001` |
-| `GOOGLE_SHEET_URL`, `SHEET_TAB_NAME`, `GOOGLE_DRIVE_ACTIVE_FOLDER`, `GOOGLE_DRIVE_ARCHIVE_FOLDER`, `BACKUP_DRIVE_FOLDER` | | URLs or raw IDs |
-| `GOOGLE_SERVICE_ACCOUNT_JSON_PATH` / `GOOGLE_SERVICE_ACCOUNT_JSON` | `./secrets/credentials.json` | File path or raw JSON |
-| `MAX_UPLOAD_SIZE_MB` | `100` | Audio uploads are allowed at least 200 MB; video up to 500 MB |
+| `ADMIN_PIN` | `2026` | **Change it.** Opens `/admin`, `/console` |
+| `OPERATOR_PIN` | off | Optional. Opens the sound console only (for a volunteer). Env only, never editable from the UI |
+| `PORT` | `8088` | Host port |
+| `EVENT_ID` | `paattukoottam-2026` | Folder name under `EVENTS_DIR` |
+| `EVENTS_DIR` / `EVENT_DIR` | `/events` (Docker), `./events` | Parent folder, or pin one event folder |
+| `APP_TITLE`, `APP_SUBTITLE`, `EVENT_START_TIME` (`MM-DD-YYYY HH:MMAM`), `EVENT_TIMEZONE`, `EVENT_VENUE`, `EVENT_TIME_RANGE`, `EVENT_POSTER_URL`, `EVENT_PAYMENT_URL`, `EVENT_GENERAL_NOTES` | see `.env.example` | Seed values |
+| `ENTRY_ID_PREFIX` | `PK` | Entry ids (`PK-001`) appear in track file names |
+| `MAX_UPLOAD_SIZE_MB` | `100` | Audio allowed at least 200 MB, video up to 500 MB |
 | `AUDIO_BITRATE` | `320k` | Upload transcode target |
-| `BACKUP_ENABLED`, `BACKUP_DEBOUNCE_SECONDS` | `true`, `10` | Backup runs 10 s after the last change |
-| `FOOD_SIGNUP_ENABLED`, `SIGNUP_ENABLED`, `FOOD_SERVING_NOTE` | | Seed defaults |
-| `LIVE_ORDER_BY` | `readiness,sequence` | Also `age_group`, `performance_type` |
-| `CONSOLE_EXTRA_COLUMNS` | `Age Group` | Sheet columns shown as tags |
-| `CACHE_DIR`, `GALLERY_DIR`, `DATA_DIR` | `/data/...` | Audio cache, sponsor gallery, and the publicly served posters/gallery root (`/data/cache` and database files are never served) |
-| `DB_DIR` | `/db` (Docker), `./data/db` (local) | SQLite location, on its own `app_db` volume. An old database in the cache folder is migrated automatically on first start |
+| `BACKUP_ENABLED`, `BACKUP_DEBOUNCE_SECONDS` | `true`, `10` | Export + snapshot a few seconds after the last change |
+| `RCLONE_REMOTE`, `RCLONE_TRASH`, `SYNC_INTERVAL` | off | Optional sidecar, see [rclone/README.md](rclone/README.md) |
+| `CACHE_DIR` | `/data/cache` | Disposable scratch for conversion and the downloader hand-off |
 | `DOWNLOADER_SERVICE_URL` | `http://downloader:8001` | |
 
 ## Key behaviors
 
-- **Signup rules:** phone required (10+ digits); juniors require guardian name+phone; max performances and max solos per person are configurable; duet partners not yet registered need a phone.
-- **Tracks:** upload MP3/WAV/M4A (transcoded to MP3) or MP4 video (720p), or paste a YouTube/SoundCloud URL (20 min max). Song title must exist first. Files go to Drive `Active/`; replaced files move to `Archive/`.
-- **Stage eligibility:** acts are cued as "ready" if Acoustic/Live, Group, or a track exists.
-- **Console safety:** warning modal before anything that would cut live audio; cue state survives reload; reordering is local and instant, then **Sync to Sheet** pushes order to the Sheet and renames Drive files.
-- **Offline resilience:** per-track cache in the browser (IndexedDB + service worker), bulk ZIP with run sheet, single-track download.
-- **Audit:** every signup/edit/rename/claim/upload/admin action is written to the activity log (`/admin` → Activity Log).
+- **Sign-up rules:** phone required (10+ digits); juniors need a guardian; songs per person and solos per person are configurable; unregistered duet partners need a phone.
+- **Tracks:** MP3/WAV/M4A (transcoded to MP3), MP4 video (720p), or a YouTube/SoundCloud link (20 min max). Which types are accepted is an event rule. A song title must exist first.
+- **Console safety:** a warning before anything that would cut live audio; cue state survives reloads; reordering is instant, **Save Order** renames files and refreshes the export; offline vault, per-track download and a numbered ZIP with a run sheet for USB playback.
+- **Live screen:** updates the moment the sound operator cues, with a slow poll as a safety net.
+- **Event readiness:** a checklist in `/admin` (default PIN, folder writable, disk space, ffmpeg, downloader, missing titles/tracks, unattached files).
+- **Audit:** every sign-up, edit, rename, claim, upload and admin action goes to the activity log.
 
 ## Security & privacy
 
-- Public pages and APIs must **never** include phone numbers or guardian details; only the admin roster/participants endpoints return them.
-- Admin endpoints require the PIN via `X-Admin-PIN` header or the `admin_pin` cookie set by `/api/auth/login`. Failed logins (and wrong-PIN guesses on any admin endpoint) are rate-limited: 8 per client and 100 overall per 5 minutes, then HTTP 429. The PIN is never accepted in a URL, and the session cookie is an HMAC token, not the PIN.
-- Run behind HTTPS (Caddy example in the runbook) and use a non-default PIN.
-- Do not commit `.env`, `secrets/`, or `data/`.
+- Public pages and APIs never include phone numbers or guardian details; only admin endpoints return them. The exported files do contain them, so share the folder/remote only with organizers.
+- Roles: **Admin PIN** (everything) and optional **Operator PIN** (sound console only; sees no phone numbers). Failed guesses are throttled (8 per client and 100 overall per 5 minutes, then HTTP 429). The PIN is never accepted in a URL; sessions use an HMAC cookie, not the PIN.
+- `/data` serves poster and gallery images only: never tracks, exports, backups or the database.
+- User-supplied text is escaped everywhere it is rendered. Spreadsheet exports neutralize formula injection.
+- Use HTTPS in front (Caddy example in the runbook) and a non-default PIN. Do not commit `.env`, `secrets/` or `events/`.
+
+## Upgrading from the Google Sheets/Drive version
+
+On first start the app copies your database from the old `/db` volume (or the audio cache) into the new event folder, and copies cached tracks into
+`tracks/`. Old copies stay in place until you delete them. Then: remove `GOOGLE_*` settings and `secrets/credentials.json` (YouTube cookies
+`secrets/yt_cookies.txt` are still used by the downloader), map `./events:/events`, and optionally run the rclone sidecar to keep Drive in sync.
 
 ## Testing
 
 ```bash
-MOCK_GOOGLE_API=true pytest tests -q
+pytest tests -q
 ```
 
-CI (`.github/workflows/docker-publish.yml`) runs the suite on Python 3.11, then builds and publishes both images. The suite runs in mock mode only; the real Google clients are verified manually (see runbook pre-event checklist).
-
-## Troubleshooting
-
-See the runbook's troubleshooting table (downloader blocked by YouTube, Sheet not updating, backup failing, stale audio, forgotten PIN).
+The suite covers the API, privacy and security rules, the event folder (adoption, renames, archive, exports), presets and potluck tooling,
+readiness, and the live stream. CI runs it on Python 3.11 and then publishes both images.
 
 ## License & community
-Maintained for **EMA Paattukoottam** (Exton Malayali Association). Built with FastAPI, Tailwind CSS, WaveSurfer.js, SQLite and yt-dlp.
+Maintained for **EMA Paattukoottam** (Exton Malayali Association). Built with FastAPI, Tailwind CSS, WaveSurfer.js, SQLite, rclone and yt-dlp.

@@ -7,71 +7,13 @@ from app.config import settings
 from app.exceptions import PerformanceNotFoundError
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
+from app.services import presets as preset_lib
 
 logger = logging.getLogger("admin-service")
 
 
 class AdminService:
     """Encapsulates admin business logic including settings, presets, participant cascades, and analytics."""
-
-    PRESETS = {
-        "musical_night": {
-            "stage_performances_enabled": True,
-            "signup_enabled": True,
-            "food_signup_enabled": True,
-            "track_upload_enabled": True,
-            "allow_duets": True,
-            "performer_edits_enabled": True,
-            "live_display_enabled": True,
-            "dashboard_enabled": True,
-            "console_enabled": True,
-            "payment_enabled": True,
-        },
-        "acoustic": {
-            "stage_performances_enabled": True,
-            "signup_enabled": True,
-            "food_signup_enabled": True,
-            "track_upload_enabled": False,
-            "allow_duets": True,
-            "performer_edits_enabled": True,
-            "live_display_enabled": True,
-            "dashboard_enabled": True,
-            "console_enabled": True,
-            "payment_enabled": True,
-        },
-        "competition": {
-            "stage_performances_enabled": True,
-            "signup_enabled": True,
-            "food_signup_enabled": False,
-            "track_upload_enabled": True,
-            "allow_duets": False,
-            "performer_edits_enabled": True,
-            "live_display_enabled": True,
-            "dashboard_enabled": False,
-            "console_enabled": True,
-            "payment_enabled": True,
-        },
-        "potluck": {
-            "stage_performances_enabled": False,
-            "signup_enabled": False,
-            "food_signup_enabled": True,
-            "track_upload_enabled": False,
-            "allow_duets": False,
-            "performer_edits_enabled": False,
-            "live_display_enabled": False,
-            "dashboard_enabled": True,
-            "console_enabled": False,
-            "payment_enabled": False,
-        },
-        "freeze": {
-            "stage_performances_enabled": True,
-            "signup_enabled": False,
-            "food_signup_enabled": False,
-            "track_upload_enabled": False,
-            "performer_edits_enabled": False,
-            "console_enabled": True,
-        }
-    }
 
     def get_settings(self) -> Dict[str, Any]:
         """Retrieves administrative settings merged with application defaults."""
@@ -115,29 +57,48 @@ class AdminService:
             "console_extra_columns": settings.console_extra_columns,
             "live_order_by": settings.live_order_by,
             "backup_enabled": settings.backup.enabled,
+            "allowed_media": ["audio", "video"],
+            "setup_completed": False,
+            "active_preset": "",
+            "stage_performances_enabled": getattr(settings.signup, "stage_performances_enabled", True),
+            "console_enabled": getattr(settings.signup, "console_enabled", True),
         }
 
         return {**defaults, **result}
 
-    def apply_preset(self, preset_name: str) -> Dict[str, Any]:
-        """Applies a named configuration preset across feature flags."""
-        preset = preset_name.strip().lower()
-        if preset not in self.PRESETS:
-            raise ValueError(f"Unknown preset '{preset}'. Valid: {list(self.PRESETS.keys())}")
+    def list_presets(self) -> List[Dict[str, Any]]:
+        """Preset catalog with a live preview of what each one would change right now."""
+        current = self.get_settings()
+        return [
+            {
+                "id": p["id"], "name": p["name"], "icon": p["icon"], "accent": p["accent"],
+                "tagline": p["tagline"], "changes": preset_lib.diff_against(p["id"], current),
+            }
+            for p in preset_lib.PRESET_CATALOG
+        ]
 
-        flags = self.PRESETS[preset]
-        for k, v in flags.items():
+    def apply_preset(self, preset_name: str) -> Dict[str, Any]:
+        """Applies a named preset: feature flags plus sign-up rules. Never deletes data."""
+        preset = preset_name.strip().lower()
+        if preset not in preset_lib.PRESETS_BY_ID:
+            raise ValueError(f"Unknown preset '{preset}'. Valid: {list(preset_lib.PRESETS_BY_ID.keys())}")
+
+        before = self.get_settings()
+        changes = preset_lib.diff_against(preset, before)
+        values = self._validate_settings(preset_lib.preset_settings(preset))
+        for k, v in values.items():
             db_service.set_app_setting(k, v)
+        db_service.set_app_setting("active_preset", preset)
 
         backup_service.trigger_backup()
         db_service.log_activity(
             action_type="preset_applied",
             performer_name="Admin",
-            summary=f"Applied event preset '{preset}' ({len(flags)} settings updated)",
-            details=json.dumps(flags),
+            summary=f"Applied event preset '{preset}' ({len(changes)} changes)",
+            details=json.dumps(changes),
             source="admin"
         )
-        return {"status": "success", "preset": preset, "applied_flags": flags}
+        return {"status": "success", "preset": preset, "applied_flags": values, "changes": changes}
 
     def update_settings(self, items: Dict[str, Any]) -> int:
         """Validates and updates custom settings."""
@@ -158,17 +119,18 @@ class AdminService:
         return len(cleaned)
 
     BOOL_SETTINGS = {
+        "setup_completed",
         "stage_performances_enabled", "signup_enabled", "food_signup_enabled", "track_upload_enabled",
         "allow_duets", "performer_edits_enabled", "live_display_enabled", "dashboard_enabled",
         "console_enabled", "payment_enabled", "backup_enabled",
     }
     INT_SETTINGS = {"max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20)}
-    LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns"}
+    LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns", "allowed_media"}
     STR_SETTINGS = {
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
         "hero_tag_status", "event_poster_url", "payment_url", "signup_sheet_url", "food_serving_note",
-        "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range",
+        "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset",
     }
 
     def _validate_settings(self, items: Dict[str, Any]) -> Dict[str, Any]:
@@ -203,6 +165,10 @@ class AdminService:
                             raise ValueError("Age group 'requires_guardian' must be true or false.")
                 elif not all(isinstance(x, str) and x.strip() for x in v):
                     raise ValueError(f"Setting '{k}' must be a list of non-empty text values.")
+                elif k == "allowed_media" and (not v or any(x not in ("audio", "video") for x in v)):
+                    raise ValueError("Allowed track types must include audio, video, or both.")
+                elif k == "performance_types" and not v:
+                    raise ValueError("At least one performance type is required.")
             elif k in self.STR_SETTINGS:
                 if v is None:
                     v = ""
@@ -214,6 +180,66 @@ class AdminService:
                 raise ValueError(f"Unknown setting '{k}'.")
             cleaned[k] = v
         return cleaned
+
+    # ------------------------------------------------------------------ potluck catalog helpers
+    FOOD_TEMPLATES = {
+        "indian": "Appetizers:\nVeg Appetizer x3\nNon-Veg Appetizer x3\nRice & Main:\nVeg Biryani\nChicken Biryani\nJeera Rice\nNoodles\nCurries:\nPaneer Curry x2\nChicken Curry x2\nDal\nBreads & Sides:\nNaan / Roti x2\nSalad / Raita\nDesserts:\nGulab Jamun\nPayasam\nCake / Pastries",
+        "bbq": "Mains:\nBurgers\nHot Dogs\nGrilled Chicken\nVeggie Skewers\nSides:\nPotato Salad\nCole Slaw\nCorn on the Cob\nBaked Beans\nChips & Dip\nDesserts:\nPie\nBrownies\nWatermelon\nDrinks & Extras:\nLemonade\nIce x2\nPlates & Cutlery",
+        "thanksgiving": "Mains:\nTurkey\nHam\nVegetarian Main\nSides:\nMashed Potatoes\nStuffing\nGreen Beans\nCranberry Sauce\nDinner Rolls x2\nSalad\nDesserts:\nPumpkin Pie\nApple Pie\nDrinks:\nCider\nSparkling Water",
+        "simple": "Mains x4\nSides x4\nDesserts x3\nDrinks x2",
+    }
+
+    @staticmethod
+    def parse_food_lines(text: str, default_group: str = "Potluck") -> List[Dict[str, str]]:
+        """Parses a pasted list into items.
+
+        ``Group:`` starts a group; ``Item x3`` (or ``Item (3)``) creates Item 1, Item 2, Item 3.
+        """
+        import re
+        items: List[Dict[str, str]] = []
+        group = default_group
+        for raw in (text or "").splitlines():
+            line = raw.strip().lstrip("-*• ").strip()
+            if not line:
+                continue
+            if line.endswith(":") and len(line) > 1:
+                group = line[:-1].strip() or default_group
+                continue
+            m = re.match(r"^(.*?)\s*(?:[x×]\s*(\d{1,2})|\((\d{1,2})\))\s*$", line, flags=re.IGNORECASE)
+            name, count = (m.group(1).strip(), int(m.group(2) or m.group(3))) if m and m.group(1).strip() else (line, 1)
+            count = max(1, min(count, 30))
+            if count == 1:
+                items.append({"group": group, "name": name})
+            else:
+                items.extend({"group": group, "name": f"{name} {i}"} for i in range(1, count + 1))
+        return items
+
+    def bulk_add_food(self, text: str, default_group: str = "Potluck") -> Dict[str, Any]:
+        """Adds many potluck items at once (skips names that already exist). Never touches existing signups."""
+        parsed = self.parse_food_lines(text, default_group)
+        if not parsed:
+            raise ValueError("Paste at least one item, one per line.")
+        if len(parsed) > 300:
+            raise ValueError("Too many items at once (max 300).")
+        groups = {g["name"].strip().lower(): g["group_id"] for g in db_service.get_food_groups()}
+        existing = {i["name"].strip().lower() for i in db_service.get_all_food_items_with_signups()}
+        added, skipped, new_groups = 0, [], 0
+        for it in parsed:
+            key = it["group"].strip().lower()
+            if key not in groups:
+                groups[key] = db_service.add_food_group(it["group"].strip())
+                new_groups += 1
+            if it["name"].strip().lower() in existing:
+                skipped.append(it["name"])
+                continue
+            db_service.add_food_item(name=it["name"], group_id=groups[key])
+            existing.add(it["name"].strip().lower())
+            added += 1
+        backup_service.trigger_backup()
+        db_service.log_activity(action_type="admin_edit", performer_name="Admin",
+                                summary=f"Bulk-added {added} potluck item(s) in {len(set(i['group'] for i in parsed))} group(s)",
+                                details=json.dumps({"skipped": skipped}), source="admin")
+        return {"status": "success", "added": added, "skipped": skipped, "groups_created": new_groups}
 
     def get_summary(self) -> Dict[str, Any]:
         """Aggregates event performance, participant, and food registration metrics."""

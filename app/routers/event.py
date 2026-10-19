@@ -55,6 +55,8 @@ def get_event_info():
         "live_display_enabled": bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True))),
         "dashboard_enabled": bool(get_setting("dashboard_enabled", getattr(settings.signup, "dashboard_enabled", True))),
         "console_enabled": bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))),
+        "allowed_media": get_setting("allowed_media", ["audio", "video"]),
+        "setup_completed": bool(get_setting("setup_completed", False)),
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
         "sheet_url": sheet_url
     }

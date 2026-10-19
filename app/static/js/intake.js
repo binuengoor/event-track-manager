@@ -92,6 +92,16 @@ async function initEventInfo() {
         window.adaptNavigationForEventConfig(data);
       }
 
+      // Only offer the track formats this event accepts (audio, video, or both)
+      if (Array.isArray(data.allowed_media) && data.allowed_media.length === 1) {
+        const only = data.allowed_media[0];
+        const audioBtn = document.getElementById('type-audio-btn');
+        const videoBtn = document.getElementById('type-video-btn');
+        (only === 'audio' ? videoBtn : audioBtn)?.classList.add('hidden');
+        audioBtn?.parentElement?.classList.replace('grid-cols-2', 'grid-cols-1');
+        if (typeof setMediaType === 'function') setMediaType(only);
+      }
+
       if (data.sheet_url) {
         sheetUrl = data.sheet_url;
       }

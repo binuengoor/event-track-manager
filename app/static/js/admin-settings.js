@@ -34,6 +34,8 @@ function setupPinAuth() {
       });
 
       if (!res.ok) throw new Error("Invalid PIN. Please try again.");
+      const loginData = await res.json().catch(() => ({}));
+      if (loginData.role && loginData.role !== "admin") throw new Error("This PIN only opens the sound console. Use the admin PIN here.");
 
       document.getElementById("pin-modal").classList.add("hidden");
       document.getElementById("auth-status-badge")?.classList.remove("hidden");
@@ -877,7 +879,8 @@ function setupActionHandlers() {
       max_performances_per_participant: parseInt(document.getElementById("setting-max-perfs").value, 10) || 2,
       max_solo_per_participant: parseInt(document.getElementById("setting-max-solo").value, 10) || 1,
       performance_types: perfTypes,
-      age_groups: ageGroups
+      age_groups: ageGroups,
+      allowed_media: (window.readAllowedMedia ? window.readAllowedMedia() : ["audio", "video"])
     };
     await updateSettingsApi(payload, "Sign-up rules updated successfully!");
   });

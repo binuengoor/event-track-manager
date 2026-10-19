@@ -29,8 +29,6 @@ jobs:
           pip install -r app/requirements-dev.txt
 
       - name: Run Pytest
-        env:
-          MOCK_GOOGLE_API: 'true'
         run: |
           pytest tests/ -v --tb=short
 

@@ -294,7 +294,17 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       fetchLiveStatus();
-      setInterval(fetchLiveStatus, 5000); // 5-second real-time poll
+      // Live updates: the server pushes a tiny "changed" ping (SSE); fetch only when something changed.
+      // A slow poll stays as a safety net, and becomes the fast 5 s poll if the stream is unavailable.
+      let pollMs = 20000, pollTimer = setInterval(fetchLiveStatus, pollMs);
+      const setPoll = (ms) => { if (ms !== pollMs) { clearInterval(pollTimer); pollMs = ms; pollTimer = setInterval(fetchLiveStatus, ms); } };
+      if (window.EventSource) {
+        const es = new EventSource('/api/live-stream');
+        es.onmessage = () => { setPoll(20000); fetchLiveStatus(); };
+        es.onerror = () => setPoll(5000);
+      } else {
+        setPoll(5000);
+      }
       setInterval(updateCountdown, 1000);  // 1-second countdown tick
 
       document.getElementById('toggle-completed-btn').addEventListener('click', () => {
