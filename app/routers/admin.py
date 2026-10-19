@@ -52,7 +52,7 @@ async def get_backup_status_endpoint(_authorized: bool = Depends(verify_admin_pi
 
 @router.post("/api/admin/backup-now")
 async def trigger_immediate_backup(_authorized: bool = Depends(verify_admin_pin)):
-    return await backup_service.backup_now()
+    return await backup_service.backup_now(force=True)
 
 
 @router.get("/api/admin/roster")

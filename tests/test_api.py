@@ -4,6 +4,23 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.config import settings
 
+@pytest.fixture(autouse=True)
+def sample_performances():
+    """A small, fixed lineup in the isolated per-test database."""
+    from app.services.db_service import db_service
+    for name, song, ptype in [
+        ("Joshua Sohan", "Puthumazha", "Solo"),
+        ("Nandhini Sankar", "Attuthottil", "Solo"),
+        ("Ishaan Anoop", "Kannalane", "Solo"),
+        ("Akshara Jaikumar", "Live Music", "Acoustic"),
+    ]:
+        db_service.create_performance(
+            performer_name=name, performance_type=ptype, song_title=song,
+            contact_info="6105550100", age_group="Senior",
+            track_status="Acoustic" if ptype == "Acoustic" else "Pending",
+        )
+
+
 def test_health_check():
     client = TestClient(app)
     res = client.get("/api/health")
@@ -52,14 +69,15 @@ def test_landing_and_tracks_pages():
 def test_data_static_serving():
     import os
     from app.main import DATA_DIR
-    test_file = os.path.join(DATA_DIR, "test_banner.txt")
-    with open(test_file, "w") as f:
-        f.write("banner content")
+    # /data serves poster/gallery images only (never tracks, exports or databases)
+    test_file = os.path.join(DATA_DIR, "test_banner.png")
+    with open(test_file, "wb") as f:
+        f.write(b"banner content")
     try:
         client = TestClient(app)
-        res = client.get("/data/test_banner.txt")
+        res = client.get("/data/test_banner.png")
         assert res.status_code == 200
-        assert res.text == "banner content"
+        assert res.content == b"banner content"
     finally:
         if os.path.exists(test_file):
             os.remove(test_file)
@@ -99,18 +117,14 @@ def test_admin_auth():
 
 def test_upload_and_stream(tmp_path, monkeypatch):
     from app.services.audio_service import audio_service
-    from app.services.google_service import google_service
     from app.services.db_service import db_service
+    from app.services.audio_workflow_service import audio_workflow_service
     monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
-    # Prevent tests from writing dummy audio files to live Google Drive or failing if sheet range differs
-    monkeypatch.setattr(google_service, "upload_file_to_active", lambda *a, **kw: "mock_test_drive_id")
-    def mock_update_meta(entry_id, drive_file_id, **kw):
-        db_service.update_performance_field(entry_id, "drive_file_id", drive_file_id)
-        db_service.update_performance_field(entry_id, "track_status", "Uploaded")
-        return True
-    monkeypatch.setattr(google_service, "update_track_metadata", mock_update_meta)
-    # Bypass ffmpeg decoding for dummy bytes test file
-    monkeypatch.setattr(audio_service, "transcode_to_standard_mp3", lambda in_p, out_p, **kw: False)
+    # Bypass ffmpeg and the media probe for a dummy-bytes test file; storage, DB and streaming are real
+    async def no_transcode(*a, **kw):
+        return False
+    monkeypatch.setattr(audio_service, "async_transcode_to_standard_mp3", no_transcode)
+    monkeypatch.setattr(audio_workflow_service, "_verify_audio", lambda path: "03:30")
     client = TestClient(app)
     
     import uuid
@@ -135,15 +149,19 @@ def test_upload_and_stream(tmp_path, monkeypatch):
     data = res.json()
     assert data["status"] == "success"
     assert data["entry_id"] == temp_id
+    assert data["filename"].startswith(("01_", "05_", "06_", "07_", "08_", "09_", "02_", "03_", "04_")) or temp_id in data["filename"]
 
-    # Now stream the track from tmp directory
+    # The performance now shows the track and it is stored in the event folder
+    perf = db_service.get_performance(temp_id)
+    assert perf["track_status"] == "Uploaded"
+    assert perf["drive_file_name"] == data["filename"]
+
+    # Now stream the track from the event folder
     stream_res = client.get(f"/api/stream/{temp_id}")
     assert stream_res.status_code == 200
     assert stream_res.headers["Content-Type"] == "audio/mpeg"
 
-def test_status_update_with_auth(monkeypatch):
-    from app.services.google_service import google_service
-    monkeypatch.setattr(google_service, "update_status", lambda *a, **kw: True)
+def test_status_update_with_auth():
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     first_id = perf_res.json()[0]["entry_id"]
@@ -173,18 +191,7 @@ def test_export_zip_with_auth():
     assert res.headers["Content-Type"] == "application/zip"
     assert len(res.content) > 0
 
-def test_staged_reorder_and_push_sequence(monkeypatch):
-    from app.services.google_service import google_service
-    from app.services.db_service import db_service
-    def mock_update_orders(items, push_to_sheet=True):
-        if not push_to_sheet:
-            db_service.set_dirty_sequence(True)
-        return len(items)
-    monkeypatch.setattr(google_service, "update_sequence_orders", mock_update_orders)
-    def mock_sync():
-        db_service.set_dirty_sequence(False)
-        return 2
-    monkeypatch.setattr(google_service, "sync_sequence_to_google", mock_sync)
+def test_staged_reorder_and_push_sequence():
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     items = perf_res.json()
@@ -230,9 +237,7 @@ def test_staged_reorder_and_push_sequence(monkeypatch):
     assert live_res2.status_code == 200
     assert live_res2.json()["is_dirty"] is False
 
-def test_cue_and_clear_active_performance(monkeypatch):
-    from app.services.google_service import google_service
-    monkeypatch.setattr(google_service, "update_status", lambda *a, **kw: True)
+def test_cue_and_clear_active_performance():
     client = TestClient(app)
     perf_res = client.get("/api/performances")
     items = perf_res.json()
@@ -279,11 +284,9 @@ def test_event_info_has_payment_and_sheet_urls():
     assert "sheet_url" in data
     assert "payment_url" in data
 
-def test_one_way_sync_sqlite_priority():
-    from app.services.google_service import google_service
-    from app.services.db_service import db_service
-    # Verify google_service reads from SQLite without calling Google Sheet
-    perfs = google_service.get_performances()
+def test_event_service_reads_from_sqlite():
+    from app.services.event_service import event_service
+    perfs = event_service.get_performances()
     assert isinstance(perfs, list)
     assert len(perfs) > 0
 
@@ -311,6 +314,12 @@ def test_is_placeholder_song_title_helper():
 
 def test_upload_blocked_when_song_title_missing_or_placeholder(tmp_path, monkeypatch):
     from app.services.db_service import db_service
+    from app.services.audio_workflow_service import audio_workflow_service
+    from app.services.audio_service import audio_service
+    async def no_transcode(*a, **kw):
+        return False
+    monkeypatch.setattr(audio_service, "async_transcode_to_standard_mp3", no_transcode)
+    monkeypatch.setattr(audio_workflow_service, "_verify_audio", lambda path: "03:30")
     client = TestClient(app)
 
     import uuid

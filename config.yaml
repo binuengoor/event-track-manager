@@ -6,37 +6,13 @@ event:
   name: "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
   subtitle: "Musical Night • September 19, 2026"
   start_time: "09-19-2026 05:00PM"
-  poster_url: "/data/paattukoottam_animated.gif"
+  poster_url: "/data/paattukoottam_animated.gif"   # file lives in the event folder
   venue: "1 Scouting Wy, Exton, PA 19341, USA"
   time_range: "5:00 PM - 9:00 PM EDT"
 
-google:
-  # Path to Google Cloud Service Account JSON Key
-  service_account_json_path: "./secrets/credentials.json"
-  # Target Google Sheet ID (Native Google Sheet for live concurrent multi-user editing)
-  sheet_id: "1bRvoj4ZlAmSRz972uhTDMfXlYgksH-BOH-zmygp5YRQ"
-  sheet_range: "Song Sign-Up!A2:O"
-  # Google Shared Drive Folder IDs
-  drive_folders:
-    active_folder_id: "1FQ1goCkaSajLjGv8Yt_vrWTS6krmZufW"
-    archive_folder_id: "1T6zqI02lKQfLfqpPRjQOhn561uUEKDil"
-
-# 0-indexed column mappings for the Google Sheet
-columns:
-  entry_id: -1         # Auto-generated from row index (PK-002, PK-003...)
-  performer_name: 0   # Col A: Singer (1)
-  performance_type: 5 # Col F: Solo/Duet/Group
-  partner_name: 2     # Col C: Singer (2)
-  song_title: 8       # Col I: Song Name
-  movie_name: 9       # Col J: Movie/Album Name
-  performance_status: 10 # Col K: Performance Status
-  track_status: 11    # Col L: Track Uploaded / Status
-  sequence_order: 6   # Col G: Sequence
-  duration: 12        # Col M: Duration (Minutes)
-  drive_file_id: 13   # Col N: Drive File ID
-  last_updated: 14    # Col O: Last Updated
-
 storage:
+  # Everything for an event lives in <events_dir>/<event id>/ (database, signups.xlsx, tracks/, backups/).
+  # Set EVENTS_DIR / EVENT_DIR in the environment to relocate it. cache_dir is disposable scratch space.
   cache_dir: "/data/cache"
   max_upload_size_mb: 100
 
@@ -60,8 +36,8 @@ signup:
       requires_guardian: false
 
 backup:
-  enabled: true
-  drive_folder_id: "1T6zqI02lKQfLfqpPRjQOhn561uUEKDil"
+  enabled: true          # writes signups.xlsx/csv + database snapshots into the event folder
+  keep_snapshots: 30
   debounce_seconds: 10
 
 food_items_seed:

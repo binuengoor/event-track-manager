@@ -59,7 +59,7 @@ class MissingSongTitleError(DomainException):
 
 
 class ExternalServiceError(DomainException):
-    """Raised when an external service (Drive, Sheets, Downloader) fails."""
+    """Raised when an external service (downloader, file storage) fails."""
     pass
 
 

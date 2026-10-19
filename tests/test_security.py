@@ -135,17 +135,18 @@ def test_valid_settings_roundtrip_and_signup_still_works(admin, client):
     assert ok.status_code == 200, ok.text
 
 
-def test_data_mount_blocks_cache_and_database_files(client):
-    for sub in ("cache", "db"):
+def test_data_mount_blocks_tracks_exports_and_database_files(client):
+    for sub in ("cache", "db", "tracks", "backups"):
         os.makedirs(os.path.join(DATA_DIR, sub), exist_ok=True)
-    secret = os.path.join(DATA_DIR, "cache", "leak.mp3")
-    dbfile = os.path.join(DATA_DIR, "event_data.db")
+    secret = os.path.join(DATA_DIR, "tracks", "leak.png")
+    dbfile = os.path.join(DATA_DIR, "event.db")
     for p in (secret, dbfile):
         with open(p, "w") as f:
             f.write("x")
     try:
-        assert client.get("/data/cache/leak.mp3").status_code == 404
-        assert client.get("/data/event_data.db").status_code == 404
+        assert client.get("/data/tracks/leak.png").status_code == 404
+        assert client.get("/data/event.db").status_code == 404
+        assert client.get("/data/signups.xlsx").status_code == 404
     finally:
         for p in (secret, dbfile):
             os.remove(p)
@@ -176,17 +177,17 @@ def test_dashboard_and_signup_scripts_escape_user_content():
     assert "${item.signer_name" not in signup.replace("escapeHtml(item.signer_name", "")
 
 
-def test_legacy_database_is_migrated_out_of_cache(tmp_path, monkeypatch):
+def test_legacy_database_is_migrated_into_event_folder(tmp_path, monkeypatch):
     import sqlite3
     from app.repositories.base import DatabaseManager
-    cache = tmp_path / "cache"; dbdir = tmp_path / "db"
+    cache = tmp_path / "old_cache"; event = tmp_path / "new_event_folder"
     cache.mkdir()
     legacy = sqlite3.connect(cache / "event_data.db")
     legacy.execute("CREATE TABLE t (v TEXT)"); legacy.execute("INSERT INTO t VALUES ('kept')"); legacy.commit(); legacy.close()
     monkeypatch.setattr(settings.storage, "cache_dir", str(cache))
-    monkeypatch.setattr(settings.storage, "db_dir", str(dbdir))
+    monkeypatch.setattr(settings.storage, "event_dir", str(event))
     path = DatabaseManager().db_path
-    assert path == str(dbdir / "event_data.db")
+    assert path == str(event / "event.db")
     assert sqlite3.connect(path).execute("SELECT v FROM t").fetchone()[0] == "kept"
 
 

@@ -468,7 +468,7 @@
       if (syncEl) {
         syncEl.textContent = `● Synced ${formatTimeAgo(data.last_synced_at)}`;
         if (data.last_synced_at) {
-          syncEl.title = `Last synchronized with Google Sheets: ${new Date(data.last_synced_at).toLocaleString()}`;
+          syncEl.title = `Last updated: ${new Date(data.last_synced_at).toLocaleString()}`;
         }
       }
 

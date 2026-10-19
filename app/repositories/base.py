@@ -28,26 +28,33 @@ class DatabaseManager:
             return self._custom_db_path
         if self._db_path_getter:
             return self._db_path_getter()
-        db_dir = settings.storage.db_dir or settings.storage.cache_dir
-        os.makedirs(db_dir, exist_ok=True)
-        path = os.path.join(db_dir, "event_data.db")
+        event_dir = settings.storage.event_dir or settings.storage.cache_dir
+        os.makedirs(event_dir, exist_ok=True)
+        path = os.path.join(event_dir, "event.db")
         self._migrate_legacy_db(path)
         return path
 
     def _migrate_legacy_db(self, new_path: str):
-        """One-time move of the database from the old location (inside the audio cache)."""
-        legacy = os.path.join(settings.storage.cache_dir, "event_data.db")
-        if os.path.exists(new_path) or not os.path.isfile(legacy) or os.path.abspath(legacy) == os.path.abspath(new_path):
+        """One-time copy of a database from an older layout (/db volume or inside the audio cache)."""
+        if os.path.exists(new_path):
             return
-        try:
-            src = sqlite3.connect(legacy)
-            dst = sqlite3.connect(new_path)
-            src.backup(dst)  # includes any data still in the -wal file
-            dst.close()
-            src.close()
-            logger.warning("Migrated database from %s to %s (legacy copy left in place; delete it).", legacy, new_path)
-        except Exception as ex:
-            logger.error("Legacy database migration failed: %s", ex)
+        candidates = []
+        if os.getenv("DB_DIR"):
+            candidates.append(os.path.join(os.getenv("DB_DIR"), "event_data.db"))
+        candidates += ["/db/event_data.db", os.path.join(settings.storage.cache_dir, "event_data.db")]
+        for legacy in candidates:
+            if not os.path.isfile(legacy) or os.path.abspath(legacy) == os.path.abspath(new_path):
+                continue
+            try:
+                src = sqlite3.connect(legacy)
+                dst = sqlite3.connect(new_path)
+                src.backup(dst)  # includes any data still in the -wal file
+                dst.close()
+                src.close()
+                logger.warning("Migrated database from %s to %s (old copy left in place; delete it when satisfied).", legacy, new_path)
+                return
+            except Exception as ex:
+                logger.error("Legacy database migration from %s failed: %s", legacy, ex)
 
     @db_path.setter
     def db_path(self, val: Optional[str]):

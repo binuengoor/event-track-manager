@@ -94,7 +94,17 @@ async def lifespan(app: FastAPI):
     # 2. Seed initial food catalog if tables are empty
     db_service.seed_food_catalog(settings.food_items_seed)
 
-    # 3. Start background backup debounce loop & pooled downloader client
+    # 3. Align tracks on disk with the database and write the first export into the event folder
+    try:
+        from app.services.event_service import event_service
+        from app.services.export_service import export_service
+        event_service.migrate_legacy_cache_tracks()
+        event_service.reconcile_tracks(force=True)
+        export_service.export_now(snapshot=False)
+    except Exception as ex:
+        logger.warning("Initial event folder sync failed: %s", ex)
+
+    # 4. Start background backup debounce loop & pooled downloader client
     backup_service.start()
     await downloader_client.start()
 
@@ -115,18 +125,20 @@ app = FastAPI(
 # Static and Data Directories
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
-DATA_DIR = os.getenv("DATA_DIR", "/data" if os.path.exists("/data") else os.path.join(os.path.dirname(BASE_DIR), "data"))
+DATA_DIR = os.getenv("DATA_DIR") or settings.storage.event_dir
 
 class PublicDataFiles(StaticFiles):
-    """Serves posters and gallery images only; never the audio cache or any database files."""
-    BLOCKED_TOP_LEVEL = {"cache", "db", "secrets"}
+    """Serves poster/gallery images only (image extensions). Never tracks, exports, backups or databases."""
+    ALLOWED_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico")
+    BLOCKED_TOP_LEVEL = {"tracks", "incoming", "backups", "cache", "db", "secrets"}
 
     async def get_response(self, path, scope):
-        parts = [p for p in path.replace("\\", "/").split("/") if p]
-        lowered = [p.lower() for p in parts]
+        parts = [p.lower() for p in path.replace("\\", "/").split("/") if p]
         if (
-            (lowered and lowered[0] in self.BLOCKED_TOP_LEVEL)
-            or any(".." == p or p.endswith((".db", ".db-wal", ".db-shm", ".sqlite")) for p in lowered)
+            not parts
+            or parts[0] in self.BLOCKED_TOP_LEVEL
+            or ".." in parts
+            or not parts[-1].endswith(self.ALLOWED_EXTS)
         ):
             raise HTTPException(status_code=404)
         return await super().get_response(path, scope)

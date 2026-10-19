@@ -182,9 +182,6 @@ class DBService:
     def seed_food_catalog(self, seed_items: List[Any]):
         return self.food_repo.seed_food_catalog(seed_items)
 
-    def sync_food_from_sheet(self, sheet_rows: List[List[str]], serving_portion_note: Optional[str] = None):
-        return self.food_repo.sync_food_from_sheet(sheet_rows, serving_portion_note)
-
     # =========================================================================
     # PERFORMANCES
     # =========================================================================

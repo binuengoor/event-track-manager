@@ -5,7 +5,7 @@ from typing import Optional, Dict, Any
 
 from app.config import settings, get_setting
 from app.services.db_service import db_service
-from app.services.google_service import google_service
+from app.services.export_service import export_service
 
 logger = logging.getLogger("backup-service")
 
@@ -67,8 +67,8 @@ class BackupService:
                 logger.error("Error in backup debounce loop: %s", e)
                 await asyncio.sleep(2.0)
 
-    async def backup_now(self) -> Dict[str, Any]:
-        """Performs an immediate backup snapshot of SQLite data to Google Sheet."""
+    async def backup_now(self, force: bool = False) -> Dict[str, Any]:
+        """Writes signups.xlsx/csv and a database snapshot into the event folder."""
         if self._is_backing_up:
             return {"status": "in_progress", "message": "Backup already running"}
 
@@ -77,45 +77,24 @@ class BackupService:
         log_id = db_service.log_backup_start()
 
         try:
-            folder_id = (
-                settings.backup.drive_folder_id
-                or getattr(settings.google.drive_folders, "archive_folder_id", "")
-                or getattr(settings.google.drive_folders, "active_folder_id", "")
-            )
-            event_id = get_setting("event_id", settings.event.id)
-            sheet_title = f"{event_id}_backup"
-
-            # Consistent snapshot from SQLite
-            performances = db_service.get_all_performances()
-            food_items = db_service.get_all_food_items_with_signups()
-
-            # Execute write via google_service in thread pool to prevent blocking asyncio loop
-            res = await asyncio.to_thread(
-                google_service.create_or_update_backup_sheet,
-                folder_id=folder_id,
-                title=sheet_title,
-                performances=performances,
-                food_items=food_items
-            )
-
-            rows_backed = res.get("rows_backed", len(performances) + len(food_items))
+            res = await asyncio.to_thread(export_service.export_now, True, force)
+            rows_backed = res.get("rows_backed", 0)
             db_service.log_backup_success(log_id, rows_backed)
-            logger.info("Backup successfully completed: %d rows", rows_backed)
+            db_service.set_last_sync_time()
+            logger.info("Export completed: %d rows", rows_backed)
             return {
                 "status": "success",
                 "rows_backed": rows_backed,
-                "sheet_title": sheet_title,
+                "files": res.get("files"),
+                "snapshot": res.get("snapshot"),
+                "event_dir": res.get("event_dir"),
                 "completed_at": datetime.now(timezone.utc).isoformat(),
-                "file_id": res.get("file_id")
             }
         except Exception as e:
             err_msg = str(e)
-            logger.error("Backup failed: %s", err_msg)
+            logger.error("Export failed: %s", err_msg)
             db_service.log_backup_error(log_id, err_msg)
-            return {
-                "status": "error",
-                "error": err_msg
-            }
+            return {"status": "error", "error": err_msg}
         finally:
             self._is_backing_up = False
 
@@ -124,13 +103,12 @@ class BackupService:
         last_info = db_service.get_last_backup_info()
         history = db_service.get_backup_history(limit=10)
         enabled = get_setting("backup_enabled", settings.backup.enabled)
-        event_id = get_setting("event_id", settings.event.id)
-
         return {
             "enabled": bool(enabled),
             "is_backing_up": self._is_backing_up,
             "has_pending_trigger": self._pending_backup,
-            "backup_target_sheet": f"{event_id}_backup",
+            "backup_target_sheet": "signups.xlsx",
+            "event_dir": settings.storage.event_dir,
             "last_backup": last_info,
             "history": history
         }

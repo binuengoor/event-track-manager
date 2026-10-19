@@ -536,7 +536,7 @@ async function loadBackupStatus() {
       <div class="flex items-center justify-between">
         <span class="font-bold text-white flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full ${b.enabled ? 'bg-emerald-500' : 'bg-slate-600'}"></span>
-          <span>Target Google Sheet:</span>
+          <span>Export file:</span>
           <code class="text-orange-400">${b.backup_target_sheet}</code>
         </span>
         <span class="text-[11px] font-semibold ${last && last.status === 'success' ? 'text-emerald-400' : 'text-slate-400'}">
@@ -1054,7 +1054,7 @@ function setupActionHandlers() {
       const res = await fetch("/api/admin/backup-now", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.status === "success") {
-        showToast(`Backup complete! ${data.rows_backed} rows saved to Sheet.`);
+        showToast(`Export complete! ${data.rows_backed} rows written to the event folder.`);
         await loadBackupStatus();
       } else {
         showToast(`Backup error: ${data.error || "Failed"}`, true);
@@ -1066,16 +1066,16 @@ function setupActionHandlers() {
     }
   });
 
-  // Export DB to Sheet Now button
+  // Export signups now button
   document.getElementById("sync-sheet-now-btn")?.addEventListener("click", async () => {
     const btn = document.getElementById("sync-sheet-now-btn");
     btn.disabled = true;
-    showToast("Exporting local DB to Google Sheet...");
+    showToast("Exporting signups to the event folder...");
     try {
       const res = await fetch("/api/sync", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.status === "success") {
-        showToast("Sync success: DB pushed to Google Sheet!");
+        showToast("Export complete: signups.xlsx, signups.csv and potluck.csv updated.");
       } else {
         showToast(`Sync error: ${data.message || "Failed"}`, true);
       }

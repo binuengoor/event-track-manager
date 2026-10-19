@@ -1114,7 +1114,7 @@ function renderQueueList() {
         filteredQueue = [...queue];
         renderQueueList();
 
-        // Save reordered sequence to Google Sheet
+        // Save reordered sequence
         await saveReorderedSequence();
       });
     }
@@ -1144,7 +1144,7 @@ async function saveReorderedSequence() {
     if (!res.ok) throw new Error('Failed to update stage queue');
     const data = await res.json();
     setDirtyState(true);
-    showToast('Sequence staged locally. Click "Sync to Sheet" to push to Google Sheet & Drive.', 'info');
+    showToast('New order is live. Click "Save Order" to rename track files and update the export.', 'info');
   } catch (err) {
     showToast(`Sequence staging failed: ${err.message}`, 'error');
   }
@@ -2133,13 +2133,13 @@ async function handleSyncButtonClick() {
         method: 'POST',
         headers: getAuthHeaders()
       });
-      if (!pushRes.ok) throw new Error('Failed to push sequence to Google Sheet');
+      if (!pushRes.ok) throw new Error('Failed to save the order');
       const pushData = await pushRes.json();
       lastSyncedAt = pushData.last_synced_at;
       setDirtyState(false);
-      showToast(`✓ Successfully synced ${pushData.synced_count} acts to Google Sheet & renamed Drive tracks!`);
+      showToast(`✓ Order saved for ${pushData.synced_count} acts. Track files renamed and export updated.`);
     } else {
-      // Normal refresh from Google Sheet
+      // Normal refresh
       const syncRes = await fetch('/api/sync', { method: 'POST', headers: getAuthHeaders() });
       if (syncRes.ok) {
         const syncData = await syncRes.json();
@@ -2175,13 +2175,13 @@ function setDirtyState(dirty) {
     if (dirty) {
       // Glowing Amber state to indicate pending push
       refreshBtn.className = "px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/40 flex items-center gap-1.5 transition active:scale-95 border border-amber-300 ring-2 ring-amber-400/80 animate-pulse";
-      refreshBtn.title = "Local stage sequence is modified! Click to push to Google Sheet and rename Drive files.";
+      refreshBtn.title = "The new order is not saved to track file names yet. Click to save.";
       const span = refreshBtn.querySelector('span');
-      if (span) span.textContent = "Sync to Sheet";
+      if (span) span.textContent = "Save Order";
     } else {
       // Normal Orange state
       refreshBtn.className = "px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40";
-      refreshBtn.title = "Refresh latest data from Google Sheet & Drive";
+      refreshBtn.title = "Refresh the latest data and tracks";
       const span = refreshBtn.querySelector('span');
       if (span) span.textContent = "Refresh Data";
     }
@@ -2205,9 +2205,9 @@ function updateSyncStatusBadge() {
   } else {
     syncBadge.className = 'flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20';
     const ago = formatTimeAgo(lastSyncedAt);
-    syncText.textContent = `● Sheet Mirror: ${ago}`;
+    syncText.textContent = `● Exported: ${ago}`;
     if (lastSyncedAt) {
-      syncBadge.title = `Event DB is primary source of truth. Background mirror to Google Sheet updated: ${new Date(lastSyncedAt).toLocaleString()}`;
+      syncBadge.title = `The event database is the source of truth. signups.xlsx was last written: ${new Date(lastSyncedAt).toLocaleString()}`;
     }
     const dot = syncBadge.querySelector('span:first-child');
     if (dot) dot.className = 'w-2 h-2 rounded-full bg-emerald-500 animate-pulse';

@@ -74,12 +74,6 @@
   <!-- Main Content -->
   <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
-    <!-- Notification Banner for Mock Mode -->
-    <div id="mock-banner" class="hidden p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
-      <i data-lucide="info" class="w-4 h-4 shrink-0 text-amber-400"></i>
-      <span><strong>Preview Mode:</strong> Running with sample performances. Uploads and updates are simulated in-memory.</span>
-    </div>
-
     <!-- Intro Card -->
     <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
       <div class="flex items-center justify-between mb-2">
@@ -363,20 +357,20 @@
           </div>
           <p class="text-xs text-slate-400 flex items-center gap-1.5 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
             <i data-lucide="sparkles" class="w-4 h-4 text-orange-400 shrink-0"></i>
-            <span>Our dedicated audio worker will extract the high-quality MP3 directly and store it in Google Drive.</span>
+            <span>Our dedicated audio worker will extract the high-quality MP3 directly and save it with the event.</span>
           </p>
         </div>
 
         <!-- Archival Note -->
         <div id="archival-notice" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-start gap-2">
           <i data-lucide="archive" class="w-4 h-4 text-slate-400 shrink-0 mt-0.5"></i>
-          <span><strong>Version Safety:</strong> If you upload a track again, the existing file is automatically moved to the <code class="text-orange-300">Archive/</code> folder in Google Shared Drive, keeping only your latest version active for the stage show.</span>
+          <span><strong>Version Safety:</strong> If you upload a track again, the existing file is automatically moved to the <code class="text-orange-300">_archive</code> folder, keeping only your latest version active for the stage show.</span>
         </div>
 
         <!-- Submit Button -->
         <button type="submit" id="submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
           <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-          <span id="submit-text">Upload Track to Google Drive</span>
+          <span id="submit-text">Upload Track</span>
         </button>
 
         <!-- Or Mark Acoustic Button -->
@@ -407,7 +401,7 @@
         </div>
         <div>
           <h3 class="font-bold text-base text-emerald-200">Track Uploaded Successfully!</h3>
-          <p id="success-summary" class="text-xs text-emerald-400/90">Your track has been safely saved in the Google Shared Drive.</p>
+          <p id="success-summary" class="text-xs text-emerald-400/90">Your track has been saved and is ready for the sound team.</p>
         </div>
       </div>
       <div id="success-details" class="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-300 space-y-1 border border-emerald-500/20">

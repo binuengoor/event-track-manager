@@ -1,4 +1,4 @@
-# Development Docker Compose override: enables local builds and live source code reloading
+# Development override: local builds and live source reloading
 # Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 services:
@@ -8,7 +8,6 @@ services:
       dockerfile: app/Dockerfile
     environment:
       - RUNTIME_ENV=docker
-      - MOCK_GOOGLE_API=true
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests

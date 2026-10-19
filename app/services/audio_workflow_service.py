@@ -1,4 +1,5 @@
 import os
+import json
 import shutil
 import logging
 import asyncio
@@ -13,8 +14,9 @@ from app.exceptions import (
     InvalidAudioError,
     ExternalServiceError,
 )
-from app.services.google_service import google_service
-from app.services.audio_service import audio_service, sanitize_filename
+from app.services.event_service import event_service
+from app.services.audio_service import audio_service
+from app.services.track_store import track_store
 from app.services.downloader_client import downloader_client
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
@@ -38,10 +40,11 @@ class AudioWorkflowService:
         if not bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))):
             raise UploadDisabledError("Backing track uploads are currently disabled for this event.")
 
-        performances = google_service.get_performances()
-        target_entry = next((p for p in performances if p.entry_id == entry_id), None)
-        if not target_entry:
+        row = db_service.get_performance(entry_id)
+        if not row:
             raise PerformanceNotFoundError(f"Performance entry {entry_id} not found")
+        from app.schemas import PerformanceEntry
+        target_entry = PerformanceEntry(**row)
 
         if target_entry.is_song_name_missing or is_placeholder_song_title(target_entry.song_title):
             raise MissingSongTitleError(
@@ -52,14 +55,16 @@ class AudioWorkflowService:
         ext = ".mp4" if is_video else ".mp3"
         mime_type = "video/mp4" if is_video else "audio/mpeg"
 
-        safe_performer = sanitize_filename(target_entry.performer_name)
-        safe_song = sanitize_filename(target_entry.song_title)
-        seq = target_entry.sequence_order
-        seq_prefix = f"{seq:02d}_" if seq else ""
-        canonical_filename = f"{seq_prefix}{entry_id}_{safe_performer}_{safe_song}{ext}"
+        canonical_filename = track_store.canonical_name(
+            entry_id, target_entry.sequence_order, target_entry.performer_name, target_entry.song_title, ext
+        )
 
+        # Work in the scratch dir; the finished file is moved into the event folder only after verification,
+        # so a failed upload never destroys the previous track.
         cache_path = audio_service.get_cache_path(entry_id, ext=ext)
-        audio_service.purge_cache(entry_id)
+        for scratch in (cache_path, cache_path + ".upload"):
+            if os.path.isfile(scratch):
+                os.remove(scratch)
 
         # 1. Process Media Input
         if submission_type == "youtube":
@@ -122,33 +127,20 @@ class AudioWorkflowService:
         # 2. Audio/Video Verification
         duration_str = self._verify_audio(cache_path)
 
-        # 3. Upload to Google Drive (offload synchronous network IO to threadpool)
+        # 3. Store in the event folder (previous version is archived) and update the database
         try:
-            drive_file_id = await asyncio.to_thread(
-                google_service.upload_file_to_active,
-                cache_path,
-                canonical_filename,
-                entry_id=entry_id,
-                mime_type=mime_type
-            )
+            stored_path = await asyncio.to_thread(track_store.save, entry_id, cache_path, canonical_filename)
         except Exception as e:
-            logger.error("Failed to upload track to Google Drive Active/ folder: %s", e)
-            raise ExternalServiceError("Failed to upload track to Google Drive")
+            logger.error("Failed to store track for %s: %s", entry_id, e)
+            raise ExternalServiceError("Failed to save the track in the event folder")
 
-        # 4. Update metadata in Sheet / DB (offload to threadpool)
-        try:
-            await asyncio.to_thread(
-                google_service.update_track_metadata,
-                entry_id,
-                drive_file_id,
-                status="Uploaded",
-                duration_str=duration_str,
-                media_type="video" if is_video else "audio",
-                drive_file_name=canonical_filename
-            )
-        except Exception as e:
-            logger.error("Failed to update Google Sheet for %s: %s", entry_id, e)
-            raise ExternalServiceError("Track uploaded to Drive, but failed to update Google Sheet row")
+        event_service.update_track_metadata(
+            entry_id,
+            os.path.basename(stored_path),
+            status="Uploaded",
+            duration_str=duration_str,
+            media_type="video" if is_video else "audio",
+        )
 
         backup_service.trigger_backup()
 
@@ -159,7 +151,7 @@ class AudioWorkflowService:
                 performer_name=target_entry.performer_name,
                 entry_id=entry_id,
                 summary=f"Downloaded {track_type_label} track from YouTube for {entry_id} ('{target_entry.song_title}')",
-                details=f'{{"youtube_url": "{youtube_url}", "duration": "{duration_str}", "media_type": "{track_type_label}"}}',
+                details=json.dumps({"youtube_url": youtube_url, "duration": duration_str, "media_type": track_type_label}),
                 source="youtube"
             )
         else:
@@ -169,7 +161,7 @@ class AudioWorkflowService:
                 performer_name=target_entry.performer_name,
                 entry_id=entry_id,
                 summary=f"Uploaded {track_type_label} track file '{canonical_filename}' for {entry_id} ('{target_entry.song_title}')",
-                details=f'{{"filename": "{upload_name}", "duration": "{duration_str}", "media_type": "{track_type_label}"}}',
+                details=json.dumps({"filename": upload_name, "duration": duration_str, "media_type": track_type_label}),
                 source="upload"
             )
 
@@ -181,47 +173,40 @@ class AudioWorkflowService:
             "filename": canonical_filename,
             "media_type": track_type_label,
             "duration": duration_str,
-            "drive_file_id": drive_file_id,
             "message": f"Successfully uploaded and queued '{canonical_filename}' for playback."
         }
 
     def _verify_audio(self, cache_path: str) -> str:
-        """Verifies that the generated audio file is playable and extracts its duration string."""
-        is_test = bool(settings.mock_google_api or os.getenv("PYTEST_CURRENT_TEST"))
+        """Verifies that the generated audio/video file is playable and returns its duration as mm:ss."""
         try:
             from mutagen import File as MutagenFile
             audio = MutagenFile(cache_path)
             if audio is None or audio.info is None:
-                if is_test:
-                    return "03:30"
-                if os.path.exists(cache_path):
-                    os.remove(cache_path)
+                self._discard(cache_path)
                 raise InvalidAudioError(
                     "Invalid audio file: Unable to decode playable audio track. Please upload a standard MP3, M4A, or WAV file."
                 )
 
             length = getattr(audio.info, "length", 0)
             if not length or length <= 0:
-                if is_test:
-                    return "03:30"
-                if os.path.exists(cache_path):
-                    os.remove(cache_path)
-                raise InvalidAudioError(
-                    "Unplayable audio file: Audio duration is 0 seconds or corrupted."
-                )
+                self._discard(cache_path)
+                raise InvalidAudioError("Unplayable audio file: Audio duration is 0 seconds or corrupted.")
 
             sec = int(length)
-            m = sec // 60
-            s = sec % 60
-            return f"{m:02d}:{s:02d}"
+            return f"{sec // 60:02d}:{sec % 60:02d}"
         except InvalidAudioError:
             raise
         except Exception as e:
-            if is_test:
-                return "03:30"
-            if os.path.exists(cache_path):
-                os.remove(cache_path)
+            self._discard(cache_path)
             raise InvalidAudioError(f"Audio verification failed: {str(e)}.")
+
+    @staticmethod
+    def _discard(path: str):
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
 
 
 audio_workflow_service = AudioWorkflowService()

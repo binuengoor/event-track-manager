@@ -54,3 +54,7 @@ ENV/
 .vscode/
 *.swp
 *.swo
+
+# Event folders (database, signups export, tracks, backups)
+events/
+rclone/rclone.conf

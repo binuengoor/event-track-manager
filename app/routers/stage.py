@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends, Request, Response
 
 from app.config import settings, get_setting
 from app.services.stage_service import stage_service
-from app.services.audio_service import audio_service, sanitize_filename
+from app.services.audio_service import audio_service
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.routers.auth import verify_admin_pin, is_admin
@@ -17,7 +17,9 @@ from app.schemas import (
     ReorderRequest,
 )
 
-from app.services.google_service import google_service, PerformanceEntry
+from app.services.event_service import event_service
+from app.services.export_service import export_service
+from app.schemas import PerformanceEntry
 
 logger = logging.getLogger("stage-router")
 
@@ -29,6 +31,13 @@ def require_console_enabled(_authorized: bool = Depends(verify_admin_pin)) -> bo
     if not bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))):
         raise HTTPException(status_code=403, detail="The sound console is disabled for this event.")
     return True
+
+
+def _run_or_404(fn, *args):
+    try:
+        return fn(*args)
+    except ValueError as ex:
+        raise HTTPException(status_code=404, detail=str(ex))
 
 
 @router.get("/api/live-status")
@@ -66,100 +75,78 @@ def get_live_status(request: Request):
 
 @router.post("/api/set-active/{entry_id}")
 def set_active_performance(entry_id: str, _authorized: bool = Depends(require_console_enabled)):
-    google_service.set_active_performance(entry_id)
+    _run_or_404(event_service.set_active_performance, entry_id)
     return {"status": "success", "active_entry_id": entry_id}
 
 
 @router.post("/api/clear-active")
 def clear_active_performance(_authorized: bool = Depends(require_console_enabled)):
-    google_service.clear_active_performance()
+    event_service.clear_active_performance()
     return {"status": "success", "message": "Performance uncued and returned to queue"}
 
 
 @router.get("/api/track-info/{entry_id}")
 def get_track_info(entry_id: str):
-    performances = google_service.get_performances()
-    target = next((p for p in performances if p.entry_id == entry_id), None)
+    target = db_service.get_performance(entry_id)
     if not target:
         raise HTTPException(status_code=404, detail="Performance entry not found")
 
-    safe_performer = sanitize_filename(target.performer_name)
-    safe_song = sanitize_filename(target.song_title)
-    seq = target.sequence_order
-    seq_prefix = f"{seq:02d}_" if seq else ""
-    canonical_filename = target.drive_file_name or f"{seq_prefix}{entry_id}_{safe_performer}_{safe_song}.mp3"
-
-    meta = audio_service.get_track_metadata(entry_id, target.drive_file_id, canonical_filename)
+    meta = audio_service.get_track_metadata(entry_id)
     meta["entry_id"] = entry_id
-    meta["performer_name"] = target.performer_name
-    meta["song_title"] = target.song_title
-    meta["last_updated"] = target.last_updated
+    meta["performer_name"] = target.get("performer_name")
+    meta["song_title"] = target.get("song_title")
+    meta["last_updated"] = target.get("last_updated")
     return meta
 
 
 @router.get("/api/performances", response_model=List[PerformanceEntry])
 def list_performances(request: Request):
     try:
-        entries = google_service.get_performances()
+        entries = event_service.get_performances()
         return entries if is_admin(request) else strip_private(entries)
     except Exception as e:
         logger.exception("Failed to fetch performances: %s", e)
-        raise HTTPException(status_code=500, detail="Failed to read performances from Google Sheet")
+        raise HTTPException(status_code=500, detail="Failed to read performances")
 
 
 @router.post("/api/sync")
 def sync_data(_authorized: bool = Depends(verify_admin_pin)):
-    """One-way sync: Exports App DB (the source of truth) directly into Google Sheet."""
+    """Writes signups.xlsx/csv and a database snapshot into the event folder (the database stays the source of truth)."""
     try:
-        performances = db_service.get_all_performances()
-        food_items = db_service.get_all_food_items_with_signups()
-        
-        target_sheet_id = settings.google.sheet_id
-        folder_id = (
-            settings.backup.drive_folder_id
-            or getattr(settings.google.drive_folders, "archive_folder_id", "")
-            or getattr(settings.google.drive_folders, "active_folder_id", "")
-        )
-        event_id = get_setting("event_id", settings.event.id)
-        sheet_title = f"{event_id}_sync"
-
-        res = google_service.create_or_update_backup_sheet(
-            folder_id=folder_id,
-            title=sheet_title,
-            performances=performances,
-            food_items=food_items,
-            target_sheet_id=target_sheet_id
-        )
+        event_service.reconcile_tracks(force=True)
+        res = export_service.export_now(snapshot=True, force_snapshot=True)
         db_service.set_last_sync_time()
         return {
             "status": "success",
-            "count": len(performances),
-            "food_count": len(food_items),
-            "sheet_title": sheet_title,
-            "target_sheet_id": target_sheet_id,
-            "file_id": res.get("file_id")
+            "count": res["performances"],
+            "food_count": res["potluck_items"],
+            "files": res["files"],
+            "snapshot": res["snapshot"],
+            "event_dir": res["event_dir"],
         }
     except Exception as e:
-        logger.exception("Failed to sync data to Google Sheet: %s", e)
+        logger.exception("Failed to export event data: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/api/stage-queue", response_model=List[PerformanceEntry])
 def stage_queue(request: Request):
     try:
-        entries = google_service.get_stage_queue()
+        entries = event_service.get_stage_queue()
         return entries if is_admin(request) else strip_private(entries)
     except Exception as e:
         logger.exception("Failed to fetch stage queue: %s", e)
-        raise HTTPException(status_code=500, detail="Failed to read queue from Google Sheet")
+        raise HTTPException(status_code=500, detail="Failed to read queue")
 
 
 @router.patch("/api/status/{entry_id}")
 def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(require_console_enabled)):
     try:
-        google_service.update_status(entry_id, payload.status)
+        event_service.update_status(entry_id, payload.status)
         backup_service.trigger_backup()
         return {"status": "success", "entry_id": entry_id, "new_status": payload.status}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.exception("Failed to update status for %s: %s", entry_id, e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -179,9 +166,9 @@ def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _a
 @router.post("/api/reorder-queue")
 def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(require_console_enabled)):
     try:
-        updated = google_service.update_sequence_orders(
+        updated = event_service.update_sequence_orders(
             [i.model_dump() for i in payload.items],
-            push_to_sheet=payload.push_to_sheet
+            push=payload.push_to_sheet
         )
         backup_service.trigger_backup()
         return {
@@ -198,7 +185,7 @@ def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(require_c
 @router.post("/api/push-sequence")
 def push_sequence(_authorized: bool = Depends(require_console_enabled)):
     try:
-        updated = google_service.sync_sequence_to_google()
+        updated = event_service.sync_sequence()
         backup_service.trigger_backup()
         return {
             "status": "success",
@@ -206,5 +193,5 @@ def push_sequence(_authorized: bool = Depends(require_console_enabled)):
             "last_synced_at": db_service.get_last_sync_time()
         }
     except Exception as e:
-        logger.exception("Failed to push sequence to Google Sheet: %s", e)
+        logger.exception("Failed to save sequence: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

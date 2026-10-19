@@ -7,8 +7,8 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from app.services.google_service import google_service
-from app.services.audio_service import audio_service, sanitize_filename
+from app.services.event_service import event_service
+from app.services.audio_service import audio_service
 from app.services.audio_workflow_service import audio_workflow_service
 from app.services.db_service import db_service
 from app.routers.auth import verify_admin_pin
@@ -59,20 +59,10 @@ async def upload_track(
 
 @router.get("/api/stream/{entry_id}")
 async def stream_audio(entry_id: str, request: Request, range: Optional[str] = Header(None)):
-    performances = google_service.get_performances()
-    target = next((p for p in performances if p.entry_id == entry_id), None)
-    drive_file_id = None
-    if target:
-        drive_file_id = target.drive_file_id
-    else:
-        # Check SQLite DB as fallback
-        db_perfs = db_service.get_all_performances()
-        db_target = next((p for p in db_perfs if p["entry_id"] == entry_id), None)
-        if not db_target:
-            raise HTTPException(status_code=404, detail="Performance entry not found")
-        drive_file_id = db_target.get("drive_file_id")
+    if not db_service.get_performance(entry_id):
+        raise HTTPException(status_code=404, detail="Performance entry not found")
 
-    cache_path = audio_service.ensure_local_cache(entry_id, drive_file_id)
+    cache_path = audio_service.get_track_path(entry_id)
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio/video track available for this performance")
 
@@ -123,24 +113,14 @@ async def export_offline_zip(_authorized: bool = Depends(verify_admin_pin)):
 
 @router.get("/api/download-track/{entry_id}")
 async def download_track(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
-    performances = google_service.get_performances()
-    target = next((p for p in performances if p.entry_id == entry_id), None)
+    target = db_service.get_performance(entry_id)
     if not target:
         raise HTTPException(status_code=404, detail="Performance entry not found")
 
-    cache_path = audio_service.ensure_local_cache(entry_id, target.drive_file_id)
+    cache_path = audio_service.get_track_path(entry_id)
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio/video track file available")
 
-    safe_p = sanitize_filename(target.performer_name)
-    safe_s = sanitize_filename(target.song_title)
     ext = os.path.splitext(cache_path)[1] or ".mp3"
-    seq_str = f"{target.sequence_order:02d}_" if target.sequence_order else ""
-    canonical_filename = f"{seq_str}{entry_id}_{safe_p}_{safe_s}{ext}"
     media_type = "video/mp4" if ext.lower() == ".mp4" else "audio/mpeg"
-
-    return FileResponse(
-        cache_path,
-        media_type=media_type,
-        filename=canonical_filename
-    )
+    return FileResponse(cache_path, media_type=media_type, filename=os.path.basename(cache_path))

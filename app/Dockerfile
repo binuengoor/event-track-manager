@@ -27,8 +27,8 @@ COPY app app
 COPY config.yaml .
 
 RUN useradd -r -u 1000 -s /bin/false appuser && \
-    mkdir -p /data/cache /db /app/data && \
-    chown -R appuser:appuser /app /data /db
+    mkdir -p /data/cache /events /app/data && \
+    chown -R appuser:appuser /app /data /events
 
 USER appuser
 

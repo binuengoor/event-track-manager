@@ -5,36 +5,6 @@ import yaml
 from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 
-def extract_google_id(url_or_id: Optional[str]) -> str:
-    """Extracts a Google Sheet/Drive folder ID from a URL or returns raw ID."""
-    if not url_or_id:
-        return ""
-    val = str(url_or_id).strip()
-    
-    # Match /spreadsheets/d/([a-zA-Z0-9_-]+)
-    m_sheet = re.search(r'/spreadsheets/d/([a-zA-Z0-9_-]+)', val)
-    if m_sheet:
-        return m_sheet.group(1)
-        
-    # Match /folders/([a-zA-Z0-9_-]+)
-    m_folder = re.search(r'/folders/([a-zA-Z0-9_-]+)', val)
-    if m_folder:
-        return m_folder.group(1)
-        
-    # Match id=([a-zA-Z0-9_-]+)
-    m_param = re.search(r'[?&]id=([a-zA-Z0-9_-]+)', val)
-    if m_param:
-        return m_param.group(1)
-        
-    # Match /file/d/([a-zA-Z0-9_-]+)
-    m_file = re.search(r'/file/d/([a-zA-Z0-9_-]+)', val)
-    if m_file:
-        return m_file.group(1)
-        
-    # Raw ID fallback
-    clean = val.split('?')[0].split('#')[0].strip('/')
-    return clean
-
 def load_dotenv_file(filepath: str = ".env") -> None:
     """Simple, zero-dependency .env loader that populates os.environ."""
     if not os.path.isfile(filepath):
@@ -109,18 +79,6 @@ class EventConfig(BaseModel):
     payment_url: Optional[str] = None
     signup_sheet_url: Optional[str] = None
 
-class DriveFoldersConfig(BaseModel):
-    active_folder_id: str = "1FQ1goCkaSajLjGv8Yt_vrWTS6krmZufW"
-    archive_folder_id: str = "1T6zqI02lKQfLfqpPRjQOhn561uUEKDil"
-
-class GoogleConfig(BaseModel):
-    service_account_json_path: str = "./secrets/credentials.json"
-    service_account_json: Optional[str] = None
-    sheet_id: str = "1bRvoj4ZlAmSRz972uhTDMfXlYgksH-BOH-zmygp5YRQ"
-    sheet_tab_name: str = "Song Sign-Up"
-    sheet_range: str = "Song Sign-Up!A2:O"
-    drive_folders: DriveFoldersConfig = Field(default_factory=DriveFoldersConfig)
-
 class ColumnNamesConfig(BaseModel):
     entry_id: str = "Entry ID"
     performer_name: str = "Performer Name"
@@ -137,27 +95,15 @@ class ColumnNamesConfig(BaseModel):
     drive_file_id: str = "Drive File ID"
     last_updated: str = "Last Updated"
 
-class ColumnsConfig(BaseModel):
-    entry_id: int = -1
-    performer_name: int = 0
-    age_group: int = 1
-    performance_type: int = 2
-    partner_name: int = 3
-    contact_info: int = 4
-    song_title: int = 5
-    sequence_order: int = 6
-    performance_status: int = 7
-    track_status: int = 8
-    duration: int = 9
-    movie_name: int = -1
-    drive_file_id: int = 10
-    last_updated: int = 11
-
 class StorageConfig(BaseModel):
+    # The event folder is the single place everything lives:
+    #   <event_dir>/event.db, signups.xlsx, signups.csv, tracks/, incoming/, backups/, gallery/
+    events_dir: str = ""
+    event_dir: str = ""
+    tracks_dir: str = ""
+    # Scratch space for transcoding and the downloader hand-off (safe to delete).
     cache_dir: str = "/data/cache"
-    gallery_dir: str = "/data/gallery"
-    # SQLite lives outside the served /data tree and outside the evictable audio cache.
-    db_dir: str = ""
+    gallery_dir: str = ""
     max_upload_size_mb: int = 100
 
 class DownloaderConfig(BaseModel):
@@ -194,14 +140,12 @@ class FoodItemSeed(BaseModel):
 
 class BackupConfig(BaseModel):
     enabled: bool = True
-    drive_folder_id: str = ""
+    keep_snapshots: int = 30
     debounce_seconds: int = 10
 
 class AppConfig(BaseModel):
     event: EventConfig = Field(default_factory=EventConfig)
-    google: GoogleConfig = Field(default_factory=GoogleConfig)
     column_names: ColumnNamesConfig = Field(default_factory=ColumnNamesConfig)
-    columns: ColumnsConfig = Field(default_factory=ColumnsConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     downloader: DownloaderConfig = Field(default_factory=DownloaderConfig)
     signup: SignupConfig = Field(default_factory=SignupConfig)
@@ -213,7 +157,6 @@ class AppConfig(BaseModel):
     entry_id_prefix: str = "PK"
 
     admin_pin: str = "2026"
-    mock_google_api: bool = False
 
 def load_config() -> AppConfig:
     config_file = os.getenv("CONFIG_PATH", "config.yaml")
@@ -268,44 +211,6 @@ def load_config() -> AppConfig:
     elif os.getenv("SIGNUP_SHEET_URL"):
         config.event.signup_sheet_url = os.getenv("SIGNUP_SHEET_URL")
 
-    # 2. Google Workspace & Drive URLs / IDs
-    sheet_url_env = os.getenv("GOOGLE_SHEET_URL") or os.getenv("SHEET_ID")
-    if sheet_url_env:
-        extracted = extract_google_id(sheet_url_env)
-        if extracted:
-            config.google.sheet_id = extracted
-
-    tab_name_env = os.getenv("SHEET_TAB_NAME")
-    if tab_name_env:
-        config.google.sheet_tab_name = tab_name_env
-        config.google.sheet_range = f"{tab_name_env}!A2:O"
-
-    active_folder_env = os.getenv("GOOGLE_DRIVE_ACTIVE_FOLDER") or os.getenv("ACTIVE_FOLDER_ID")
-    if active_folder_env:
-        extracted = extract_google_id(active_folder_env)
-        if extracted:
-            config.google.drive_folders.active_folder_id = extracted
-
-    archive_folder_env = os.getenv("GOOGLE_DRIVE_ARCHIVE_FOLDER") or os.getenv("ARCHIVE_FOLDER_ID")
-    if archive_folder_env:
-        extracted = extract_google_id(archive_folder_env)
-        if extracted:
-            config.google.drive_folders.archive_folder_id = extracted
-
-    # Service account credentials
-    creds_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON_PATH") or os.getenv("GOOGLE_CREDENTIALS_PATH")
-    if creds_path:
-        if not os.path.isfile(creds_path) and os.path.isfile("/secrets/credentials.json"):
-            config.google.service_account_json_path = "/secrets/credentials.json"
-        elif not os.path.isfile(creds_path) and os.path.isfile(os.path.join(os.getcwd(), "secrets", "credentials.json")):
-            config.google.service_account_json_path = os.path.join(os.getcwd(), "secrets", "credentials.json")
-        else:
-            config.google.service_account_json_path = creds_path
-
-    raw_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    if raw_json:
-        config.google.service_account_json = raw_json
-
     # 3. Dynamic Column Names
     col_mapping = {
         "COL_PERFORMER_NAME": "performer_name",
@@ -346,12 +251,6 @@ def load_config() -> AppConfig:
         except ValueError:
             pass
 
-    mock_env = os.getenv("MOCK_GOOGLE_API", "").lower()
-    if mock_env in ("true", "1", "yes"):
-        config.mock_google_api = True
-    elif not config.google.service_account_json and not os.path.isfile(config.google.service_account_json_path):
-        config.mock_google_api = True
-
     if os.getenv("DOWNLOADER_SERVICE_URL"):
         config.downloader.service_url = os.getenv("DOWNLOADER_SERVICE_URL")
 
@@ -362,12 +261,6 @@ def load_config() -> AppConfig:
     if os.getenv("BACKUP_ENABLED"):
         b_val = os.getenv("BACKUP_ENABLED", "").lower()
         config.backup.enabled = b_val in ("true", "1", "yes")
-
-    backup_folder_env = os.getenv("BACKUP_DRIVE_FOLDER") or os.getenv("BACKUP_FOLDER_ID")
-    if backup_folder_env:
-        extracted = extract_google_id(backup_folder_env)
-        if extracted:
-            config.backup.drive_folder_id = extracted
 
     if os.getenv("BACKUP_DEBOUNCE_SECONDS"):
         try:
@@ -387,38 +280,37 @@ def load_config() -> AppConfig:
         config.signup.food_serving_note = os.getenv("FOOD_SERVING_NOTE")
 
     is_docker = os.getenv("RUNTIME_ENV") == "docker" or os.path.exists("/.dockerenv")
+
+    # Event folder: EVENT_DIR (explicit) or EVENTS_DIR/<event id>
+    safe_event_id = re.sub(r"[^A-Za-z0-9._-]", "_", (config.event.id or "event").strip()) or "event"
+    if os.getenv("EVENT_DIR"):
+        config.storage.event_dir = os.getenv("EVENT_DIR")
+    else:
+        events_root = os.getenv("EVENTS_DIR") or ("/events" if is_docker else "./events")
+        config.storage.events_dir = events_root
+        config.storage.event_dir = os.path.join(events_root, safe_event_id)
+    config.storage.tracks_dir = os.getenv("TRACKS_DIR") or os.path.join(config.storage.event_dir, "tracks")
+    config.storage.gallery_dir = os.getenv("GALLERY_DIR") or os.path.join(config.storage.event_dir, "gallery")
+
     if os.getenv("CACHE_DIR"):
         config.storage.cache_dir = os.getenv("CACHE_DIR")
     elif not is_docker and config.storage.cache_dir.startswith("/data"):
         config.storage.cache_dir = "./data/cache"
 
-    if os.getenv("DB_DIR"):
-        config.storage.db_dir = os.getenv("DB_DIR")
-    elif not config.storage.db_dir:
-        config.storage.db_dir = "/db" if is_docker else "./data/db"
+    def _make(path_attr: str, fallback: str):
+        path = getattr(config.storage, path_attr)
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError:
+            setattr(config.storage, path_attr, fallback)
+            os.makedirs(fallback, exist_ok=True)
 
-    if os.getenv("GALLERY_DIR"):
-        config.storage.gallery_dir = os.getenv("GALLERY_DIR")
-    elif not is_docker and config.storage.gallery_dir.startswith("/data"):
-        config.storage.gallery_dir = "./data/gallery"
-
-    try:
-        os.makedirs(config.storage.cache_dir, exist_ok=True)
-    except OSError:
-        config.storage.cache_dir = "./data/cache"
-        os.makedirs(config.storage.cache_dir, exist_ok=True)
-
-    try:
-        os.makedirs(config.storage.db_dir, exist_ok=True)
-    except OSError:
-        config.storage.db_dir = "./data/db"
-        os.makedirs(config.storage.db_dir, exist_ok=True)
-
-    try:
-        os.makedirs(config.storage.gallery_dir, exist_ok=True)
-    except OSError:
-        config.storage.gallery_dir = "./data/gallery"
-        os.makedirs(config.storage.gallery_dir, exist_ok=True)
+    _make("event_dir", "./events/" + safe_event_id)
+    for sub, attr in (("tracks", "tracks_dir"), ("gallery", "gallery_dir")):
+        _make(attr, os.path.join(config.storage.event_dir, sub))
+    for sub in ("incoming", "backups"):
+        os.makedirs(os.path.join(config.storage.event_dir, sub), exist_ok=True)
+    _make("cache_dir", "./data/cache")
 
     return config
 

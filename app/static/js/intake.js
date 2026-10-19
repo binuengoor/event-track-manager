@@ -4,7 +4,7 @@ let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
 let currentMediaType = 'audio'; // 'audio' or 'video'
-let sheetUrl = 'https://docs.google.com/spreadsheets/d/1OB0F_qM7FRvivZfp6u3qrqKCjBCpCZiPDr_CMr-posk/edit';
+let sheetUrl = '';
 let maxUploadSizeMb = 100;
 let performerFoodSignup = null;
 let allFoodGroups = [];
@@ -92,9 +92,6 @@ async function initEventInfo() {
         window.adaptNavigationForEventConfig(data);
       }
 
-      if (data.mock_mode) {
-        document.getElementById('mock-banner').classList.remove('hidden');
-      }
       if (data.sheet_url) {
         sheetUrl = data.sheet_url;
       }
@@ -1400,7 +1397,7 @@ function updateSubmitButtonText() {
   } else {
     submitText.textContent = isReplacing
       ? (isVideo ? 'Replace with New Video Track' : 'Replace Existing Track')
-      : (isVideo ? 'Upload Video Track to Google Drive' : 'Upload Track to Google Drive');
+      : (isVideo ? 'Upload Video Track' : 'Upload Track');
   }
   if (window.lucide) lucide.createIcons();
 }

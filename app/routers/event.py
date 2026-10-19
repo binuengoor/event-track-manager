@@ -11,7 +11,7 @@ router = APIRouter(tags=["event"])
 
 @router.get("/api/event-info")
 def get_event_info():
-    sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or f"https://docs.google.com/spreadsheets/d/{settings.google.sheet_id}/edit"
+    sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or ""
     payment_url = get_setting("payment_url") or settings.event.payment_url
     poster_url = get_setting("event_poster_url") or settings.event.poster_url
     header_brand_title = get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "EMA Paattukoottam")
@@ -55,7 +55,6 @@ def get_event_info():
         "live_display_enabled": bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True))),
         "dashboard_enabled": bool(get_setting("dashboard_enabled", getattr(settings.signup, "dashboard_enabled", True))),
         "console_enabled": bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))),
-        "mock_mode": settings.mock_google_api,
         "max_upload_size_mb": settings.storage.max_upload_size_mb,
         "sheet_url": sheet_url
     }
@@ -67,6 +66,5 @@ async def health():
     return {
         "status": "healthy",
         "app": "event-track-manager",
-        "mock_mode": settings.mock_google_api,
         "downloader": downloader_status
     }

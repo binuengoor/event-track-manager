@@ -1,4 +1,5 @@
 services:
+  # 1. Main web application. All event data lives in ./events/<EVENT_ID>/ (database, signups.xlsx, tracks/, backups/)
   app:
     build:
       context: .
@@ -11,23 +12,21 @@ services:
     ports:
       - "${PORT:-8088}:8000"
     environment:
+      - RUNTIME_ENV=docker
       - CONFIG_PATH=/app/config.yaml
       - ADMIN_PIN=${ADMIN_PIN:-2026}
+      - EVENTS_DIR=/events
       - DOWNLOADER_SERVICE_URL=http://downloader:8001
       - CACHE_DIR=/data/cache
-      - DB_DIR=/db
-      - GOOGLE_CREDENTIALS_PATH=/secrets/credentials.json
-      - MOCK_GOOGLE_API=${MOCK_GOOGLE_API:-false}
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./secrets:/secrets:ro
-      - ./data:/data
+      - ./events:/events
       - ./app:/app/app:ro
       - audio_cache:/data/cache
-      - app_db:/db
     depends_on:
       - downloader
 
+  # 2. YouTube/SoundCloud extractor (yt-dlp + ffmpeg). Hands finished files to the app through the scratch volume.
   downloader:
     build:
       context: ./downloader
@@ -35,14 +34,32 @@ services:
     container_name: event_track_manager_downloader
     restart: unless-stopped
     environment:
+      - RUNTIME_ENV=docker
       - CACHE_DIR=/data/cache
       - COOKIES_PATH=/secrets/yt_cookies.txt
     volumes:
       - ./secrets:/secrets:ro
       - audio_cache:/data/cache
 
+  # 3. Optional cloud sync sidecar (Google Drive, S3, NAS, ...). Start with: docker compose --profile sync up -d
+  rclone-sync:
+    image: rclone/rclone:1
+    container_name: event_track_manager_rclone
+    profiles: ["sync"]
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/sync.sh"]
+    environment:
+      - EVENTS_DIR=/events
+      - EVENT_ID=${EVENT_ID:-paattukoottam-2026}
+      - RCLONE_REMOTE=${RCLONE_REMOTE:-}
+      - RCLONE_TRASH=${RCLONE_TRASH:-}
+      - SYNC_INTERVAL=${SYNC_INTERVAL:-30}
+      - RCLONE_CONFIG=/config/rclone/rclone.conf
+    volumes:
+      - ./events:/events
+      - ./rclone:/config/rclone
+      - ./rclone/sync.sh:/sync.sh:ro
+
 volumes:
   audio_cache:
-    driver: local
-  app_db:
     driver: local

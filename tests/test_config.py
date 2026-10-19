@@ -1,16 +1,14 @@
+import os
 import pytest
 from app.config import load_config
 
 def test_load_default_config():
     cfg = load_config()
     assert cfg.event.id is not None
-    assert cfg.columns.entry_id == -1  # auto-generated
-    assert cfg.columns.performer_name == 0
-    assert cfg.columns.song_title == 8
-    assert cfg.columns.sequence_order == 6
-    assert cfg.columns.track_status == 11
-    assert cfg.columns.drive_file_id == 13
-    import os
+    # Everything lives in one event folder: database, exports, tracks, backups, gallery
+    assert cfg.storage.event_dir.endswith(cfg.event.id)
+    assert cfg.storage.tracks_dir == os.path.join(cfg.storage.event_dir, "tracks")
+    assert cfg.storage.gallery_dir == os.path.join(cfg.storage.event_dir, "gallery")
     expected_upload_mb = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
     assert cfg.storage.max_upload_size_mb == expected_upload_mb
 

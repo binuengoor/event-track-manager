@@ -10,15 +10,19 @@ def isolate_test_db(tmp_path, monkeypatch):
     Ensures every test runs against a clean, isolated SQLite database in a temp directory,
     preventing any test pollution from touching production or host databases.
     """
-    test_db_dir = tmp_path / "test_cache"
-    test_db_dir.mkdir(parents=True, exist_ok=True)
-    test_db_file = test_db_dir / "event_data.db"
-    
     # Isolate storage settings
-    monkeypatch.setattr(settings.storage, "cache_dir", str(test_db_dir))
-    monkeypatch.setattr(settings.storage, "db_dir", str(test_db_dir))
+    event_dir = tmp_path / "event"
+    for sub in ("tracks", "incoming", "backups", "gallery", "scratch"):
+        (event_dir / sub).mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(settings.storage, "cache_dir", str(event_dir / "scratch"))
+    monkeypatch.setattr(settings.storage, "event_dir", str(event_dir))
+    monkeypatch.setattr(settings.storage, "tracks_dir", str(event_dir / "tracks"))
+    monkeypatch.setattr(settings.storage, "gallery_dir", str(event_dir / "gallery"))
+    from app.services.audio_service import audio_service
+    monkeypatch.setattr(audio_service, "cache_dir", str(event_dir / "scratch"))
     
-    # Re-point db_service to test db
+    # Re-point db_service to the test event folder's database (same file the default manager resolves to)
+    test_db_file = event_dir / "event.db"
     original_db_path = db_service._db_path
     db_service._db_path = str(test_db_file)
     db_service._ensure_db()
@@ -26,13 +30,6 @@ def isolate_test_db(tmp_path, monkeypatch):
     from app.events.listeners import register_default_listeners
     register_default_listeners()
 
-    # Ensure google_service mock_mode is enabled for isolated tests
-    from app.services.google_service import google_service
-    original_mock_mode = google_service.mock_mode
-    google_service.mock_mode = True
-    if not google_service._mock_data:
-        google_service._init_mock_data()
-    
     # Failed-login throttling is process-global; start every test with a clean slate.
     from app.routers.auth import failure_limiter
     failure_limiter.reset()
@@ -41,4 +38,3 @@ def isolate_test_db(tmp_path, monkeypatch):
     
     # Restore original states
     db_service._db_path = original_db_path
-    google_service.mock_mode = original_mock_mode

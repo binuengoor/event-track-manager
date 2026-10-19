@@ -228,15 +228,15 @@
       </div>
     </div>
 
-    <!-- Unsynced Staged Changes Banner (Shows when local order is ahead of Google Sheet) -->
+    <!-- Unsynced Staged Changes Banner (Shows when the new order has not been saved to track file names and exports yet) -->
     <div id="unsynced-sequence-banner" class="hidden p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg animate-pulse">
       <div class="flex items-center gap-2">
         <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
-        <span><strong>Stage Sequence Updated Locally:</strong> Your reordered lineup is active in memory but out of sync with Google Sheet.</span>
+        <span><strong>Stage Sequence Updated Locally:</strong> Your new order is live, but track file names and the signup export still show the old order.</span>
       </div>
       <button id="banner-sync-btn" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow transition active:scale-95 flex items-center gap-1">
         <i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i>
-        <span>Sync to Google Sheet & Drive Now</span>
+        <span>Save Order &amp; Rename Tracks</span>
       </button>
     </div>
 
@@ -256,7 +256,7 @@
       <!-- Queue List Container (Draggable) -->
       <div id="queue-container" class="divide-y divide-slate-800/60">
         <div class="p-8 text-center text-slate-500 text-sm">
-          Loading performances from Google Sheet...
+          Loading performances...
         </div>
       </div>
     </div>

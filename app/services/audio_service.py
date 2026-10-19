@@ -10,13 +10,9 @@ from app.exceptions import AudioNotFoundError, InvalidByteRangeError, AudioTrans
 
 from app.config import settings
 from app.services.db_service import db_service
-from app.services.google_service import google_service, PerformanceEntry
+from app.services.track_store import track_store, sanitize_filename, media_type_for
 
 logger = logging.getLogger("audio-service")
-
-def sanitize_filename(text: str) -> str:
-    cleaned = re.sub(r'[^\w\s-]', '', text).strip()
-    return re.sub(r'[-\s]+', '_', cleaned)
 
 import time
 
@@ -263,113 +259,29 @@ class AudioService:
         return False
 
     def purge_cache(self, entry_id: str) -> bool:
+        """Cleans scratch files for an entry and archives its stored track (tracks are never hard-deleted)."""
         safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
-        variations = {
-            f"{safe_id}.mp3",
-            f"{safe_id.replace('-', '_')}.mp3",
-            f"{safe_id.replace('_', '-')}.mp3",
-            f"{safe_id}.mp4",
-            f"{safe_id.replace('-', '_')}.mp4",
-            f"{safe_id.replace('_', '-')}.mp4",
-        }
         purged = False
-        for v in variations:
-            p = os.path.join(self.cache_dir, v)
+        for ext in (".mp3", ".mp4", ".mp3.upload", ".mp4.upload"):
+            p = os.path.join(self.cache_dir, f"{safe_id}{ext}")
             if os.path.isfile(p):
                 try:
                     os.remove(p)
-                    logger.info("Purged local audio/video cache: %s", p)
                     purged = True
                 except Exception as e:
-                    logger.warning("Error purging cache %s: %s", p, e)
-            meta_p = p + ".meta.json"
-            if os.path.isfile(meta_p):
-                try:
-                    os.remove(meta_p)
-                except Exception:
-                    pass
+                    logger.warning("Error removing scratch file %s: %s", p, e)
+        try:
+            purged = bool(track_store.archive_existing(entry_id)) or purged
+        except Exception as e:
+            logger.warning("Error archiving track for %s: %s", entry_id, e)
         return purged
 
-    def ensure_local_cache(self, entry_id: str, drive_file_id: Optional[str] = None) -> Optional[str]:
-        safe_id = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_")).strip()
-        is_mock = settings.mock_google_api or getattr(google_service, "mock_mode", False)
+    def get_track_path(self, entry_id: str) -> Optional[str]:
+        """Absolute path of the entry's track in the event folder, or None."""
+        return track_store.find(entry_id)
 
-        # If no drive_file_id and not mock mode, the file was deleted from Drive: purge cache!
-        if not drive_file_id and not is_mock:
-            self.purge_cache(entry_id)
-            return None
-
-        # Check existing candidates (.mp4 or .mp3)
-        for ext in [".mp4", ".mp3"]:
-            candidate_path = os.path.join(self.cache_dir, f"{safe_id}{ext}")
-            meta_path = candidate_path + ".meta.json"
-            if os.path.isfile(candidate_path) and os.path.getsize(candidate_path) > 0:
-                if drive_file_id and not is_mock:
-                    try:
-                        if os.path.isfile(meta_path):
-                            import json
-                            with open(meta_path, "r") as mf:
-                                cached_meta = json.load(mf)
-                            if cached_meta.get("drive_file_id") == drive_file_id:
-                                return candidate_path
-                        else:
-                            import json
-                            with open(meta_path, "w") as mf:
-                                json.dump({"drive_file_id": drive_file_id}, mf)
-                            return candidate_path
-                    except Exception as ex:
-                        logger.warning("Error checking cache metadata for %s: %s", entry_id, ex)
-                        return candidate_path
-                else:
-                    return candidate_path
-
-        # If mismatch or not found, purge cache before downloading
-        if drive_file_id and not is_mock:
-            self.purge_cache(entry_id)
-
-        # If not cached locally, attempt to download from Google Drive
-        if drive_file_id and not is_mock:
-            logger.info("Cache miss for %s. Downloading from Google Drive (file_id: %s)...", entry_id, drive_file_id)
-            drive_meta = google_service.get_drive_file_metadata(drive_file_id)
-            is_video = False
-            if drive_meta:
-                name = (drive_meta.get("name") or "").lower()
-                mime = (drive_meta.get("mimeType") or "").lower()
-                if name.endswith(".mp4") or "video" in mime:
-                    is_video = True
-
-            ext = ".mp4" if is_video else ".mp3"
-            cache_path = os.path.join(self.cache_dir, f"{safe_id}{ext}")
-            meta_path = cache_path + ".meta.json"
-
-            file_bytes = google_service.download_file_bytes(drive_file_id)
-            if file_bytes:
-                with open(cache_path, "wb") as f:
-                    f.write(file_bytes)
-                try:
-                    import json
-                    with open(meta_path, "w") as mf:
-                        json.dump({"drive_file_id": drive_file_id}, mf)
-                except Exception:
-                    pass
-                logger.info("Cached %d bytes to %s", len(file_bytes), cache_path)
-                return cache_path
-
-        # If in mock mode or file doesn't exist
-        if is_mock:
-            mp4_p = os.path.join(self.cache_dir, f"{safe_id}.mp4")
-            mp3_p = os.path.join(self.cache_dir, f"{safe_id}.mp3")
-            if os.path.isfile(mp4_p) and os.path.getsize(mp4_p) > 0:
-                return mp4_p
-            if os.path.isfile(mp3_p) and os.path.getsize(mp3_p) > 0:
-                return mp3_p
-            self._create_mock_mp3(mp3_p)
-            return mp3_p
-
-        return None
-
-    def get_track_metadata(self, entry_id: str, drive_file_id: Optional[str], canonical_name: str) -> dict:
-        cache_path = self.ensure_local_cache(entry_id, drive_file_id)
+    def get_track_metadata(self, entry_id: str, canonical_name: Optional[str] = None) -> dict:
+        cache_path = self.get_track_path(entry_id)
         if not cache_path or not os.path.isfile(cache_path):
             return {"exists": False}
 
@@ -402,7 +314,7 @@ class AudioService:
 
         return {
             "exists": True,
-            "filename": canonical_name,
+            "filename": os.path.basename(cache_path),
             "media_type": media_type,
             "size_bytes": size_bytes,
             "size_formatted": fmt_size(size_bytes),
@@ -410,20 +322,6 @@ class AudioService:
             "duration_formatted": fmt_duration(duration_sec),
             "stream_url": f"/api/stream/{entry_id}"
         }
-
-    def _create_mock_mp3(self, path: str):
-        # 1-second silent MP3 binary frame for mock mode playback testing
-        silent_mp3_header = bytes([
-            0xFF, 0xFB, 0x90, 0x64, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-        ] * 64)
-        with open(path, "wb") as f:
-            f.write(silent_mp3_header)
-
-    def _create_mock_mp4(self, path: str):
-        # Minimal valid MP4 header for mock testing
-        with open(path, "wb") as f:
-            f.write(b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2mp41\x00\x00\x00\x08free")
 
     def stream_file_range(self, filepath: str, range_header: Optional[str] = None):
         """Streams byte-range requests for a local audio file via streaming utility."""
@@ -433,14 +331,8 @@ class AudioService:
     def generate_sequenced_zip_file(self) -> Tuple[str, str]:
         """Builds offline sequenced ZIP file on disk using tempfile to prevent RAM exhaustion."""
         import tempfile
-        queue = google_service.get_stage_queue()
-        if not queue:
-            db_perfs = db_service.get_all_performances()
-            class SimplePerf:
-                def __init__(self, d):
-                    for k, v in d.items():
-                        setattr(self, k, v)
-            queue = [SimplePerf(p) for p in sorted(db_perfs, key=lambda x: x.get("sequence_order") if x.get("sequence_order") is not None else 9999)]
+        from app.services.event_service import event_service
+        queue = event_service.get_stage_queue()
 
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
         zip_filename = f"Paattukoottam_Stage_Tracks_{timestamp_str}.zip"
@@ -449,8 +341,10 @@ class AudioService:
             tmp_path = tmp.name
 
         with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            from app.config import get_setting
+            event_title = get_setting("header_brand_title") or get_setting("event_name") or settings.event.name
             run_sheet_lines = [
-                "EMA Paattukoottam - Live Stage Show Run Sheet",
+                f"{event_title} - Live Stage Show Run Sheet",
                 f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
                 "=" * 70,
                 f"{'Seq':<5} | {'Performer(s)':<35} | {'Song Title':<30} | {'Type':<8} | {'Status':<10} | Stage Notes",
@@ -474,12 +368,8 @@ class AudioService:
                 line = f"#{seq_num:<4} | {performer_display:<35} | {(getattr(item, 'song_title', '') or '-'):<30} | {perf_type:<8} | {track_status:<10} | {stage_notes}"
                 run_sheet_lines.append(line)
 
-                drive_id = getattr(item, "drive_file_id", None)
-                if track_status in ("Acoustic", "Pending") and not drive_id:
-                    continue
-
                 entry_id = getattr(item, "entry_id", "")
-                cache_file = self.ensure_local_cache(entry_id, drive_id)
+                cache_file = self.get_track_path(entry_id)
                 if cache_file and os.path.isfile(cache_file):
                     ext = os.path.splitext(cache_file)[1] or ".mp3"
                     zip_entry_name = f"{seq_num}_{singer_clean}{partner_suffix}_{song_clean}{ext}"

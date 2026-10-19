@@ -4,7 +4,9 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.audio_service import audio_service
-from app.services.google_service import google_service, PerformanceEntry
+from app.services.db_service import db_service
+from app.services.audio_workflow_service import audio_workflow_service
+from app.services.track_store import track_store
 
 client = TestClient(app)
 
@@ -50,22 +52,17 @@ def test_stage_monitor_routes():
 def test_video_upload_and_stream(tmp_path, monkeypatch):
     monkeypatch.setattr(audio_service, "cache_dir", str(tmp_path))
 
-    # Add a mock performance to google_service
-    test_entry = PerformanceEntry(
-        entry_id="PK-TEST-VIDEO",
-        performer_name="Test Singer",
-        song_title="Test Karaoke Video",
-        performance_type="Solo",
-        track_status="Pending",
-        media_type="audio"
+    entry_id = db_service.create_performance(
+        performer_name="Test Singer", song_title="Test Karaoke Video", performance_type="Solo", contact_info="6105550100"
     )
-    monkeypatch.setattr(google_service, "_mock_data", [test_entry])
+    # Dummy bytes are not a decodable video; bypass only the media probe, not storage or streaming
+    monkeypatch.setattr(audio_workflow_service, "_verify_audio", lambda path: "03:30")
 
     # Upload video file
     video_content = b"\x00\x00\x00\x18ftypisom\x00\x00\x02\x00isomiso2mp41\x00\x00\x00\x08free" + b"A" * 1000
     files = {"file": ("karaoke_lyrics.mp4", io.BytesIO(video_content), "video/mp4")}
     data = {
-        "entry_id": "PK-TEST-VIDEO",
+        "entry_id": entry_id,
         "submission_type": "file",
         "media_type": "video"
     }
@@ -76,15 +73,18 @@ def test_video_upload_and_stream(tmp_path, monkeypatch):
     assert body["status"] == "success"
     assert body["media_type"] == "video"
     assert body["filename"].endswith(".mp4")
+    # the file is stored in the event folder's tracks/ directory, matched by entry id
+    assert track_store.find(entry_id) is not None
+    assert os.path.dirname(track_store.find(entry_id)) == track_store.tracks_dir
 
     # Stream video and verify Content-Type: video/mp4 and range support
-    stream_res = client.get("/api/stream/PK-TEST-VIDEO")
+    stream_res = client.get(f"/api/stream/{entry_id}")
     assert stream_res.status_code == 200
     assert "video/mp4" in stream_res.headers["content-type"]
     assert "Accept-Ranges" in stream_res.headers
 
     # HTTP 206 Partial Content range request
-    range_res = client.get("/api/stream/PK-TEST-VIDEO", headers={"Range": "bytes=0-100"})
+    range_res = client.get(f"/api/stream/{entry_id}", headers={"Range": "bytes=0-100"})
     assert range_res.status_code == 206
     assert "video/mp4" in range_res.headers["content-type"]
     assert range_res.headers["Content-Length"] == "101"
@@ -96,14 +96,7 @@ async def test_video_upload_size_limit(monkeypatch):
     from app.services.audio_workflow_service import audio_workflow_service
     from app.exceptions import FileTooLargeError
 
-    test_entry = PerformanceEntry(
-        entry_id="PK-SIZE-TEST",
-        performer_name="Test Singer",
-        song_title="Test Song",
-        performance_type="Solo",
-        track_status="Pending"
-    )
-    monkeypatch.setattr(google_service, "_mock_data", [test_entry])
+    size_entry = db_service.create_performance(performer_name="Test Singer", song_title="Test Song", performance_type="Solo")
 
     class FakeLargeBytes:
         def __len__(self):
@@ -111,7 +104,7 @@ async def test_video_upload_size_limit(monkeypatch):
 
     with pytest.raises(FileTooLargeError) as exc_info:
         await audio_workflow_service.process_track_upload(
-            entry_id="PK-SIZE-TEST",
+            entry_id=size_entry,
             submission_type="file",
             media_type="video",
             file_content=FakeLargeBytes()

@@ -8,7 +8,7 @@ logger = logging.getLogger("event-listeners")
 
 
 def on_data_mutated(event: Event):
-    """Triggers debounced Google Sheets backup when data is mutated."""
+    """Triggers the debounced export (signups.xlsx/csv + snapshot) when data is mutated."""
     try:
         backup_service.trigger_backup()
     except Exception as ex:

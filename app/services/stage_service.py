@@ -42,7 +42,7 @@ class StageService:
             return True
         if "group" in ptype and "karaoke" not in ptype:
             return True
-        # Backing track uploaded or present in active Drive
+        # Backing track present in the event folder
         track_status = getattr(p, "track_status", None)
         drive_file_id = getattr(p, "drive_file_id", None)
         if track_status == "Uploaded" or bool(drive_file_id):
@@ -51,32 +51,10 @@ class StageService:
 
     def get_live_status(self) -> Dict[str, Any]:
         """Calculates stage breakdown (now performing, up next, upcoming, done, hold) for /live."""
-        from app.services.google_service import google_service
+        from app.services.event_service import event_service
 
         last_sync = db_service.get_last_sync_time()
-
-        # Background sync for live view if cache is stale (> 30 seconds)
-        if not google_service.mock_mode:
-            should_sync = False
-            if not last_sync:
-                should_sync = True
-            else:
-                try:
-                    dt = datetime.fromisoformat(last_sync)
-                    diff = (datetime.now(timezone.utc) - dt).total_seconds()
-                    if diff > 30:
-                        should_sync = True
-                except Exception:
-                    pass
-
-            if should_sync:
-                try:
-                    google_service.get_performances(force_sync=True)
-                    last_sync = db_service.get_last_sync_time()
-                except Exception as ex:
-                    logger.warning("Background live sync failed: %s", ex)
-
-        queue = google_service.get_stage_queue()
+        queue = event_service.get_stage_queue()
         now_performing = None
         up_next = []
         upcoming = []
