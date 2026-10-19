@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from app.config import settings, get_setting
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
+from app.privacy import strip_private
+from app.utils.name_matcher import split_signer_names
 from app.schemas import (
     AddPerformanceRequest,
     PerformerRenameRequest,
@@ -24,10 +26,13 @@ async def get_performer_profile(name: str):
         raise HTTPException(status_code=400, detail="Name parameter is required.")
 
     all_perfs = db_service.get_all_performances()
+    # Exact (case-insensitive) match only: substring matching let anyone enumerate every performer.
+    wanted = clean_name.lower()
     user_perfs = [
         p for p in all_perfs
-        if clean_name.lower() in p.get("performer_name", "").lower()
-        or clean_name.lower() in (p.get("partner_name") or "").lower()
+        if wanted == (p.get("performer_name") or "").strip().lower()
+        or wanted in [t.lower() for t in split_signer_names(p.get("partner_name"))]
+        or wanted == (p.get("partner_name") or "").strip().lower()
     ]
 
     food_signup = db_service.get_food_signup_for_signer(clean_name)
@@ -66,7 +71,7 @@ async def get_performer_profile(name: str):
             for p in all_perfs if p["entry_id"] not in user_ids and not is_placeholder_song_title(p.get("song_title"))
         ]
 
-    return {
+    return strip_private({
         "performer_name": clean_name,
         "performances": effective_perfs,
         "food_signup": food_signup,
@@ -79,7 +84,7 @@ async def get_performer_profile(name: str):
         "allow_duets": allow_duets,
         "all_food_items": all_food_items,
         "other_songs": other_songs
-    }
+    })
 
 
 @router.get("/api/performer/names")

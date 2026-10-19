@@ -427,7 +427,7 @@ function renderFoodGroups(groups, allItems) {
     header.innerHTML = `
       <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
         <i data-lucide="utensils" class="w-3.5 h-3.5"></i>
-        <span>${group.name}</span>
+        <span>${escapeHtml(group.name)}</span>
       </h4>
       <span class="text-[11px] font-semibold text-slate-400">
         ${group.taken_count || 0}/${groupItems.length} taken
@@ -445,18 +445,18 @@ function renderFoodGroups(groups, allItems) {
         itemRow.innerHTML = `
           <div class="flex items-center gap-2">
             <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-            <span class="font-medium">${item.name}</span>
+            <span class="font-medium">${escapeHtml(item.name)}</span>
           </div>
           <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            Taken (${item.signer_name || "Signed Up"})
+            Taken (${escapeHtml(item.signer_name || "Signed Up")})
           </span>
         `;
       } else {
         itemRow.className = "flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-emerald-500/60 cursor-pointer transition text-xs text-slate-200";
         itemRow.innerHTML = `
           <div class="flex items-center gap-2">
-            <input type="radio" name="food_item_id" value="${item.item_id}" data-name="${item.name}" class="text-emerald-500 focus:ring-emerald-500">
-            <span class="font-medium text-white">${item.name}</span>
+            <input type="radio" name="food_item_id" value="${escapeQuotes(item.item_id)}" data-name="${escapeQuotes(item.name)}" class="text-emerald-500 focus:ring-emerald-500">
+            <span class="font-medium text-white">${escapeHtml(item.name)}</span>
           </div>
           <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             OPEN
@@ -1112,7 +1112,7 @@ function showSuccessModal(response, request) {
 
   request.performances.forEach((p, idx) => {
     detailsHtml += `
-      <p class="text-[11px] text-slate-400 pl-2">&bull; Act ${idx + 1}: ${p.performance_type} ${p.song_title ? `— "${p.song_title}"` : "(Song name TBD)"}</p>
+      <p class="text-[11px] text-slate-400 pl-2">&bull; Act ${idx + 1}: ${escapeHtml(p.performance_type)} ${p.song_title ? `— "${escapeHtml(p.song_title)}"` : "(Song name TBD)"}</p>
     `;
   });
 

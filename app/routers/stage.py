@@ -9,7 +9,8 @@ from app.services.stage_service import stage_service
 from app.services.audio_service import audio_service, sanitize_filename
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
-from app.routers.auth import verify_admin_pin
+from app.routers.auth import verify_admin_pin, is_admin
+from app.privacy import strip_private
 from app.schemas import (
     StatusUpdateRequest,
     PerformanceNotesRequest,
@@ -23,6 +24,13 @@ logger = logging.getLogger("stage-router")
 router = APIRouter(tags=["stage"])
 
 
+def require_console_enabled(_authorized: bool = Depends(verify_admin_pin)) -> bool:
+    """Blocks stage-control actions when the organizer disabled the sound console (e.g. potluck preset)."""
+    if not bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))):
+        raise HTTPException(status_code=403, detail="The sound console is disabled for this event.")
+    return True
+
+
 @router.get("/api/live-status")
 def get_live_status(request: Request):
     status = stage_service.get_live_status()
@@ -32,10 +40,17 @@ def get_live_status(request: Request):
     status["event_name"] = get_setting("event_name", status.get("event_name"))
     status["event_subtitle"] = get_setting("event_subtitle", status.get("event_subtitle"))
     status["live_display_enabled"] = bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True)))
+    if not status["live_display_enabled"]:
+        for key in ("now_performing",):
+            status[key] = None
+        for key in ("up_next", "upcoming", "performed", "on_hold", "gallery_images"):
+            status[key] = []
+        status["active_entry_id"] = None
 
     from fastapi.encoders import jsonable_encoder
 
-    serializable_status = jsonable_encoder(status)
+    # The live feed is public: never include phone numbers or guardian details.
+    serializable_status = strip_private(jsonable_encoder(status))
     body = json.dumps(serializable_status, sort_keys=True)
     etag = f'"{hashlib.sha1(body.encode()).hexdigest()}"'
     if_none_match = request.headers.get("if-none-match")
@@ -50,13 +65,13 @@ def get_live_status(request: Request):
 
 
 @router.post("/api/set-active/{entry_id}")
-def set_active_performance(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+def set_active_performance(entry_id: str, _authorized: bool = Depends(require_console_enabled)):
     google_service.set_active_performance(entry_id)
     return {"status": "success", "active_entry_id": entry_id}
 
 
 @router.post("/api/clear-active")
-def clear_active_performance(_authorized: bool = Depends(verify_admin_pin)):
+def clear_active_performance(_authorized: bool = Depends(require_console_enabled)):
     google_service.clear_active_performance()
     return {"status": "success", "message": "Performance uncued and returned to queue"}
 
@@ -83,9 +98,10 @@ def get_track_info(entry_id: str):
 
 
 @router.get("/api/performances", response_model=List[PerformanceEntry])
-def list_performances():
+def list_performances(request: Request):
     try:
-        return google_service.get_performances()
+        entries = google_service.get_performances()
+        return entries if is_admin(request) else strip_private(entries)
     except Exception as e:
         logger.exception("Failed to fetch performances: %s", e)
         raise HTTPException(status_code=500, detail="Failed to read performances from Google Sheet")
@@ -129,16 +145,17 @@ def sync_data(_authorized: bool = Depends(verify_admin_pin)):
 
 
 @router.get("/api/stage-queue", response_model=List[PerformanceEntry])
-def stage_queue():
+def stage_queue(request: Request):
     try:
-        return google_service.get_stage_queue()
+        entries = google_service.get_stage_queue()
+        return entries if is_admin(request) else strip_private(entries)
     except Exception as e:
         logger.exception("Failed to fetch stage queue: %s", e)
         raise HTTPException(status_code=500, detail="Failed to read queue from Google Sheet")
 
 
 @router.patch("/api/status/{entry_id}")
-def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(require_console_enabled)):
     try:
         google_service.update_status(entry_id, payload.status)
         backup_service.trigger_backup()
@@ -149,7 +166,7 @@ def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool
 
 
 @router.patch("/api/performance-notes/{entry_id}")
-def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _authorized: bool = Depends(require_console_enabled)):
     try:
         db_service.update_performance_field(entry_id, "stage_notes", payload.notes.strip())
         backup_service.trigger_backup()
@@ -160,7 +177,7 @@ def update_performance_notes(entry_id: str, payload: PerformanceNotesRequest, _a
 
 
 @router.post("/api/reorder-queue")
-def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
+def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(require_console_enabled)):
     try:
         updated = google_service.update_sequence_orders(
             [i.model_dump() for i in payload.items],
@@ -179,7 +196,7 @@ def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(verify_ad
 
 
 @router.post("/api/push-sequence")
-def push_sequence(_authorized: bool = Depends(verify_admin_pin)):
+def push_sequence(_authorized: bool = Depends(require_console_enabled)):
     try:
         updated = google_service.sync_sequence_to_google()
         backup_service.trigger_backup()

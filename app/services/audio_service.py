@@ -52,6 +52,8 @@ class AudioService:
         total_bytes = 0
         for fname in os.listdir(self.cache_dir):
             fpath = os.path.join(self.cache_dir, fname)
+            if ".db" in fname or fname.endswith(".sqlite"):
+                continue  # never evict database files
             try:
                 if os.path.isfile(fpath):
                     size = os.path.getsize(fpath)

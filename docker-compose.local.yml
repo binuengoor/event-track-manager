@@ -15,6 +15,7 @@ services:
       - ADMIN_PIN=${ADMIN_PIN:-2026}
       - DOWNLOADER_SERVICE_URL=http://downloader:8001
       - CACHE_DIR=/data/cache
+      - DB_DIR=/db
       - GOOGLE_CREDENTIALS_PATH=/secrets/credentials.json
       - MOCK_GOOGLE_API=${MOCK_GOOGLE_API:-false}
     volumes:
@@ -23,6 +24,7 @@ services:
       - ./data:/data
       - ./app:/app/app:ro
       - audio_cache:/data/cache
+      - app_db:/db
     depends_on:
       - downloader
 
@@ -41,4 +43,6 @@ services:
 
 volumes:
   audio_cache:
+    driver: local
+  app_db:
     driver: local

@@ -58,6 +58,10 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
         "guardian_phone": payload.guardian_phone,
         "contact_info": payload.contact_info
     }
+    # Phones are never returned to the public hub, so blank values mean "unchanged".
+    for private_field in ("partner_phone", "guardian_phone", "contact_info", "guardian_name"):
+        if not (update_kwargs.get(private_field) or "").strip():
+            update_kwargs.pop(private_field, None)
     if payload.track_status is not None:
         update_kwargs["track_status"] = payload.track_status
     elif payload.is_acoustic is not None:

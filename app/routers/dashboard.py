@@ -4,6 +4,7 @@ from fastapi import APIRouter
 
 from app.config import settings, get_setting
 from app.services.db_service import db_service
+from app.privacy import strip_private
 
 logger = logging.getLogger("dashboard-router")
 
@@ -47,7 +48,7 @@ def dashboard_food():
         "enabled": enabled,
         "serving_note": serving_note,
         "groups": groups,
-        "items": items,
+        "items": strip_private(items),
         "total_items": len(items),
         "taken_items": sum(1 for i in items if i.get("is_taken")),
         "open_items": sum(1 for i in items if not i.get("is_taken")),

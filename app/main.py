@@ -2,7 +2,7 @@ import os
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -117,9 +117,24 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 DATA_DIR = os.getenv("DATA_DIR", "/data" if os.path.exists("/data") else os.path.join(os.path.dirname(BASE_DIR), "data"))
 
+class PublicDataFiles(StaticFiles):
+    """Serves posters and gallery images only; never the audio cache or any database files."""
+    BLOCKED_TOP_LEVEL = {"cache", "db", "secrets"}
+
+    async def get_response(self, path, scope):
+        parts = [p for p in path.replace("\\", "/").split("/") if p]
+        lowered = [p.lower() for p in parts]
+        if (
+            (lowered and lowered[0] in self.BLOCKED_TOP_LEVEL)
+            or any(".." == p or p.endswith((".db", ".db-wal", ".db-shm", ".sqlite")) for p in lowered)
+        ):
+            raise HTTPException(status_code=404)
+        return await super().get_response(path, scope)
+
+
 os.makedirs(DATA_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-app.mount("/data", StaticFiles(directory=DATA_DIR), name="data")
+app.mount("/data", PublicDataFiles(directory=DATA_DIR), name="data")
 
 # Register Modular Routers
 app.include_router(pages.router)

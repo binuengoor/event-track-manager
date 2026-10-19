@@ -103,7 +103,7 @@ Logs: `docker compose logs -f app` and `docker compose logs -f downloader`.
 | Old audio plays | Browser cache | Console **Clear Cache** then re-cache the track |
 | Edits to the Sheet disappear | Sheet is export only | Change data in the app (`/admin`), not the Sheet |
 | Forgot PIN | | Edit `ADMIN_PIN` in `.env`, `docker compose up -d` |
-| Too many failed logins ("try again later") | Rate limit | Wait 5 minutes |
+| Login says "Too many failed attempts" (HTTP 429) | Rate limit (8 per client / 100 overall per 5 min) | Wait 5 minutes, or `docker compose restart app` to clear it |
 | Everything is in mock mode | Missing/invalid `secrets/credentials.json` | Fix the file, restart; `/api/health` must say `mock_mode:false` |
 | Live screen frozen | Network on the display device | Reload `/live` (it polls every 5 s) |
 

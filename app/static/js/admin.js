@@ -1584,8 +1584,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
           downloadBtn.classList.add('opacity-50', 'pointer-events-none');
           showToast('Downloading track...');
           try {
-            const pin = localStorage.getItem('paattukoottam_pin') || '2026';
-            const res = await fetch(`/api/download-track/${currentCuedItem.entry_id}?pin=${encodeURIComponent(pin)}`, {
+            const res = await fetch(`/api/download-track/${currentCuedItem.entry_id}`, {
               headers: getAuthHeaders()
             });
             if (!res.ok) throw new Error('Download failed from server');
@@ -2072,8 +2071,7 @@ function setupActionButtons() {
       if (window.lucide) lucide.createIcons();
 
       try {
-        const pin = localStorage.getItem('paattukoottam_pin') || '2026';
-        const res = await fetch(`/api/admin/export-tracks-zip?pin=${encodeURIComponent(pin)}`, {
+        const res = await fetch(`/api/admin/export-tracks-zip`, {
           headers: getAuthHeaders()
         });
         if (!res.ok) throw new Error('ZIP bundling failed');

@@ -150,11 +150,70 @@ class AdminService:
         if "event_subtitle" in items and isinstance(items["event_subtitle"], str) and len(items["event_subtitle"].strip()) > 80:
             raise ValueError("Event Subtitle cannot exceed 80 characters.")
 
-        for k, v in items.items():
+        cleaned = self._validate_settings(items)
+        for k, v in cleaned.items():
             db_service.set_app_setting(k, v)
 
         backup_service.trigger_backup()
-        return len(items)
+        return len(cleaned)
+
+    BOOL_SETTINGS = {
+        "stage_performances_enabled", "signup_enabled", "food_signup_enabled", "track_upload_enabled",
+        "allow_duets", "performer_edits_enabled", "live_display_enabled", "dashboard_enabled",
+        "console_enabled", "payment_enabled", "backup_enabled",
+    }
+    INT_SETTINGS = {"max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20)}
+    LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns"}
+    STR_SETTINGS = {
+        "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
+        "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
+        "hero_tag_status", "event_poster_url", "payment_url", "signup_sheet_url", "food_serving_note",
+        "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range",
+    }
+
+    def _validate_settings(self, items: Dict[str, Any]) -> Dict[str, Any]:
+        """Rejects unknown keys and wrong types so a bad value can never break signup or live pages."""
+        if not isinstance(items, dict):
+            raise ValueError("Settings payload must be an object.")
+        cleaned: Dict[str, Any] = {}
+        for k, v in items.items():
+            if k in self.BOOL_SETTINGS:
+                if isinstance(v, str) and v.strip().lower() in ("true", "false"):
+                    v = v.strip().lower() == "true"
+                if not isinstance(v, bool):
+                    raise ValueError(f"Setting '{k}' must be true or false.")
+            elif k in self.INT_SETTINGS:
+                lo, hi = self.INT_SETTINGS[k]
+                try:
+                    if isinstance(v, bool):
+                        raise ValueError
+                    v = int(str(v).strip())
+                except ValueError:
+                    raise ValueError(f"Setting '{k}' must be a whole number.")
+                if not lo <= v <= hi:
+                    raise ValueError(f"Setting '{k}' must be between {lo} and {hi}.")
+            elif k in self.LIST_SETTINGS:
+                if not isinstance(v, list) or len(v) > 50:
+                    raise ValueError(f"Setting '{k}' must be a list (max 50 entries).")
+                if k == "age_groups":
+                    for ag in v:
+                        if not isinstance(ag, dict) or not isinstance(ag.get("name"), str) or not ag["name"].strip():
+                            raise ValueError("Each age group needs a name.")
+                        if not isinstance(ag.get("requires_guardian", False), bool):
+                            raise ValueError("Age group 'requires_guardian' must be true or false.")
+                elif not all(isinstance(x, str) and x.strip() for x in v):
+                    raise ValueError(f"Setting '{k}' must be a list of non-empty text values.")
+            elif k in self.STR_SETTINGS:
+                if v is None:
+                    v = ""
+                if not isinstance(v, str):
+                    raise ValueError(f"Setting '{k}' must be text.")
+                if len(v) > 5000:
+                    raise ValueError(f"Setting '{k}' is too long.")
+            else:
+                raise ValueError(f"Unknown setting '{k}'.")
+            cleaned[k] = v
+        return cleaned
 
     def get_summary(self) -> Dict[str, Any]:
         """Aggregates event performance, participant, and food registration metrics."""

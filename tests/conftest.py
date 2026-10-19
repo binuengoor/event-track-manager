@@ -16,6 +16,7 @@ def isolate_test_db(tmp_path, monkeypatch):
     
     # Isolate storage settings
     monkeypatch.setattr(settings.storage, "cache_dir", str(test_db_dir))
+    monkeypatch.setattr(settings.storage, "db_dir", str(test_db_dir))
     
     # Re-point db_service to test db
     original_db_path = db_service._db_path
@@ -32,6 +33,10 @@ def isolate_test_db(tmp_path, monkeypatch):
     if not google_service._mock_data:
         google_service._init_mock_data()
     
+    # Failed-login throttling is process-global; start every test with a clean slate.
+    from app.routers.auth import failure_limiter
+    failure_limiter.reset()
+
     yield
     
     # Restore original states

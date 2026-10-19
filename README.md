@@ -120,7 +120,8 @@ Sheet columns are matched by header name (row 1), so reordering columns is safe.
 | `FOOD_SIGNUP_ENABLED`, `SIGNUP_ENABLED`, `FOOD_SERVING_NOTE` | | Seed defaults |
 | `LIVE_ORDER_BY` | `readiness,sequence` | Also `age_group`, `performance_type` |
 | `CONSOLE_EXTRA_COLUMNS` | `Age Group` | Sheet columns shown as tags |
-| `CACHE_DIR`, `GALLERY_DIR`, `DATA_DIR` | `/data/...` | Cache/DB and sponsor gallery paths |
+| `CACHE_DIR`, `GALLERY_DIR`, `DATA_DIR` | `/data/...` | Audio cache, sponsor gallery, and the publicly served posters/gallery root (`/data/cache` and database files are never served) |
+| `DB_DIR` | `/db` (Docker), `./data/db` (local) | SQLite location, on its own `app_db` volume. An old database in the cache folder is migrated automatically on first start |
 | `DOWNLOADER_SERVICE_URL` | `http://downloader:8001` | |
 
 ## Key behaviors
@@ -135,7 +136,7 @@ Sheet columns are matched by header name (row 1), so reordering columns is safe.
 ## Security & privacy
 
 - Public pages and APIs must **never** include phone numbers or guardian details; only the admin roster/participants endpoints return them.
-- Admin endpoints require the PIN via `X-Admin-PIN` header or the `admin_pin` cookie set by `/api/auth/login`. Failed logins are rate-limited per client.
+- Admin endpoints require the PIN via `X-Admin-PIN` header or the `admin_pin` cookie set by `/api/auth/login`. Failed logins (and wrong-PIN guesses on any admin endpoint) are rate-limited: 8 per client and 100 overall per 5 minutes, then HTTP 429. The PIN is never accepted in a URL, and the session cookie is an HMAC token, not the PIN.
 - Run behind HTTPS (Caddy example in the runbook) and use a non-default PIN.
 - Do not commit `.env`, `secrets/`, or `data/`.
 

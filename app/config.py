@@ -156,6 +156,8 @@ class ColumnsConfig(BaseModel):
 class StorageConfig(BaseModel):
     cache_dir: str = "/data/cache"
     gallery_dir: str = "/data/gallery"
+    # SQLite lives outside the served /data tree and outside the evictable audio cache.
+    db_dir: str = ""
     max_upload_size_mb: int = 100
 
 class DownloaderConfig(BaseModel):
@@ -390,6 +392,11 @@ def load_config() -> AppConfig:
     elif not is_docker and config.storage.cache_dir.startswith("/data"):
         config.storage.cache_dir = "./data/cache"
 
+    if os.getenv("DB_DIR"):
+        config.storage.db_dir = os.getenv("DB_DIR")
+    elif not config.storage.db_dir:
+        config.storage.db_dir = "/db" if is_docker else "./data/db"
+
     if os.getenv("GALLERY_DIR"):
         config.storage.gallery_dir = os.getenv("GALLERY_DIR")
     elif not is_docker and config.storage.gallery_dir.startswith("/data"):
@@ -400,6 +407,12 @@ def load_config() -> AppConfig:
     except OSError:
         config.storage.cache_dir = "./data/cache"
         os.makedirs(config.storage.cache_dir, exist_ok=True)
+
+    try:
+        os.makedirs(config.storage.db_dir, exist_ok=True)
+    except OSError:
+        config.storage.db_dir = "./data/db"
+        os.makedirs(config.storage.db_dir, exist_ok=True)
 
     try:
         os.makedirs(config.storage.gallery_dir, exist_ok=True)

@@ -6,6 +6,7 @@ from app.config import settings, get_setting
 from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
+from app.privacy import strip_private
 from app.schemas import SignupRequest, PerformanceUpdateRequest, validate_phone
 
 logger = logging.getLogger("registration-service")
@@ -74,7 +75,7 @@ class RegistrationService:
             "performance_types": perf_types,
             "age_groups": age_groups,
             "food_groups": visible_groups,
-            "food_items": all_items,
+            "food_items": strip_private(all_items),
             "registered_performers": registered_names,
             "existing_songs": existing_songs
         }

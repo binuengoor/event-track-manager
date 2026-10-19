@@ -36,7 +36,7 @@ def test_export_tracks_zip_success():
         assert "EMA Paattukoottam" in run_sheet
         assert "Show Run Sheet" in run_sheet
 
-def test_export_tracks_zip_query_param_pin():
+def test_export_tracks_zip_rejects_pin_in_query_string():
+    """PINs in URLs leak into logs/history; only the header or session cookie is accepted."""
     res = client.get("/api/admin/export-tracks-zip?pin=2026")
-    assert res.status_code == 200
-    assert "application/zip" in res.headers.get("content-type", "")
+    assert res.status_code == 401

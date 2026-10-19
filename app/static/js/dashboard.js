@@ -193,9 +193,9 @@ function renderSongsTable() {
 
   tbody.innerHTML = filtered.map(p => {
     const safeName = encodeURIComponent(p.link_performer);
-    const songName = p.song_title || '<span class="text-amber-400 italic">Song name TBD</span>';
-    const movieName = p.movie_name ? `<span class="text-[11px] text-slate-500 block">${p.movie_name}</span>` : '';
-    const partner = p.display_partner ? `<span class="text-[11px] text-amber-400 block font-normal">w/ ${p.display_partner}</span>` : '';
+    const songName = p.song_title ? escapeHtml(p.song_title) : '<span class="text-amber-400 italic">Song name TBD</span>';
+    const movieName = p.movie_name ? `<span class="text-[11px] text-slate-500 block">${escapeHtml(p.movie_name)}</span>` : '';
+    const partner = p.display_partner ? `<span class="text-[11px] text-amber-400 block font-normal">w/ ${escapeHtml(p.display_partner)}</span>` : '';
 
     let trackBadge = '';
     if (p.track_status === "Acoustic") {
@@ -206,13 +206,13 @@ function renderSongsTable() {
       trackBadge = '<span class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20"><i data-lucide="clock" class="w-3 h-3"></i> Pending</span>';
     }
 
-    const agePill = p.age_group ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px] font-semibold">${p.age_group}</span>` : '—';
+    const agePill = p.age_group ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px] font-semibold">${escapeHtml(p.age_group)}</span>` : '—';
 
     return `
       <tr class="hover:bg-slate-800/40 transition">
         <td class="px-5 py-3.5">
           <a href="/performer?name=${safeName}" class="text-orange-400 hover:text-orange-300 font-bold inline-flex items-center gap-1 group" title="Click to view performer hub & edit details">
-            <span>${p.display_performer}</span>
+            <span>${escapeHtml(p.display_performer)}</span>
             <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-60 group-hover:opacity-100 transition"></i>
           </a>
           ${partner}
@@ -222,7 +222,7 @@ function renderSongsTable() {
           ${movieName}
         </td>
         <td class="px-4 py-3.5">
-          <span class="px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300 font-semibold text-[11px]">${p.performance_type || 'Solo'}</span>
+          <span class="px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300 font-semibold text-[11px]">${escapeHtml(p.performance_type || 'Solo')}</span>
         </td>
         <td class="px-4 py-3.5">${agePill}</td>
         <td class="px-4 py-3.5">${trackBadge}</td>
@@ -293,11 +293,11 @@ function renderFoodGroups() {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                <span class="font-bold text-slate-200 text-xs truncate">${item.name}</span>
+                <span class="font-bold text-slate-200 text-xs truncate">${escapeHtml(item.name)}</span>
               </div>
               <p class="text-[11px] text-slate-400 mt-1 pl-4 truncate">
-                <span class="text-orange-400 font-semibold">${item.signer_name}</span>
-                ${item.dish_description ? ` &bull; <span class="text-slate-300 italic">"${item.dish_description}"</span>` : ''}
+                <span class="text-orange-400 font-semibold">${escapeHtml(item.signer_name)}</span>
+                ${item.dish_description ? ` &bull; <span class="text-slate-300 italic">"${escapeHtml(item.dish_description)}"</span>` : ''}
               </p>
             </div>
             <span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-bold uppercase shrink-0">
@@ -310,9 +310,9 @@ function renderFoodGroups() {
           <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 hover:border-emerald-500/60 flex items-center justify-between gap-3 transition">
             <div class="flex items-center gap-2 min-w-0">
               <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-              <span class="font-bold text-white text-xs truncate">${item.name}</span>
+              <span class="font-bold text-white text-xs truncate">${escapeHtml(item.name)}</span>
             </div>
-            <a href="/performer?food_item=${item.item_id}" class="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1 transition shrink-0">
+            <a href="/performer?food_item=${encodeURIComponent(item.item_id)}" class="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1 transition shrink-0">
               <span>Sign up</span>
               <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
             </a>
@@ -326,7 +326,7 @@ function renderFoodGroups() {
         <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
           <h3 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
             <i data-lucide="utensils" class="w-4 h-4"></i>
-            <span>${group.name}</span>
+            <span>${escapeHtml(group.name)}</span>
           </h3>
           <span class="text-xs font-semibold text-slate-400">
             ${group.taken_count || 0} of ${items.length} slots claimed
