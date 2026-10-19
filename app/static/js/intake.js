@@ -160,7 +160,7 @@ async function loadPerformances() {
 
     const select = document.getElementById('performer-select');
     const currentSelected = select.value;
-    select.innerHTML = '<option value="">-- Choose your name from the sign-up list --</option>';
+    select.innerHTML = '<option value="">Choose your name…</option>';
 
     sortedPerformers.forEach(name => {
       const opt = document.createElement('option');

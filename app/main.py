@@ -136,6 +136,15 @@ os.makedirs(DATA_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 app.mount("/data", PublicDataFiles(directory=DATA_DIR), name="data")
 
+@app.middleware("http")
+async def revalidate_static_assets(request, call_next):
+    """Static JS/CSS revalidate on every load (cheap 304s) so UI updates reach users without hard refreshes."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 # Register Modular Routers
 app.include_router(pages.router)
 app.include_router(auth.router)

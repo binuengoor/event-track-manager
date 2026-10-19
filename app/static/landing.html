@@ -185,6 +185,7 @@
       </nav>
     </div>
   </header>
+  <script src="/static/js/nav.js"></script>
 
   <!-- Main Hero & Hub Content -->
   <main class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:py-10 space-y-8">
@@ -199,14 +200,10 @@
              onerror="this.style.display='none'; document.getElementById('poster-fallback').classList.remove('hidden');" />
         
         <!-- Fallback Graphic if poster image is loading or missing -->
-        <div id="poster-fallback" class="hidden py-16 px-6 text-center space-y-3">
+        <div id="poster-fallback" class="hidden py-12 px-6 text-center">
           <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-xl shadow-orange-500/30">
             <i data-lucide="music-2" class="w-8 h-8"></i>
           </div>
-          <h2 class="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-300 to-yellow-400">
-            ✨🎤✨ Paattukoottam Sing & Serenade ✨🎶✨
-          </h2>
-          <p class="text-slate-400 text-sm max-w-md mx-auto">An unforgettable evening of melodious music and celebration</p>
         </div>
       </div>
 
@@ -215,7 +212,7 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 id="event-title-display" class="text-xl sm:text-2xl font-black text-white tracking-tight">
-              ✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨
+              Paattukoottam Sing & Serenade
             </h2>
             <p id="event-subtitle-display" class="text-xs sm:text-sm text-amber-400 font-medium mt-0.5">
               Musical Night • September 19, 2026
@@ -505,6 +502,7 @@
     </div>
   </footer>
 
+  <script src="/static/js/utils.js"></script>
   <script>
     // Initialize Lucide icons
     lucide.createIcons();
@@ -540,7 +538,7 @@
         }
         if (info.event_name || info.app_title) {
           const titleDisplay = document.getElementById("event-title-display");
-          if (titleDisplay) titleDisplay.textContent = info.event_name || info.app_title;
+          if (titleDisplay) titleDisplay.textContent = (window.cleanEventName ? window.cleanEventName(info.event_name || info.app_title) : (info.event_name || info.app_title));
         }
 
         if (info.venue) {
@@ -554,6 +552,7 @@
 
         if (info.time_range) {
           document.getElementById("event-time-range-text").textContent = info.time_range;
+          eventDurationMs = parseRangeDurationMs(info.time_range) || eventDurationMs;
         }
 
         if (info.hero_tag_primary) {
@@ -705,9 +704,35 @@
       }
     }
 
+    // Event window: derived from "5:00 PM - 9:00 PM" style ranges (default 5 hours)
+    let eventDurationMs = 5 * 3600 * 1000;
+    function parseRangeDurationMs(range) {
+      const m = String(range).match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*(?:-|–|—|to)\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
+      if (!m) return null;
+      const to24 = (h, min, ap) => { h = parseInt(h, 10) % 12; if (/pm/i.test(ap)) h += 12; return h * 60 + parseInt(min || "0", 10); };
+      const endAp = m[6];
+      const start = to24(m[1], m[2], m[3] || endAp);
+      let end = to24(m[4], m[5], endAp);
+      if (end <= start) end += 24 * 60;
+      return (end - start) * 60000;
+    }
+
     function updateCountdown() {
       const now = new Date();
       const diffMs = targetEventDate.getTime() - now.getTime();
+
+      if (diffMs <= -eventDurationMs) {
+        // Event is over
+        document.getElementById("countdown-heading-badge").textContent = "EVENT ENDED";
+        document.getElementById("countdown-status-title").textContent = "Thank you for being part of the night!";
+        document.getElementById("countdown-status-sub").textContent = "The program has wrapped up. Browse the final setlist on the Dashboard, and see you at the next one.";
+        const tiles = document.getElementById("countdown-tiles");
+        if (tiles) tiles.classList.add("hidden");
+        const pill = document.getElementById("status-pill");
+        pill.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/40 text-slate-300 border border-slate-600/50 text-xs font-semibold";
+        document.getElementById("status-pill-text").textContent = "EVENT ENDED";
+        return;
+      }
 
       if (diffMs <= 0) {
         // Event has started!

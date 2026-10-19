@@ -152,3 +152,31 @@ input[type="range"] {
   border-color: #334155 !important;
   margin: 0.75rem 0 !important;
 }
+
+
+/* ==========================================================================
+   Responsive stacked tables: on phones each row becomes a compact card (no sideways scrolling)
+   ========================================================================== */
+@media (max-width: 767px) {
+  .stack-table thead { display: none; }
+  .stack-table, .stack-table tbody { display: block; width: 100%; }
+  .stack-table tbody { padding: 0.5rem; }
+  .stack-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    margin-bottom: 0.6rem;
+    padding: 0.8rem 0.9rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    background: rgba(15, 23, 42, 0.55);
+  }
+  .stack-table td { display: block; padding: 0 !important; text-align: left; }
+  .stack-table td[data-label="Performer"] { flex: 1 1 60%; font-size: 1rem; }
+  .stack-table td[data-label="Song"] { flex: 1 1 100%; order: 2; }
+  .stack-table td[data-label="Type"], .stack-table td[data-label="Category"], .stack-table td[data-label="Track"] { order: 3; }
+  .stack-table td[data-label="Track"] { margin-left: auto; }
+  .stack-table td:not([data-label]) { order: 1; margin-left: auto; }
+  .stack-table td[colspan] { flex: 1 1 100%; text-align: center; padding: 1rem 0 !important; }
+}

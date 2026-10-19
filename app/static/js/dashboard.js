@@ -19,7 +19,7 @@ async function loadEventInfo() {
       if (data.header_brand_title) {
         const titleEl = document.getElementById("nav-event-title");
         if (titleEl) titleEl.textContent = data.header_brand_title;
-        document.title = `Transparency Dashboard - ${data.header_brand_title}`;
+        document.title = `Dashboard - ${data.header_brand_title}`;
       }
       if (data.header_brand_subtitle) {
         const subEl = document.getElementById("nav-event-subtitle");
@@ -210,22 +210,22 @@ function renderSongsTable() {
 
     return `
       <tr class="hover:bg-slate-800/40 transition">
-        <td class="px-5 py-3.5">
+        <td class="px-5 py-3.5" data-label="Performer">
           <a href="/performer?name=${safeName}" class="text-orange-400 hover:text-orange-300 font-bold inline-flex items-center gap-1 group" title="Click to view performer hub & edit details">
             <span>${escapeHtml(p.display_performer)}</span>
             <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-60 group-hover:opacity-100 transition"></i>
           </a>
           ${partner}
         </td>
-        <td class="px-5 py-3.5">
+        <td class="px-5 py-3.5" data-label="Song">
           <span class="font-semibold text-white">${songName}</span>
           ${movieName}
         </td>
-        <td class="px-4 py-3.5">
+        <td class="px-4 py-3.5" data-label="Type">
           <span class="px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300 font-semibold text-[11px]">${escapeHtml(p.performance_type || 'Solo')}</span>
         </td>
-        <td class="px-4 py-3.5">${agePill}</td>
-        <td class="px-4 py-3.5">${trackBadge}</td>
+        <td class="px-4 py-3.5" data-label="Category">${agePill}</td>
+        <td class="px-4 py-3.5" data-label="Track">${trackBadge}</td>
         <td class="px-4 py-3.5 text-right">
           <a href="/performer?name=${safeName}" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold transition">
             Edit

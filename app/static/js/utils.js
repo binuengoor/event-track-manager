@@ -13,6 +13,16 @@ window.escapeHtml = function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 };
 
+/** Removes decorative emoji from event names (keeps them out of headings and browser tabs). */
+window.cleanEventName = function cleanEventName(str) {
+  if (!str) return "";
+  const cleaned = String(str)
+    .replace(/[\p{Extended_Pictographic}\u2728\uFE0F\u200D]/gu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  return cleaned || String(str).trim();
+};
+
 window.escapeQuotes = function escapeQuotes(str) {
   if (!str) return "";
   return String(str).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -42,17 +52,16 @@ window.sanitizeFilename = function sanitizeFilename(text) {
 window.adaptNavigationForEventConfig = function adaptNavigationForEventConfig(info) {
   if (!info) return;
   if (info.stage_performances_enabled === false) {
+    const relabel = (a, fn) => {
+      const target = a.querySelector('.nav-label') || a;
+      if (target === a && a.children.length) return;
+      target.textContent = fn(target.textContent.trim());
+    };
     document.querySelectorAll('a[href="/performer"]').forEach(a => {
-      const text = a.textContent.trim();
-      if (/performer/i.test(text)) {
-        a.textContent = text.replace(/Performer(\s+Hub)?/i, 'Attendee Hub');
-      }
+      relabel(a, text => /performer/i.test(text) ? text.replace(/Performer(\s+Hub)?/i, 'Attendee Hub') : text);
     });
     document.querySelectorAll('a[href="/dashboard"]').forEach(a => {
-      const text = a.textContent.trim();
-      if (text.toLowerCase() === 'dashboard' || text.toLowerCase().includes('transparency dashboard')) {
-        a.textContent = 'Food Board';
-      }
+      relabel(a, text => (text.toLowerCase() === 'dashboard' || text.toLowerCase().includes('transparency dashboard')) ? 'Food Board' : text);
     });
   }
   if (info.console_enabled === false) {

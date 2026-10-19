@@ -1,14 +1,8 @@
 /**
- * Google Gemini iOS Ambient Aurora Effect
- * Modeled directly after the Gemini iOS app ambient light:
- * - Minimal, ethereal, breathing ambient light that comes and goes.
- * - Periodic intervals of pure OLED black (#000000) where the light completely rests.
- * - Single/dual harmonized color moods that slowly transition over time:
- *     * Mood 1: Deep Emerald & Luminous Teal (iOS Screen 1)
- *     * Mood 2: Deep Sapphire & Royal Blue (iOS Screen 2 & 4)
- *     * Mood 3: Radiant Purple & Electric Violet (iOS Screen 5)
- *     * Mood 4: Warm Rose Magenta & Amber Gold (iOS Screen 3)
- * - Ultra-soft Gaussian atmospheric diffusion with zero harsh lines or rainbow bands.
+ * Gemini-style ambient aurora.
+ * Soft multi-colour ribbons of light (blue -> violet -> pink -> peach -> teal) flow along the top edge of the
+ * screen, with a fainter echo along the bottom edge. Light spills from the edges, fades to pure black towards
+ * the middle, breathes slowly and never fully disappears. Playing audio / events speed it up and brighten it.
  */
 
 (function () {
@@ -31,140 +25,84 @@
     uniform float u_time;
     uniform float u_intensity;
 
-    // Simplex Noise 2D
-    vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-    vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-    vec3 permute(vec3 x) { return mod289(((x * 34.0) + 1.0) * x); }
-
-    float snoise(vec2 v) {
-      const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                         -0.577350269189626, 0.024390243902439);
-      vec2 i  = floor(v + dot(v, C.yy));
-      vec2 x0 = v -   i + dot(i, C.xx);
-      vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-      vec4 x12 = x0.xyxy + C.xxzz;
-      x12.xy -= i1;
-      i = mod289(i);
-      vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-      vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
-      m = m * m;
-      m = m * m;
-      vec3 x = 2.0 * fract(p * C.www) - 1.0;
-      vec3 h = abs(x) - 0.5;
-      vec3 ox = floor(x + 0.5);
-      vec3 a0 = x - ox;
-      m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
-      vec3 g;
-      g.x  = a0.x  * x0.x  + h.x  * x0.y;
-      g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-      return 130.0 * dot(m, g);
-    }
-
     float hash(vec2 p) {
       return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
+    // Gemini-style spectrum: blue -> violet -> magenta -> peach -> teal -> blue (cyclic, s in any range)
+    vec3 spectrum(float s) {
+      s = fract(s) * 5.0;
+      vec3 c0 = vec3(0.20, 0.45, 1.00); // google blue
+      vec3 c1 = vec3(0.56, 0.32, 1.00); // violet
+      vec3 c2 = vec3(1.00, 0.28, 0.62); // magenta / pink
+      vec3 c3 = vec3(1.00, 0.62, 0.34); // warm peach
+      vec3 c4 = vec3(0.10, 0.82, 0.86); // teal
+      float f = smoothstep(0.0, 1.0, fract(s));
+      if (s < 1.0) return mix(c0, c1, f);
+      if (s < 2.0) return mix(c1, c2, f);
+      if (s < 3.0) return mix(c2, c3, f);
+      if (s < 4.0) return mix(c3, c4, f);
+      return mix(c4, c0, f);
+    }
+
+    // One flowing ribbon of light hugging an edge. d = distance from the edge (0 at edge).
+    vec3 ribbon(float x, float d, float t, float seed, float width, float amp, float colorShift) {
+      float wave =
+          0.5 + 0.5 * sin(x * 3.1 + t * 0.9 + seed * 6.2831)
+        + 0.5 * sin(x * 5.3 - t * 0.7 + seed * 12.7)
+        + 0.25 * sin(x * 9.1 + t * 1.3 + seed * 3.3);
+      float center = 0.05 + amp * wave * 0.11;
+      float dist = (d - center) / width;
+      float core = exp(-dist * dist);
+      float halo = exp(-abs(dist) * 1.4) * 0.18;
+      // colour flows horizontally and drifts over time -> spatial spectral separation
+      float s = x * 0.55 + t * 0.045 + colorShift + 0.12 * sin(t * 0.3 + seed * 5.0);
+      return spectrum(s) * (core + halo);
+    }
+
+    vec3 edgeLight(float x, float d, float t, float strength) {
+      // layers are combined with max() (not +) so colours stay saturated instead of washing to grey
+      vec3 light = ribbon(x, d, t, 0.00, 0.095, 1.00, 0.00) * 1.00;
+      light = max(light, ribbon(x, d, t * 0.83 + 4.0, 0.37, 0.120, 0.80, 0.33) * 0.85);
+      light = max(light, ribbon(x, d, t * 1.17 + 9.0, 0.71, 0.075, 1.15, 0.66) * 0.80);
+      // light spilling from the edge itself
+      float spill = exp(-d * 4.5);
+      light = max(light, spectrum(x * 0.55 + t * 0.045 + 0.15) * spill * 0.70);
+      return light * strength;
     }
 
     void main() {
       vec2 uv = gl_FragCoord.xy / u_resolution.xy;
       float aspect = u_resolution.x / max(u_resolution.y, 1.0);
+      float x = uv.x * min(aspect, 1.8) * 1.15;
+      float yTop = 1.0 - uv.y;   // 0 at top edge
+      float yBot = uv.y;         // 0 at bottom edge
 
-      // Coordinate space: (0,0) at top-left, y increasing downwards
-      float x = uv.x;
-      float y = 1.0 - uv.y;
+      float t = u_time * 0.55;
 
-      // Slow, hypnotic time base
-      float t = u_time * 0.032;
+      // slow breathing: never fully dark, swells now and then
+      float breath = 0.78 + 0.22 * sin(u_time * 0.35) + 0.12 * smoothstep(0.6, 1.0, sin(u_time * 0.13 + 1.0));
 
-      // Ultra-wide organic simplex warp (liquid celestial cloud)
-      vec2 warp = vec2(
-        snoise(vec2(x * 1.1 + t * 0.18, y * 1.3 - t * 0.14)),
-        snoise(vec2(x * 1.3 - t * 0.15, y * 1.2 + t * 0.16))
-      ) * 0.14;
+      // vertical reach: light fades to pure black well before the middle of the screen
+      float topReach = smoothstep(0.42, 0.0, yTop);
+      float botReach = smoothstep(0.18, 0.0, yBot);
 
-      vec2 p = vec2(x * aspect, y) + warp;
+      vec3 light = edgeLight(x, yTop, t, 1.0) * topReach;
+      light = max(light, edgeLight(x + 1.7, yBot, t * 0.9 + 20.0, 0.35) * botReach);
 
-      // -----------------------------------------------------------------------
-      // 1. Color Mood Cross-Fading (Smoothly evolves every ~25-35s)
-      // -----------------------------------------------------------------------
-      float moodCycle = fract(t * 0.06); // 0.0 to 1.0
-      float moodPhase = moodCycle * 4.0; // 0 to 4
-      int moodIndex = int(floor(moodPhase));
-      float moodFrac = smoothstep(0.0, 1.0, fract(moodPhase));
+      light *= breath * u_intensity;
 
-      // Palettes sampled directly from Gemini iOS app:
-      // Mood 0: Emerald / Deep Teal
-      vec3 c0_a = vec3(0.015, 0.480, 0.320); // Emerald
-      vec3 c0_b = vec3(0.010, 0.360, 0.420); // Deep Teal
-      // Mood 1: Royal Sapphire / Deep Azure
-      vec3 c1_a = vec3(0.060, 0.280, 0.820); // Royal Blue
-      vec3 c1_b = vec3(0.020, 0.180, 0.600); // Sapphire
-      // Mood 2: Rich Violet / Purple
-      vec3 c2_a = vec3(0.460, 0.140, 0.740); // Radiant Purple
-      vec3 c2_b = vec3(0.240, 0.100, 0.620); // Deep Indigo
-      // Mood 3: Warm Rose / Amber
-      vec3 c3_a = vec3(0.780, 0.160, 0.420); // Warm Rose
-      vec3 c3_b = vec3(0.720, 0.400, 0.080); // Amber Gold
+      // filmic roll-off keeps highlights luminous but never clipped
+      vec3 col = 1.0 - exp(-light * 1.6);
+      float lum = dot(col, vec3(0.299, 0.587, 0.114));
+      col = clamp(mix(vec3(lum), col, 1.3), 0.0, 1.0);
 
-      vec3 colA;
-      vec3 colB;
+      // micro-dither against banding on OLED gradients
+      col += (hash(gl_FragCoord.xy + u_time) - 0.5) * (1.5 / 255.0);
+      col = max(col, vec3(0.0));
 
-      if (moodIndex == 0) {
-        colA = mix(c0_a, c1_a, moodFrac);
-        colB = mix(c0_b, c1_b, moodFrac);
-      } else if (moodIndex == 1) {
-        colA = mix(c1_a, c2_a, moodFrac);
-        colB = mix(c1_b, c2_b, moodFrac);
-      } else if (moodIndex == 2) {
-        colA = mix(c2_a, c3_a, moodFrac);
-        colB = mix(c2_b, c3_b, moodFrac);
-      } else {
-        colA = mix(c3_a, c0_a, moodFrac);
-        colB = mix(c3_b, c0_b, moodFrac);
-      }
-
-      // -----------------------------------------------------------------------
-      // 2. "Come and Go, and Sometimes Just Be Black" Breathing Cycles
-      // -----------------------------------------------------------------------
-      // Blob 1 breathing envelope: spends ~35% of the time fully in 0.0 (pitch black)
-      float breath1 = sin(t * 1.10);
-      float b1 = clamp((breath1 - 0.15) / 0.85, 0.0, 1.0);
-      b1 = smoothstep(0.0, 1.0, b1);
-
-      // Blob 2 breathing envelope: phase offset so they emerge independently
-      float breath2 = sin(t * 0.85 + 2.3);
-      float b2 = clamp((breath2 - 0.20) / 0.80, 0.0, 1.0);
-      b2 = smoothstep(0.0, 1.0, b2);
-
-      // -----------------------------------------------------------------------
-      // 3. Gentle Celestial Wandering Paths (Anchored to top 25%-40%)
-      // -----------------------------------------------------------------------
-      vec2 center1 = vec2((0.30 + 0.18 * sin(t * 0.70)) * aspect, 0.14 + 0.10 * cos(t * 0.55));
-      vec2 center2 = vec2((0.70 + 0.20 * cos(t * 0.60)) * aspect, 0.18 + 0.12 * sin(t * 0.65));
-
-      float d1 = length(p - center1);
-      float d2 = length(p - center2);
-
-      // Ultra-wide Gaussian atmospheric diffusion (no sharp crests, pure velvet fog)
-      float energy1 = exp(-d1 * d1 * 2.8) * b1;
-      float energy2 = exp(-d2 * d2 * 2.5) * b2;
-
-      // Soft ambient light synthesis (1 or 2 subtle tones only)
-      vec3 light = colA * energy1 * 1.45 + colB * energy2 * 1.35;
-
-      // Smooth vertical dissipation: completely pure OLED black past top 40%
-      float vertFade = smoothstep(0.48, 0.02, y);
-      vertFade = pow(vertFade, 1.5);
-
-      vec3 finalColor = light * vertFade * u_intensity;
-
-      // Micro-dither
-      float dither = (hash(gl_FragCoord.xy) - 0.5) * (1.0 / 255.0);
-      finalColor = max(vec3(0.0), finalColor + dither);
-
-      // Alpha: 0.0 during rest periods (pure OLED black), gentle luminescence during peaks
-      float alpha = clamp(length(finalColor) * 1.5, 0.0, 1.0);
-
-      gl_FragColor = vec4(finalColor, alpha);
+      float a = clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0);
+      gl_FragColor = vec4(col, a);
     }
   `;
 
@@ -177,9 +115,9 @@
       this.options = Object.assign(
         {
           speed: 1.0,
-          intensity: 0.95,
-          activeSpeed: 2.0,
-          activeIntensity: 1.35,
+          intensity: 0.85,
+          activeSpeed: 1.8,
+          activeIntensity: 1.3,
         },
         options
       );
@@ -346,7 +284,8 @@
         this.animationFrameId = requestAnimationFrame(render);
       };
 
-      this.animationFrameId = requestAnimationFrame(render);
+      // Draw the first frame immediately so the glow is visible on load (rAF can be deferred in background panes).
+      render(performance.now());
     }
 
     stopLoop() {
@@ -440,9 +379,9 @@
   class AuroraBackgroundElement extends HTMLElement {
     connectedCallback() {
       const speed = parseFloat(this.getAttribute('speed')) || 1.0;
-      const intensity = parseFloat(this.getAttribute('intensity')) || 0.95;
-      const activeSpeed = parseFloat(this.getAttribute('active-speed')) || 2.0;
-      const activeIntensity = parseFloat(this.getAttribute('active-intensity')) || 1.35;
+      const intensity = parseFloat(this.getAttribute('intensity')) || 0.85;
+      const activeSpeed = parseFloat(this.getAttribute('active-speed')) || 1.8;
+      const activeIntensity = parseFloat(this.getAttribute('active-intensity')) || 1.3;
 
       this.controller = new AuroraController(this, {
         speed,
