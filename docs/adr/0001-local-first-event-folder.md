@@ -32,8 +32,9 @@ that runs with `docker compose up` and nothing else.
   folder to back up, archive, move or clone, and the cloud provider is a deployment choice.
 - Good: removes a class of failures (expired tokens, API quotas, folder sharing mistakes).
 - Cost: organizers who edited the Google Sheet directly lose that (it was already one-way); they now edit in the app.
-- Cost: the DB columns `drive_file_id` / `drive_file_name` keep their old names and now hold the track file name
-  (kept to avoid a wide UI/API rename; a later cleanup can rename them).
+- Cost: the DB columns `drive_file_id` / `drive_file_name` keep their old names (to avoid a wide UI/API rename; a later
+  cleanup can rename them). `drive_file_name` is the track file name; `drive_file_id` is a content version (size + mtime)
+  that survives renumbering, so the console's offline vault is only invalidated when a track is actually replaced.
 - Migration: on first start the DB is copied from the old `/db` volume or the audio cache into the event folder,
   and tracks cached as `<entry>.mp3` are copied into `tracks/` (old copies are left in place).
 

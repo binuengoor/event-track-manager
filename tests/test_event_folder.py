@@ -163,3 +163,22 @@ def test_legacy_cached_tracks_are_migrated_into_tracks_dir():
     assert stored and os.path.dirname(stored) == track_store.tracks_dir
     assert os.path.exists(legacy)  # the old copy is left alone
     assert event_service.migrate_legacy_cache_tracks() == 0  # idempotent
+
+
+def test_renumbering_keeps_the_file_version_so_the_offline_vault_stays_valid():
+    eid = _perf()
+    _drop(track_store.tracks_dir, f"01_{eid}_Maya_Nair_Kannalane.mp3")
+    event_service.reconcile_tracks(force=True)
+    before = db_service.get_performance(eid)
+    assert before["drive_file_id"].startswith("v")
+    client = TestClient(app)
+    client.post("/api/reorder-queue", headers=ADMIN, json={"items": [{"entry_id": eid, "sequence_order": 7}], "push_to_sheet": True})
+    after = db_service.get_performance(eid)
+    assert after["drive_file_name"].startswith(f"07_{eid}_") and after["drive_file_name"] != before["drive_file_name"]
+    assert after["drive_file_id"] == before["drive_file_id"]          # same content -> vault entry still valid
+    # replacing the content changes the version
+    path = track_store.find(eid)
+    with open(path, "wb") as f:
+        f.write(b"different audio bytes" * 10)
+    event_service.reconcile_tracks(force=True)
+    assert db_service.get_performance(eid)["drive_file_id"] != before["drive_file_id"]
