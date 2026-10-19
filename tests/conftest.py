@@ -11,20 +11,22 @@ def isolate_test_db(tmp_path, monkeypatch):
     preventing any test pollution from touching production or host databases.
     """
     # Isolate storage settings
-    event_dir = tmp_path / "event"
+    events_root = tmp_path / "events"
+    event_dir = events_root / "test-event"
     for sub in ("tracks", "incoming", "backups", "gallery", "scratch"):
         (event_dir / sub).mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(settings.storage, "cache_dir", str(event_dir / "scratch"))
+    monkeypatch.setattr(settings.storage, "events_dir", str(events_root))
+    monkeypatch.setattr(settings.event, "id", "test-event")
     monkeypatch.setattr(settings.storage, "event_dir", str(event_dir))
     monkeypatch.setattr(settings.storage, "tracks_dir", str(event_dir / "tracks"))
     monkeypatch.setattr(settings.storage, "gallery_dir", str(event_dir / "gallery"))
     from app.services.audio_service import audio_service
     monkeypatch.setattr(audio_service, "cache_dir", str(event_dir / "scratch"))
     
-    # Re-point db_service to the test event folder's database (same file the default manager resolves to)
-    test_db_file = event_dir / "event.db"
-    original_db_path = db_service._db_path
-    db_service._db_path = str(test_db_file)
+    # db_service resolves <event_dir>/event.db on every call, so patching settings above is enough (no pinned path);
+    # that also lets tests exercise real event switching.
+    db_service.db_manager.close_all()
     db_service._ensure_db()
 
     from app.events.listeners import register_default_listeners
@@ -36,5 +38,4 @@ def isolate_test_db(tmp_path, monkeypatch):
 
     yield
     
-    # Restore original states
-    db_service._db_path = original_db_path
+    db_service.db_manager.close_all()

@@ -2,7 +2,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app, DATA_DIR
+from app.main import app
 from app.config import settings
 from app.routers import auth as auth_module
 
@@ -136,6 +136,7 @@ def test_valid_settings_roundtrip_and_signup_still_works(admin, client):
 
 
 def test_data_mount_blocks_tracks_exports_and_database_files(client):
+    DATA_DIR = settings.storage.event_dir
     for sub in ("cache", "db", "tracks", "backups"):
         os.makedirs(os.path.join(DATA_DIR, sub), exist_ok=True)
     secret = os.path.join(DATA_DIR, "tracks", "leak.png")

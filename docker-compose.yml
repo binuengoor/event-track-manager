@@ -31,10 +31,13 @@ services:
     environment:
       - RUNTIME_ENV=docker
       - CACHE_DIR=/data/cache
-      - COOKIES_PATH=/secrets/yt_cookies.txt
+      - COOKIES_PATH=/secrets/yt_cookies.txt      # optional: export cookies.txt from a logged-in browser
+      - YTDLP_AUTO_UPDATE=${YTDLP_AUTO_UPDATE:-true}
+      - YTDLP_UPDATE_HOURS=${YTDLP_UPDATE_HOURS:-24}
     volumes:
       - ./secrets:/secrets:ro
       - audio_cache:/data/cache
+      - ytdlp_pkgs:/home/appuser/.local          # keeps the auto-updated yt-dlp across restarts
 
   # 3. Optional cloud sync sidecar (Google Drive, S3, NAS, ...). Start with: docker compose --profile sync up -d
   rclone-sync:
@@ -57,4 +60,6 @@ services:
 
 volumes:
   audio_cache:
+    driver: local
+  ytdlp_pkgs:
     driver: local

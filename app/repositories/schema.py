@@ -290,6 +290,17 @@ def ensure_database(conn: sqlite3.Connection):
     CREATE INDEX IF NOT EXISTS idx_participants_name ON participants (name)
     """)
 
+    # Payment tracking (singers only; used by the admin Payments tab)
+    for col_name, col_def in [
+        ("paid", "INTEGER DEFAULT 0"),
+        ("paid_at", "TEXT DEFAULT ''"),
+        ("payment_note", "TEXT DEFAULT ''"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE participants ADD COLUMN {col_name} {col_def}")
+        except Exception:
+            pass
+
     # Idempotent backfill
     backfill_participants(conn)
     conn.commit()

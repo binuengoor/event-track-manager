@@ -95,7 +95,7 @@
   <main id="admin-main-container" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 space-y-6">
 
     <!-- Admin Navigation Tabs -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-slate-800">
+    <div class="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-800">
       <button data-tab="event" class="admin-tab-btn active px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow">
         <i data-lucide="file-text" class="w-4 h-4"></i>
         <span>Event Details</span>
@@ -116,6 +116,14 @@
         <i data-lucide="users" class="w-4 h-4"></i>
         <span>Participants</span>
       </button>
+      <button data-tab="sheet" id="tab-btn-sheet" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="table-2" class="w-4 h-4"></i>
+        <span>Spreadsheet</span>
+      </button>
+      <button data-tab="payments" id="tab-btn-payments" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
+        <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
+        <span>Payments</span>
+      </button>
       <button data-tab="stats" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
         <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
         <span>Event Summary</span>
@@ -134,6 +142,16 @@
     <div id="admin-toast" class="hidden p-4 rounded-2xl text-xs font-bold transition flex items-center justify-between">
       <span id="admin-toast-text"></span>
       <button type="button" onclick="this.parentElement.classList.add('hidden')"><i data-lucide="x" class="w-4 h-4"></i></button>
+    </div>
+
+    <!-- Event switcher (filled by admin-events.js) -->
+    <div id="event-bar" class="hidden flex flex-col sm:flex-row sm:items-center gap-2.5 p-3 rounded-2xl bg-slate-900/90 border border-slate-800">
+      <div class="flex items-center gap-2 text-xs font-bold text-slate-300 shrink-0"><i data-lucide="calendar-days" class="w-4 h-4 text-orange-400"></i><span>Event</span></div>
+      <select id="event-select" class="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-semibold"></select>
+      <div class="flex gap-2 shrink-0">
+        <button type="button" id="new-event-btn" class="px-3.5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow flex items-center gap-1.5"><i data-lucide="plus" class="w-3.5 h-3.5"></i><span>New event</span></button>
+        <button type="button" id="manage-events-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-1.5"><i data-lucide="folder-cog" class="w-3.5 h-3.5"></i><span>Manage</span></button>
+      </div>
     </div>
 
     <!-- Event readiness strip (filled by admin-setup.js) -->
@@ -479,6 +497,75 @@
 
         <div id="admin-food-items-list" class="space-y-2">
           <!-- Dynamically populated -->
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: SPREADSHEET VIEWER -->
+    <section id="panel-sheet" class="admin-panel hidden space-y-4">
+      <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="table-2" class="w-5 h-5 text-emerald-400"></i><span>Event spreadsheet</span></h3>
+            <p id="sheet-sub" class="text-xs text-slate-400">The latest sign-ups, straight from the event database. Refreshed every time you open this page.</p>
+          </div>
+          <div class="flex items-center gap-2 relative">
+            <button type="button" id="sheet-refresh" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 flex items-center gap-1.5"><i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i><span>Refresh</span></button>
+            <button type="button" id="sheet-download-btn" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1.5"><i data-lucide="download" class="w-3.5 h-3.5"></i><span>Download</span><i data-lucide="chevron-down" class="w-3.5 h-3.5"></i></button>
+            <div id="sheet-download-menu" class="hidden absolute right-0 top-full mt-2 w-64 rounded-2xl bg-slate-950 border border-slate-700 shadow-2xl z-20 p-1.5"></div>
+          </div>
+        </div>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div id="sheet-tabs" class="flex flex-wrap gap-1.5"></div>
+          <input id="sheet-search" type="search" placeholder="Search this tab..." class="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white md:w-72">
+        </div>
+        <div class="overflow-auto rounded-2xl border border-slate-800 max-h-[62vh]">
+          <table class="w-full text-left text-xs border-collapse" id="sheet-table"></table>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+          <span id="sheet-note"></span><span id="sheet-count"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB: PAYMENTS -->
+    <section id="panel-payments" class="admin-panel hidden space-y-4">
+      <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl space-y-4">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2"><i data-lucide="badge-dollar-sign" class="w-5 h-5 text-amber-400"></i><span>Who has paid</span></h3>
+            <p class="text-xs text-slate-400">Everyone who sings, including duet and group partners, A to Z. Potluck-only guests are not listed.</p>
+          </div>
+          <div class="md:text-right">
+            <div id="pay-summary" class="text-sm font-bold text-white"></div>
+            <div class="mt-1.5 h-2 w-full md:w-56 rounded-full bg-slate-800 overflow-hidden"><div id="pay-bar" class="h-full bg-emerald-500 transition-all" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div class="flex gap-1.5" id="pay-filters">
+            <button type="button" data-f="all" class="pay-filter px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 text-white">All</button>
+            <button type="button" data-f="unpaid" class="pay-filter px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white">Not paid</button>
+            <button type="button" data-f="paid" class="pay-filter px-3 py-1.5 rounded-lg text-xs font-bold text-slate-400 hover:text-white">Paid</button>
+          </div>
+          <input id="pay-search" type="search" placeholder="Search a name..." class="bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-xs text-white md:w-72">
+        </div>
+        <div class="overflow-auto rounded-2xl border border-slate-800 max-h-[60vh]">
+          <table class="w-full text-left text-xs">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold sticky top-0 z-10">
+              <tr>
+                <th class="px-3.5 py-3 w-16"><label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="pay-all"> <span>Paid</span></label></th>
+                <th class="px-3.5 py-3">Name</th><th class="px-3.5 py-3">Age</th><th class="px-3.5 py-3">Songs</th><th class="px-3.5 py-3">Note</th>
+              </tr>
+            </thead>
+            <tbody id="pay-body" class="divide-y divide-slate-800/80"></tbody>
+          </table>
+        </div>
+        <div class="flex items-center justify-between gap-3 sticky bottom-0 bg-slate-900/95 backdrop-blur rounded-2xl px-3 py-2 border border-slate-800">
+          <span id="pay-dirty" class="text-xs text-slate-400">No unsaved changes</span>
+          <div class="flex gap-2">
+            <button type="button" id="pay-discard" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold disabled:opacity-40" disabled>Discard</button>
+            <button type="button" id="pay-save" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow disabled:opacity-40" disabled>Save changes</button>
+          </div>
         </div>
       </div>
     </section>
@@ -955,6 +1042,44 @@
   </div>
 
   
+  <!-- NEW EVENT -->
+  <div id="new-event-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl p-5 sm:p-6 space-y-4 text-xs">
+      <div class="flex items-start justify-between gap-3">
+        <div><h2 class="text-lg font-black text-white">Create a new event</h2><p class="text-slate-400">Your old event and all its data stay exactly as they are.</p></div>
+        <button type="button" data-close-modal class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <label class="block"><span class="block font-semibold text-slate-300 mb-1">Event name</span><input id="ne-name" maxlength="80" placeholder="Summer Talent Night 2027" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white"></label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label class="block"><span class="block font-semibold text-slate-300 mb-1">Start (MM-DD-YYYY HH:MMAM)</span><input id="ne-start" placeholder="06-14-2027 06:00PM" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white"></label>
+        <label class="block"><span class="block font-semibold text-slate-300 mb-1">Venue</span><input id="ne-venue" placeholder="Community Hall" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white"></label>
+      </div>
+      <label class="block"><span class="block font-semibold text-slate-300 mb-1">Start from</span>
+        <select id="ne-copy" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white"></select>
+        <span class="block text-[11px] text-slate-500 mt-1">Copies rules, switches, branding and the potluck menu. Never copies sign-ups, payments or tracks.</span></label>
+      <label class="flex items-center gap-2 text-slate-300"><input type="checkbox" id="ne-activate" checked> Switch to it now (every page shows the new event)</label>
+      <div id="ne-error" class="hidden text-rose-300 font-semibold"></div>
+      <div class="flex justify-end gap-2"><button type="button" data-close-modal class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">Cancel</button>
+        <button type="button" id="ne-create" class="px-5 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold shadow">Create event</button></div>
+    </div>
+  </div>
+
+  <!-- MANAGE EVENTS -->
+  <div id="manage-events-modal" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
+    <div class="w-full sm:max-w-4xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl p-5 sm:p-6 space-y-4 text-xs">
+      <div class="flex items-start justify-between gap-3">
+        <div><h2 class="text-lg font-black text-white">All events</h2><p class="text-slate-400">Every event keeps its own sign-ups, potluck, payments and settings. Clearing media only frees disk space.</p></div>
+        <button type="button" data-close-modal class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="overflow-x-auto rounded-2xl border border-slate-800">
+        <table class="w-full text-left"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold"><tr>
+          <th class="px-3 py-2.5">Event</th><th class="px-3 py-2.5">Acts</th><th class="px-3 py-2.5">Potluck</th><th class="px-3 py-2.5">Paid</th><th class="px-3 py-2.5">Media</th><th class="px-3 py-2.5">Last activity</th><th class="px-3 py-2.5 text-right">Actions</th></tr></thead>
+          <tbody id="events-table-body" class="divide-y divide-slate-800/80"></tbody></table>
+      </div>
+      <div id="clear-media-box" class="hidden p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 space-y-3"></div>
+    </div>
+  </div>
+
   <!-- SETUP WIZARD -->
   <div id="setup-wizard" class="hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm">
     <div class="w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl">
@@ -977,5 +1102,7 @@
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/admin-settings.js?v=2.1"></script>
   <script src="/static/js/admin-setup.js"></script>
+  <script src="/static/js/admin-data.js"></script>
+  <script src="/static/js/admin-events.js"></script>
 </body>
 </html>

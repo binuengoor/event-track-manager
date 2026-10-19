@@ -68,7 +68,7 @@ def test_landing_and_tracks_pages():
 
 def test_data_static_serving():
     import os
-    from app.main import DATA_DIR
+    DATA_DIR = settings.storage.event_dir
     # /data serves poster/gallery images only (never tracks, exports or databases)
     test_file = os.path.join(DATA_DIR, "test_banner.png")
     with open(test_file, "wb") as f:

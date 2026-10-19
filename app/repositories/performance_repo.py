@@ -36,7 +36,8 @@ class PerformanceRepository(BaseRepository):
         track_status: str = "Pending",
         created_via: str = "signup"
     ) -> str:
-        prefix = getattr(settings, "entry_id_prefix", "PK") or "PK"
+        from app.config import get_setting
+        prefix = str(get_setting("entry_id_prefix", getattr(settings, "entry_id_prefix", "PK")) or "PK").strip().upper() or "PK"
         now_iso = datetime.now(timezone.utc).isoformat()
         extra_tags = [age_group] if age_group else []
         if partner_age_group:
@@ -369,6 +370,22 @@ class PerformanceRepository(BaseRepository):
             raise ValueError(f"Field {field_name} not allowed for direct update")
         with self.get_connection() as conn:
             conn.execute(f"UPDATE performances SET {field_name} = ? WHERE entry_id = ?", (value, entry_id))
+            conn.commit()
+
+    def get_meta(self, key: str) -> Optional[str]:
+        try:
+            with self.get_connection() as conn:
+                row = conn.execute("SELECT value FROM sync_meta WHERE key = ?", (key,)).fetchone()
+                return row["value"] if row else None
+        except Exception:
+            return None
+
+    def set_meta(self, key: str, value: str):
+        with self.get_connection() as conn:
+            conn.execute("""
+            INSERT INTO sync_meta (key, value) VALUES (?, ?)
+            ON CONFLICT(key) DO UPDATE SET value=excluded.value
+            """, (key, value))
             conn.commit()
 
     def set_last_sync_time(self, ts: Optional[str] = None):

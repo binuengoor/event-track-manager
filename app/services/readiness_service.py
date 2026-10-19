@@ -76,7 +76,10 @@ class ReadinessService:
         except Exception as ex:
             status = {"status": "unavailable", "error": str(ex)}
         if status.get("status") == "healthy":
-            return _check("downloader", "YouTube link extractor", OK, "Reachable." + ("" if status.get("cookies_mounted") else " No cookies file (optional, helps with YouTube bot checks)."))
+            version = status.get("ytdlp_version")
+            return _check("downloader", "YouTube link extractor", OK,
+                          "Reachable" + (f", yt-dlp {version} (updates itself daily)." if version else ".")
+                          + ("" if status.get("cookies_mounted") else " No cookies file (optional, helps with YouTube bot checks)."))
         return _check("downloader", "YouTube link extractor", WARN, "Not reachable. Pasting YouTube links will fail; file uploads still work.",
                       "Start the downloader container: docker compose up -d downloader")
 

@@ -33,10 +33,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
-COPY main.py .
+COPY main.py start.sh ./
 
 RUN useradd -r -u 1000 -m -d /home/appuser -s /bin/false appuser && \
     mkdir -p /data/cache /tmp /home/appuser/.cache && \
+    chmod +x /app/start.sh && \
     chown -R appuser:appuser /app /data /tmp /home/appuser
 
 USER appuser
@@ -47,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8001/health || exit 1
 
 ENTRYPOINT ["tini", "--"]
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+CMD ["sh", "/app/start.sh"]

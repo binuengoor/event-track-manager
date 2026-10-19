@@ -1,41 +1,38 @@
-"""Writes the event's signup workbook/CSVs and database snapshots into the event folder.
+"""Writes the event's signup workbook/CSVs and database snapshots into the event folder, and renders downloads.
 
-signups.xlsx / signups.csv / potluck.csv are regenerated from SQLite (the source of truth) and written
-atomically (temp file + rename), so a sync tool such as rclone never uploads a half-written file.
+signups.xlsx / signups.csv / singers.csv / potluck.csv are regenerated from SQLite (the source of truth) and
+written atomically (temp file + rename), so a sync tool such as rclone never uploads a half-written file.
+The tables themselves come from ``datasets`` so the file, the admin viewer and the downloads always agree.
 """
+import io
 import os
 import csv
 import glob
+import json
 import sqlite3
 import logging
 import tempfile
 import threading
+import zipfile
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
-from app.config import settings
+from app.config import settings, get_setting
 
 logger = logging.getLogger("export-service")
 
 SNAPSHOT_MIN_INTERVAL_SECONDS = 300
 
-PERFORMANCE_COLUMNS = [
-    ("Entry ID", "entry_id"), ("Sequence", "sequence_order"), ("Performer", "performer_name"),
-    ("Age Group", "age_group"), ("Performance Type", "performance_type"), ("Duet Partner", "partner_name"),
-    ("Contact Phone", "contact_info"), ("Guardian", "guardian_name"), ("Guardian Phone", "guardian_phone"),
-    ("Partner Phone", "partner_phone"), ("Song", "song_title"), ("Movie/Album", "movie_name"),
-    ("Performance Status", "performance_status"), ("Track Status", "track_status"), ("Track File", "drive_file_name"),
-    ("Media", "media_type"), ("Duration", "duration"), ("Stage Notes", "stage_notes"),
-    ("Signed Up Via", "created_via"), ("Last Updated", "last_updated"),
-]
-POTLUCK_COLUMNS = [
-    ("Group", "group_name"), ("Item", "name"), ("Status", "_status"), ("Signed Up By", "signer_name"),
-    ("Phone", "signer_phone"), ("Dish", "dish_description"),
-]
-PARTICIPANT_COLUMNS = [
-    ("Name", "name"), ("Phone", "phone"), ("Age Group", "age_group"),
-    ("Guardian", "guardian_name"), ("Guardian Phone", "guardian_phone"),
-]
+# file names written to the event folder (kept stable for people who point tools at them)
+CSV_FILE_FOR = {"songs": "signups.csv", "singers": "singers.csv", "potluck": "potluck.csv"}
+
+DOWNLOAD_FORMATS = {
+    "xlsx": ("Excel workbook (all tabs)", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    "csv": ("CSV (this tab)", "text/csv; charset=utf-8"),
+    "tsv": ("TSV (this tab)", "text/tab-separated-values; charset=utf-8"),
+    "json": ("JSON (this tab)", "application/json"),
+    "zip": ("ZIP of CSVs (all tabs)", "application/zip"),
+}
 
 
 def _cell(value: Any) -> Any:
@@ -47,6 +44,10 @@ def _cell(value: Any) -> Any:
     # Neutralize spreadsheet formula injection from user-supplied text (phones like "+1 610 555 0123" stay intact).
     starts_formula = text[:1] in ("=", "@") or (text[:1] in ("+", "-") and any(c.isalpha() for c in text))
     return "'" + text if starts_formula else text
+
+
+def _safe_filename(text: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_." else "_" for c in (text or "event")) or "event"
 
 
 class ExportService:
@@ -65,7 +66,7 @@ class ExportService:
         os.makedirs(path, exist_ok=True)
         return path
 
-    # ------------------------------------------------------------------ helpers
+    # ------------------------------------------------------------------ writers
     def _atomic_write(self, final_path: str, writer):
         fd, tmp = tempfile.mkstemp(dir=os.path.dirname(final_path), prefix=".tmp_", suffix=os.path.splitext(final_path)[1])
         os.close(fd)
@@ -76,65 +77,47 @@ class ExportService:
             if os.path.exists(tmp):
                 os.remove(tmp)
 
-    def _rows(self, records: List[Dict[str, Any]], columns) -> List[List[Any]]:
-        return [[_cell(r.get(key)) for _, key in columns] for r in records]
+    @staticmethod
+    def _grid(table: Dict[str, Any]) -> List[List[Any]]:
+        return [[_cell(row.get(col)) for col in table["columns"]] for row in table["rows"]]
 
-    def _collect(self):
-        from app.services.db_service import db_service
-        perfs = db_service.get_all_performances()
-        food = db_service.get_all_food_items_with_signups()
-        for f in food:
-            f["_status"] = "Taken" if f.get("is_taken") else "Open"
-        try:
-            participants = db_service.participant_repo.get_all_participants(all_performances=[], all_food_items=[])
-        except Exception:
-            participants = []
-        return perfs, food, participants
-
-    # ------------------------------------------------------------------ outputs
-    def _write_xlsx(self, path: str, perfs, food, participants):
+    def _write_xlsx(self, path: str, tables: List[Dict[str, Any]]):
         from openpyxl import Workbook
         from openpyxl.styles import Font, PatternFill, Alignment
         wb = Workbook()
         header_font = Font(bold=True, color="FFFFFF")
         header_fill = PatternFill("solid", fgColor="C2410C")
-
-        def add_sheet(title, columns, records, first=False):
-            ws = wb.active if first else wb.create_sheet()
-            ws.title = title
-            ws.append([c for c, _ in columns])
-            for row in self._rows(records, columns):
+        for idx, table in enumerate(tables):
+            ws = wb.active if idx == 0 else wb.create_sheet()
+            ws.title = table["title"][:31]
+            ws.append(table["columns"])
+            grid = self._grid(table)
+            for row in grid:
                 ws.append(row)
             for cell in ws[1]:
                 cell.font = header_font
                 cell.fill = header_fill
                 cell.alignment = Alignment(vertical="center")
             ws.freeze_panes = "A2"
-            for idx, (header, _) in enumerate(columns, start=1):
-                longest = max([len(str(header))] + [len(str(r[idx - 1])) for r in self._rows(records, columns)] or [10])
-                ws.column_dimensions[ws.cell(row=1, column=idx).column_letter].width = min(max(longest + 2, 10), 48)
-            return ws
-
-        add_sheet("Performances", PERFORMANCE_COLUMNS, perfs, first=True)
-        run_sheet_cols = [("Seq", "sequence_order"), ("Performer(s)", "_who"), ("Song", "song_title"),
-                          ("Type", "performance_type"), ("Track", "track_status"), ("Notes", "stage_notes")]
-        run = []
-        for p in sorted(perfs, key=lambda x: x.get("sequence_order") or 9999):
-            who = p.get("performer_name") or ""
-            if p.get("partner_name"):
-                who += f" & {p['partner_name']}"
-            run.append({**p, "_who": who})
-        add_sheet("Run Sheet", run_sheet_cols, run)
-        add_sheet("Potluck", POTLUCK_COLUMNS, food)
-        add_sheet("Participants", PARTICIPANT_COLUMNS, participants)
+            for col_idx, header in enumerate(table["columns"], start=1):
+                longest = max([len(str(header))] + [len(str(r[col_idx - 1])) for r in grid])
+                ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = min(max(longest + 2, 10), 48)
+        if not tables:
+            wb.active.title = "Empty"
         wb.save(path)
 
-    def _write_csv(self, path: str, columns, records):
-        with open(path, "w", newline="", encoding="utf-8-sig") as f:
-            w = csv.writer(f)
-            w.writerow([c for c, _ in columns])
-            w.writerows(self._rows(records, columns))
+    def _csv_text(self, table: Dict[str, Any], delimiter: str = ",") -> str:
+        buf = io.StringIO(newline="")
+        w = csv.writer(buf, delimiter=delimiter)
+        w.writerow(table["columns"])
+        w.writerows(self._grid(table))
+        return buf.getvalue()
 
+    def _write_csv(self, path: str, table: Dict[str, Any]):
+        with open(path, "w", newline="", encoding="utf-8-sig") as f:
+            f.write(self._csv_text(table))
+
+    # ------------------------------------------------------------------ snapshots
     def snapshot_database(self) -> str:
         from app.services.db_service import db_service
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -154,26 +137,75 @@ class ExportService:
         self._last_snapshot = datetime.now().timestamp()
         return dest
 
-    # ------------------------------------------------------------------ public
+    # ------------------------------------------------------------------ public: event folder export
     def export_now(self, snapshot: bool = True, force_snapshot: bool = False) -> Dict[str, Any]:
+        from app.services.datasets import build_datasets
         with self._lock:
-            perfs, food, participants = self._collect()
+            tables = build_datasets()
             base = self.event_dir
-            self._atomic_write(os.path.join(base, "signups.xlsx"), lambda p: self._write_xlsx(p, perfs, food, participants))
-            self._atomic_write(os.path.join(base, "signups.csv"), lambda p: self._write_csv(p, PERFORMANCE_COLUMNS, perfs))
-            self._atomic_write(os.path.join(base, "potluck.csv"), lambda p: self._write_csv(p, POTLUCK_COLUMNS, food))
+            self._atomic_write(os.path.join(base, "signups.xlsx"), lambda p: self._write_xlsx(p, tables))
+            files = ["signups.xlsx"]
+            for table in tables:
+                name = CSV_FILE_FOR.get(table["id"])
+                if name:
+                    self._atomic_write(os.path.join(base, name), lambda p, t=table: self._write_csv(p, t))
+                    files.append(name)
             snap = None
             now = datetime.now().timestamp()
             if snapshot and (force_snapshot or now - self._last_snapshot >= SNAPSHOT_MIN_INTERVAL_SECONDS):
                 snap = self.snapshot_database()
+            by_id = {t["id"]: t for t in tables}
             return {
-                "rows_backed": len(perfs) + len(food),
-                "performances": len(perfs),
-                "potluck_items": len(food),
-                "files": ["signups.xlsx", "signups.csv", "potluck.csv"],
+                "rows_backed": sum(t["count"] for t in tables if t["id"] in ("songs", "potluck")),
+                "performances": by_id["songs"]["count"] if "songs" in by_id else 0,
+                "potluck_items": by_id["potluck"]["count"] if "potluck" in by_id else 0,
+                "files": files,
                 "snapshot": os.path.basename(snap) if snap else None,
                 "event_dir": base,
             }
+
+    # ------------------------------------------------------------------ public: downloads (always fresh from the database)
+    def render_download(self, fmt: str, sheet: str = "") -> Tuple[bytes, str, str]:
+        """Returns (content, media_type, filename) for one of DOWNLOAD_FORMATS."""
+        from app.services.datasets import build_datasets
+        fmt = (fmt or "xlsx").lower()
+        if fmt not in DOWNLOAD_FORMATS:
+            raise ValueError(f"Unknown format '{fmt}'. Choose one of: {', '.join(DOWNLOAD_FORMATS)}.")
+        tables = build_datasets()
+        if not tables:
+            raise ValueError("This event has no data tables yet.")
+        event = _safe_filename(str(get_setting("event_id", settings.event.id)))
+        stamp = datetime.now().strftime("%Y%m%d")
+        media = DOWNLOAD_FORMATS[fmt][1]
+
+        if fmt == "xlsx":
+            fd, tmp = tempfile.mkstemp(suffix=".xlsx")
+            os.close(fd)
+            try:
+                self._write_xlsx(tmp, tables)
+                with open(tmp, "rb") as f:
+                    data = f.read()
+            finally:
+                os.remove(tmp)
+            return data, media, f"{event}_{stamp}.xlsx"
+
+        if fmt == "zip":
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                for t in tables:
+                    zf.writestr(f"{event}_{t['id']}.csv", ("﻿" + self._csv_text(t)).encode("utf-8"))
+            return buf.getvalue(), media, f"{event}_{stamp}_csv.zip"
+
+        table = next((t for t in tables if t["id"] == sheet), tables[0])
+        if sheet and table["id"] != sheet:
+            raise ValueError(f"Unknown tab '{sheet}'.")
+        name = f"{event}_{table['id']}_{stamp}.{fmt}"
+        if fmt == "csv":
+            return ("﻿" + self._csv_text(table)).encode("utf-8"), media, name
+        if fmt == "tsv":
+            return ("﻿" + self._csv_text(table, "\t")).encode("utf-8"), media, name
+        payload = {"event": event, "tab": table["id"], "title": table["title"], "count": table["count"], "rows": table["rows"]}
+        return json.dumps(payload, ensure_ascii=False, indent=2, default=str).encode("utf-8"), media, name
 
 
 export_service = ExportService()

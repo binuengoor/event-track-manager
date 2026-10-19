@@ -83,6 +83,83 @@ class ParticipantRepository(BaseRepository):
 
             return participants
 
+    def get_singers(self) -> List[Dict[str, Any]]:
+        """Everyone who sings in the show (performers AND duet/group partners), alphabetical, with payment status.
+
+        Potluck-only attendees are excluded. Participant rows are created on demand so every singer has an id.
+        """
+        from app.utils.name_matcher import split_signer_names
+        with self.get_connection() as conn:
+            perfs = [dict(r) for r in conn.execute("""
+                SELECT entry_id, sequence_order, performer_name, partner_name, partner_age_group, partner_phone,
+                       song_title, performance_type, age_group, contact_info, guardian_name, guardian_phone
+                FROM performances ORDER BY COALESCE(sequence_order, 9999), row_index""").fetchall()]
+
+            people: Dict[str, Dict[str, Any]] = {}
+
+            def add(name, role, perf, phone, age, guardian, guardian_phone):
+                name = (name or "").strip()
+                if not name:
+                    return
+                key = name.lower()
+                person = people.setdefault(key, {"name": name, "phone": "", "age_group": "", "guardian_name": "",
+                                                 "guardian_phone": "", "songs": [], "entry_ids": []})
+                person["phone"] = person["phone"] or (phone or "")
+                person["age_group"] = person["age_group"] or (age or "")
+                person["guardian_name"] = person["guardian_name"] or (guardian or "")
+                person["guardian_phone"] = person["guardian_phone"] or (guardian_phone or "")
+                title = (perf.get("song_title") or "").strip()
+                person["songs"].append(title + (f" ({role})" if role == "partner" else "") if title else "(no title yet)")
+                person["entry_ids"].append(perf["entry_id"])
+
+            for p in perfs:
+                add(p["performer_name"], "primary", p, p["contact_info"], p["age_group"], p["guardian_name"], p["guardian_phone"])
+                for partner in split_signer_names(p.get("partner_name")):
+                    junior = "junior" in (p.get("partner_age_group") or "").lower()
+                    add(partner, "partner", p, p.get("partner_phone"), p.get("partner_age_group") or p.get("age_group"),
+                        p["guardian_name"] if junior else "", p["guardian_phone"] if junior else "")
+
+            result = []
+            for key in sorted(people, key=lambda k: k):
+                person = people[key]
+                part_id = get_or_create_participant_conn(
+                    conn, name=person["name"], phone=person["phone"], age_group=person["age_group"] or "Senior",
+                    guardian_name=person["guardian_name"], guardian_phone=person["guardian_phone"])
+                row = conn.execute("SELECT paid, paid_at, payment_note FROM participants WHERE participant_id = ?", (part_id,)).fetchone()
+                result.append({
+                    "participant_id": part_id, "name": person["name"], "age_group": person["age_group"],
+                    "phone": person["phone"], "guardian_name": person["guardian_name"], "guardian_phone": person["guardian_phone"],
+                    "songs": person["songs"], "act_count": len(person["entry_ids"]),
+                    "paid": bool(row["paid"]) if row else False, "paid_at": (row["paid_at"] if row else "") or "",
+                    "payment_note": (row["payment_note"] if row else "") or "",
+                })
+            conn.commit()
+            return result
+
+    def set_paid(self, updates: List[Dict[str, Any]]) -> int:
+        """Saves paid checkboxes. Each update: {participant_id, paid, note?}. Returns rows changed."""
+        changed = 0
+        with self.get_connection() as conn:
+            for u in updates:
+                pid = str(u.get("participant_id") or "").strip()
+                if not pid:
+                    continue
+                paid = 1 if u.get("paid") else 0
+                note = (u.get("note") or "").strip()[:200] if u.get("note") is not None else None
+                cur = conn.execute("SELECT paid FROM participants WHERE participant_id = ?", (pid,)).fetchone()
+                if cur is None:
+                    continue
+                sets = ["paid = ?", "paid_at = CASE WHEN ? = 1 AND paid = 0 THEN datetime('now') WHEN ? = 0 THEN '' ELSE paid_at END", "updated_at = datetime('now')"]
+                params = [paid, paid, paid]
+                if note is not None:
+                    sets.append("payment_note = ?")
+                    params.append(note)
+                params.append(pid)
+                conn.execute(f"UPDATE participants SET {', '.join(sets)} WHERE participant_id = ?", params)
+                changed += 1 if bool(cur["paid"]) != bool(paid) or note is not None else 0
+            conn.commit()
+        return changed
+
     def update_participant(self, participant_id: str, **fields) -> bool:
         """Updates participant details."""
         allowed_fields = {"name", "phone", "age_group", "guardian_name", "guardian_phone"}

@@ -48,6 +48,9 @@ const fakeDate = (iso) => `(() => { const R = Date; const off = new R('${iso}').
   await shot(c, '/admin', 'admin-presets', { wait: 2500, pre: async (p) => { await tab(/Features/i)(p); await p.evaluate(() => document.querySelector('.preset-card[data-preset="show_no_potluck"]')?.click()); await settle(p, 800); } });
   await shot(c, '/admin', 'admin-food', { wait: 2500, pre: async (p) => { await tab(/Food/i)(p); await p.evaluate(() => document.querySelector('.food-template-btn[data-t="indian"]')?.click()); await settle(p, 800); } });
   await shot(c, '/admin', 'admin-wizard', { wait: 2500, pre: async (p) => { await tab(/Features/i)(p); await p.evaluate(() => document.getElementById('open-wizard-btn').click()); await settle(p, 800); } });
+  await shot(c, '/admin', 'admin-sheet', { wait: 2500, pre: async (p) => { await tab(/Spreadsheet/i)(p); await p.evaluate(() => [...document.querySelectorAll('.sheet-tab')].find(b => /Singers/.test(b.textContent))?.click()); await settle(p, 400); await p.evaluate(() => document.getElementById('sheet-download-btn').click()); await settle(p, 400); } });
+  await shot(c, '/admin', 'admin-payments', { wait: 2500, pre: async (p) => { await tab(/Payments/i)(p); await p.evaluate(() => { document.querySelectorAll('.pay-check')[0].click(); }); await settle(p, 300); await p.evaluate(() => { document.querySelectorAll('.pay-check')[2].click(); }); await settle(p, 300); await p.evaluate(() => { document.getElementById('pay-save').click(); }); await settle(p, 1200); } });
+  await shot(c, '/admin', 'admin-events', { wait: 2500, pre: async (p) => { await p.evaluate(() => document.getElementById('manage-events-btn').click()); await settle(p, 900); } });
   await shot(c, '/admin', 'admin-readiness', { wait: 2500, pre: async (p) => { await p.evaluate(() => document.getElementById('readiness-toggle')?.click()); await settle(p, 800); } });
   await c.close();
 

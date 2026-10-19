@@ -13,7 +13,9 @@ router = APIRouter(tags=["event"])
 def get_event_info():
     sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or ""
     payment_url = get_setting("payment_url") or settings.event.payment_url
-    poster_url = get_setting("event_poster_url") or settings.event.poster_url
+    poster_url = get_setting("event_poster_url")
+    if poster_url is None:
+        poster_url = settings.event.poster_url
     header_brand_title = get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "EMA Paattukoottam")
     header_brand_subtitle = get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "Musical Night")
     event_name = get_setting("event_name") or settings.event.name

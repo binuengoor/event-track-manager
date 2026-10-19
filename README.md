@@ -21,6 +21,20 @@ Event-day instructions: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · Design decisio
 
 ---
 
+## Three services
+
+```
+ app          the web app (sign-up, console, live, admin). Needs nothing else to run.
+ downloader   YouTube/SoundCloud extractor: yt-dlp + ffmpeg + a JS solver. Required only for pasted links;
+              file uploads work without it. yt-dlp upgrades itself on start and every 24 h (no rebuild).
+ rclone-sync  OPTIONAL cloud mirror (profile "sync"). Without it, everything simply stays in ./events.
+```
+
+`docker compose up -d` starts `app` + `downloader`; add `--profile sync` for rclone. For YouTube "confirm you're not a bot" errors,
+save a cookies export as `secrets/yt_cookies.txt` (mounted read-only into the downloader). Turn updates off with `YTDLP_AUTO_UPDATE=false`.
+Why our own downloader image and not a stock one: YouTube needs ffmpeg plus a JavaScript challenge solver (deno), which no official
+yt-dlp image bundles; ours installs upstream yt-dlp and keeps it current.
+
 ## One event, one folder
 
 Everything the app stores lives in `./events/<event id>/`. Map one volume and you are done.
@@ -38,7 +52,7 @@ events/paattukoottam-2026/
 
 - **Drop-in tracks:** put `PK-004_anything.mp3` into `tracks/` or `incoming/` and act PK-004 shows as ready within seconds.
 - **Reordering** renames the files to their new running-order numbers. Replacing a track archives the old one. Nothing is hard-deleted.
-- **A new event** is a new folder. Archiving an event is zipping its folder.
+- **A new event** is a new folder (create it from `/admin`; the active one is remembered in `events/.active_event`). Archiving an event is zipping its folder.
 
 ## Cloud sync is optional and lives outside the app
 
@@ -69,6 +83,8 @@ All screenshots are the real app with sample (fictional) data. The glow behind e
 | **Sound Console** (Admin or Operator PIN): cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, rules, food, participants, exports<br><img src="docs/images/admin.jpg" width="420"> |
 | **Presets with a change preview**<br><img src="docs/images/admin-presets.jpg" width="420"> | **Setup wizard**<br><img src="docs/images/admin-wizard.jpg" width="420"> |
 | **Potluck quick add**: paste a menu, `x3` makes three slots<br><img src="docs/images/admin-food.jpg" width="420"> | **Event readiness**: what to fix before doors open<br><img src="docs/images/admin-readiness.jpg" width="420"> |
+| **Spreadsheet viewer** with downloads (Excel, CSV, TSV, JSON, ZIP)<br><img src="docs/images/admin-sheet.jpg" width="420"> | **Payments**: who has paid, singers A to Z<br><img src="docs/images/admin-payments.jpg" width="420"> |
+| **All events**: keep every event, clear media to free disk<br><img src="docs/images/admin-events.jpg" width="420"> | |
 
 **Phone layout.** One compact menu, and tables become cards.
 
@@ -81,6 +97,19 @@ All screenshots are the real app with sample (fictional) data. The glow behind e
 > To regenerate these images see [docs/RUNBOOK.md](docs/RUNBOOK.md#10-refreshing-the-readme-screenshots).
 
 ---
+
+## Spreadsheet, payments and past events (all in `/admin`)
+
+- **Spreadsheet tab:** a live, searchable view of the event's data, refreshed every time you open the admin page (which also rewrites `signups.xlsx`/CSVs in the event folder). Tabs follow the event type:
+  a stage show gets **Songs**, **Singers** and **Run Sheet** (plus **Potluck** when potluck is on); a potluck-only event gets just **Potluck**.
+  **Download** as Excel (all tabs), CSV, TSV, JSON (the current tab) or a ZIP of CSVs. Downloads are generated fresh from the database.
+- **Payments tab** (stage events): every singer, **including duet and group partners**, A to Z, with a Paid checkbox, an optional note ("Zelle"), a
+  Not paid / Paid filter, a progress bar and one **Save changes** button. Potluck-only guests are not listed. Paid status feeds the Singers sheet.
+- **Events:** the bar at the top of `/admin` switches the **active event** (sign-up, console, live and every page follow immediately),
+  creates a new one (copying rules, switches and the potluck menu from the current or any past event, never sign-ups, payments or tracks), and
+  **Manage** lists every event with its acts, potluck, paid count and disk use. Each event keeps its own folder, database and exports forever.
+- **Clear media** (per event, typed confirmation): deletes that event's audio/video to free disk space. Sign-ups, potluck, payments and settings stay;
+  acts just show "no track" again. Do this after the event is over.
 
 ## Pick an event type (presets)
 
@@ -115,7 +144,7 @@ from a template (Indian, BBQ, Thanksgiving, simple). Existing items and claims a
 | `/live` | Venue screen | Now on Stage, Up Next, notes, sponsor gallery. Pushed instantly (server-sent events) |
 | `/console` | Admin or Operator PIN | Queue, cue, waveform player, notes, reorder, status, offline vault, ZIP |
 | `/console/stage-monitor` | Admin or Operator PIN | Video confidence monitor for the stage |
-| `/admin` | Admin PIN | Setup wizard, presets, readiness, rules, potluck, roster, exports, activity log |
+| `/admin` | Admin PIN | Event switcher, setup wizard, presets, readiness, rules, potluck, roster, **spreadsheet + downloads**, **payments**, exports, activity log |
 | `/docs` | Public | OpenAPI reference |
 
 ## Quickstart
@@ -170,14 +199,15 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 | `ADMIN_PIN` | `2026` | **Change it.** Opens `/admin`, `/console` |
 | `OPERATOR_PIN` | off | Optional. Opens the sound console only (for a volunteer). Env only, never editable from the UI |
 | `PORT` | `8088` | Host port |
-| `EVENT_ID` | `paattukoottam-2026` | Folder name under `EVENTS_DIR` |
-| `EVENTS_DIR` / `EVENT_DIR` | `/events` (Docker), `./events` | Parent folder, or pin one event folder |
+| `EVENT_ID` | `paattukoottam-2026` | First event's folder under `EVENTS_DIR`. After that, switch events in `/admin` |
+| `EVENTS_DIR` / `EVENT_DIR` | `/events` (Docker), `./events` | Parent folder of all events. `EVENT_DIR` pins ONE folder and turns event switching off |
 | `APP_TITLE`, `APP_SUBTITLE`, `EVENT_START_TIME` (`MM-DD-YYYY HH:MMAM`), `EVENT_TIMEZONE`, `EVENT_VENUE`, `EVENT_TIME_RANGE`, `EVENT_POSTER_URL`, `EVENT_PAYMENT_URL`, `EVENT_GENERAL_NOTES` | see `.env.example` | Seed values |
 | `ENTRY_ID_PREFIX` | `PK` | Entry ids (`PK-001`) appear in track file names |
 | `MAX_UPLOAD_SIZE_MB` | `100` | Audio allowed at least 200 MB, video up to 500 MB |
 | `AUDIO_BITRATE` | `320k` | Upload transcode target |
 | `BACKUP_ENABLED`, `BACKUP_DEBOUNCE_SECONDS` | `true`, `10` | Export + snapshot a few seconds after the last change |
 | `RCLONE_REMOTE`, `RCLONE_TRASH`, `SYNC_INTERVAL` | off | Optional sidecar, see [rclone/README.md](rclone/README.md) |
+| `YTDLP_AUTO_UPDATE`, `YTDLP_UPDATE_HOURS` | `true`, `24` | Downloader keeps yt-dlp current without a rebuild |
 | `CACHE_DIR` | `/data/cache` | Disposable scratch for conversion and the downloader hand-off |
 | `DOWNLOADER_SERVICE_URL` | `http://downloader:8001` | |
 

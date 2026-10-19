@@ -247,6 +247,12 @@ class DBService:
     def update_performance_field(self, entry_id: str, field_name: str, value: Any):
         return self.performance_repo.update_performance_field(entry_id, field_name, value)
 
+    def get_meta(self, key: str) -> Optional[str]:
+        return self.performance_repo.get_meta(key)
+
+    def set_meta(self, key: str, value: str):
+        return self.performance_repo.set_meta(key, value)
+
     def set_last_sync_time(self, ts: Optional[str] = None):
         return self.performance_repo.set_last_sync_time(ts)
 
@@ -338,6 +344,12 @@ class DBService:
             all_performances=self.get_all_performances(),
             all_food_items=self.get_all_food_items_with_signups()
         )
+
+    def get_singers(self) -> List[Dict[str, Any]]:
+        return self.participant_repo.get_singers()
+
+    def set_paid(self, updates: List[Dict[str, Any]]) -> int:
+        return self.participant_repo.set_paid(updates)
 
     def update_participant(self, participant_id: str, **fields) -> bool:
         return self.participant_repo.update_participant(participant_id, **fields)

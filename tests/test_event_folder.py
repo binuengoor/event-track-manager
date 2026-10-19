@@ -115,8 +115,8 @@ def test_export_writes_xlsx_csv_and_snapshot_atomically():
 
     from openpyxl import load_workbook
     wb = load_workbook(os.path.join(base, "signups.xlsx"))
-    assert wb.sheetnames == ["Performances", "Run Sheet", "Potluck", "Participants"]
-    rows = list(wb["Performances"].values)
+    assert wb.sheetnames == ["Songs", "Singers", "Run Sheet", "Potluck"]
+    rows = list(wb["Songs"].values)
     assert rows[0][0] == "Entry ID" and any(r[2] == "Formula Guy" for r in rows[1:])
     song = next(r for r in rows[1:] if r[2] == "Formula Guy")[10]
     assert song.startswith("'=")                    # formulas are neutralized

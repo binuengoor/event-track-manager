@@ -285,6 +285,17 @@ def load_config() -> AppConfig:
 
     is_docker = os.getenv("RUNTIME_ENV") == "docker" or os.path.exists("/.dockerenv")
 
+    # The active event can be switched in /admin; the choice is remembered in <events dir>/.active_event
+    if not os.getenv("EVENT_DIR"):
+        _root = os.getenv("EVENTS_DIR") or ("/events" if is_docker else "./events")
+        try:
+            with open(os.path.join(_root, ".active_event"), "r", encoding="utf-8") as f:
+                _active = f.read().strip()
+            if _active and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,80}", _active) and os.path.isdir(os.path.join(_root, _active)):
+                config.event.id = _active
+        except OSError:
+            pass
+
     # Event folder: EVENT_DIR (explicit) or EVENTS_DIR/<event id>
     safe_event_id = re.sub(r"[^A-Za-z0-9._-]", "_", (config.event.id or "event").strip()) or "event"
     if os.getenv("EVENT_DIR"):

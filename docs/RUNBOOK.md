@@ -65,9 +65,12 @@ Rules of thumb:
 
 ## 5. After the event
 
+0. **Spreadsheet** tab: download the final Excel (or CSV bundle). **Payments** tab: confirm who has paid and save.
+
 1. `/admin -> Backup & Sync -> Force Backup Now` (writes `signups.xlsx/csv`, `potluck.csv` and a database snapshot).
 2. Copy or zip the whole `events/<EVENT_ID>/` folder. That is the complete archive (database snapshot, signups, every track).
-3. To start a new event: change `EVENT_ID` in `.env` (and restart). The new event gets its own empty folder; the old one stays untouched. Apply a preset or run the wizard.
+3. To start a new event: `/admin` -> **New event** (copies rules and the potluck menu if you want; never sign-ups). The old event stays untouched and can be re-opened from the Event bar any time.
+4. To free disk space: **Manage -> Clear media** on the finished event (type its id to confirm). Sign-ups, potluck and payments are kept; only audio/video files are deleted.
 
 ## 6. Deploy / update
 
