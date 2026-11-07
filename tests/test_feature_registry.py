@@ -41,3 +41,22 @@ def test_dataset_flags_follow_config_and_database_precedence(monkeypatch):
 
     monkeypatch.setattr(SettingsRepository, "get_setting", lambda self, key: "true")
     assert event_kind() == {"stage": True, "potluck": True}
+
+
+def test_presets_use_registered_flags_and_freeze_is_a_partial_patch():
+    from app.services.presets import PRESET_CATALOG, preset_settings
+
+    assert len(PRESET_CATALOG) == 8
+    for preset in PRESET_CATALOG:
+        flags = preset["flags"]
+        assert set(flags) <= set(features.FEATURES)
+        assert all(type(value) is bool for value in flags.values())
+        if preset["id"] != "freeze":
+            assert set(flags) == set(features.FEATURES)
+    assert preset_settings("freeze") == {
+        "signup_enabled": False,
+        "food_signup_enabled": False,
+        "track_upload_enabled": False,
+        "performer_edits_enabled": False,
+        "console_enabled": True,
+    }

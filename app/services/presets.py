@@ -5,11 +5,9 @@ deleted by a preset; it only changes which pages/actions are open and the sign-u
 """
 from typing import Any, Dict, List
 
-FLAG_KEYS = [
-    "stage_performances_enabled", "signup_enabled", "food_signup_enabled", "track_upload_enabled",
-    "allow_duets", "performer_edits_enabled", "live_display_enabled", "dashboard_enabled",
-    "console_enabled", "payment_enabled",
-]
+from app.features import FEATURES
+
+FLAG_KEYS = list(FEATURES)
 
 SETTING_LABELS: Dict[str, str] = {
     "stage_performances_enabled": "Stage performances",
