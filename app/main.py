@@ -102,8 +102,8 @@ PUBLIC_BLOCKED_TOP_LEVEL = {"tracks", "incoming", "backups", "cache", "db", "sec
 class AppStaticFiles(StaticFiles):
     # Do not serve guest HTML templates directly: the page routes inject event navigation.
     GUEST_ALIASES = {
-        "landing.html": "/", "index.html": "/performer", "signup.html": "/signup",
-        "dashboard.html": "/dashboard", "live.html": "/live",
+        "landing.html": "/", "index.html": "/my-entry", "signup.html": "/signup",
+        "dashboard.html": "/schedule", "live.html": "/live",
     }
 
     async def get_response(self, path, scope):

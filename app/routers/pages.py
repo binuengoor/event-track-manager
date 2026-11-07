@@ -43,7 +43,7 @@ async def serve_signup_page():
     return response
 
 
-@router.get("/performer", response_class=HTMLResponse)
+@router.get("/my-entry", response_class=HTMLResponse)
 async def serve_performer_page():
     index_path = os.path.join(STATIC_DIR, "index.html")
     with open(index_path, "r", encoding="utf-8") as f:
@@ -52,10 +52,20 @@ async def serve_performer_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
 
-    html = render_guest_navigation(html, "/performer")
+    html = render_guest_navigation(html, "/my-entry")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
+
+
+@router.get("/performer")
+async def redirect_performer():
+    return RedirectResponse(url="/my-entry", status_code=301)
+
+
+@router.get("/dashboard")
+async def redirect_dashboard():
+    return RedirectResponse(url="/schedule", status_code=301)
 
 
 @router.get("/tracks")
@@ -74,12 +84,12 @@ async def redirect_intake_to_performer():
     return RedirectResponse(url="/tracks")
 
 
-@router.get("/dashboard", response_class=HTMLResponse)
+@router.get("/schedule", response_class=HTMLResponse)
 async def serve_dashboard_page():
     dash_path = os.path.join(STATIC_DIR, "dashboard.html")
     with open(dash_path, "r", encoding="utf-8") as f:
         html = f.read()
-    html = render_guest_navigation(html, "/dashboard")
+    html = render_guest_navigation(html, "/schedule")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response

@@ -37,3 +37,6 @@
     line-height: 1.2;
   }
 }
+.guest-admin-link { text-align: center; padding: 1rem; font-size: .875rem; }
+.guest-admin-link a { color: #cbd5e1; text-decoration: underline; }
+.guest-admin-link a:focus-visible { outline: 3px solid #fbbf24; outline-offset: 2px; }

@@ -17,9 +17,11 @@ def test_guest_shell_uses_preset_flags_on_initial_response(preset):
     flags = preset['flags']
     assert ('href="/signup"' in shell) == (flags.get('signup_enabled', True) or flags.get('food_signup_enabled', True))
     assert ('href="/live"' in shell) == flags.get('live_display_enabled', True)
-    assert ('href="/dashboard"' in shell) == flags.get('dashboard_enabled', True)
+    assert ('href="/schedule"' in shell) == flags.get('dashboard_enabled', True)
     assert 'href="/console"' not in shell
-    assert 'href="/admin"' in shell
+    assert 'href="/admin"' not in shell
+    assert '<footer class="guest-admin-link"><a href="/admin">' in response.text
+    assert ('href="/my-entry"' in shell) == (flags.get('performer_edits_enabled', True) or flags.get('track_upload_enabled', True) or flags.get('food_signup_enabled', True))
     assert '/static/js/nav.js' not in response.text
 
 
@@ -34,7 +36,7 @@ def test_guest_shell_has_active_page_and_does_not_interpolate_event_name():
     assert response.headers['cache-control'].startswith('no-cache')
 
 
-@pytest.mark.parametrize('path', ['/', '/signup', '/performer', '/dashboard', '/live'])
+@pytest.mark.parametrize('path', ['/', '/signup', '/my-entry', '/schedule'])
 def test_each_guest_route_serves_its_own_current_navigation(path):
     with TestClient(app) as client:
         response = client.get(path)
@@ -45,8 +47,8 @@ def test_each_guest_route_serves_its_own_current_navigation(path):
 
 
 @pytest.mark.parametrize(('alias', 'target'), [
-    ('landing', '/'), ('index', '/performer'), ('signup', '/signup'),
-    ('dashboard', '/dashboard'), ('live', '/live'),
+    ('landing', '/'), ('index', '/my-entry'), ('signup', '/signup'),
+    ('dashboard', '/schedule'), ('live', '/live'),
 ])
 def test_guest_static_aliases_redirect_to_dynamic_pages(alias, target):
     with TestClient(app) as client:
@@ -63,3 +65,29 @@ def test_active_link_has_visible_style():
     shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
     active = shell.split('href="/signup" aria-current="page"', 1)[1].split('</a>', 1)[0]
     assert 'bg-orange-600' in active
+
+
+@pytest.mark.parametrize(('old', 'new'), [('/dashboard', '/schedule'), ('/performer', '/my-entry')])
+def test_old_guest_routes_permanently_redirect(old, new):
+    with TestClient(app) as client:
+        response = client.get(old, follow_redirects=False)
+    assert response.status_code == 301
+    assert response.headers['location'] == new
+
+
+def test_live_is_full_screen_without_guest_navigation():
+    with TestClient(app) as client:
+        response = client.get('/live')
+    assert response.status_code == 200
+    assert '<nav aria-label="Main"' not in response.text
+    assert 'guest-admin-link' not in response.text
+
+
+def test_single_destination_has_no_navigation_bar():
+    for flag in ('signup_enabled', 'food_signup_enabled', 'dashboard_enabled',
+                 'performer_edits_enabled', 'track_upload_enabled', 'live_display_enabled'):
+        db_service.set_app_setting(flag, False)
+    with TestClient(app) as client:
+        response = client.get('/')
+    assert '<nav aria-label="Main"' not in response.text
+    assert '<footer class="guest-admin-link"><a href="/admin">' in response.text

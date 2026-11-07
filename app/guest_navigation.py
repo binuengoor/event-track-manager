@@ -7,16 +7,16 @@ from app.features import feature_enabled
 
 def render_guest_navigation(html: str, path: str) -> str:
     stage = feature_enabled('stage_performances_enabled')
-    signup = feature_enabled('signup_enabled') or feature_enabled('food_signup_enabled')
+    food = feature_enabled('food_signup_enabled')
     links = [('/', 'Home')]
-    if signup:
-        links.append(('/signup', 'Sign up'))
-    links.append(('/performer', 'Performer Hub' if stage else 'Attendee Hub'))
     if feature_enabled('dashboard_enabled'):
-        links.append(('/dashboard', 'Dashboard' if stage else 'Food Board'))
+        links.append(('/schedule', 'Schedule' if stage else 'Food board'))
+    if feature_enabled('signup_enabled') or food:
+        links.append(('/signup', 'Sign up'))
+    if feature_enabled('performer_edits_enabled') or feature_enabled('track_upload_enabled') or food:
+        links.append(('/my-entry', 'My entry' if stage else 'My dish'))
     if feature_enabled('live_display_enabled'):
         links.append(('/live', 'Live'))
-    links.append(('/admin', 'Admin sign-in'))
 
     def link(href: str, label: str) -> str:
         active = ' aria-current="page"' if href == path else ''
@@ -26,11 +26,13 @@ def render_guest_navigation(html: str, path: str) -> str:
                 f'{escape(label)}</a>')
 
     items = ''.join(link(href, label) for href, label in links)
-    shell = f'<nav aria-label="Main" class="guest-navigation">{items}</nav>'
+    shell = f'<nav aria-label="Main" class="guest-navigation">{items}</nav>' if len(links) >= 2 and path != '/live' else ''
     # Page templates each have one simple nav within their first header.
     pattern = r'(<header\b[^>]*>.*?)(<nav\b[^>]*>.*?</nav>)(.*?</header>)'
     result, count = re.subn(pattern, lambda m: m.group(1) + shell + m.group(3), html, count=1, flags=re.S)
     if count != 1:
         raise ValueError('Guest template has no recognizable header navigation')
+    if path != '/live':
+        result = result.replace('</body>', '<footer class="guest-admin-link"><a href="/admin">Admin sign-in</a></footer></body>', 1)
     result = result.replace('</head>', '<link rel="stylesheet" href="/static/css/guest-navigation.css"></head>', 1)
     return result.replace('<script src="/static/js/nav.js"></script>', '', 1)
