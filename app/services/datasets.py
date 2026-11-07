@@ -9,7 +9,7 @@ file in the event folder, so what the admin sees is exactly what is exported.
 """
 from typing import Any, Dict, List
 
-from app.config import get_setting
+from app.features import feature_enabled
 from app.services.db_service import db_service
 
 SONG_COLUMNS = [
@@ -38,8 +38,8 @@ POTLUCK_COLUMNS = [
 
 def event_kind() -> Dict[str, bool]:
     return {
-        "stage": bool(get_setting("stage_performances_enabled", True)),
-        "potluck": bool(get_setting("food_signup_enabled", True)),
+        "stage": feature_enabled("stage_performances_enabled"),
+        "potluck": feature_enabled("food_signup_enabled"),
     }
 
 

@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict, Any
 from fastapi import APIRouter
 
+from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.db_service import db_service
 from app.privacy import strip_private
@@ -13,7 +14,7 @@ router = APIRouter(tags=["dashboard"])
 
 @router.get("/api/dashboard/performances")
 def dashboard_performances():
-    if not bool(get_setting("dashboard_enabled", getattr(settings.signup, "dashboard_enabled", True))):
+    if not feature_enabled("dashboard_enabled"):
         return []
 
     perfs = db_service.get_all_performances()
@@ -40,7 +41,7 @@ def dashboard_performances():
 @router.get("/api/dashboard/food")
 def dashboard_food():
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)
-    enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
+    enabled = feature_enabled("food_signup_enabled")
     groups = [g for g in db_service.get_food_groups() if g.get("item_count", 0) > 0]
     items = db_service.get_all_food_items_with_signups()
 

@@ -6,6 +6,7 @@ import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.stage_service import stage_service
 from app.services.audio_service import audio_service
@@ -33,7 +34,7 @@ SSE_KEEPALIVE_SECONDS = 15
 
 def require_console_enabled(_authorized: bool = Depends(verify_operator_pin)) -> bool:
     """Blocks stage-control actions when the organizer disabled the sound console (e.g. potluck preset)."""
-    if not bool(get_setting("console_enabled", getattr(settings.signup, "console_enabled", True))):
+    if not feature_enabled("console_enabled"):
         raise HTTPException(status_code=403, detail="The sound console is disabled for this event.")
     return True
 
@@ -53,7 +54,7 @@ def get_live_status(request: Request):
     status["header_brand_subtitle"] = get_setting("header_brand_subtitle", getattr(settings.event, "header_brand_subtitle", "Musical Night"))
     status["event_name"] = get_setting("event_name", status.get("event_name"))
     status["event_subtitle"] = get_setting("event_subtitle", status.get("event_subtitle"))
-    status["live_display_enabled"] = bool(get_setting("live_display_enabled", getattr(settings.signup, "live_display_enabled", True)))
+    status["live_display_enabled"] = feature_enabled("live_display_enabled")
     if not status["live_display_enabled"]:
         for key in ("now_performing",):
             status[key] = None

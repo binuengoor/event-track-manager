@@ -6,6 +6,7 @@ import logging
 import asyncio
 from typing import Optional, Dict, Any
 
+from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.exceptions import (
     UploadDisabledError,
@@ -49,7 +50,7 @@ class AudioWorkflowService:
         file_path: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Validates, transcodes, verifies, and synchronizes a backing track (audio or video) for a performance."""
-        if not bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))):
+        if not feature_enabled("track_upload_enabled"):
             raise UploadDisabledError("Backing track uploads are currently disabled for this event.")
 
         allowed = get_setting("allowed_media", ["audio", "video"])

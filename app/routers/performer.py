@@ -3,6 +3,7 @@ import logging
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException
 
+from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
@@ -46,11 +47,11 @@ async def get_performer_profile(name: str):
     counts = db_service.count_performances_for_performer(clean_name)
     all_food_items = db_service.get_all_food_items_with_signups()
     serving_note = get_setting("food_serving_note", settings.signup.food_serving_note)
-    food_enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
-    stage_performances_enabled = bool(get_setting("stage_performances_enabled", getattr(settings.signup, "stage_performances_enabled", True)))
-    track_upload_enabled = bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True)))
-    edits_enabled = bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True)))
-    allow_duets = bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True)))
+    food_enabled = feature_enabled("food_signup_enabled")
+    stage_performances_enabled = feature_enabled("stage_performances_enabled")
+    track_upload_enabled = feature_enabled("track_upload_enabled")
+    edits_enabled = feature_enabled("performer_edits_enabled")
+    allow_duets = feature_enabled("allow_duets")
 
     # When stage performances are disabled (e.g. potluck-only event), suppress performances & songs completely
     if not stage_performances_enabled:
@@ -93,7 +94,7 @@ async def get_registered_participant_names():
     returns distinct performer and partner names from performances to prevent food signups
     (e.g., family groupings like 'Rajiv & Anjana') from appearing in the performer dropdown.
     If stage performances are disabled, falls back to registered participants (e.g. food/attendees)."""
-    stage_performances_enabled = bool(get_setting("stage_performances_enabled", getattr(settings.signup, "stage_performances_enabled", True)))
+    stage_performances_enabled = feature_enabled("stage_performances_enabled")
 
     names = set()
     perfs = db_service.get_all_performances()
@@ -117,7 +118,7 @@ async def get_registered_participant_names():
 
 @router.post("/api/performer/performances")
 async def add_performer_performance(payload: AddPerformanceRequest):
-    if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
+    if not feature_enabled("performer_edits_enabled"):
         raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
 
     clean_name = payload.performer_name.strip()
@@ -134,7 +135,7 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         raise HTTPException(status_code=404, detail=f"No registration found for {clean_name}. Please sign up first.")
 
     perf_type = payload.performance_type.strip().capitalize() if payload.performance_type else "Solo"
-    allow_duets = bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True)))
+    allow_duets = feature_enabled("allow_duets")
     if not allow_duets and perf_type != "Solo":
         raise HTTPException(status_code=400, detail="Duet and group performances are currently disabled for this event (Solo only).")
 
@@ -208,7 +209,7 @@ async def add_performer_performance(payload: AddPerformanceRequest):
 
 @router.put("/api/performer/rename")
 async def rename_performer_endpoint(payload: PerformerRenameRequest):
-    if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
+    if not feature_enabled("performer_edits_enabled"):
         raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
 
     old_name = payload.old_name.strip()

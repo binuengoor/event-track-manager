@@ -2,6 +2,7 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 
+from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
 from app.services.db_service import db_service
@@ -62,13 +63,13 @@ class RegistrationService:
             "event_name": get_setting("event_name", settings.event.name),
             "event_subtitle": get_setting("event_subtitle", settings.event.subtitle),
             "poster_url": get_setting("event_poster_url", settings.event.poster_url),
-            "payment_url": get_setting("payment_url", settings.event.payment_url) if bool(get_setting("payment_enabled", getattr(settings.signup, "payment_enabled", True))) else "",
-            "signup_enabled": bool(get_setting("signup_enabled", settings.signup.signup_enabled)),
-            "food_signup_enabled": bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled)),
-            "track_upload_enabled": bool(get_setting("track_upload_enabled", getattr(settings.signup, "track_upload_enabled", True))),
-            "allow_duets": bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True))),
-            "performer_edits_enabled": bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))),
-            "payment_enabled": bool(get_setting("payment_enabled", getattr(settings.signup, "payment_enabled", True))),
+            "payment_url": get_setting("payment_url", settings.event.payment_url) if feature_enabled("payment_enabled") else "",
+            "signup_enabled": feature_enabled("signup_enabled"),
+            "food_signup_enabled": feature_enabled("food_signup_enabled"),
+            "track_upload_enabled": feature_enabled("track_upload_enabled"),
+            "allow_duets": feature_enabled("allow_duets"),
+            "performer_edits_enabled": feature_enabled("performer_edits_enabled"),
+            "payment_enabled": feature_enabled("payment_enabled"),
             "food_serving_note": get_setting("food_serving_note", settings.signup.food_serving_note),
             "max_performances_per_participant": int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant)),
             "max_solo_per_participant": int(get_setting("max_solo_per_participant", settings.signup.max_solo_per_participant)),
@@ -82,8 +83,8 @@ class RegistrationService:
 
     def register_participant(self, payload: SignupRequest) -> Dict[str, Any]:
         """Executes full participant registration with validation and quota enforcement."""
-        perf_signup_enabled = bool(get_setting("signup_enabled", getattr(settings.signup, "signup_enabled", True)))
-        food_signup_enabled = bool(get_setting("food_signup_enabled", getattr(settings.signup, "food_signup_enabled", True)))
+        perf_signup_enabled = feature_enabled("signup_enabled")
+        food_signup_enabled = feature_enabled("food_signup_enabled")
 
         if not perf_signup_enabled and not food_signup_enabled:
             raise RegistrationError(
@@ -151,7 +152,7 @@ class RegistrationService:
         if not payload.performances:
             raise RegistrationError("At least one performance is required.")
 
-        allow_duets = bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True)))
+        allow_duets = feature_enabled("allow_duets")
         if not allow_duets:
             for p in payload.performances:
                 ptype = (p.performance_type or "").strip().lower()

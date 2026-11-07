@@ -7,6 +7,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
+from app.features import feature_enabled
 from app.services.event_service import event_service
 from app.services.audio_service import audio_service
 from app.services.track_store import mime_type_for
@@ -37,8 +38,7 @@ async def upload_track(
 ):
     raw_path = None
     try:
-        from app.config import get_setting, settings as _settings
-        if not bool(get_setting("track_upload_enabled", getattr(_settings.signup, "track_upload_enabled", True))):
+        if not feature_enabled("track_upload_enabled"):
             raise UploadDisabledError("Backing track uploads are currently disabled for this event.")
         original_filename = file.filename if file else None
         if file:
