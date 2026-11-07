@@ -1,4 +1,4 @@
-import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions } from "./console/offline-actions.js";
+import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions, appendSynchronized, drainSynchronized } from "./console/offline-actions.js";
 import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
 
 // EMA Paattukoottam Stage Playback Console
@@ -288,16 +288,15 @@ async function clearVaultStorage() {
 // =============================================================================
 // OFFLINE ACTIONS & NETWORK RECOVERY SYNC
 // =============================================================================
-function enqueueOfflineAction(type, entryId, payload = {}) {
-  const actions = getOfflineActions();
-  actions.push({
-    type,
-    entryId,
-    payload,
-    timestamp: Date.now()
-  });
-  saveOfflineActions(actions);
-  updateNetworkStatusDisplay();
+async function enqueueOfflineAction(type, entryId, payload = {}) {
+  try {
+    await appendSynchronized({type, entryId, payload, timestamp: Date.now()});
+    updateNetworkStatusDisplay();
+    return true;
+  } catch (error) {
+    showToast(`Could not save action for offline sync: ${error.message}`, 'error');
+    return false;
+  }
 }
 
 async function syncOfflineActions() {
@@ -309,7 +308,13 @@ async function syncOfflineActions() {
   }
 
   showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
-  const syncedCount = await drainOfflineActions(getAuthHeaders);
+  let syncedCount;
+  try {
+    syncedCount = await drainSynchronized(getAuthHeaders);
+  } catch (error) {
+    showToast(`Could not sync offline actions: ${error.message}`, 'error');
+    return;
+  }
   updateNetworkStatusDisplay();
   if (syncedCount > 0) {
     showToast(`✓ Successfully synced ${syncedCount} offline actions to server!`);
@@ -1331,7 +1336,7 @@ async function uncueTrack() {
     resetPlayerBar();
 
     if (!navigator.onLine) {
-      enqueueOfflineAction('uncue', null, {});
+      if (!await enqueueOfflineAction('uncue', null, {})) return;
       showToast(`✓ Uncued "${songName}" locally. Live Program restored.`);
       return;
     }
@@ -1344,7 +1349,7 @@ async function uncueTrack() {
       if (!res.ok) throw new Error('Failed to uncue track on server');
       showToast(`✓ Uncued "${songName}". Live Program restored to countdown.`);
     } catch (err) {
-      enqueueOfflineAction('uncue', null, {});
+      if (!await enqueueOfflineAction('uncue', null, {})) return;
       showToast(`Uncued locally (network error, will sync when online)`, 'warning');
     }
   });
@@ -1593,11 +1598,11 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
         fetch(`/api/set-active/${item.entry_id}`, {
           method: 'POST',
           headers: getAuthHeaders()
-        }).catch(() => {
-          enqueueOfflineAction('set_active', item.entry_id, {});
+        }).catch(async () => {
+          await enqueueOfflineAction('set_active', item.entry_id, {});
         });
       } else {
-        enqueueOfflineAction('set_active', item.entry_id, {});
+        await enqueueOfflineAction('set_active', item.entry_id, {});
       }
     }
   };
@@ -1689,7 +1694,7 @@ async function updateStatus(entryId, newStatus) {
   localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
 
   if (!navigator.onLine) {
-    enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus });
+    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
     showToast(`✓ Marked ${normalizedPerfStatus} locally (will sync when online)`, 'info');
     return;
   }
@@ -1707,7 +1712,7 @@ async function updateStatus(entryId, newStatus) {
     if (!res.ok) throw new Error('Status update failed');
     showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${normalizedPerfStatus}`);
   } catch (err) {
-    enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus });
+    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
     showToast(`Saved locally (network error, will sync when online)`, 'warning');
   }
 }
@@ -1725,7 +1730,7 @@ async function updateStageNotes(entryId, notes) {
   localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
 
   if (!navigator.onLine) {
-    enqueueOfflineAction('stage_notes', entryId, { notes: notes });
+    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
     showToast('✓ Stage note updated locally (will sync when online)', 'info');
     return;
   }
@@ -1744,7 +1749,7 @@ async function updateStageNotes(entryId, notes) {
     const data = await res.json();
     showToast(data.stage_notes ? '✓ Stage note updated' : '✓ Stage note cleared');
   } catch (err) {
-    enqueueOfflineAction('stage_notes', entryId, { notes: notes });
+    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
     showToast('Saved locally (network error, will sync when online)', 'warning');
   }
 }

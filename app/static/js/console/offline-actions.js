@@ -86,3 +86,49 @@ export function drainOfflineActions(getHeaders, fetchRequest = fetch) {
   })().finally(() => { replayInFlight = null; });
   return replayInFlight;
 }
+
+// Web Locks are shared by every tab of this origin. Queue mutations take a
+// short lock; replay takes a separate lock for its lifetime so an append never
+// waits for a slow network request. Without Web Locks, refuse unsafe writes.
+function locks() {
+  const manager = globalThis.navigator?.locks;
+  if (!manager || typeof manager.request !== 'function') {
+    throw new Error('Offline sync needs a browser that supports Web Locks.');
+  }
+  return manager;
+}
+const QUEUE_LOCK = 'event-track-manager-offline-queue';
+const REPLAY_LOCK = 'event-track-manager-offline-replay';
+
+export async function appendSynchronized(action) {
+  return locks().request(QUEUE_LOCK, () => {
+    const queue = getOfflineActions();
+    if (!Array.isArray(queue)) throw new Error('Offline queue is invalid.');
+    queue.push(action);
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  });
+}
+
+export async function drainSynchronized(getHeaders, fetchRequest = fetch) {
+  return locks().request(REPLAY_LOCK, async () => {
+    let synced = 0;
+    while (true) {
+      const action = await locks().request(QUEUE_LOCK, () => {
+        const queue = getOfflineActions();
+        if (!Array.isArray(queue)) throw new Error('Offline queue is invalid.');
+        return queue[0];
+      });
+      if (!action) return synced;
+      const remaining = await replayOfflineActions([action], getHeaders, fetchRequest);
+      if (remaining.length) return synced;
+      const removed = await locks().request(QUEUE_LOCK, () => {
+        const latest = getOfflineActions();
+        if (!Array.isArray(latest) || JSON.stringify(latest[0]) !== JSON.stringify(action)) return false;
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(latest.slice(1)));
+        return true;
+      });
+      if (!removed) return synced;
+      synced += 1;
+    }
+  });
+}
