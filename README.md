@@ -59,11 +59,33 @@ events/                         <- the one volume you map
 - **Reordering** renames the files to their new running-order numbers. Replacing a track archives the old one. Nothing is hard-deleted.
 - **A new event** is a new folder (create it from `/admin`; the active one is remembered in `events/.active_event`). Archiving an event is zipping its folder.
 
+## How the data fits together
+
+There is **no single central database**. Each event folder holds its own SQLite file, and the folder *is* the event.
+
+| Question | Answer |
+|---|---|
+| Where are sign-ups, potluck claims, payments, settings, the activity log? | In that event's `event.db` (SQLite, WAL mode). It is the source of truth. |
+| What ties events together? | Nothing in the database. The only shared piece is the one-line pointer file `events/.active_event`. "New event -> copy from" copies rules, switches and the potluck **menu** once; it never links or shares rows afterwards. |
+| How does an act find its track? | By the **entry id inside the file name** (`PK-004` in `02_PK-004_Maya_Nair_Kannalane.mp3`), not by a stored path. The database keeps a cached copy (`drive_file_name` = file name, `drive_file_id` = size+mtime version) for fast screens. |
+| Who wins if the database and the folder disagree? | The folder, for tracks. The app re-scans `tracks/` (and adopts `incoming/`) every few seconds: a new matching file marks the act Uploaded; a missing file puts it back to Pending. Everything else (people, food, order, payments) is database-only. |
+| Do entry ids repeat across events? | Yes (`PK-001` exists in every event). That is safe because tracks are only ever looked up inside the active event's folder. |
+| What does an event cost to keep? | Its folder. Archive = zip it. **Clear media** deletes only its audio/video and keeps every record. |
+
+Column names such as `drive_file_id` / `drive_file_name` are leftovers from the Google Drive era. They now hold the local file name and a
+content version. See [docs/AUDIT-2026-11.md](docs/AUDIT-2026-11.md) for the full list of leftovers and known gaps.
+
 ## Cloud sync is optional and lives outside the app
 
 The app never talks to Google or any cloud. If you want the folder mirrored (Google Drive, Dropbox, S3, a NAS...), start
 the **rclone sidecar**: it uploads the folder (never the live `event.db`; snapshots in `backups/` instead) and pulls a cloud
 `incoming/` inbox so organizers can drop tracks into Drive from their phones.
+
+> [!WARNING]
+> **Known limitation: the sidecar follows `EVENT_ID` from `.env`, not the active event.** `rclone/sync.sh` mirrors exactly one folder,
+> `events/$EVENT_ID`. If you create or switch to another event in `/admin`, the sidecar keeps copying the old event until you change
+> `EVENT_ID` **and** `RCLONE_REMOTE` in `.env` and run `docker compose --profile sync up -d`. Until this is fixed, treat the cloud copy as
+> "one event at a time" and check the remote after each switch. Tracked in the audit.
 
 ```bash
 docker compose --profile sync run --rm --entrypoint rclone rclone-sync config   # one-time: create the remote
@@ -239,8 +261,28 @@ On first start the app copies your database from the old `/db` volume (or the au
 `tracks/`. Old copies stay in place until you delete them. Then: remove `GOOGLE_*` settings and `secrets/credentials.json` (YouTube cookies
 `secrets/yt_cookies.txt` are still used by the downloader), map `./events:/events`, and optionally run the rclone sidecar to keep Drive in sync.
 
+## Extending it (what to touch)
+
+The backend is layered (routers -> services -> repositories) and the event types are data (`app/services/presets.py`), so most changes are small.
+A new **on/off feature** is the least tidy case, because a switch is spread across several files. Use `console_enabled` as the worked example:
+
+| Step | File |
+|---|---|
+| Default value | `SignupConfig` in `app/config.py`, and `default_app_settings()` in `app/services/event_manager.py` |
+| Name, label, and which presets turn it on | `FLAG_KEYS`, `SETTING_LABELS`, each preset in `app/services/presets.py` |
+| Allow it to be saved from the admin page | the flag lists in `app/services/admin_service.py` |
+| Tell the browser | `app/routers/event.py` (public payload) |
+| Enforce it on the server | the router that owns the feature (for example `require_console_enabled` in `app/routers/stage.py`) |
+| Show/hide in the UI | `app/static/js/utils.js`, the page's JS, and the toggle in `admin-settings.html/.js` |
+| Prove it | `tests/test_feature_flags.py` |
+
+Removing a feature is the same list in reverse. Presets never delete data, so turning a feature off is always safe.
+
 ## Good to know
 
+- **The server needs no internet, but browsers do.** Pages load Tailwind, Lucide icons, WaveSurfer (and `marked` in one page) from public CDNs. On a
+  venue network without internet, pages render unstyled and the console waveform fails unless that browser has visited the console online before
+  (the service worker caches only the console shell). The offline USB ZIP is the real stage fallback. Bundling these files locally is on the audit list.
 - Keep `./events` on a **local disk** (not SMB/NFS): the database uses SQLite, which needs a real filesystem for safe locking. Use the rclone sidecar to copy to the cloud or a NAS instead.
 - If the event folder is not writable, the app **stops with a clear message** instead of quietly saving somewhere that disappears.
 - Uploads are streamed to disk (a 500 MB video never sits in memory) and refused as soon as they exceed the limit.

@@ -13,6 +13,7 @@ Roles: **Organizer** (runs `/admin`, Admin PIN), **Sound operator** (runs `/cons
 3. Fine-tune in **Event Details**, **Sign-Up Rules** (songs per person, solos, audio/video, age groups) and **Food & Potluck** (paste a menu into *Quick add*).
 4. Drop sponsor logos into `events/<EVENT_ID>/gallery/` (png/jpg/webp/gif). The live screen splits 70/30 automatically.
 5. Optional cloud copy: set up the rclone sidecar (`rclone/README.md`) so the event folder is mirrored to Google Drive, Dropbox, a NAS, etc.
+   The sidecar copies the event named by `EVENT_ID` in `.env`, **not** whichever event is active in `/admin`. After creating or switching events, update `EVENT_ID` and `RCLONE_REMOTE`, then `docker compose --profile sync up -d`.
 6. Share `https://<your-domain>/signup` with participants.
 
 ## 2. Pre-event checklist (2 days before)
@@ -30,7 +31,7 @@ Open `/admin`: the **Event readiness** strip at the top should be green (or only
 | Reorder + save | drag in `/console`, press **Save Order** | file names get the new numbers; `signups.xlsx` updates |
 | Live screen | open `/live` on the venue display, cue an act in the console | screen changes within a second or two |
 | Operator PIN | log in to `/console` with it | works; `/admin` refuses it |
-| Export opens | open `events/<id>/signups.xlsx` | 4 tabs: Performances, Run Sheet, Potluck, Participants |
+| Export opens | open `events/<id>/signups.xlsx` | Tabs follow the event type: Songs, Singers, Run Sheet (+ Potluck when potluck is on); potluck-only has just Potluck |
 | Cloud copy (if used) | check the remote folder | tracks, xlsx and `backups/` appear |
 | Delete test data | `/admin -> Participants` | |
 
@@ -119,6 +120,8 @@ Files are matched to acts by the **entry id** in the file name (the id shown in 
 | `signups.xlsx` looks out of date | Export is debounced (10 s) | **Export signups now** in Backup & Sync |
 | Edits to the spreadsheet disappear | The spreadsheet is an export | Change data in the app (`/admin`), not the file |
 | Nothing reaches the cloud | rclone sidecar not running or remote misconfigured | `docker compose --profile sync logs rclone-sync`; re-run `rclone config` |
+| New event's files are not in the cloud | The sidecar still follows the old `EVENT_ID` | Set `EVENT_ID` and `RCLONE_REMOTE` in `.env` to the new event, `docker compose --profile sync up -d` |
+| Pages look unstyled / no icons / no waveform at the venue | Browsers fetch Tailwind, icons and WaveSurfer from public CDNs and the network has no internet | Use a network with internet, or open `/console` once online first (it caches its own files); keep the offline USB ZIP as the fallback |
 | Forgot PIN | | Edit `ADMIN_PIN` in `.env`, `docker compose up -d` |
 | "Too many failed attempts" (HTTP 429) | Rate limit (8 per client / 100 overall per 5 min) | Wait 5 minutes, or `docker compose restart app` |
 | Live screen frozen | Network on the display device | Reload `/live` |
