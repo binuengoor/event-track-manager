@@ -642,8 +642,8 @@ empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the 
 
 | Upgrade | Detail | Provenance |
 |---|---|---|
-| Transport state machine | `IDLE, ARMED, PLAYING, PAUSED, FADING, ENDED`; selecting a row while `PLAYING` never changes the deck, it sets "on deck" or asks first. Unit-tested. | from external plan |
-| On-deck concept | Active deck plus the next act shown with its notes; "cue next" arms it. The existing disruption modal stays as the confirmation. | from external plan, adapted |
+| Transport state machine | `IDLE, CUED, PLAYING, PAUSED, FADING, ENDED`; selecting a row while `PLAYING` never changes the deck, it sets "on deck" or asks first. Unit-tested. | from external plan |
+| On-deck concept | Active deck plus the next act shown with its notes; "Cue next" loads it (owner prefers the word "cue" throughout the UI and docs; never "arm"). The existing disruption modal stays as the confirmation. | from external plan, adapted |
 | Fade out | `F` fades over 3 s through a gain stage, then stops. Keep `M` as mute; do not remap keys (D6). | from external plan, adapted |
 | Reorder lock | Lock toggle (on during the show); unlocked shows drag handles; each drop saves the order; file renames and exports run automatically after a few seconds idle (D7). The manual Save Order button stays for "do it now". | from external plan, adapted (its premise that unsaved orders are lost is wrong, see Appendix C) |
 | Screen wake lock | Request a screen wake lock on `/console`, `/console/monitor`, `/live`; re-request on visibility change (needs HTTPS, which Cloudflare provides). | from external plan |
