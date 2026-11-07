@@ -21,7 +21,7 @@ router = APIRouter(tags=["performer"])
 
 
 @router.get("/api/performer/profile")
-async def get_performer_profile(name: str):
+def get_performer_profile(name: str):
     clean_name = name.strip()
     if not clean_name:
         raise HTTPException(status_code=400, detail="Name parameter is required.")
@@ -108,7 +108,7 @@ async def get_performer_profile(name: str):
 
 
 @router.get("/api/performer/names")
-async def get_registered_participant_names():
+def get_registered_participant_names():
     """Returns unique, sorted names of performers. When stage performances are enabled,
     returns distinct performer and partner names from performances to prevent food signups
     (e.g., family groupings like 'Rajiv & Anjana') from appearing in the performer dropdown.
@@ -138,7 +138,7 @@ async def get_registered_participant_names():
 
 
 @router.post("/api/performer/performances")
-async def add_performer_performance(payload: AddPerformanceRequest):
+def add_performer_performance(payload: AddPerformanceRequest):
     if not feature_enabled("performer_edits_enabled"):
         raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
 
@@ -259,7 +259,7 @@ async def add_performer_performance(payload: AddPerformanceRequest):
 
 
 @router.put("/api/performer/rename")
-async def rename_performer_endpoint(payload: PerformerRenameRequest):
+def rename_performer_endpoint(payload: PerformerRenameRequest):
     if not feature_enabled("performer_edits_enabled"):
         raise HTTPException(status_code=400, detail="Performer self-service editing is currently locked for this event.")
 

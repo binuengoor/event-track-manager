@@ -25,12 +25,12 @@ from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodIt
 
 
 @router.get("/api/signup/config")
-async def get_signup_config():
+def get_signup_config():
     return registration_service.get_signup_config()
 
 
 @router.post("/api/signup")
-async def register_participant(payload: SignupRequest):
+def register_participant(payload: SignupRequest):
     try:
         return registration_service.register_participant(payload)
     except FoodItemUnavailableError as ex:
@@ -112,7 +112,7 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
 
 
 @router.put("/api/signup/performance/{entry_id}")
-async def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
+def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
     require_feature("performer_edits_enabled", "Performer self-service editing is currently locked for this event.")
 
     old_perf = db_service.get_performance(entry_id)

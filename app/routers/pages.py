@@ -158,6 +158,8 @@ async def serve_stage_monitor_page():
     return response
 
 
+@router.get("/console/monitor")
+@router.get("/monitor")
 @router.get("/stage-monitor")
 async def redirect_stage_monitor():
     return RedirectResponse(url="/console/stage-monitor", status_code=302)

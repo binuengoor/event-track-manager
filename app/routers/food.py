@@ -40,7 +40,7 @@ def _food_admin(request: Request) -> bool:
 # =============================================================================
 
 @router.post("/api/signup/food")
-async def claim_food_item_endpoint(payload: FoodClaimRequest):
+def claim_food_item_endpoint(payload: FoodClaimRequest):
     require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
 
     if not payload.signer_name.strip():
@@ -78,7 +78,7 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
 
 
 @router.put("/api/signup/food/{signup_id}")
-async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest, request: Request):
+def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest, request: Request):
     require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
     admin = _food_admin(request)
     all_items_before = db_service.get_all_food_items_with_signups()
@@ -120,7 +120,7 @@ async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest
 
 
 @router.delete("/api/signup/food/{signup_id}")
-async def release_food_signup_endpoint(signup_id: str, request: Request, payload: Optional[FoodOwnershipProof] = None):
+def release_food_signup_endpoint(signup_id: str, request: Request, payload: Optional[FoodOwnershipProof] = None):
     require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
     admin = _food_admin(request)
     all_items_before = db_service.get_all_food_items_with_signups()
@@ -156,19 +156,19 @@ async def release_food_signup_endpoint(signup_id: str, request: Request, payload
 # =============================================================================
 
 @router.get("/api/admin/food-groups")
-async def list_admin_food_groups(_authorized: bool = Depends(verify_admin_pin)):
+def list_admin_food_groups(_authorized: bool = Depends(verify_admin_pin)):
     return db_service.get_food_groups()
 
 
 @router.post("/api/admin/food-groups")
-async def create_admin_food_group(payload: FoodGroupCreateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def create_admin_food_group(payload: FoodGroupCreateRequest, _authorized: bool = Depends(verify_admin_pin)):
     gid = db_service.add_food_group(payload.name)
     backup_service.trigger_backup()
     return {"status": "success", "group_id": gid}
 
 
 @router.put("/api/admin/food-groups/{group_id}")
-async def update_admin_food_group(group_id: str, payload: FoodGroupUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_admin_food_group(group_id: str, payload: FoodGroupUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
     success = db_service.update_food_group(group_id, name=payload.name, display_order=payload.display_order)
     if not success:
         raise HTTPException(status_code=404, detail="Food group not found.")
@@ -177,7 +177,7 @@ async def update_admin_food_group(group_id: str, payload: FoodGroupUpdateRequest
 
 
 @router.delete("/api/admin/food-groups/{group_id}")
-async def delete_admin_food_group(group_id: str, _authorized: bool = Depends(verify_admin_pin)):
+def delete_admin_food_group(group_id: str, _authorized: bool = Depends(verify_admin_pin)):
     try:
         success = db_service.delete_food_group(group_id)
         if not success:
@@ -189,26 +189,26 @@ async def delete_admin_food_group(group_id: str, _authorized: bool = Depends(ver
 
 
 @router.post("/api/admin/food-groups/reorder")
-async def reorder_admin_food_groups(payload: FoodGroupReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
+def reorder_admin_food_groups(payload: FoodGroupReorderRequest, _authorized: bool = Depends(verify_admin_pin)):
     db_service.reorder_food_groups(payload.ordered_ids)
     backup_service.trigger_backup()
     return {"status": "success"}
 
 
 @router.get("/api/admin/food-items")
-async def list_admin_food_items(_authorized: bool = Depends(verify_admin_pin)):
+def list_admin_food_items(_authorized: bool = Depends(verify_admin_pin)):
     return db_service.get_all_food_items_with_signups()
 
 
 @router.post("/api/admin/food-items")
-async def create_admin_food_item(payload: FoodItemCreateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def create_admin_food_item(payload: FoodItemCreateRequest, _authorized: bool = Depends(verify_admin_pin)):
     iid = db_service.add_food_item(name=payload.name, group_id=payload.group_id)
     backup_service.trigger_backup()
     return {"status": "success", "item_id": iid}
 
 
 @router.put("/api/admin/food-items/{item_id}")
-async def update_admin_food_item(item_id: str, payload: FoodItemUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_admin_food_item(item_id: str, payload: FoodItemUpdateRequest, _authorized: bool = Depends(verify_admin_pin)):
     if payload.display_order is not None and payload.signer_name is None and not payload.release_claim:
         success = db_service.update_food_item(item_id, name=payload.name, group_id=payload.group_id, display_order=payload.display_order)
     else:
@@ -232,7 +232,7 @@ async def update_admin_food_item(item_id: str, payload: FoodItemUpdateRequest, _
 
 
 @router.delete("/api/admin/food-items/{item_id}")
-async def delete_admin_food_item(item_id: str, force: bool = False, _authorized: bool = Depends(verify_admin_pin)):
+def delete_admin_food_item(item_id: str, force: bool = False, _authorized: bool = Depends(verify_admin_pin)):
     try:
         success = db_service.delete_food_item(item_id, force=force)
         if not success:
@@ -244,21 +244,21 @@ async def delete_admin_food_item(item_id: str, force: bool = False, _authorized:
 
 
 @router.put("/api/admin/food-serving-note")
-async def update_admin_serving_note(payload: FoodServingNoteRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_admin_serving_note(payload: FoodServingNoteRequest, _authorized: bool = Depends(verify_admin_pin)):
     db_service.set_app_setting("food_serving_note", payload.text)
     backup_service.trigger_backup()
     return {"status": "success"}
 
 
 @router.put("/api/admin/food-toggle")
-async def update_admin_food_toggle(payload: FoodToggleRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_admin_food_toggle(payload: FoodToggleRequest, _authorized: bool = Depends(verify_admin_pin)):
     db_service.set_app_setting("food_signup_enabled", payload.enabled)
     backup_service.trigger_backup()
     return {"status": "success"}
 
 
 @router.put("/api/admin/signup-toggle")
-async def update_admin_signup_toggle(payload: SignupToggleRequest, _authorized: bool = Depends(verify_admin_pin)):
+def update_admin_signup_toggle(payload: SignupToggleRequest, _authorized: bool = Depends(verify_admin_pin)):
     db_service.set_app_setting("signup_enabled", payload.enabled)
     backup_service.trigger_backup()
     return {"status": "success", "enabled": payload.enabled}

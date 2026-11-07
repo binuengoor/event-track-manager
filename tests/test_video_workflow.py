@@ -43,10 +43,11 @@ def test_stage_monitor_routes():
     assert "stage-video" in res.text
     assert "muted" in res.text
 
-    # Redirect /stage-monitor -> /console/stage-monitor
-    redirect_res = client.get("/stage-monitor", follow_redirects=False)
-    assert redirect_res.status_code == 302
-    assert redirect_res.headers["location"] == "/console/stage-monitor"
+    # Redirect /stage-monitor, /console/monitor, /monitor -> /console/stage-monitor
+    for alias in ("/stage-monitor", "/console/monitor", "/monitor"):
+        redirect_res = client.get(alias, follow_redirects=False)
+        assert redirect_res.status_code == 302
+        assert redirect_res.headers["location"] == "/console/stage-monitor"
 
 
 def test_video_upload_and_stream(tmp_path, monkeypatch):
