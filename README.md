@@ -202,6 +202,7 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 | Variable | Default | Notes |
 |---|---|---|
 | `ADMIN_PIN` | `2026` | **Change it.** Opens `/admin`, `/console` |
+| `TRUST_CLOUDFLARE` | `false` | Set `true` only when the app is reachable solely through Cloudflare: failed-login throttling then keys on `CF-Connecting-IP` instead of the first `X-Forwarded-For` value |
 | `OPERATOR_PIN` | off | Optional. Opens the sound console only (for a volunteer). Env only, never editable from the UI |
 | `PORT` | `8088` | Host port |
 | `EVENT_ID` | `paattukoottam-2026` | First event's folder under `EVENTS_DIR`. After that, switch events in `/admin` |
@@ -229,6 +230,7 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 
 - Public pages and APIs never include phone numbers or guardian details; only admin endpoints return them. The exported files do contain them, so share the folder/remote only with organizers.
 - Roles: **Admin PIN** (everything) and optional **Operator PIN** (sound console only; sees no phone numbers). Failed guesses are throttled (8 per client and 100 overall per 5 minutes, then HTTP 429). The PIN is never accepted in a URL; sessions use an HMAC cookie, not the PIN.
+- Every response carries `X-Robots-Tag: noindex, nofollow, noarchive` and `/robots.txt` disallows all, so search engines skip the public pages (they list participant names). Activity-log entries never store phone numbers. Readiness warns when the admin PIN is shorter than 6 characters; behind Cloudflare set `TRUST_CLOUDFLARE=true` so throttling cannot be dodged with a spoofed `X-Forwarded-For`.
 - `/data` serves poster and gallery images only: never tracks, exports, backups or the database.
 - User-supplied text is escaped everywhere it is rendered. Spreadsheet exports neutralize formula injection.
 - Use HTTPS in front (Caddy example in the runbook) and a non-default PIN. Do not commit `.env`, `secrets/` or `events/`.
