@@ -8,10 +8,12 @@ from app.config import settings, get_setting
 from app.services.db_service import db_service
 from app.services.track_store import track_store
 from app.services.downloader_client import downloader_client
+from app.repositories.audit_repo import BACKUP_FAILED
 
 logger = logging.getLogger("readiness")
 
 OK, WARN, ERROR, INFO = "ok", "warn", "error", "info"
+MIN_PIN_LENGTH = 6
 
 
 def _check(cid: str, label: str, status: str, detail: str, fix: str = "") -> Dict[str, Any]:
@@ -24,9 +26,11 @@ class ReadinessService:
         checks.append(self._pin())
         checks.append(self._storage())
         checks.append(self._disk())
+        checks.append(self._db_integrity())
         checks.append(self._ffmpeg())
         checks.append(await self._downloader())
         checks.extend(self._acts())
+        checks.append(self._track_files())
         checks.append(self._backup())
         checks.append(self._incoming())
         checks.append(self._wizard())
@@ -39,6 +43,10 @@ class ReadinessService:
         if settings.admin_pin == "2026":
             return _check("pin", "Admin PIN", WARN, "Still the default PIN (2026). Anyone who knows it can change settings.",
                           "Set ADMIN_PIN in .env and restart.")
+        if len(settings.admin_pin or "") < MIN_PIN_LENGTH:
+            return _check("pin", "Admin PIN", WARN,
+                          f"The admin PIN is shorter than {MIN_PIN_LENGTH} characters. On a public address a short PIN can be guessed.",
+                          f"Set ADMIN_PIN to {MIN_PIN_LENGTH} or more characters in .env and restart.")
         if not getattr(settings, "operator_pin", ""):
             return _check("pin", "Admin PIN", OK, "Custom PIN set. Optional: set OPERATOR_PIN so a volunteer can run the console without admin access.")
         return _check("pin", "Admin and operator PINs", OK, "Both PINs are set.")
@@ -64,6 +72,33 @@ class ReadinessService:
         if free_gb < 5:
             return _check("disk", "Free disk space", WARN, f"{free_gb:.1f} GB free.", "Video tracks can be large; free more space if you expect many.")
         return _check("disk", "Free disk space", OK, f"{free_gb:.0f} GB free.")
+
+    @staticmethod
+    def _quick_check_rows() -> List[str]:
+        """Rows returned by PRAGMA quick_check; a healthy database returns just 'ok'."""
+        with db_service.performance_repo.get_connection() as conn:
+            return [str(r[0]) for r in conn.execute("PRAGMA quick_check").fetchall()]
+
+    def _db_integrity(self):
+        try:
+            rows = self._quick_check_rows()
+        except Exception as ex:
+            return _check("db_integrity", "Database integrity", ERROR, f"Could not run the database check: {ex}",
+                          "Restore the latest snapshot from backups/.")
+        if rows == ["ok"]:
+            return _check("db_integrity", "Database integrity", OK, "SQLite quick check passed.")
+        return _check("db_integrity", "Database integrity", ERROR, "SQLite reports damage: " + "; ".join(rows[:3]),
+                      "Restore the latest snapshot from backups/ (Backup & Sync).")
+
+    def _track_files(self):
+        """Every track the database says exists must exist in tracks/."""
+        missing = [p["entry_id"] for p in db_service.get_all_performances()
+                   if (p.get("drive_file_name") or p.get("drive_file_id")) and not track_store.find(p["entry_id"])]
+        if missing:
+            return _check("track_files", "Track files on disk", ERROR,
+                          f"{len(missing)} act(s) list a track that is not in the tracks/ folder: " + ", ".join(missing[:5]) + ("..." if len(missing) > 5 else ""),
+                          "Upload the track again, or copy the file back into tracks/ (or incoming/) with the entry id in its name.")
+        return _check("track_files", "Track files on disk", OK, "Every listed track is on disk.")
 
     def _ffmpeg(self):
         if shutil.which("ffmpeg"):
@@ -110,7 +145,7 @@ class ReadinessService:
         last = db_service.get_last_backup_info()
         if not last:
             return _check("backup", "Exports and snapshots", INFO, "No export yet. One is written a few seconds after the first change.")
-        if last.get("status") == "error":
+        if last.get("status") in (BACKUP_FAILED, "error"):
             return _check("backup", "Exports and snapshots", ERROR, f"Last export failed: {last.get('error_msg') or 'unknown error'}", "Check disk space and folder permissions.")
         return _check("backup", "Exports and snapshots", OK, f"Last export: {last.get('completed_at') or last.get('triggered_at')}")
 

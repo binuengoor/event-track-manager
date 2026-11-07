@@ -4,8 +4,12 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
 from app.repositories.base import BaseRepository
+from app.privacy import redact_phones
 
 logger = logging.getLogger("audit-repo")
+
+# Status strings written to backup_log; readers (readiness, admin UI) must compare against these.
+BACKUP_PENDING, BACKUP_SUCCESS, BACKUP_FAILED = "pending", "success", "failed"
 
 
 class AuditRepository(BaseRepository):
@@ -18,8 +22,8 @@ class AuditRepository(BaseRepository):
     def log_backup_start(self) -> int:
         with self.get_connection() as conn:
             cursor = conn.execute("""
-            INSERT INTO backup_log (triggered_at, status) VALUES (datetime('now'), 'pending')
-            """)
+            INSERT INTO backup_log (triggered_at, status) VALUES (datetime('now'), ?)
+            """, (BACKUP_PENDING,))
             conn.commit()
             return cursor.lastrowid
 
@@ -27,18 +31,18 @@ class AuditRepository(BaseRepository):
         with self.get_connection() as conn:
             conn.execute("""
             UPDATE backup_log 
-            SET completed_at = datetime('now'), status = 'success', rows_backed = ?
+            SET completed_at = datetime('now'), status = ?, rows_backed = ?
             WHERE id = ?
-            """, (rows_backed, log_id))
+            """, (BACKUP_SUCCESS, rows_backed, log_id))
             conn.commit()
 
     def log_backup_error(self, log_id: int, error_msg: str):
         with self.get_connection() as conn:
             conn.execute("""
             UPDATE backup_log 
-            SET completed_at = datetime('now'), status = 'failed', error_msg = ?
+            SET completed_at = datetime('now'), status = ?, error_msg = ?
             WHERE id = ?
-            """, (error_msg, log_id))
+            """, (BACKUP_FAILED, error_msg, log_id))
             conn.commit()
 
     def get_backup_history(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -89,8 +93,8 @@ class AuditRepository(BaseRepository):
                     action_type.strip().lower(),
                     performer_name.strip(),
                     entry_id.strip() if entry_id else "",
-                    summary.strip(),
-                    details.strip() if details else "",
+                    redact_phones(summary).strip(),
+                    redact_phones(details).strip() if details else "",
                     source.strip().lower()
                 ))
                 conn.commit()
