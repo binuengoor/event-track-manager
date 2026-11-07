@@ -60,3 +60,29 @@ export async function replayOfflineActions(actions, getHeaders, fetchRequest = f
 
   return remaining;
 }
+
+// Only one replay can run in this tab. Remove an action immediately after its
+// successful response, re-reading storage so actions queued during fetch stay.
+let replayInFlight = null;
+export function drainOfflineActions(getHeaders, fetchRequest = fetch) {
+  if (replayInFlight) return replayInFlight;
+  replayInFlight = (async () => {
+    let synced = 0;
+    while (true) {
+      const queue = getOfflineActions();
+      if (!Array.isArray(queue) || queue.length === 0) return synced;
+      const action = queue[0];
+      const remaining = await replayOfflineActions([action], getHeaders, fetchRequest);
+      if (remaining.length) return synced; // Later actions must not overtake this one.
+      const latest = getOfflineActions();
+      if (!Array.isArray(latest) || JSON.stringify(latest[0]) !== JSON.stringify(action)) return synced;
+      try {
+        localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(latest.slice(1)));
+      } catch (error) {
+        return synced; // Keep the queue intact if it could not be saved.
+      }
+      synced += 1;
+    }
+  })().finally(() => { replayInFlight = null; });
+  return replayInFlight;
+}

@@ -1,4 +1,4 @@
-import { getOfflineActions, saveOfflineActions, replayOfflineActions } from "./console/offline-actions.js";
+import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions } from "./console/offline-actions.js";
 import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
 
 // EMA Paattukoottam Stage Playback Console
@@ -309,12 +309,8 @@ async function syncOfflineActions() {
   }
 
   showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
-  const remaining = await replayOfflineActions(actions, getAuthHeaders);
-
-  saveOfflineActions(remaining);
+  const syncedCount = await drainOfflineActions(getAuthHeaders);
   updateNetworkStatusDisplay();
-
-  const syncedCount = actions.length - remaining.length;
   if (syncedCount > 0) {
     showToast(`✓ Successfully synced ${syncedCount} offline actions to server!`);
     await loadQueue();

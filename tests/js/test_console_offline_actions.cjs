@@ -50,3 +50,42 @@ test('console imports the replay module and service worker precaches it', () => 
   assert.match(consoleScript, /import\s*\{[^}]*replayOfflineActions[^}]*\}\s*from\s*["']\.\/console\/offline-actions\.js["']/);
   assert.match(worker, /['"]\/static\/js\/console\/offline-actions\.js['"]/);
 });
+
+test('production replay stops at first failure and retains later actions in order', async () => {
+  const {drainOfflineActions, saveOfflineActions, getOfflineActions} = await load();
+  const values = new Map();
+  global.localStorage = {getItem: k => values.get(k), setItem: (k,v) => values.set(k,v)};
+  const acts = [
+    {type:'update_status', entryId:'PK-001', payload:{status:'Playing'}},
+    {type:'update_status', entryId:'PK-001', payload:{status:'Done'}},
+  ];
+  saveOfflineActions(acts);
+  const calls = [];
+  assert.equal(await drainOfflineActions(() => ({}), async (url, opts) => {calls.push(opts); return {ok:false};}), 0);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(getOfflineActions(), acts);
+  assert.equal(await drainOfflineActions(() => ({}), async (url, opts) => {calls.push(opts); return {ok:true};}), 2);
+  assert.deepEqual(calls.slice(1).map(x=>JSON.parse(x.body).status), ['Playing', 'Done']);
+  assert.deepEqual(getOfflineActions(), []);
+});
+
+test('production replay keeps actions added during a pending request and avoids overlapping syncs', async () => {
+  const {drainOfflineActions, saveOfflineActions, getOfflineActions} = await load();
+  const values = new Map();
+  global.localStorage = {getItem: k => values.get(k), setItem: (k,v) => values.set(k,v)};
+  const first = {type:'uncue', entryId:null, payload:{}};
+  const added = {type:'set_active', entryId:'PK-002', payload:{}};
+  saveOfflineActions([first]);
+  let release;
+  const gate = new Promise(resolve => {release = resolve;});
+  const calls = [];
+  const fetch = async url => {calls.push(url); if (calls.length === 1) await gate; return {ok:true};};
+  const firstRun = drainOfflineActions(() => ({}), fetch);
+  const secondRun = drainOfflineActions(() => ({}), fetch);
+  saveOfflineActions([...getOfflineActions(), added]);
+  release();
+  assert.equal(await firstRun, 2);
+  assert.equal(await secondRun, 2);
+  assert.deepEqual(calls, ['/api/clear-active', '/api/set-active/PK-002']);
+  assert.deepEqual(getOfflineActions(), []);
+});
