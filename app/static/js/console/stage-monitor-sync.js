@@ -1,0 +1,40 @@
+// Console-to-stage-monitor state transport; caller supplies live player state.
+export function createStageMonitorSync(getState) {
+  const channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('stage_monitor_channel') : null;
+
+  function broadcast(eventType = 'SYNC') {
+    if (!channel) return;
+    const {item, wavesurfer, isPlaying} = getState();
+    if (!item) {
+      channel.postMessage({type: 'UNCUE'});
+      return;
+    }
+    const isAcoustic = item.track_status === 'Acoustic';
+    const isVideo = (item.media_type === 'video') || (item.drive_file_name && item.drive_file_name.endsWith('.mp4'));
+    const currentTime = (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') ? wavesurfer.getCurrentTime() : 0;
+    channel.postMessage({
+      type: eventType,
+      entryId: item.entry_id,
+      performerName: item.performer_name,
+      partnerName: item.partner_name || '',
+      songTitle: item.song_title,
+      mediaType: isAcoustic ? 'acoustic' : (isVideo ? 'video' : 'audio'),
+      streamUrl: `/api/stream/${item.entry_id}`,
+      currentTime,
+      isPlaying
+    });
+  }
+
+  if (channel) {
+    channel.onmessage = event => {
+      if (event.data && event.data.type === 'REQUEST_STATE') {
+        broadcast(getState().item ? 'CUE' : 'UNCUE');
+      }
+    };
+  }
+  return {broadcast};
+}
+
+export function openStageMonitor() {
+  window.open('/console/stage-monitor', 'StageMonitor', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+}

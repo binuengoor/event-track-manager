@@ -1,3 +1,4 @@
+import { createStageMonitorSync, openStageMonitor } from "./console/stage-monitor-sync.js";
 import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions, appendSynchronized, drainSynchronized, appendOfflineAction, drainOfflineQueue, coordinatedOfflineQueueAvailable } from "./console/offline-actions.js";
 import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
 
@@ -19,43 +20,12 @@ let lastSyncedAt = null;
 // =============================================================================
 // POP-OUT STAGE CONFIDENCE MONITOR (BroadcastChannel Sync)
 // =============================================================================
-const stageMonitorChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('stage_monitor_channel') : null;
-
-function broadcastStageMonitor(eventType = 'SYNC') {
-  if (!stageMonitorChannel) return;
-  if (!currentCuedItem) {
-    stageMonitorChannel.postMessage({ type: 'UNCUE' });
-    return;
-  }
-  const isAcoustic = currentCuedItem.track_status === 'Acoustic';
-  const isVideo = (currentCuedItem.media_type === 'video') || (currentCuedItem.drive_file_name && currentCuedItem.drive_file_name.endsWith('.mp4'));
-  const curTime = (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') ? wavesurfer.getCurrentTime() : 0;
-  const isPlayingNow = (typeof isAudioPlaying === 'function') ? isAudioPlaying() : false;
-
-  stageMonitorChannel.postMessage({
-    type: eventType,
-    entryId: currentCuedItem.entry_id,
-    performerName: currentCuedItem.performer_name,
-    partnerName: currentCuedItem.partner_name || '',
-    songTitle: currentCuedItem.song_title,
-    mediaType: isAcoustic ? 'acoustic' : (isVideo ? 'video' : 'audio'),
-    streamUrl: `/api/stream/${currentCuedItem.entry_id}`,
-    currentTime: curTime,
-    isPlaying: isPlayingNow
-  });
-}
-
-if (stageMonitorChannel) {
-  stageMonitorChannel.onmessage = (event) => {
-    if (event.data && event.data.type === 'REQUEST_STATE') {
-      broadcastStageMonitor(currentCuedItem ? 'CUE' : 'UNCUE');
-    }
-  };
-}
-
-function openStageMonitor() {
-  window.open('/console/stage-monitor', 'StageMonitor', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
-}
+const stageMonitor = createStageMonitorSync(() => ({
+  item: currentCuedItem,
+  wavesurfer,
+  isPlaying: typeof isAudioPlaying === 'function' ? isAudioPlaying() : false
+}));
+const broadcastStageMonitor = stageMonitor.broadcast;
 
 function syncConsolePreviewVideo(play) {
   const previewVid = document.getElementById('console-preview-video');
