@@ -32,8 +32,11 @@ class PerformanceSignupItem(BaseModel):
     song_title: Optional[str] = ""
     movie_name: Optional[str] = ""
     partner_name: Optional[str] = None
+    partner_same_person: Optional[bool] = None
     partner_age_group: Optional[str] = None
     partner_phone: Optional[str] = ""
+    partner_guardian_name: Optional[str] = ""
+    partner_guardian_phone: Optional[str] = ""
     stage_notes: Optional[str] = ""
     is_acoustic: bool = False
 
@@ -49,6 +52,7 @@ class SignupRequest(BaseModel):
     age_group: Optional[str] = ""
     guardian_name: Optional[str] = ""
     guardian_phone: Optional[str] = ""
+    public_first_name_only: Optional[bool] = False
     registration_type: Optional[str] = "performer"
     performances: List[PerformanceSignupItem] = []
     food_signup: Optional[FoodSignupItem] = None

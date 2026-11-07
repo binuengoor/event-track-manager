@@ -112,6 +112,13 @@
             <p id="err-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
           </div>
         </div>
+
+        <div id="adult-privacy-box" class="gf-field" style="margin-top:.75rem">
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="checkbox" id="public-first-name-only" class="gf-check">
+            <span>Show only my first name and last initial on public screens</span>
+          </label>
+        </div>
       </section>
 
       <!-- STEP: YOUR ACT -->
@@ -157,8 +164,15 @@
             <fieldset class="gf-fieldset">
               <legend class="gf-label">Partner age group</legend>
               <div id="partner-age-options" class="gf-radio-row"></div>
-              <p class="gf-muted" style="margin:.375rem 0 0">If your partner is a junior, the organizers will ask for a guardian name and phone.</p>
             </fieldset>
+            <div id="partner-guardian-box" hidden>
+              <label for="partner-guardian-name" class="gf-label">Partner's guardian name</label>
+              <input id="partner-guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-partner-guardian-name">
+              <p id="err-partner-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+              <label for="partner-guardian-phone" class="gf-label">Partner's guardian phone</label>
+              <input id="partner-guardian-phone" type="tel" class="gf-input" inputmode="tel" autocomplete="off" aria-describedby="err-partner-guardian-phone">
+              <p id="err-partner-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+            </div>
           </div>
         </div>
 

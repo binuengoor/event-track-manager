@@ -243,6 +243,8 @@ function updateGuardian() {
     setErr("guardian-name", "");
     setErr("guardian-phone", "");
   }
+  const adultBox = $("adult-privacy-box");
+  if (adultBox) adultBox.hidden = show;
 }
 
 function renderPerformanceTypes(types) {
@@ -264,9 +266,21 @@ function renderPartnerAgeGroups(groups) {
   // Default to the group that does not need a guardian (an adult) when we can tell.
   const def = list.findIndex((g) => !g.requires_guardian);
   list.forEach((ag, idx) => {
-    const { label } = makeRadio("partner_age_group", ag.name, ag.name, ag.description || "", idx === (def < 0 ? 0 : def));
+    const { label, input } = makeRadio("partner_age_group", ag.name, ag.name, ag.description || "", idx === (def < 0 ? 0 : def));
+    input.addEventListener("change", syncPartnerGuardian);
     box.appendChild(label);
   });
+  syncPartnerGuardian();
+}
+
+function partnerNeedsGuardian() {
+  const value = document.querySelector('input[name="partner_age_group"]:checked')?.value || "";
+  const group = (state.config?.age_groups || []).find(g => g.name === value);
+  return group ? Boolean(group.requires_guardian) : value.toLowerCase() === "junior";
+}
+
+function syncPartnerGuardian() {
+  $("partner-guardian-box").hidden = !partnerNeedsGuardian();
 }
 
 function renderPartnerDatalist() {
@@ -468,28 +482,19 @@ function updateNameLookup() {
   box.hidden = true;
 }
 
-// Phone (and age group) pre-fill goes through the existing exact-name profile API only.
+// A public profile does not expose contact details or age. Ask the returning
+// person to choose their own age group instead of guessing the adult default.
 async function prefillFromProfile(name) {
   const key = name.trim().toLowerCase();
   if (state.profileChecked === key) return;
   state.profileChecked = key;
+  document.querySelectorAll('input[name="age_group"]').forEach((radio) => { radio.checked = false; });
+  state.ageGroup = null;
+  updateGuardian();
   try {
     const res = await fetch(`/api/performer/profile?name=${encodeURIComponent(name)}`);
-    if (!res.ok) return;
-    const data = await res.json();
-    const perf = (data.performances || []).find((p) => (p.performer_name || "").trim().toLowerCase() === key) || (data.performances || [])[0] || {};
-    const phone = data.contact_info || data.phone || perf.contact_info || "";
-    const input = $("contact-info");
-    if (phone && !input.value.trim()) {
-      input.value = phone;
-      const note = $("phone-note");
-      note.textContent = "Filled in from your earlier sign-up. Change it if it is different.";
-      note.hidden = false;
-    }
-    const ag = perf.age_group;
-    if (ag) {
-      const radio = Array.from(document.querySelectorAll('input[name="age_group"]')).find((r) => r.value === ag);
-      if (radio && !radio.checked) { radio.checked = true; radio.dispatchEvent(new Event("change")); }
+    if (res.status === 409 && $("performer-name").value.trim().toLowerCase() === key) {
+      setErr("performer-name", "This display name matches more than one person. Please contact an organizer.");
     }
   } catch (e) {
     console.warn("Profile lookup failed:", e);
@@ -601,6 +606,10 @@ const VALIDATORS = {
           const pp = $("partner-phone").value.trim();
           if (!pp) fail("partner-phone", "Enter your partner's phone number.");
           else if (!isValidPhone(pp)) fail("partner-phone", "Enter a 10-digit phone number for your partner.");
+          if (partnerNeedsGuardian()) {
+            if (!$('partner-guardian-name').value.trim()) fail('partner-guardian-name', "Enter your partner's guardian name.");
+            if (!isValidPhone($('partner-guardian-phone').value.trim())) fail('partner-guardian-phone', "Enter a 10-digit guardian phone number.");
+          }
         }
       }
     }
@@ -702,6 +711,7 @@ function buildPayload() {
     age_group: choice === "dish" ? "" : (document.querySelector('input[name="age_group"]:checked')?.value || ""),
     guardian_name: isJunior() ? $("guardian-name").value.trim() : "",
     guardian_phone: isJunior() ? $("guardian-phone").value.trim() : "",
+    public_first_name_only: !isJunior() && Boolean($("public-first-name-only")?.checked),
     registration_type: choice === "dish" ? "food_only" : choice === "both" ? "both" : "performer",
     performances: [],
     food_signup: null,
@@ -714,8 +724,11 @@ function buildPayload() {
     payload.performances.push({
       performance_type: t,
       partner_name: partner || null,
+      partner_same_person: isDuet && findEntry(partner) ? state.partnerSame : null,
       partner_age_group: needsPartnerPhone ? (document.querySelector('input[name="partner_age_group"]:checked')?.value || null) : null,
       partner_phone: needsPartnerPhone ? $("partner-phone").value.trim() : "",
+      partner_guardian_name: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-name").value.trim() : "",
+      partner_guardian_phone: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-phone").value.trim() : "",
       song_title: $("song-title").value.trim(),
       movie_name: $("movie-name").value.trim(),
       stage_notes: $("stage-notes").value.trim(),

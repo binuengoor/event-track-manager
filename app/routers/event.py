@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter
 
-from app.features import feature_enabled
+from app.features import feature_enabled, public_flags
 from app.config import settings, get_setting, parse_event_datetime
 from app.services.downloader_client import downloader_client
 from app.services.audio_workflow_service import audio_workflow_service
@@ -50,15 +50,7 @@ def get_event_info():
         "hero_tag_status": hero_tag_status,
         "payment_url": effective_payment_url,
         "payment_enabled": payment_enabled,
-        "stage_performances_enabled": feature_enabled("stage_performances_enabled"),
-        "signup_enabled": feature_enabled("signup_enabled"),
-        "food_signup_enabled": feature_enabled("food_signup_enabled"),
-        "track_upload_enabled": feature_enabled("track_upload_enabled"),
-        "allow_duets": feature_enabled("allow_duets"),
-        "performer_edits_enabled": feature_enabled("performer_edits_enabled"),
-        "live_display_enabled": feature_enabled("live_display_enabled"),
-        "dashboard_enabled": feature_enabled("dashboard_enabled"),
-        "console_enabled": feature_enabled("console_enabled"),
+        **public_flags(),
         "allowed_media": get_setting("allowed_media", ["audio", "video"]),
         "setup_completed": bool(get_setting("setup_completed", False)),
         "max_audio_upload_mb": audio_workflow_service.upload_limit_mb(False),

@@ -70,7 +70,7 @@ async def get_performer_profile(name: str):
             return names.partners(value) if names.active else value
 
         effective_perfs = [
-            {**{k: v for k, v in p.items() if k not in ("drive_file_name", "age_group", "partner_age_group", "extra_tags")}, "drive_file_id": "available" if p.get("drive_file_id") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
+            {**{k: v for k, v in p.items() if k not in ("drive_file_name", "age_group", "partner_age_group", "extra_tags", "stage_notes")}, "drive_file_id": "available" if p.get("drive_file_id") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
             for p in user_perfs
         ]
         # Other songs list for transparency
@@ -124,7 +124,8 @@ async def get_registered_participant_names():
             names.add(privacy.name(pname))
         partner = (perf.get("partner_name") or "").strip()
         if partner:
-            names.add(privacy.partners(partner))
+            for person in split_signer_names(partner):
+                names.add(privacy.name(person))
 
     if not stage_performances_enabled:
         participants = db_service.get_all_participants()
@@ -176,6 +177,11 @@ async def add_performer_performance(payload: AddPerformanceRequest):
 
     partner_name = payload.partner_name.strip() if payload.partner_name else None
     partner_phone = payload.partner_phone.strip() if payload.partner_phone else ""
+    if partner_name:
+        try:
+            partner_name = " & ".join(NamePrivacy(all_perfs).resolve_name(n) for n in split_signer_names(partner_name))
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
     if perf_type == "Duet":
         if not partner_name:
             raise HTTPException(status_code=400, detail="Partner name is required for Duet performance.")
@@ -184,6 +190,7 @@ async def add_performer_performance(payload: AddPerformanceRequest):
             for p in all_perfs
             if p.get("performer_name")
         }
+        registered_names.update(name.casefold() for p in all_perfs for name in split_signer_names(p.get("partner_name")))
         if partner_name.lower() not in registered_names:
             if not partner_phone or not validate_phone(partner_phone):
                 raise HTTPException(

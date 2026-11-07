@@ -177,7 +177,7 @@ async function loadPerformances() {
       const performerSet = new Set();
       performances.forEach(p => {
         if (p.performer_name) performerSet.add(p.performer_name.trim());
-        if (p.partner_name) performerSet.add(p.partner_name.trim());
+        if (p.partner_name) p.partner_name.split(/\s*(?:&|,|\band\b)\s*/i).filter(Boolean).forEach(name => performerSet.add(name.trim()));
       });
       sortedPerformers = Array.from(performerSet).sort((a, b) => a.localeCompare(b));
     }
@@ -728,6 +728,10 @@ function setupEditModalEvents() {
     const ytUrl = document.getElementById('edit-youtube-url').value.trim();
     const movieName = document.getElementById('edit-movie-name')?.value.trim() || '';
     const stageNotes = document.getElementById('edit-stage-notes')?.value.trim() || '';
+    const clearStageNotes = document.getElementById('clear-stage-notes')?.checked || false;
+    const typeChanged = perfType !== (form.dataset.initialType || '');
+    const partnerChanged = partnerName !== (form.dataset.initialPartner || '');
+    const groupChanged = groupMembers !== (form.dataset.initialGroup || '');
 
     const isAcousticChecked = document.getElementById('edit-acoustic-check')?.checked;
     const partnerPhone = document.getElementById('edit-partner-phone')?.value.trim() || '';
@@ -747,12 +751,13 @@ function setupEditModalEvents() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           song_title: songTitle,
-          performance_type: perfType,
-          partner_name: perfType === 'Duet' ? partnerName : '',
-          partner_phone: perfType === 'Duet' ? partnerPhone : '',
+          performance_type: typeChanged ? perfType : undefined,
+          partner_name: typeChanged || (perfType === 'Duet' && partnerChanged) || (perfType === 'Group' && groupChanged)
+            ? (perfType === 'Duet' ? partnerName : (perfType === 'Group' ? groupMembers : '')) : undefined,
+          partner_phone: perfType === 'Duet' && partnerPhone ? partnerPhone : undefined,
           group_members: perfType === 'Group' ? groupMembers : '',
           movie_name: movieName,
-          stage_notes: stageNotes,
+          stage_notes: clearStageNotes ? '' : (stageNotes || undefined),
           youtube_url: ytUrl,
           track_status: isAcousticChecked ? 'Acoustic' : (selectedEntry && selectedEntry.track_status === 'Acoustic' ? 'Pending' : undefined)
         })
@@ -792,6 +797,10 @@ function openEditSongModal(song) {
     if (groupOpt) groupOpt.disabled = !allowDuets;
   }
   perfTypeSelect.value = song.performance_type || 'Solo';
+  const editForm = document.getElementById('edit-song-form');
+  editForm.dataset.initialType = perfTypeSelect.value;
+  editForm.dataset.initialPartner = song.partner_name || '';
+  editForm.dataset.initialGroup = song.performance_type === 'Group' ? (song.partner_name || '') : '';
   document.getElementById('edit-partner-name').value = song.partner_name || '';
   const partnerPhoneInput = document.getElementById('edit-partner-phone');
   if (partnerPhoneInput) {
@@ -805,7 +814,7 @@ function openEditSongModal(song) {
       partnerPhoneRow.classList.add('hidden');
     }
   }
-  document.getElementById('edit-group-members').value = song.group_members || '';
+  document.getElementById('edit-group-members').value = song.performance_type === 'Group' ? (song.partner_name || '') : '';
   document.getElementById('edit-youtube-url').value = song.youtube_url || '';
 
   const movieNameInput = document.getElementById('edit-movie-name');
@@ -815,8 +824,10 @@ function openEditSongModal(song) {
 
   const stageNotesInput = document.getElementById('edit-stage-notes');
   if (stageNotesInput) {
-    stageNotesInput.value = song.stage_notes || '';
+    stageNotesInput.value = '';
   }
+  const clearStageNotes = document.getElementById('clear-stage-notes');
+  if (clearStageNotes) clearStageNotes.checked = false;
 
   const acousticCheck = document.getElementById('edit-acoustic-check');
   if (acousticCheck) {

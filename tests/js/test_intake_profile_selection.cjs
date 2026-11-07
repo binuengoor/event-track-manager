@@ -9,7 +9,7 @@ function setup(fetch) {
   function node(id) {
     if (!nodes.has(id)) {
       const classes = new Set();
-      nodes.set(id, { textContent: '', innerHTML: '', classList: {
+      nodes.set(id, { textContent: '', innerHTML: '', value: '', checked: false, dataset: {}, listeners: {}, addEventListener(type, fn) { this.listeners[type] = fn; }, classList: {
         add: x => classes.add(x), remove: x => classes.delete(x), contains: x => classes.has(x),
       }});
     }
@@ -59,4 +59,28 @@ test('older response cannot replace the latest selection', async () => {
   resolveOld({ok: true, json: async () => ({food_enabled: false, performances: [], performer_name: 'Old'})});
   await oldLookup;
   assert.equal(context.window.performerProfileData.performer_name, 'New');
+});
+
+
+test('edit keeps hidden notes and unchanged shortened partners, while allowing explicit note clear', async () => {
+  const requests = [];
+  const { context, node } = setup(async (_url, options) => { requests.push(JSON.parse(options.body)); return {ok: false, json: async () => ({detail: 'stop'})}; });
+  context.alert = () => {};
+  vm.runInContext('setupPartnerAutocomplete = () => {}; setupGroupAutocomplete = () => {}; setupSongDuplicateWarning = () => {};', context);
+  vm.runInContext('setupEditModalEvents()', context);
+  const form = node('edit-song-form');
+  form.dataset.initialType = 'Duet';
+  form.dataset.initialPartner = 'Mira N.';
+  form.dataset.initialGroup = '';
+  node('edit-entry-id').value = 'PK-001';
+  node('edit-song-title').value = 'Song';
+  node('edit-perf-type').value = 'Duet';
+  node('edit-partner-name').value = 'Mira N.';
+  await form.listeners.submit({preventDefault() {}});
+  assert.equal('stage_notes' in requests[0], false);
+  assert.equal('partner_name' in requests[0], false);
+  assert.equal('performance_type' in requests[0], false);
+  node('clear-stage-notes').checked = true;
+  await form.listeners.submit({preventDefault() {}});
+  assert.equal(requests[1].stage_notes, '');
 });

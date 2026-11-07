@@ -93,14 +93,13 @@ class PerformanceRepository(BaseRepository):
             )
             if partner_name:
                 p_age = partner_age_group.strip() if partner_age_group else "Senior"
-                is_junior = "junior" in p_age.lower()
                 get_or_create_participant_conn(
                     conn,
                     name=partner_name.strip(),
                     phone=partner_phone.strip() if partner_phone else "",
                     age_group=p_age,
-                    guardian_name=partner_guardian_name.strip() if (is_junior and partner_guardian_name) else "",
-                    guardian_phone=partner_guardian_phone.strip() if (is_junior and partner_guardian_phone) else ""
+                    guardian_name=partner_guardian_name.strip() if partner_guardian_name else "",
+                    guardian_phone=partner_guardian_phone.strip() if partner_guardian_phone else ""
                 )
 
             conn.execute("""
@@ -245,14 +244,18 @@ class PerformanceRepository(BaseRepository):
 
     def count_performances_for_performer(self, name: str) -> Dict[str, int]:
         clean_name = name.strip().lower()
+        from app.utils.name_matcher import split_signer_names
         with self.get_connection() as conn:
             rows = conn.execute("""
-            SELECT performance_type, partner_name FROM performances 
-            WHERE LOWER(TRIM(performer_name)) = ? OR LOWER(TRIM(partner_name)) = ?
-            """, (clean_name, clean_name)).fetchall()
+            SELECT performer_name, performance_type, partner_name FROM performances
+            """).fetchall()
 
             counts = {"total": 0, "solo": 0, "duet": 0, "group": 0}
             for r in rows:
+                primary = (r["performer_name"] or "").strip().lower()
+                partners = [part.lower() for part in split_signer_names(r["partner_name"])]
+                if clean_name != primary and clean_name not in partners:
+                    continue
                 counts["total"] += 1
                 ptype = (r["performance_type"] or "").lower()
                 if "solo" in ptype:

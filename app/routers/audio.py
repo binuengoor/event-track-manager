@@ -14,7 +14,8 @@ from app.services.audio_service import audio_service
 from app.services.track_store import mime_type_for, media_type_for
 from app.services.audio_workflow_service import audio_workflow_service
 from app.services.db_service import db_service
-from app.routers.auth import verify_operator_pin, verify_admin_pin
+from app.routers.auth import verify_operator_pin, verify_admin_pin, is_admin
+from app.privacy import NamePrivacy
 from app.config import get_setting, settings
 from app.exceptions import (
     UploadDisabledError,
@@ -32,6 +33,7 @@ router = APIRouter(tags=["audio"])
 
 @router.post("/api/upload")
 async def upload_track(
+    request: Request,
     entry_id: str = Form(...),
     submission_type: str = Form("file"),
     media_type: str = Form("audio"),
@@ -60,7 +62,7 @@ async def upload_track(
                     if written > limit:
                         raise FileTooLargeError(audio_workflow_service.too_large_message(limit))
                     out.write(chunk)
-        return await audio_workflow_service.process_track_upload(
+        result = await audio_workflow_service.process_track_upload(
             entry_id=entry_id,
             submission_type=submission_type,
             media_type=media_type,
@@ -68,6 +70,15 @@ async def upload_track(
             file_path=raw_path,
             original_filename=original_filename,
         )
+        if not is_admin(request):
+            result = dict(result)
+            names = NamePrivacy(db_service.get_all_performances())
+            original_name = result.get("performer_name")
+            result["performer_name"] = names.name(original_name)
+            if result.get("filename") and (result["performer_name"] != original_name or names.contains_protected_name(result["filename"])):
+                result["filename"] = "Backing track"
+                result["message"] = "Your backing track was uploaded and queued for playback."
+        return result
     except (UploadDisabledError, MissingSongTitleError, ValueError, InvalidAudioError) as ex:
         raise HTTPException(status_code=400, detail=str(ex))
     except PerformanceNotFoundError as ex:

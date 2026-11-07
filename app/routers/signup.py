@@ -7,6 +7,8 @@ from app.config import settings, get_setting
 from app.features import feature_enabled, require_feature
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
+from app.privacy import NamePrivacy
+from app.utils.name_matcher import split_signer_names
 from app.schemas import (
     SignupRequest,
     PerformanceUpdateRequest,
@@ -76,8 +78,16 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
             raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').capitalize()} is too long (max {limit} characters).")
 
     ptype = _canonical_type(payload.performance_type) if payload.performance_type else (old_perf.get("performance_type") or "Solo")
+    old_ptype = (old_perf.get("performance_type") or "Solo")
+    performer_name = (old_perf.get("performer_name") or "").strip()
     if payload.performance_type and ptype.lower() != "solo" and not feature_enabled("allow_duets"):
         raise HTTPException(status_code=400, detail="Duet and group performances are currently disabled for this event (Solo only).")
+
+    if payload.performance_type and ptype.strip().lower() == "solo" and old_ptype.strip().lower() != "solo" and performer_name:
+        max_solo = int(get_setting("max_solo_per_participant", settings.signup.max_solo_per_participant))
+        counts = db_service.count_performances_for_performer(performer_name)
+        if counts["solo"] >= max_solo:
+            raise HTTPException(status_code=400, detail=f"Solo limit exceeded. Maximum allowed is {max_solo} solo performance per participant.")
 
     # Re-check the duet partner rule whenever the edit touches the type or the partner.
     if ptype.strip().capitalize() == "Duet" and (payload.performance_type or payload.partner_name is not None or payload.partner_phone is not None):
@@ -85,7 +95,16 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
         partner = partner.strip()
         if not partner:
             raise HTTPException(status_code=400, detail="Partner name is required for Duet performance.")
-        registered = {(p.get("performer_name") or "").strip().lower() for p in db_service.get_all_performances() if p.get("performer_name")}
+        old_partner = (old_perf.get("partner_name") or "").strip()
+        if partner.casefold() != old_partner.casefold():
+            max_perf = int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant))
+            for p_name in split_signer_names(partner):
+                pcounts = db_service.count_performances_for_performer(p_name)
+                if pcounts["total"] >= max_perf:
+                    raise HTTPException(status_code=400, detail=f"Registration exceeds limit. Maximum allowed is {max_perf} performance(s) per participant for '{p_name}'.")
+        perfs = db_service.get_all_performances()
+        registered = {(p.get("performer_name") or "").strip().lower() for p in perfs if p.get("performer_name")}
+        registered.update(name.casefold() for p in perfs for name in split_signer_names(p.get("partner_name")))
         if partner.lower() not in registered:
             phone = (payload.partner_phone or "").strip() or (old_perf.get("partner_phone") or "").strip()
             if not validate_phone(phone):
@@ -99,6 +118,16 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
     old_perf = db_service.get_performance(entry_id)
     if not old_perf:
         raise HTTPException(status_code=404, detail=f"Performance entry {entry_id} not found")
+    if payload.partner_name:
+        names = NamePrivacy(db_service.get_all_performances())
+        try:
+            payload.partner_name = " & ".join(names.resolve_name(name) for name in split_signer_names(payload.partner_name))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+    for field in ("age_group", "partner_age_group"):
+        value = getattr(payload, field)
+        if value is not None and value.strip().casefold() != (old_perf.get(field) or "").strip().casefold():
+            raise HTTPException(status_code=403, detail="Ask an organizer to change participant age-group details.")
     _validate_public_edit(payload, old_perf)
     if payload.performance_type:
         payload.performance_type = _canonical_type(payload.performance_type)
@@ -115,6 +144,22 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
         "guardian_phone": payload.guardian_phone,
         "contact_info": payload.contact_info
     }
+    if payload.partner_name is not None and payload.partner_name.strip().casefold() != (old_perf.get("partner_name") or "").strip().casefold():
+        roster = db_service.get_all_performances()
+        names = NamePrivacy(roster)
+        people = split_signer_names(payload.partner_name)
+        juniors = [name for name in people if names.is_junior(name)]
+        if juniors:
+            if len(people) != 1:
+                raise HTTPException(status_code=400, detail="Ask an organizer to add group members who are juniors.")
+            person = juniors[0]
+            primary = next((p for p in roster if (p.get("performer_name") or "").strip().casefold() == person.casefold() and (p.get("age_group") or "").strip().casefold() == "junior"), None)
+            partner = next((p for p in roster if len(split_signer_names(p.get("partner_name"))) == 1 and split_signer_names(p.get("partner_name"))[0].casefold() == person.casefold() and (p.get("partner_age_group") or "").strip().casefold() == "junior"), None)
+            guardian_name = (primary or {}).get("guardian_name") or (partner or {}).get("partner_guardian_name") or ""
+            guardian_phone = (primary or {}).get("guardian_phone") or (partner or {}).get("partner_guardian_phone") or ""
+            if not guardian_name or not guardian_phone:
+                raise HTTPException(status_code=400, detail="The selected junior partner's guardian details are missing. Please contact an organizer.")
+            update_kwargs.update(partner_age_group="Junior", partner_guardian_name=guardian_name, partner_guardian_phone=guardian_phone)
     # Phones are never returned to the public hub, so blank values mean "unchanged".
     for private_field in ("partner_phone", "guardian_phone", "contact_info", "guardian_name"):
         if not (update_kwargs.get(private_field) or "").strip():

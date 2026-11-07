@@ -124,6 +124,9 @@ class NamePrivacy:
     def active(self) -> bool:
         return self.enabled or bool(self._opted_in)
 
+    def is_junior(self, value: str) -> bool:
+        return value.strip().casefold() in self._junior
+
     def resolve_name(self, value: str) -> str:
         """Resolve a display name only when it identifies a single person.
 
@@ -131,6 +134,8 @@ class NamePrivacy:
         must never silently select another participant.
         """
         clean = value.strip()
+        if len(_PARTNER_SPLIT_RE.split(clean)) > 1:
+            raise ValueError("Please choose one individual name rather than a group.")
         exact = self._roster.get(clean.casefold())
         matches = [name for name in self._roster.values() if (self.name(name) or "").casefold() == clean.casefold()]
         candidates = {name.casefold() for name in matches}
@@ -139,6 +144,13 @@ class NamePrivacy:
         if len(candidates) > 1:
             raise ValueError("That display name matches more than one person. Please contact an organizer.")
         return exact or (matches[0] if matches else clean)
+
+    def contains_protected_name(self, value: str) -> bool:
+        """Check filenames too, where spaces may have become underscores."""
+        normalize = lambda text: re.sub(r"[^\w]+|_+", " ", text.casefold()).strip()
+        text = normalize(value or "")
+        return any(normalize(name) in text for name in self._roster.values()
+                   if self.name(name) != name and normalize(name))
 
     def food_items(self, items: Iterable[Dict[str, Any]]) -> list:
         """Remove private fields and shorten names on public food listings."""

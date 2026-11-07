@@ -8,6 +8,7 @@ from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodIt
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.privacy import NamePrivacy
+from app.utils.name_matcher import split_signer_names
 from app.schemas import SignupRequest, PerformanceUpdateRequest, validate_phone
 
 logger = logging.getLogger("registration-service")
@@ -42,11 +43,14 @@ class RegistrationService:
 
         perfs = db_service.get_all_performances()
         privacy = NamePrivacy(perfs)
-        registered_names = sorted({privacy.name(p["performer_name"]) for p in perfs if p.get("performer_name")})
-        registered_entries = [
-            {"name": privacy.name(p["performer_name"]), "entry_id": p.get("entry_id")}
-            for p in perfs if p.get("performer_name")
-        ]
+        registered_entries = []
+        for p in perfs:
+            people = ([p["performer_name"]] if p.get("performer_name") else []) + split_signer_names(p.get("partner_name"))
+            registered_entries.extend({"name": privacy.name(person), "entry_id": p.get("entry_id")} for person in people)
+        registered_names = sorted({entry["name"] for entry in registered_entries if entry["name"]})
+        for item in all_items:
+            registered_entries.extend({"name": privacy.name(person), "entry_id": None}
+                                      for person in split_signer_names(item.get("signer_name")))
         existing_songs = [
             {
                 "song_title": (p.get("song_title") or "").strip(),
@@ -100,6 +104,12 @@ class RegistrationService:
         clean_name = payload.performer_name.strip()
         if not clean_name:
             raise RegistrationError("Name is required.")
+        roster = db_service.get_all_performances()
+        privacy = NamePrivacy(roster)
+        try:
+            clean_name = privacy.resolve_name(clean_name)
+        except ValueError as exc:
+            raise RegistrationError(str(exc))
 
         reg_type = (payload.registration_type or "performer").strip().lower()
         is_food_only = (reg_type in ("food_only", "food")) or (not payload.performances and payload.food_signup and payload.food_signup.item_id)
@@ -143,10 +153,10 @@ class RegistrationService:
             return {
                 "status": "success",
                 "registration_type": "food_only",
-                "performer_name": clean_name,
+                "performer_name": privacy.name(clean_name),
                 "entry_ids": [],
                 "food_signup_id": food_signup_id,
-                "message": f"Thank you, {clean_name}! Your potluck food contribution has been registered."
+                "message": "Thank you! Your potluck food contribution has been registered."
             }
 
         if reg_type == "both" and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
@@ -160,6 +170,17 @@ class RegistrationService:
 
         if not payload.performances:
             raise RegistrationError("At least one performance is required.")
+
+        # A shortened selection must not create a second person or change a
+        # known junior into an adult to bypass guardian requirements.
+        known_ages = set()
+        for row in roster:
+            if (row.get("performer_name") or "").strip().casefold() == clean_name.casefold() and row.get("age_group"):
+                known_ages.add(row["age_group"].strip().casefold())
+            elif any(name.casefold() == clean_name.casefold() for name in split_signer_names(row.get("partner_name"))) and row.get("partner_age_group"):
+                known_ages.add(row["partner_age_group"].strip().casefold())
+        if known_ages and (len(known_ages) > 1 or (payload.age_group or "").strip().casefold() not in known_ages):
+            raise RegistrationError("The selected age group does not match the existing registration. Please contact an organizer.")
 
         allow_duets = feature_enabled("allow_duets")
         if not allow_duets:
@@ -217,16 +238,60 @@ class RegistrationService:
             )
 
         # Duet partner validation
-        all_perfs = db_service.get_all_performances()
+        all_perfs = roster
         registered_names = {
             (p.get("performer_name") or "").strip().lower()
             for p in all_perfs
             if p.get("performer_name")
         }
+        registered_names.update(name.casefold() for p in all_perfs for name in split_signer_names(p.get("partner_name")))
+        registered_names.update(name.casefold() for item in db_service.get_all_food_items_with_signups()
+                                for name in split_signer_names(item.get("signer_name")))
+        partner_details = {}
         for p in payload.performances:
             ptype = (p.performance_type or "").strip().capitalize()
             p_name = p.partner_name.strip() if p.partner_name else ""
+            if p_name:
+                try:
+                    people = split_signer_names(p_name)
+                    p_name = " & ".join(privacy.resolve_name(person) for person in people)
+                    p.partner_name = p_name
+                except ValueError as exc:
+                    raise RegistrationError(str(exc))
             p_phone = p.partner_phone.strip() if p.partner_phone else ""
+            people = split_signer_names(p_name)
+            if p.partner_same_person is False and any(person.casefold() in registered_names for person in people):
+                raise RegistrationError("That name matches an existing registration. Enter a distinct full name or contact an organizer.")
+            if p.partner_same_person is True and (not people or any(person.casefold() not in registered_names for person in people)):
+                raise RegistrationError("The selected existing partner could not be identified. Please contact an organizer.")
+            if len(people) > 1 and any(privacy.is_junior(person) for person in people):
+                raise RegistrationError("Please ask an organizer to add group members who are juniors.")
+            if len(people) == 1 and privacy.is_junior(people[0]):
+                person = people[0]
+                primary = next((row for row in all_perfs if (row.get("performer_name") or "").strip().casefold() == person.casefold() and (row.get("age_group") or "").strip().casefold() == "junior"), None)
+                partner = next((row for row in all_perfs if len(split_signer_names(row.get("partner_name"))) == 1 and split_signer_names(row.get("partner_name"))[0].casefold() == person.casefold() and (row.get("partner_age_group") or "").strip().casefold() == "junior"), None)
+                partner_guardian_name = (primary or {}).get("guardian_name") or (partner or {}).get("partner_guardian_name") or ""
+                partner_guardian_phone = (primary or {}).get("guardian_phone") or (partner or {}).get("partner_guardian_phone") or ""
+                if not partner_guardian_name or not partner_guardian_phone:
+                    raise RegistrationError("The selected junior partner's guardian details are missing. Please contact an organizer.")
+                if p.partner_age_group and p.partner_age_group.strip().casefold() != "junior":
+                    raise RegistrationError("The selected partner's age group does not match the existing registration.")
+                partner_details[id(p)] = ("Junior", partner_guardian_name, partner_guardian_phone)
+            elif len(people) == 1 and any(
+                ((ag.get("name") if isinstance(ag, dict) else ag.name) or "").strip().casefold() == (p.partner_age_group or "").strip().casefold()
+                and bool(ag.get("requires_guardian") if isinstance(ag, dict) else ag.requires_guardian)
+                for ag in age_groups
+            ):
+                partner_guardian_name = (p.partner_guardian_name or "").strip()
+                partner_guardian_phone = (p.partner_guardian_phone or "").strip()
+                if partner_guardian_name or partner_guardian_phone:
+                    if not partner_guardian_name or not validate_phone(partner_guardian_phone):
+                        raise RegistrationError("A junior partner needs a guardian name and valid phone number.")
+                    partner_details[id(p)] = (p.partner_age_group, partner_guardian_name, partner_guardian_phone)
+                elif (payload.guardian_name or "").strip() and validate_phone((payload.guardian_phone or "").strip()):
+                    partner_details[id(p)] = (p.partner_age_group, payload.guardian_name.strip(), payload.guardian_phone.strip())
+                else:
+                    partner_details[id(p)] = (p.partner_age_group, "", "")
             if ptype == "Duet":
                 if not p_name:
                     raise RegistrationError("Partner name is required for Duet performance.")
@@ -247,6 +312,9 @@ class RegistrationService:
             movie = p.movie_name.strip() if p.movie_name else None
             notes = p.stage_notes.strip() if p.stage_notes else ""
             track_status = "Acoustic" if p.is_acoustic else "Pending"
+            inherited = partner_details.get(id(p))
+            if inherited:
+                partner_ag = inherited[0]
 
             entry_id = db_service.create_performance(
                 performer_name=clean_name,
@@ -255,11 +323,14 @@ class RegistrationService:
                 partner_age_group=partner_ag,
                 contact_info=contact_phone,
                 partner_phone=partner_ph,
+                partner_guardian_name=inherited[1] if inherited else "",
+                partner_guardian_phone=inherited[2] if inherited else "",
                 song_title=song,
                 movie_name=movie,
                 age_group=payload.age_group,
                 guardian_name=guardian_name if requires_guardian else "",
                 guardian_phone=guardian_phone if requires_guardian else "",
+                public_first_name_only=bool(payload.public_first_name_only),
                 stage_notes=notes,
                 track_status=track_status,
                 created_via="signup_portal"
@@ -296,7 +367,7 @@ class RegistrationService:
 
         return {
             "status": "success",
-            "performer_name": clean_name,
+            "performer_name": NamePrivacy(db_service.get_all_performances()).name(clean_name),
             "entry_ids": created_ids,
             "food_signup_id": food_signup_id,
             "message": "Registration completed successfully! Welcome to Paattukoottam."
