@@ -1,3 +1,27 @@
+# === Stage 0: CSS (standalone Tailwind CLI, no Node) ===
+FROM debian:bookworm-slim AS css
+ARG TARGETARCH
+ARG TAILWIND_VERSION=3.4.17
+ARG TAILWIND_SHA256_AMD64=7d24f7fa191d2193b78cd5f5a42a6093e14409521908529f42d80b11fde1f1d4
+ARG TAILWIND_SHA256_ARM64=69b1378b8133192d7d2feb12a116fa12d035594f58db3eff215879e4ad8cf39b
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    case "${TARGETARCH:-amd64}" in \
+      amd64) asset=tailwindcss-linux-x64;   sha="${TAILWIND_SHA256_AMD64}" ;; \
+      arm64) asset=tailwindcss-linux-arm64; sha="${TAILWIND_SHA256_ARM64}" ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL --retry 3 -o /usr/local/bin/tailwindcss \
+      "https://github.com/tailwindlabs/tailwindcss/releases/download/v${TAILWIND_VERSION}/${asset}"; \
+    echo "${sha}  /usr/local/bin/tailwindcss" | sha256sum -c -; \
+    chmod +x /usr/local/bin/tailwindcss
+WORKDIR /src
+COPY app/tailwind.config.js app/tailwind.config.js
+COPY app/static app/static
+RUN tailwindcss -c app/tailwind.config.js -i app/static/css/tailwind.input.css \
+      -o /out/app.css --minify
+
 # === Stage 1: Builder ===
 FROM python:3.11.9-slim AS builder
 WORKDIR /build
@@ -25,6 +49,7 @@ RUN apt-get update && \
 
 COPY --from=builder /install /usr/local
 COPY app app
+COPY --from=css /out/app.css app/static/css/app.css
 COPY config.yaml .
 COPY app/docker-entrypoint.sh /docker-entrypoint.sh
 

@@ -129,6 +129,7 @@ Files are matched to acts by the **entry id** in the file name (the id shown in 
 | Upload refused with "exceeds maximum allowed size" (413) | File over the per-file cap (or Cloudflare's 100 MB request limit before it reaches the app) | Compress or trim the file; the cap is `MAX_UPLOAD_SIZE_MB` (audio is allowed at least 200 MB, video 500 MB) |
 | Live screen frozen | Network on the display device | Reload `/live` |
 | Old audio plays in the console | Browser vault | Console **Clear Cache** then re-cache the track |
+| Page unstyled or icons missing after an update | Browser kept the old service worker cache | Hard reload once (cache name is bumped on asset changes); styles are local `app.css`, nothing comes from a CDN |
 
 ## 9. Privacy rules for organizers
 

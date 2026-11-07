@@ -1,23 +1,25 @@
 // Service Worker for EMA Paattukoottam Stage Console
 // Enables offline loading of the console UI shell and assets.
 
-const CACHE_NAME = 'paattukoottam-console-v1';
+const CACHE_NAME = 'paattukoottam-console-v2';
 
 const SHELL_URLS = [
   '/console',
   '/static/admin.html',
   '/static/css/style.css',
   '/static/js/admin.js',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/lucide@latest',
-  'https://unpkg.com/wavesurfer.js@7'
+  '/static/js/nav.js',
+  '/static/js/utils.js',
+  '/static/css/app.css?v=1',
+  '/static/vendor/lucide.min.js',
+  '/static/vendor/wavesurfer.min.js'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      // Cache core shell files, ignore external CDN errors if any
+      // Cache core shell files, a failed fetch must not block install
       return Promise.allSettled(
         SHELL_URLS.map((url) =>
           fetch(url, { cache: 'reload' })
@@ -74,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (CSS, JS, icons, CDNs): Network-first with cache fallback
+  // Static assets (CSS, JS, icons, vendored libs): Network-first with cache fallback
   event.respondWith(
     fetch(request)
       .then((response) => {
