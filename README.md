@@ -17,7 +17,7 @@ from the admin page in a couple of minutes.
 > backups) need the **Admin PIN**; running the sound console can use a separate **Operator PIN**. Personal data (phone numbers,
 > guardians) is never returned by public pages or APIs. See [Security & privacy](#security--privacy).
 
-Event-day instructions: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · Design decision: **[docs/adr/0001-local-first-event-folder.md](docs/adr/0001-local-first-event-folder.md)**
+Full specification (behaviour, data model, API, roadmap): **[docs/SPEC.md](docs/SPEC.md)** · Event-day instructions: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · Design decision: **[docs/adr/0001-local-first-event-folder.md](docs/adr/0001-local-first-event-folder.md)**
 
 ---
 
