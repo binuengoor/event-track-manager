@@ -71,6 +71,16 @@ class EventManager:
                     pass
         return total
 
+    @staticmethod
+    def _count_singers(conn) -> int:
+        """Distinct people on stage: performers plus duet/group partners (same rule as the Payments tab)."""
+        return conn.execute("""
+            SELECT COUNT(*) FROM (
+                SELECT LOWER(TRIM(performer_name)) AS n FROM performances WHERE TRIM(COALESCE(performer_name, '')) != ''
+                UNION
+                SELECT LOWER(TRIM(partner_name)) FROM performances WHERE TRIM(COALESCE(partner_name, '')) != ''
+            )""").fetchone()[0]
+
     def _summarize(self, event_id: str) -> Optional[Dict[str, Any]]:
         folder = self._folder(event_id)
         db_path = os.path.join(folder, "event.db")
@@ -96,6 +106,7 @@ class EventManager:
                 info["participants"] = conn.execute("SELECT COUNT(*) FROM participants").fetchone()[0]
                 info["potluck_total"] = conn.execute("SELECT COUNT(*) FROM food_items").fetchone()[0]
                 info["potluck_taken"] = conn.execute("SELECT COUNT(*) FROM food_signups").fetchone()[0]
+                info["singers"] = self._count_singers(conn)
                 info["paid"] = conn.execute("SELECT COUNT(*) FROM participants WHERE paid = 1").fetchone()[0]
             finally:
                 conn.close()

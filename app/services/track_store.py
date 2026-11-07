@@ -8,6 +8,7 @@ import os
 import re
 import shutil
 import logging
+import mimetypes
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -28,6 +29,21 @@ def sanitize_filename(text: str) -> str:
 
 def media_type_for(path: str) -> str:
     return "video" if os.path.splitext(path)[1].lower() in VIDEO_EXTS else "audio"
+
+
+# Explicit overrides so the answer does not depend on the host's mime database (macOS and Debian disagree on several).
+_MIME_OVERRIDES = {
+    ".mp3": "audio/mpeg", ".m4a": "audio/mp4", ".wav": "audio/wav", ".aac": "audio/aac", ".ogg": "audio/ogg",
+    ".flac": "audio/flac", ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm",
+    ".mkv": "video/x-matroska", ".m4v": "video/x-m4v",
+}
+
+
+def mime_type_for(path: str) -> str:
+    """Content-Type for a track file: explicit table, then mimetypes, then a generic audio/video type."""
+    ext = os.path.splitext(path)[1].lower()
+    guessed = _MIME_OVERRIDES.get(ext) or mimetypes.guess_type(f"x{ext}")[0]
+    return guessed or ("video/mp4" if media_type_for(path) == "video" else "audio/mpeg")
 
 
 class TrackStore:
