@@ -227,17 +227,20 @@ class EventManager:
         finally:
             conn.close()
 
-        # remember the choice (atomic) so a restart comes back to the same event
-        tmp = os.path.join(self.events_root(), ACTIVE_FILE + ".tmp")
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(event_id)
-        os.replace(tmp, os.path.join(self.events_root(), ACTIVE_FILE))
+        # Reconciliation and the active-event path change are one critical section.
+        from app.services.event_service import event_service
+        with event_service._lock:
+            # remember the choice (atomic) so a restart comes back to the same event
+            tmp = os.path.join(self.events_root(), ACTIVE_FILE + ".tmp")
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(event_id)
+            os.replace(tmp, os.path.join(self.events_root(), ACTIVE_FILE))
 
-        self._point_at(folder, event_id)
-        self.bootstrap(seed_food=False)
-        db_service.log_activity(action_type="admin_edit", performer_name="Admin",
-                                summary=f"Activated event '{event_id}'", source="admin")
-        logger.warning("Active event is now %s (%s)", event_id, folder)
+            self._point_at(folder, event_id)
+            self.bootstrap(seed_food=False)
+            db_service.log_activity(action_type="admin_edit", performer_name="Admin",
+                                    summary=f"Activated event '{event_id}'", source="admin")
+            logger.warning("Active event is now %s (%s)", event_id, folder)
         return {"id": event_id, "changed": True}
 
     @staticmethod

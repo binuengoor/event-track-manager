@@ -1,5 +1,6 @@
 import os
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -12,6 +13,7 @@ from app.services.backup_service import backup_service
 from app.services.downloader_client import downloader_client
 from app.events import register_default_listeners
 from app.services.event_manager import event_manager
+from app.services.event_service import event_service
 
 # Re-exports for backward compatibility
 from app.schemas import (
@@ -73,12 +75,14 @@ async def lifespan(app: FastAPI):
     # 4. Start background backup debounce loop & pooled downloader client
     backup_service.start()
     await downloader_client.start()
+    event_service.start_reconcile_worker()
 
-    yield
-
-    # Shutdown
-    await downloader_client.close()
-    await backup_service.stop()
+    try:
+        yield
+    finally:
+        await asyncio.to_thread(event_service.stop_reconcile_worker)
+        await downloader_client.close()
+        await backup_service.stop()
 
 
 app = FastAPI(

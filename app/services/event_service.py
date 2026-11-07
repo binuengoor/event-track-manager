@@ -17,6 +17,7 @@ from app.services.track_store import track_store, media_type_for
 logger = logging.getLogger("event-service")
 
 RECONCILE_INTERVAL_SECONDS = 3.0
+RECONCILE_JOIN_TIMEOUT_SECONDS = 5.0
 
 
 def _duration_str(path: str) -> Optional[str]:
@@ -42,7 +43,10 @@ def file_version(path: str) -> str:
 class EventService:
     def __init__(self):
         self._last_reconcile = 0.0
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._worker_lock = threading.Lock()
+        self._worker_stop = threading.Event()
+        self._worker = None
 
     # ------------------------------------------------------------------ active cue
     @property
@@ -56,10 +60,10 @@ class EventService:
     # ------------------------------------------------------------------ track reconciliation
     def reconcile_tracks(self, force: bool = False) -> int:
         """Aligns performances with the files present in tracks/ (adopting anything dropped in incoming/)."""
-        now = time.time()
-        if not force and now - self._last_reconcile < RECONCILE_INTERVAL_SECONDS:
-            return 0
         with self._lock:
+            now = time.monotonic()
+            if not force and now - self._last_reconcile < RECONCILE_INTERVAL_SECONDS:
+                return 0
             self._last_reconcile = now
             changed = 0
             perfs = db_service.get_all_performances()
@@ -92,6 +96,41 @@ class EventService:
                     changed += 1
             return changed
 
+    def start_reconcile_worker(self) -> None:
+        """Start one background scanner for the current application lifespan."""
+        with self._worker_lock:
+            if self._worker and self._worker.is_alive():
+                if self._worker_stop.is_set():
+                    raise RuntimeError("Previous track reconciliation worker is still stopping")
+                return
+            self._worker_stop.clear()
+            self._worker = threading.Thread(target=self._reconcile_loop, name="track-reconcile", daemon=True)
+            self._worker.start()
+
+    def _reconcile_loop(self) -> None:
+        try:
+            while not self._worker_stop.wait(RECONCILE_INTERVAL_SECONDS):
+                try:
+                    self.reconcile_tracks()
+                except Exception:
+                    logger.exception("Background track reconciliation failed")
+        finally:
+            # DatabaseManager connections are thread-local.
+            db_service.db_manager.close_all()
+
+    def stop_reconcile_worker(self) -> None:
+        """Stop and join before application shutdown or a subsequent start."""
+        with self._worker_lock:
+            worker = self._worker
+            if not worker:
+                return
+            self._worker_stop.set()
+            worker.join(timeout=RECONCILE_JOIN_TIMEOUT_SECONDS)
+            if worker.is_alive():
+                logger.warning("Track reconciliation worker did not stop before timeout")
+            else:
+                self._worker = None
+
     def migrate_legacy_cache_tracks(self) -> int:
         """Upgrade path: copy tracks that older versions kept as <entry>.mp3/.mp4 in the cache into tracks/."""
         from app.config import settings
@@ -113,7 +152,8 @@ class EventService:
 
     # ------------------------------------------------------------------ reads
     def get_performances(self, force_sync: bool = False) -> List[PerformanceEntry]:
-        self.reconcile_tracks(force=force_sync)
+        if force_sync:
+            self.reconcile_tracks(force=True)
         return [PerformanceEntry(**row) for row in db_service.get_all_performances()]
 
     def get_stage_queue(self) -> List[PerformanceEntry]:
