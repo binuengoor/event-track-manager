@@ -87,22 +87,12 @@ def _eq(a: Optional[str], b: Optional[str]) -> bool:
     return bool(a) and bool(b) and hmac.compare_digest(a.encode(), b.encode())
 
 
-def _operator_pin() -> str:
-    pin = getattr(settings, "operator_pin", "") or ""
-    return pin if pin and pin != settings.admin_pin else ""
-
-
 def _role(request: Request) -> Optional[str]:
-    """'admin', 'operator' (sound console only) or None, from the PIN header or the signed session cookie."""
-    header = request.headers.get("X-Admin-PIN")
-    if _eq(header, settings.admin_pin):
+    """Recognize only the shared admin PIN and its signed session cookie."""
+    if _eq(request.headers.get("X-Admin-PIN"), settings.admin_pin):
         return "admin"
-    if _operator_pin() and _eq(header, _operator_pin()):
-        return "operator"
     if _eq(request.cookies.get("admin_session"), _token("admin", settings.admin_pin)):
         return "admin"
-    if _operator_pin() and _eq(request.cookies.get("operator_session"), _token("operator", _operator_pin())):
-        return "operator"
     return None
 
 
@@ -130,8 +120,8 @@ def verify_admin_pin(request: Request) -> bool:
 
 
 def verify_operator_pin(request: Request) -> bool:
-    """Admin or sound operator: cueing, status, order, track downloads, exports."""
-    return _guard(request, ("admin", "operator"))
+    """Console access uses the same admin PIN as the rest of the app."""
+    return _guard(request, ("admin",))
 
 
 @router.post("/api/auth/login")
@@ -142,8 +132,6 @@ async def admin_login(login: LoginRequest, request: Request):
     role = None
     if _eq(login.pin, settings.admin_pin):
         role, pin = "admin", settings.admin_pin
-    elif _operator_pin() and _eq(login.pin, _operator_pin()):
-        role, pin = "operator", _operator_pin()
     if role:
         response = JSONResponse(content={"status": "success", "message": "Authenticated", "role": role})
         secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"

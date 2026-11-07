@@ -14,7 +14,7 @@ from the admin page in a couple of minutes.
 > [!IMPORTANT]
 > **Design philosophy.** Performer-facing self-service (sign-up, edits, dish claims, track upload) is intentionally login-free for
 > friends-and-neighbors events: anyone who knows a name can edit that entry. Administrative actions (settings, presets, roster,
-> backups) need the **Admin PIN**; running the sound console can use a separate **Operator PIN**. Personal data (phone numbers,
+> backups and the sound console) use the same **Admin PIN**. Personal data (phone numbers,
 > guardians) is never returned by public pages or APIs. See [Security & privacy](#security--privacy).
 
 Full specification (behaviour, data model, API, roadmap): **[docs/SPEC.md](docs/SPEC.md)** · Event-day instructions: **[docs/RUNBOOK.md](docs/RUNBOOK.md)** · Design decision: **[docs/adr/0001-local-first-event-folder.md](docs/adr/0001-local-first-event-folder.md)**
@@ -107,7 +107,7 @@ All screenshots are the real app with sample (fictional) data. The glow behind e
 
 | Staff | |
 |---|---|
-| **Sound Console** (Admin or Operator PIN): cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, rules, food, participants, exports<br><img src="docs/images/admin.jpg" width="420"> |
+| **Sound Console** (Admin PIN): cue, play, reorder, offline vault<br><img src="docs/images/console.jpg" width="420"> | **Admin**: event settings, rules, food, participants, exports<br><img src="docs/images/admin.jpg" width="420"> |
 | **Presets with a change preview**<br><img src="docs/images/admin-presets.jpg" width="420"> | **Setup wizard**<br><img src="docs/images/admin-wizard.jpg" width="420"> |
 | **Potluck quick add**: paste a menu, `x3` makes three slots<br><img src="docs/images/admin-food.jpg" width="420"> | **Event readiness**: what to fix before doors open<br><img src="docs/images/admin-readiness.jpg" width="420"> |
 | **Spreadsheet viewer** with downloads (Excel, CSV, TSV, JSON, ZIP)<br><img src="docs/images/admin-sheet.jpg" width="420"> | **Payments**: who has paid, singers A to Z<br><img src="docs/images/admin-payments.jpg" width="420"> |
@@ -169,8 +169,8 @@ from a template (Indian, BBQ, Thanksgiving, simple). Existing items and claims a
 | `/performer` | Public (by name) | Performer Hub: edit songs, upload audio/video or paste a YouTube link, pick a dish |
 | `/dashboard` | Public | Read-only setlist and potluck board |
 | `/live` | Venue screen | Now on Stage, Up Next, notes, sponsor gallery. Pushed instantly (server-sent events) |
-| `/console` | Admin or Operator PIN | Queue, cue, waveform player, notes, reorder, status, offline vault, ZIP |
-| `/console/stage-monitor` | Admin or Operator PIN | Video confidence monitor for the stage |
+| `/console` | Admin PIN | Queue, cue, waveform player, notes, reorder, status, offline vault, ZIP |
+| `/console/stage-monitor` | Admin PIN | Video confidence monitor for the stage |
 | `/admin` | Admin PIN | Event switcher, setup wizard, presets, readiness, rules, potluck, roster, **spreadsheet + downloads**, **payments**, exports, activity log |
 | `/docs` | Public | OpenAPI reference |
 
@@ -179,7 +179,7 @@ from a template (Indian, BBQ, Thanksgiving, simple). Existing items and claims a
 ```bash
 git clone https://github.com/binuengoor/event-track-manager.git
 cd event-track-manager
-cp .env.example .env            # set ADMIN_PIN (and optionally OPERATOR_PIN)
+cp .env.example .env            # set ADMIN_PIN
 mkdir -p events                  # the app fixes folder ownership itself on start
 docker compose up -d
 ```
@@ -238,7 +238,6 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 |---|---|---|
 | `ADMIN_PIN` | `2026` | **Change it.** Opens `/admin`, `/console` |
 | `TRUST_CLOUDFLARE` | `false` | Set `true` only when the app is reachable solely through Cloudflare: failed-login throttling then keys on `CF-Connecting-IP` instead of the first `X-Forwarded-For` value |
-| `OPERATOR_PIN` | off | Optional. Opens the sound console only (for a volunteer). Env only, never editable from the UI |
 | `PORT` | `8088` | Host port |
 | `EVENT_ID` | `paattukoottam-2026` | First event's folder under `EVENTS_DIR`. After that, switch events in `/admin` |
 | `EVENTS_DIR` / `EVENT_DIR` | `/events` (Docker), `./events` | Parent folder of all events. `EVENT_DIR` pins ONE folder and turns event switching off |
@@ -264,8 +263,8 @@ Defaults work out of the box. `.env` / `config.yaml` seed the first boot, after 
 ## Security & privacy
 
 - Public pages and APIs never include phone numbers or guardian details; only admin endpoints return them. The exported files do contain them, so share the folder/remote only with organizers.
-- Roles: **Admin PIN** (everything) and optional **Operator PIN** (sound console only; sees no phone numbers). Failed guesses are throttled (8 per client and 100 overall per 5 minutes, then HTTP 429). The PIN is never accepted in a URL; sessions use an HMAC cookie, not the PIN.
-- Every response carries `X-Robots-Tag: noindex, nofollow, noarchive` and `/robots.txt` disallows all, so search engines skip the public pages (they list participant names). Activity-log entries never store phone numbers. Readiness warns when the admin PIN is shorter than 6 characters; behind Cloudflare set `TRUST_CLOUDFLARE=true` so throttling cannot be dodged with a spoofed `X-Forwarded-For`.
+- One **Admin PIN** opens the admin screens and sound console. Failed guesses are throttled (8 per client and 100 overall per 5 minutes, then HTTP 429). The PIN is never accepted in a URL; sessions use an HMAC cookie, not the PIN.
+- Every response carries `X-Robots-Tag: noindex, nofollow, noarchive` and `/robots.txt` disallows all, so search engines skip the public pages (they list participant names). Activity-log entries never store phone numbers. Readiness warns when the admin PIN is still the default; behind Cloudflare set `TRUST_CLOUDFLARE=true` so throttling cannot be dodged with a spoofed `X-Forwarded-For`.
 - `/data` serves poster and gallery images only: never tracks, exports, backups or the database.
 - User-supplied text is escaped everywhere it is rendered. Spreadsheet exports neutralize formula injection.
 - Use HTTPS in front (Caddy example in the runbook) and a non-default PIN. Do not commit `.env`, `secrets/` or `events/`.

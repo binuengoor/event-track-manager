@@ -2,13 +2,13 @@
 
 For the organizer and the sound coordinator. Plain steps, in the order you need them.
 
-Roles: **Organizer** (runs `/admin`, Admin PIN), **Sound operator** (runs `/console`, Admin or Operator PIN), **MC / venue screen** (shows `/live`).
+Roles: **Organizer** (runs `/admin`, Admin PIN), **Sound operator** (runs `/console`, Admin PIN), **MC / venue screen** (shows `/live`).
 
 ---
 
 ## 1. Weeks before the event
 
-1. Deploy (section 6). In `.env` set a strong `ADMIN_PIN`. Optionally set `OPERATOR_PIN` so a volunteer can run the console without admin access.
+1. Deploy (section 6). In `.env` set a strong `ADMIN_PIN`. The same PIN opens the sound console.
 2. Open `/admin`. The **setup wizard** appears on a fresh event: pick the event type (or later use **Features & Presets**), then name, date, venue, potluck menu and rules.
 3. Fine-tune in **Event Details**, **Sign-Up Rules** (songs per person, solos, audio/video, age groups) and **Food & Potluck** (paste a menu into *Quick add*).
 4. Drop sponsor logos into `events/<EVENT_ID>/gallery/` (png/jpg/webp/gif). The live screen splits 70/30 automatically.
@@ -30,7 +30,7 @@ Open `/admin`: the **Event readiness** strip at the top should be green (or only
 | Hand-delivered file | copy `PK-001_test.mp3` into `events/<id>/incoming/` | PK-001 shows Ready within seconds |
 | Reorder + save | drag in `/console`, press **Save Order** | file names get the new numbers; `signups.xlsx` updates |
 | Live screen | open `/live` on the venue display, cue an act in the console | screen changes within a second or two |
-| Operator PIN | log in to `/console` with it | works; `/admin` refuses it |
+| Admin PIN | log in to `/console` and `/admin` with it | both work |
 | Export opens | open `events/<id>/signups.xlsx` | Tabs follow the event type: Songs, Singers, Run Sheet (+ Potluck when potluck is on); potluck-only has just Potluck |
 | Cloud copy (if used) | check the remote folder | tracks, xlsx and `backups/` appear |
 | Delete test data | `/admin -> Participants` | |

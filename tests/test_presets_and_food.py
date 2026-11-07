@@ -120,7 +120,8 @@ def test_readiness_requires_pin_and_reports_default_pin_and_missing_tracks(admin
     db_service.create_performance(performer_name="No Title", song_title="", performance_type="Solo", contact_info="6105550100")
     data = admin.get("/api/admin/readiness", headers={"X-Admin-PIN": "2026"}).json()
     by_id = {c["id"]: c for c in data["checks"]}
-    assert by_id["pin"]["status"] == "warn" and "2026" in by_id["pin"]["detail"]
+    assert by_id["pin"]["status"] == "warn" and "default" in by_id["pin"]["detail"].lower()
+    assert "2026" not in by_id["pin"]["detail"]
     assert by_id["storage"]["status"] == "ok"
     assert by_id["tracks"]["status"] == "warn" and "No Track" in by_id["tracks"]["detail"]
     assert by_id["songs"]["status"] == "warn" and "No Title" in by_id["songs"]["detail"]

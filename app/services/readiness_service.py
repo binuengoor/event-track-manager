@@ -13,7 +13,6 @@ from app.repositories.audit_repo import BACKUP_FAILED
 logger = logging.getLogger("readiness")
 
 OK, WARN, ERROR, INFO = "ok", "warn", "error", "info"
-MIN_PIN_LENGTH = 6
 
 
 def _check(cid: str, label: str, status: str, detail: str, fix: str = "") -> Dict[str, Any]:
@@ -41,15 +40,9 @@ class ReadinessService:
     # ------------------------------------------------------------------ individual checks
     def _pin(self):
         if settings.admin_pin == "2026":
-            return _check("pin", "Admin PIN", WARN, "Still the default PIN (2026). Anyone who knows it can change settings.",
+            return _check("pin", "Admin PIN", WARN, "The Admin PIN is still the default.",
                           "Set ADMIN_PIN in .env and restart.")
-        if len(settings.admin_pin or "") < MIN_PIN_LENGTH:
-            return _check("pin", "Admin PIN", WARN,
-                          f"The admin PIN is shorter than {MIN_PIN_LENGTH} characters. On a public address a short PIN can be guessed.",
-                          f"Set ADMIN_PIN to {MIN_PIN_LENGTH} or more characters in .env and restart.")
-        if not getattr(settings, "operator_pin", ""):
-            return _check("pin", "Admin PIN", OK, "Custom PIN set. Optional: set OPERATOR_PIN so a volunteer can run the console without admin access.")
-        return _check("pin", "Admin and operator PINs", OK, "Both PINs are set.")
+        return _check("pin", "Admin PIN", OK, "Custom Admin PIN set.")
 
     def _storage(self):
         probe = os.path.join(settings.storage.event_dir, f".write_test_{os.getpid()}")

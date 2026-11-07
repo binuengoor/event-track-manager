@@ -195,15 +195,16 @@ def test_rate_limit_key_trusts_cloudflare_header_only_when_enabled(monkeypatch):
     assert client_key(req) == "1.2.3.4"
 
 
-# ----------------------------------------------------------------------------- N23 short PIN
-def test_readiness_warns_when_admin_pin_is_shorter_than_six(monkeypatch):
+# ----------------------------------------------------------------------------- PIN readiness
+def test_readiness_warns_only_for_default_admin_pin(monkeypatch):
     monkeypatch.setattr(settings, "admin_pin", "4821")
     check = _checks()["pin"]
-    assert check["status"] == "warn" and "6" in check["detail"]
-    monkeypatch.setattr(settings, "admin_pin", "482193")
-    assert _checks()["pin"]["status"] == "ok"
+    assert check["status"] == "ok"
+    assert "operator" not in check["detail"].lower()
     monkeypatch.setattr(settings, "admin_pin", "2026")
-    assert "default" in _checks()["pin"]["detail"].lower()
+    check = _checks()["pin"]
+    assert check["status"] == "warn" and "default" in check["detail"].lower()
+    assert "2026" not in check["detail"]
 
 
 # ----------------------------------------------------------------------------- N15 upload cap and message

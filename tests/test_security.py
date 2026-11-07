@@ -202,50 +202,40 @@ def test_cache_pruning_never_deletes_database_files(tmp_path, monkeypatch):
     assert (tmp_path / "event_data.db").exists()
 
 
-# --------------------------------------------------------------------------- operator (sound console) PIN
-@pytest.fixture
-def operator_pin(monkeypatch):
-    monkeypatch.setattr(settings, "operator_pin", "7777")
-    return "7777"
-
-
-def test_operator_pin_runs_the_console_but_not_admin(operator_pin, client):
-    op = {"X-Admin-PIN": operator_pin}
+# --------------------------------------------------------------------------- shared admin and console PIN
+def test_admin_pin_opens_console_and_admin(client):
+    headers = {"X-Admin-PIN": settings.admin_pin}
     eid = _signup_junior(client)
-    assert client.post(f"/api/set-active/{eid}", headers=op).status_code == 200
-    assert client.post("/api/clear-active", headers=op).status_code == 200
-    assert client.get("/api/admin/settings", headers=op).status_code == 403
-    assert client.get("/api/admin/roster", headers=op).status_code == 403
-    assert client.put("/api/admin/settings", headers=op, json={"settings": {"signup_enabled": False}}).status_code == 403
-    assert client.post("/api/admin/apply-preset", headers=op, json={"preset": "potluck"}).status_code == 403
+    assert client.post(f"/api/set-active/{eid}", headers=headers).status_code == 200
+    assert client.post("/api/clear-active", headers=headers).status_code == 200
+    assert client.get("/api/admin/settings", headers=headers).status_code == 200
+    assert client.get("/api/admin/roster", headers=headers).status_code == 200
 
 
-def test_operator_never_sees_phone_numbers(operator_pin, client):
-    _signup_junior(client)
-    queue = client.get("/api/stage-queue", headers={"X-Admin-PIN": operator_pin})
-    assert queue.status_code == 200 and PHONE not in queue.text
+def test_legacy_operator_pin_and_cookie_are_rejected(monkeypatch, client):
+    monkeypatch.setattr(settings, "operator_pin", "7777")
+    headers = {"X-Admin-PIN": "7777"}
+    assert client.post("/api/clear-active", headers=headers).status_code == 401
+    assert client.get("/api/admin/settings", headers=headers).status_code == 401
+    assert client.post("/api/auth/login", json={"pin": "7777"}).status_code == 401
+    client.cookies.set("operator_session", auth_module._token("operator", "7777"))
+    assert client.post("/api/clear-active").status_code == 401
+    assert client.get("/api/admin/summary").status_code == 401
 
 
-def test_operator_login_sets_a_role_scoped_cookie(operator_pin, client):
-    res = client.post("/api/auth/login", json={"pin": operator_pin})
-    assert res.status_code == 200 and res.json()["role"] == "operator"
-    assert "operator_session" in res.headers["set-cookie"] and operator_pin not in res.headers["set-cookie"]
-    assert client.post("/api/clear-active").status_code == 200       # cookie opens the console
-    assert client.get("/api/admin/summary").status_code == 403         # but not admin
-
-
-def test_wrong_role_does_not_count_as_a_failed_guess(operator_pin, client):
-    for _ in range(auth_module.MAX_FAILS_PER_CLIENT + 2):
-        assert client.get("/api/admin/summary", headers={"X-Admin-PIN": operator_pin}).status_code == 403
-    assert client.get("/api/admin/summary", headers={"X-Admin-PIN": settings.admin_pin}).status_code == 200
-
-
-def test_operator_pin_is_off_by_default_and_cannot_equal_admin_pin(monkeypatch, client):
-    monkeypatch.setattr(settings, "operator_pin", "")
-    assert client.post("/api/auth/login", json={"pin": ""}).status_code == 401
-    monkeypatch.setattr(settings, "operator_pin", settings.admin_pin)
+def test_admin_cookie_opens_console_and_admin_without_exposing_pin(client):
     res = client.post("/api/auth/login", json={"pin": settings.admin_pin})
-    assert res.json()["role"] == "admin"
+    assert res.status_code == 200 and res.json()["role"] == "admin"
+    assert "admin_session" in res.headers["set-cookie"]
+    assert settings.admin_pin not in res.headers["set-cookie"]
+    assert client.post("/api/clear-active").status_code == 200
+    assert client.get("/api/admin/summary").status_code == 200
+
+
+def test_invalid_pin_is_rate_limited(client):
+    for _ in range(auth_module.MAX_FAILS_PER_CLIENT):
+        assert client.post("/api/auth/login", json={"pin": "7777"}).status_code == 401
+    assert client.post("/api/auth/login", json={"pin": "7777"}).status_code == 429
 
 
 # --------------------------------------------------------------------------- uploads: bounded memory, early rejection
