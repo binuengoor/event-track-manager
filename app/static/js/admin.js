@@ -307,14 +307,18 @@ try {
 } catch (error) {
   console.warn('Offline acknowledgments across tabs are unavailable:', error);
 }
-function actionKey(type, entryId) { return `${type}:${entryId || ''}`; }
+function actionKey(type, entryId) {
+  // Cue and uncue both update the one active act. Status and notes are per act.
+  if (type === 'set_active' || type === 'uncue') return 'active-act';
+  return `${type}:${entryId || ''}`;
+}
 function beginAction(payload = {}) {
   return { sequence: ++nextActionSequence, value: JSON.stringify(payload) };
 }
 function actionReachedServer(type, entryId, action) {
   const key = actionKey(type, entryId);
   const unsaved = unsavedOfflineActions.get(key);
-  if (unsaved && action && action.sequence >= unsaved.sequence && action.value === unsaved.value) {
+  if (unsaved && action && action.sequence >= unsaved.sequence) {
     unsavedOfflineActions.delete(key);
   }
   offlineSaveFailure = unsavedOfflineActions.size > 0;

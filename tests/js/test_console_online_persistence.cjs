@@ -48,7 +48,7 @@ test('unsaved action warning remains through unrelated success and clears after 
   assert.equal(nodes['network-status-text'].textContent,'Online');
 });
 
-test('an older or different status success cannot clear a newer failed intent', async()=>{
+test('older status success cannot clear a newer failure, but a newer status supersedes it', async()=>{
   const {context,nodes,setStorage,setFetch,setAppend} = consoleContext();
   setStorage(false);setFetch(true);setAppend(true);
   const old = context.beginAction({status:'Performed'});
@@ -58,12 +58,10 @@ test('an older or different status success cannot clear a newer failed intent', 
   assert.match(nodes['network-status-text'].textContent,/not queued/);
   setFetch(false);
   await context.updateStatus('PK-001','Upcoming');
-  assert.match(nodes['network-status-text'].textContent,/not queued/);
-  await context.updateStatus('PK-001','Done');
   assert.equal(nodes['network-status-text'].textContent,'Online');
 });
 
-test('cue and uncue failures clear only after the matching newer action succeeds', async()=>{
+test('cue and uncue share an active-act intent and only newer success clears failures', async()=>{
   const {context,nodes,setStorage,setAppend} = consoleContext();
   setStorage(false);setAppend(true);
   const cueOld = context.beginAction();
@@ -72,9 +70,13 @@ test('cue and uncue failures clear only after the matching newer action succeeds
   const uncueFailed = context.beginAction();
   await context.enqueueOfflineAction('uncue',null,{},uncueFailed);
   context.actionReachedServer('set_active','PK-001',cueOld);
-  context.actionReachedServer('uncue',null,context.beginAction());
   assert.match(nodes['network-status-text'].textContent,/not queued/);
-  context.actionReachedServer('set_active','PK-001',context.beginAction());
+  context.actionReachedServer('uncue',null,context.beginAction());
+  assert.equal(nodes['network-status-text'].textContent,'Online');
+  setAppend(true);
+  await context.enqueueOfflineAction('set_active','PK-001',{},context.beginAction());
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  context.actionReachedServer('set_active','PK-002',context.beginAction());
   assert.equal(nodes['network-status-text'].textContent,'Online');
 });
 
@@ -94,5 +96,16 @@ test('a successfully replayed matching queued intent clears its own unsaved warn
   context.loadQueue = async()=>{};
   await context.enqueueOfflineAction('uncue',null,{},context.beginAction({}));
   await context.syncOfflineActions();
+  assert.equal(nodes['network-status-text'].textContent,'Online');
+});
+
+test('status and note warnings are scoped independently per act', async()=>{
+  const {context,nodes,setStorage,setAppend} = consoleContext();
+  setStorage(false);setAppend(true);
+  await context.enqueueOfflineAction('update_status','PK-001',{status:'Performed'},context.beginAction({status:'Performed'}));
+  context.actionReachedServer('update_status','PK-002',context.beginAction({status:'Upcoming'}));
+  context.actionReachedServer('stage_notes','PK-001',context.beginAction({notes:'different'}));
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  context.actionReachedServer('update_status','PK-001',context.beginAction({status:'Upcoming'}));
   assert.equal(nodes['network-status-text'].textContent,'Online');
 });
