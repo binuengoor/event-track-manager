@@ -1,6 +1,6 @@
 # Event & Track Manager: Specification
 
-Status: draft 2, 2026-11-07 (draft 1 plus the review of the external architecture and design plan and the owner's answers). Written against commit `aa07405` (code unchanged since `2fc83ae`).
+Status: draft 3, 2026-11-07 (draft 2 plus the owner's answers on hosting, uploads and rendering approach). Written against commit `aa07405` (code unchanged since `2fc83ae`).
 Owner: BP. Audience: the owner (non-coder), any developer or AI agent who will change the app.
 
 ## How to read this document
@@ -54,7 +54,7 @@ guardian details from public endpoints.
 
 | Topic | Fact (owner, 2026-11-07) | Consequence |
 |---|---|---|
-| Where it runs | A Proxmox LXC at Hetzner, reached through a **Cloudflare Tunnel** (Q14 asks to confirm this reading). It is **not** on the venue network. | Venue internet is a hard dependency for every venue device; the console must run from its offline vault; the app is on the public internet (children's names, 4-digit PIN). See 4.6 and 6.12. |
+| Where it runs | A Proxmox LXC at Hetzner, reached through a **Cloudflare Tunnel**; confirmed a Hetzner data centre, not home. It is **not** on the venue network. | Venue internet is a hard dependency for every venue device; the console must run from its offline vault; the app is on the public internet (children's names, 4-digit PIN). See 4.6 and 6.12. |
 | Video on stage | A separate display or TV connected by HDMI (to the console laptop, assumed). | Stage monitor stays a second window in the console's browser (works today); no networked monitor needed. |
 | Payments | A manual tracker (Paid checkbox and note) plus a link to the payment page; no payment processing. | The current Payments tab and `payment_url` are the whole feature. |
 | Families | After one registration, offer to add another; no multi-act form. | See 6.10. |
@@ -480,7 +480,7 @@ IDs `A#` refer to the audit table; `N#` are new.
 | N12 | Low | UI copy "Automated Cloud Backup & One-Way Sync" and `/docs` titles still imply cloud features | `admin-settings.html` | Phase 3 |
 | N13 | Low | `food_items.name` is unique across all groups, so "Rice" cannot exist in two groups (bulk add silently skips duplicates, reported as skipped) | `schema.py` | Open question Q9 |
 | N14 | Low | Participants are unique by name, so two people with the same name share one record (phone, paid flag) | `schema.py` | Open question Q9 |
-| N15 | Medium | Upload limits (200 MB audio, 500 MB video) exceed what Cloudflare accepts on Free/Pro (100 MB per request; Tunnel-specific behaviour not confirmed); a larger file would fail with 413 at the edge | `audio_workflow_service.py`, Cloudflare | Phase 0; Q14 |
+| N15 | Medium | Upload limits (200 MB audio, 500 MB video) exceed what Cloudflare accepts on Free/Pro (100 MB per request; Tunnel-specific behaviour not confirmed); a larger file would fail with 413 at the edge | `audio_workflow_service.py`, Cloudflare | Owner will handle the limit (worst case a direct reverse proxy); app keeps a cap and a clear 413 message (Phase 0) |
 | N16 | Medium | No `robots.txt`, no `X-Robots-Tag`; public pages list children's names [V grep] | `app/` | Phase 0 |
 | N17 | Medium | Rate-limit key is the first `X-Forwarded-For` value (client-settable); behind Cloudflare use `CF-Connecting-IP` | `routers/auth.py` | Phase 0 |
 | N18 | Medium | Offline vault is filled only when the operator presses "Cache All Offline"; nothing tells the operator it is incomplete before doors | `js/admin.js` | Phase 4 |
@@ -511,7 +511,7 @@ they were changed to fit decisions already made. Appendix C lists what was adopt
 
 | ID | Topic | Decision | Status |
 |---|---|---|---|
-| D1 | How pages are rendered | Keep browser-rendered pages with ES modules (agreed), but **inject the shell (navigation + feature map) from the server** so every page gets one source for navigation and flags. A short **spike** at the start of Phase 2 rebuilds `/dashboard` with Jinja2 + HTMX; if it removes at least half the code and keeps tests green, guest and admin pages may follow. The console stays plain ES modules either way. | Proposed, owner decides after the spike (Q13) |
+| D1 | How pages are rendered | **Decided: keep browser-rendered pages with ES modules; inject the shell (navigation + feature map) from the server** so every page gets one source for navigation and flags and no wrong-menu flash. No Jinja2 or HTMX now. Reasons: it honours the agreed principles (no rewrite, fewest dependencies); the console must be client-side code anyway, so a second rendering style would mean two ways to build screens for a project maintained with AI help; the real pain (navigation and flags in many places) is solved by the shell. Revisit only if Phase 2 or 3 shows large duplicated render code across guest pages. | Decided (owner delegated, 2026-11-07) |
 | D2 | Track-to-act link | Keep the **entry id in the file name** as the link and the disaster-recovery format (agreed). Add an optional per-event **file-facts table** (sha256, size, duration, loudness gain) as a cache the folder can always rebuild. | Proposed (Phase 5) |
 | D3 | Service worker | **Revised.** Console: full shell cache plus offline vault. Guest pages: cache only versioned static files, never HTML or JSON; show a clear "offline, schedule as of 7:42 PM" banner from the last good response. | Replaces the earlier "offline-tolerant guest pages" idea |
 | D4 | Guest navigation shape | Bottom tab bar on phones, **top bar on desktop** (not a side rail). Admin and console use a left rail on desktop. Hide the bar when fewer than two destinations are enabled. | Proposed |
@@ -527,9 +527,9 @@ app/
   features.py              [T] the flag registry (6.4)
   db/migrations.py         [T] numbered migrations on PRAGMA user_version (6.8)
   routers/ services/ repositories/    unchanged layering
-  templates/               [T] only if D1 spike passes; otherwise a small shell injector in pages.py
+  shell injector           [T] small helper in `routers/pages.py` that inlines the navigation and feature map into each page
   static/
-    vendor/                [T] pinned htmx (only if D1), wavesurfer, marked, lucide sprite; SHA-256 checked
+    vendor/                [T] pinned wavesurfer, marked, lucide sprite; SHA-256 checked
     fonts/                 [T] self-hosted variable fonts
     css/tokens.css         [T] design tokens (light + dark)
     css/app.css            [T] Tailwind output built in Docker
@@ -677,7 +677,7 @@ Order the owner asked for, plus Phase 0 (fixes and hardening) and a console phas
 |---|---|---|
 | **0. Fixes and public-internet hardening** | N1 readiness status; N2 public edit validation (types, track status, limits, duet rule); N3 never reuse entry ids (high-water mark in `sync_meta`); N6 consistent redacted shape; N10 no phones in activity details; A9 media types from `mimetypes`; N16 `X-Robots-Tag` and `robots.txt`; N17 optional `TRUST_CLOUDFLARE` to key rate limits on `CF-Connecting-IP`; N15 per-file upload cap behind the tunnel (and chunked upload decision); `ffprobe` check; readiness additions | Each fix has a test that fails before and passes after; the 183 existing tests pass; readiness shows ERROR after a forced export failure; `curl -I` on every page shows the robots header |
 | **1. Bundle assets** | Standalone Tailwind CLI in the Docker build (arch-aware, hash-checked); pinned wavesurfer and marked; Lucide pinned for now (sprite comes in Phase 3); self-hosted fonts; update the 8 pages and `sw.js` | A test fails on any `http(s)://` host in HTML/JS/CSS except links an organizer typed; with all non-local requests aborted every page renders with no console errors; screenshot diff against today within tolerance (8 pages x 390x844 and 1280x800); both images build for amd64 and arm64; compiled CSS size recorded (the external target was under 25 KB gzipped; unverified) |
-| **2. Registry, modules, shared shell** | `features.py` + `require_feature`; presets as patches on the registry; migration runner (no renames yet); background reconcile; ES module split; server-injected shell and navigation per area; route renames with redirects; staff sign-in and console auth change; guest service-worker policy (D3); **D1 spike** | Adding a throw-away feature touches only the registry, one gate and one page (shown by a test); generic flag test passes; navigation matches the enabled destinations for each of the 8 presets (table-driven); no staff links in guest navigation; no JS file over 600 lines; all tests pass; old URLs redirect |
+| **2. Registry, modules, shared shell** | `features.py` + `require_feature`; presets as patches on the registry; migration runner (no renames yet); background reconcile; ES module split; server-injected shell and navigation per area; route renames with redirects; staff sign-in and console auth change; guest service-worker policy (D3) | Adding a throw-away feature touches only the registry, one gate and one page (shown by a test); generic flag test passes; navigation matches the enabled destinations for each of the 8 presets (table-driven); no staff links in guest navigation; no JS file over 600 lines; all tests pass; old URLs redirect |
 | **3. Visual redesign and guest/admin flows** | Tokens, themes, components, icon sprite, guest flows (6.10), admin consolidation to 5 destinations with Overview and readiness, copy and branding from settings | Axe scan has no serious or critical issues on every page; measured targets at least 44 px (48 px for primary controls) on phone layouts; every old admin setting reachable in two clicks (checklist test); light and dark verified; contrast script passes on the token table; Lighthouse mobile (throttled) Performance 90+ and Accessibility 95+ on guest pages (proposed; external plan wanted Accessibility 100); owner sign-off on screenshots of five main screens on phone and laptop |
 | **4. Console and live** | 6.9 items: state machine, reorder lock plus auto Save Order, fade, wake lock, sink id, auto vault with pill, `/live` BroadcastChannel path, loudness gain, ZIP extras | "Unplug" test passes end to end; selecting a row during playback never interrupts audio (tested); a dropped order is saved and files renamed without pressing a button; operator confirms hotkeys feel unchanged |
 | **5. Renames, migration, file facts** | Migrations 2+: `drive_file_id` -> `track_version`, `drive_file_name` -> `track_file`, `created_via` default `'sheet'` -> `'signup'`; remove `ColumnNamesConfig`/`COL_*`, `reset_database`, facade layers; `/api/sync` -> `/api/export-now`, `push_to_sheet` -> `save_files` (old names kept as aliases for one release); `signup_sheet_url` -> `external_link_url`; optional file-facts table | Fixture databases from `2fc83ae` and from the Google-era layout migrate and load; old snapshot restores into new code; pre-migration backup created; alias tests; grep finds no Google-era identifiers outside the changelog |
@@ -685,13 +685,13 @@ Order the owner asked for, plus Phase 0 (fixes and hardening) and a console phas
 
 ### 6.12 Remote hosting behind a Cloudflare Tunnel [O][T]
 
-Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached through a Cloudflare Tunnel (Q14 asks to confirm the reading). Consequences:
+Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached through a Cloudflare Tunnel (confirmed: Hetzner data centre). Consequences:
 
 | Topic | Effect | What to do |
 |---|---|---|
 | Venue internet drops | Every venue device (console laptop, TV, guests on venue Wi-Fi) loses the app. Guests on cellular are unaffected. | Console runs from its vault and service worker; stage monitor works (same browser); `/live` follows the console by `BroadcastChannel`; offline ZIP is the last resort. The vault must be complete before doors (auto-cache, pill). |
 | Server or tunnel down | Same as above for everyone | Same fallbacks; runbook step "cache all, then check the pill" before every show |
-| Upload size | Cloudflare caps request bodies at 100 MB on Free and Pro (200 Business, 500 Enterprise by default), per Cloudflare's documentation as found by search; whether Tunnel traffic follows the same cap was not confirmed. The app allows 200 MB audio and 500 MB video. | Check the plan; set the app cap at or below the plan limit; offer chunked upload or "paste a link" for big videos; show a clear message on HTTP 413 |
+| Upload size | Cloudflare caps request bodies at 100 MB on Free and Pro (200 Business, 500 Enterprise by default), per Cloudflare's documentation as found by search; whether Tunnel traffic follows the same cap was not confirmed. The app allows 200 MB audio and 500 MB video. | **Owner will handle it** (plan check, or a direct reverse proxy on the server that bypasses Cloudflare for uploads). The app still sets its own cap, shows a clear message on HTTP 413, and may offer chunked upload later |
 | Client IP | The rate limiter keys on the first `X-Forwarded-For` value, which a client can set. Behind Cloudflare the trustworthy value is `CF-Connecting-IP`. | `TRUST_CLOUDFLARE` setting; only then use that header |
 | PIN on the open internet | A 4-digit PIN has 10,000 possibilities; the global failure cap also lets anyone lock the admin out for 5 minutes | Longer PIN (6+) recommended by the readiness check; optionally put `/admin*`, `/console*`, `/api/admin*` behind a Cloudflare Access rule as a second lock (outside the app) |
 | Children's data | Public pages show names of minors to anyone with the URL | Robots header, optional passcode, optional short display names (6.10) |
@@ -720,10 +720,12 @@ Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached throu
 
 | Topic | Answer | Where it landed |
 |---|---|---|
-| Where does video play? | On a separate display or TV connected by HDMI (to the console laptop; confirm in Q14) | 1.4, 6.12; closes the old Q6 about a second device |
+| Where does video play? | On a separate display or TV connected by HDMI (to the console laptop, as assumed; speak up if the TV is driven by a different computer) | 1.4, 6.12; closes the old Q6 about a second device |
 | Payments | A manual tracker only (Paid checkbox, note) plus a deep link to the payment page; no payment processing | 1.4, existing Payments tab; optional QR/link on the landing and success card |
 | Several people per family | After a registration, offer to add another; no multi-act form | 6.10 |
-| Where does it run? | Proxmox LXC at Hetzner, through a Cloudflare Tunnel | 1.4, 4.6, 6.12 |
+| Where does it run? | Proxmox LXC at a Hetzner data centre, through a Cloudflare Tunnel (confirmed) | 1.4, 4.6, 6.12 |
+| Upload size limit behind Cloudflare | The owner will handle it; worst case the owner serves the app through a direct reverse proxy on the server, bypassing Cloudflare for uploads | 6.12; the app should still enforce its own per-file cap and show a clear error on 413 |
+| Page rendering approach (old Q13) | Delegated to the spec author: stay with ES modules plus a server-injected shell; no Jinja2/HTMX now | D1 |
 
 **Open**
 
@@ -740,8 +742,6 @@ Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached throu
 | Q10 | How long to keep old API names as aliases? | Compatibility | One release |
 | Q11 | Public pages stay phone-free only? | Privacy | Yes |
 | Q12 | Keep the bundled `rclone/` sidecar in the repo (sync is yours to run)? | Repo scope | Keep, document limits |
-| Q13 | After the Phase 2 spike, move guest and admin pages to server-rendered Jinja2 + HTMX if it clearly cuts code, or stay with ES modules? | Biggest architecture choice; adds two small dependencies | Decide from the spike result |
-| Q14 | Confirm: the server is at a Hetzner data centre (not at home), the TV is driven from the console laptop, and which Cloudflare plan applies (upload cap)? | Upload limits, offline needs | As stated in 6.12 |
 | Q15 | Allow the optional event passcode and minor short names? | Child privacy on a public URL | Build both as off-by-default switches |
 | Q16 | Loudness: apply gain at playback only, or also bake a normalized copy? | Changes the audio the PA plays vs. preserving originals | Playback gain; optional copy in the ZIP |
 | Q17 | Retire the on-screen spreadsheet viewer once downloads are prominent? | Less to maintain vs. a feature you just built | Keep for now |
@@ -833,7 +833,7 @@ The second agent's plan ("Principal Architecture & Product Design Specification"
 
 | External idea | Change |
 |---|---|
-| Jinja2 + HTMX for guest and admin pages | Not adopted by default (adds two dependencies and rewrites most pages). Server-injected shell now; D1 spike decides later. |
+| Jinja2 + HTMX for guest and admin pages | Not adopted (adds two dependencies, rewrites most pages, and the console would still need client-side code). Server-injected shell instead; decision D1. |
 | Database `tracks` table as the runtime link, filenames only an export | Kept filename token as the link (agreed; also what drop-in and rclone workflows use). Offered an optional rebuildable file-facts table instead. |
 | Guest pages must never use a service worker | Accepted in part: no stale HTML or JSON; versioned static assets only; banner for offline. |
 | Phone-last-4 and cookie verification for edits | Optional off-by-default switch, not a change of philosophy. |
