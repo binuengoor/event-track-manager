@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from app.config import settings
 from app.services.db_service import db_service
@@ -114,6 +114,22 @@ async def serve_public_data(file_path: str):
     if not full.startswith(root + os.sep) or not os.path.isfile(full):
         raise HTTPException(status_code=404)
     return FileResponse(full)
+
+
+ROBOTS_TAG = "noindex, nofollow, noarchive"
+
+
+@app.middleware("http")
+async def no_search_indexing(request, call_next):
+    """Public pages list children's names: ask every crawler to stay away (also covered by /robots.txt)."""
+    response = await call_next(request)
+    response.headers["X-Robots-Tag"] = ROBOTS_TAG
+    return response
+
+
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    return PlainTextResponse("User-agent: *\nDisallow: /")
 
 
 @app.middleware("http")

@@ -1,3 +1,4 @@
+import os
 import hmac
 import time
 import hashlib
@@ -57,7 +58,16 @@ class FailureLimiter:
 failure_limiter = FailureLimiter()
 
 
+def trust_cloudflare() -> bool:
+    """TRUST_CLOUDFLARE=true: the app is only reachable through Cloudflare, so CF-Connecting-IP is trustworthy."""
+    return os.getenv("TRUST_CLOUDFLARE", "").strip().lower() in ("1", "true", "yes", "on")
+
+
 def client_key(request: Request) -> str:
+    if trust_cloudflare():
+        cf_ip = request.headers.get("cf-connecting-ip", "").strip()
+        if cf_ip:
+            return cf_ip
     fwd = request.headers.get("x-forwarded-for", "")
     if fwd:
         return fwd.split(",")[0].strip()
