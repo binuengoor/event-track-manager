@@ -14,14 +14,17 @@
     }
   </style>
   <script src="/static/vendor/lucide.min.js"></script>
+  <script src="/static/js/icons.js"></script>
   <script src="/static/vendor/wavesurfer.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/guest-forms.css">
+  <link rel="stylesheet" href="/static/css/a11y.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <!-- Dynamic Ambient Aurora Fluid Light Effect -->
   <aurora-background></aurora-background>
@@ -44,7 +47,7 @@
   <script src="/static/js/nav.js"></script>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
+  <main id="main-content" class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
     <!-- Intro Card -->
     <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
@@ -217,7 +220,7 @@
               <i data-lucide="check-circle-2" class="w-4 h-4"></i>
               <span>Active Backing Track on File</span>
             </div>
-            <span class="text-[11px] text-slate-400 font-mono" id="track-size-badge">-- MB</span>
+            <span class="text-xs text-slate-400 font-mono" id="track-size-badge">-- MB</span>
           </div>
           <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
             <div class="flex items-center justify-between text-xs text-slate-300">
@@ -237,7 +240,7 @@
               <video id="preview-video-player" class="w-full max-h-56 object-contain" controls playsinline></video>
             </div>
           </div>
-          <p class="text-[11px] text-slate-400 leading-normal" id="existing-track-hint">
+          <p class="text-xs text-slate-400 leading-normal" id="existing-track-hint">
             Listen/watch above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.
           </p>
         </div>
@@ -249,7 +252,7 @@
               <i data-lucide="guitar" class="w-4 h-4 text-blue-400"></i>
               <span>Marked as Acoustic Performance</span>
             </div>
-            <button type="button" id="switch-to-track-btn" class="text-[11px] text-blue-300 hover:text-white underline font-semibold transition">
+            <button type="button" id="switch-to-track-btn" class="text-xs text-blue-300 hover:text-white underline font-semibold transition">
               Switch to Track Upload
             </button>
           </div>
@@ -270,7 +273,7 @@
         <div class="space-y-1.5">
           <label class="block text-xs font-semibold text-slate-300 flex items-center justify-between">
             <span>Choose Track Format</span>
-            <span id="media-type-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium">🎵 Audio Track (MP3)</span>
+            <span id="media-type-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium">🎵 Audio Track (MP3)</span>
           </label>
           <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
             <button type="button" id="type-audio-btn" class="py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow">
@@ -282,7 +285,7 @@
               <span>🎬 Video (MP4 or WebM)</span>
             </button>
           </div>
-          <p id="media-type-hint" class="text-[11px] text-slate-400">Standard studio-grade audio backing track for on-stage sound.</p>
+          <p id="media-type-hint" class="text-xs text-slate-400">Standard studio-grade audio backing track for on-stage sound.</p>
         </div>
 
         <!-- Method Tabs -->
@@ -493,7 +496,7 @@
                 <i data-lucide="guitar" class="w-3.5 h-3.5 text-orange-400"></i>
                 <span>Acoustic Performance (No Backing Track Upload Needed)</span>
               </span>
-              <span class="text-[11px] text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
+              <span class="text-xs text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
             </div>
           </label>
         </div>
@@ -526,7 +529,7 @@
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1">New Participant Name *</label>
           <input type="text" id="new-performer-name-input" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <p class="text-[11px] text-slate-400 mt-1">This will update your name across all your performances and potluck contributions.</p>
+          <p class="text-xs text-slate-400 mt-1">This will update your name across all your performances and potluck contributions.</p>
         </div>
         <div id="rename-error-msg" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg"></div>
         <div class="flex items-center justify-end gap-2 pt-1">
@@ -565,7 +568,7 @@
             <option value="Duet">Duet</option>
             <option value="Group">Group</option>
           </select>
-          <p id="add-perf-solo-warning" class="hidden text-[11px] text-amber-400 mt-1">Note: Only 1 solo performance is allowed per participant.</p>
+          <p id="add-perf-solo-warning" class="hidden text-xs text-amber-400 mt-1">Note: Only 1 solo performance is allowed per participant.</p>
         </div>
 
         <div id="add-perf-partner-row" class="hidden space-y-3">
@@ -577,12 +580,12 @@
               <span class="block font-semibold mb-1 text-amber-300">Matching registered participants:</span>
               <div id="add-perf-partner-matched-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
             </div>
-            <p class="text-[11px] text-slate-500 mt-1">Select from registered participants or type name (comma-separated for group).</p>
+            <p class="text-xs text-slate-500 mt-1">Select from registered participants or type name (comma-separated for group).</p>
           </div>
           <div id="add-perf-partner-phone-wrap" class="hidden">
             <label class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number *</label>
             <input type="tel" id="add-perf-partner-phone" placeholder="Partner's mobile e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-            <p class="text-[11px] text-slate-500 mt-1">Required for unlisted duet partners so organizers can identify them.</p>
+            <p class="text-xs text-slate-500 mt-1">Required for unlisted duet partners so organizers can identify them.</p>
           </div>
         </div>
 
@@ -610,7 +613,7 @@
                 <i data-lucide="guitar" class="w-3.5 h-3.5 text-blue-400"></i>
                 <span>Acoustic Performance (No Backing Track Upload Needed)</span>
               </span>
-              <span class="text-[11px] text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
+              <span class="text-xs text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
             </div>
           </label>
         </div>

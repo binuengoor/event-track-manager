@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#000000">
   <title>Live Stage Program - EMA Paattukoottam</title>
   <script src="/static/vendor/lucide.min.js"></script>
+  <script src="/static/js/icons.js"></script>
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
   <link rel="stylesheet" href="/static/css/app.css?v=1">
@@ -81,8 +82,10 @@
     #refresh-data-btn { padding: 10px 22px; border-radius: 14px; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; font: inherit; font-weight: 700; cursor: pointer; }
     #refresh-data-btn[disabled] { opacity: .6; }
   </style>
+  <link rel="stylesheet" href="/static/css/a11y.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <aurora-background></aurora-background>
 
   <!-- Full-width announcement strip (event-wide; empty means hidden) -->
@@ -98,7 +101,7 @@
     <span id="live-badge" class="chip wait"><span class="dot"></span><span id="live-badge-text">COUNTDOWN</span></span>
   </header>
 
-  <main>
+  <main id="main-content">
     <!-- OFF -->
     <div id="live-inactive-card" class="hidden card wait" style="max-width: 900px; margin: 48px auto;">
       <h2 class="big">Live stage display is off</h2>

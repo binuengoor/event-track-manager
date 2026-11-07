@@ -20,9 +20,9 @@ fetch lucide.min.js "https://unpkg.com/lucide@${LUCIDE_VERSION}/dist/umd/lucide.
 
 if [ "${1:-}" = "--update" ]; then
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum lucide.min.js marked.umd.js wavesurfer.min.js > CHECKSUMS.sha256
+    sha256sum lucide.min.js marked.umd.js wavesurfer.min.js icons.svg > CHECKSUMS.sha256
   else
-    shasum -a 256 lucide.min.js marked.umd.js wavesurfer.min.js > CHECKSUMS.sha256
+    shasum -a 256 lucide.min.js marked.umd.js wavesurfer.min.js icons.svg > CHECKSUMS.sha256
   fi
   echo "CHECKSUMS.sha256 rewritten"
 elif command -v sha256sum >/dev/null 2>&1; then

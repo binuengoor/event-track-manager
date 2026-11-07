@@ -14,11 +14,14 @@
     }
   </style>
   <script src="/static/vendor/lucide.min.js"></script>
+  <script src="/static/js/icons.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/admin-shell.css?v=1">
+  <link rel="stylesheet" href="/static/css/a11y.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white">
+  <a class="skip-link" href="#admin-main-container">Skip to main content</a>
 
   <!-- Top Navigation Bar -->
   <header class="border-b border-slate-800 bg-slate-900/70 backdrop-blur sticky top-0 z-30">
@@ -249,7 +252,7 @@
             <h3 class="text-base font-bold text-white">Event Metadata & Branding</h3>
             <p class="text-xs text-slate-400">Changes save directly to the database and take effect immediately across all pages without restarting the server.</p>
           </div>
-          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">LIVE UPDATE</span>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">LIVE UPDATE</span>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -260,20 +263,20 @@
                 <i data-lucide="layout" class="w-3.5 h-3.5"></i>
                 Top Navigation Bar Branding (Across All Pages)
               </span>
-              <span class="text-[10px] text-slate-500">Header Branding</span>
+              <span class="text-xs text-slate-500">Header Branding</span>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <label class="block font-semibold text-slate-300">Header Title (Max 35 chars)</label>
-                  <span id="header-title-char-count" class="text-[11px] text-slate-500 font-mono">0/35</span>
+                  <span id="header-title-char-count" class="text-xs text-slate-500 font-mono">0/35</span>
                 </div>
                 <input type="text" id="setting-header-brand-title" maxlength="35" placeholder="e.g. EMA Paattukoottam" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
               </div>
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <label class="block font-semibold text-slate-300">Header Subtitle (Max 45 chars)</label>
-                  <span id="header-subtitle-char-count" class="text-[11px] text-slate-500 font-mono">0/45</span>
+                  <span id="header-subtitle-char-count" class="text-xs text-slate-500 font-mono">0/45</span>
                 </div>
                 <input type="text" id="setting-header-brand-subtitle" maxlength="45" placeholder="e.g. Musical Night" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
               </div>
@@ -287,20 +290,20 @@
                 <i data-lucide="home" class="w-3.5 h-3.5"></i>
                 Homepage Hero Card & Poster Branding
               </span>
-              <span class="text-[10px] text-slate-500">Card Branding</span>
+              <span class="text-xs text-slate-500">Card Branding</span>
             </div>
             <div class="space-y-3">
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <label class="block font-semibold text-slate-300">Homepage Event Title (Max 60 chars)</label>
-                  <span id="title-char-count" class="text-[11px] text-slate-500 font-mono">0/60</span>
+                  <span id="title-char-count" class="text-xs text-slate-500 font-mono">0/60</span>
                 </div>
                 <input type="text" id="setting-event-name" maxlength="60" placeholder="e.g. ✨🎤✨ Paattukoottam Sing & Serenade ✨🎶✨" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
               </div>
               <div>
                 <div class="flex items-center justify-between mb-1">
                   <label class="block font-semibold text-slate-300">Homepage Event Subtitle (Max 80 chars)</label>
-                  <span id="subtitle-char-count" class="text-[11px] text-slate-500 font-mono">0/80</span>
+                  <span id="subtitle-char-count" class="text-xs text-slate-500 font-mono">0/80</span>
                 </div>
                 <input type="text" id="setting-event-subtitle" maxlength="80" placeholder="e.g. Musical Night • September 19, 2026" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500">
               </div>
@@ -343,7 +346,7 @@
           <div class="sm:col-span-2">
             <div class="flex items-center justify-between mb-1">
               <label class="block font-semibold text-slate-300">General Notes & Announcements (Markdown Supported)</label>
-              <span class="text-[10px] text-slate-500 font-mono">Supports **bold**, *italic*, bullets (-)</span>
+              <span class="text-xs text-slate-500 font-mono">Supports **bold**, *italic*, bullets (-)</span>
             </div>
             <textarea id="setting-general-notes" rows="4" placeholder="Enter any general rules, parking details, announcements, or arrival guidelines for performers and guests..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500 text-xs font-mono"></textarea>
           </div>
@@ -377,7 +380,7 @@
               <i data-lucide="user-plus" class="w-4 h-4 text-orange-400"></i>
               <span>Participant Sign-Up Status</span>
             </h4>
-            <p class="text-[11px] text-slate-400 mt-0.5">Control whether public sign-ups are currently open or closed for this event.</p>
+            <p class="text-xs text-slate-400 mt-0.5">Control whether public sign-ups are currently open or closed for this event.</p>
           </div>
           <div>
             <button id="toggle-signup-status-btn" type="button" class="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-2"></button>
@@ -415,13 +418,13 @@
             <label for="setting-max-video-mb" class="block font-semibold text-slate-300 mb-1">Largest video file (MB)</label>
             <input type="number" id="setting-max-video-mb" min="1" max="5000" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
           </div>
-          <p class="sm:col-span-2 text-[11px] text-slate-500 -mt-2">Audio: MP3, WAV, M4A. Video: MP4, WebM. Bigger files are refused with a plain message.</p>
+          <p class="sm:col-span-2 text-xs text-slate-500 -mt-2">Audio: MP3, WAV, M4A. Video: MP4, WebM. Bigger files are refused with a plain message.</p>
 
           <!-- Junior names -->
           <div class="sm:col-span-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
             <div>
               <span id="shorten-junior-label" class="block font-semibold text-slate-200">Shorten junior names on public screens</span>
-              <span id="shorten-junior-help" class="block text-[11px] text-slate-400 mt-0.5">Juniors are shown as first name and last initial (for example Anika M.) on the schedule and live screen. Admin and the sound console always show full names.</span>
+              <span id="shorten-junior-help" class="block text-xs text-slate-400 mt-0.5">Juniors are shown as first name and last initial (for example Anika M.) on the schedule and live screen. Admin and the sound console always show full names.</span>
             </div>
             <button type="button" role="switch" id="setting-shorten-junior-names" class="sw" aria-checked="true" aria-labelledby="shorten-junior-label" aria-describedby="shorten-junior-help"></button>
           </div>
@@ -472,13 +475,13 @@
             </h3>
             <p class="text-xs text-slate-400">Instantly reconfigure feature modules for your event type. No data is ever deleted.</p>
           </div>
-          <span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">PRESETS</span>
+          <span class="px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold">PRESETS</span>
         </div>
 
         <div id="preset-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1"></div>
         <div id="preset-preview" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"></div>
         <div class="flex items-center justify-between pt-1">
-          <p class="text-[11px] text-slate-500">Tip: presets only change what is switched on and the sign-up rules. Nothing is deleted.</p>
+          <p class="text-xs text-slate-500">Tip: presets only change what is switched on and the sign-up rules. Nothing is deleted.</p>
           <button type="button" id="open-wizard-btn" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition flex items-center gap-1.5">
             <i data-lucide="wand-2" class="w-3.5 h-3.5 text-amber-400"></i><span>Run setup wizard</span>
           </button>
@@ -495,7 +498,7 @@
             </h3>
             <p class="text-xs text-slate-400">Enable or disable specific capabilities individually. Existing data remains safe in the database.</p>
           </div>
-          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] font-bold">ZERO DATA LOSS</span>
+          <span class="px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">ZERO DATA LOSS</span>
         </div>
 
         <div id="feature-modules-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
@@ -537,7 +540,7 @@
         </div>
         <textarea id="bulk-food-text" rows="7" placeholder="Appetizers:&#10;Samosa x4&#10;Spring rolls&#10;Mains:&#10;Biryani x3&#10;Curry x2" class="w-full bg-slate-950 border border-slate-700 rounded-2xl px-3.5 py-3 text-xs text-white font-mono"></textarea>
         <div class="flex items-center justify-between">
-          <span id="bulk-food-hint" class="text-[11px] text-slate-500">Existing items and claims are never changed. Duplicates are skipped.</span>
+          <span id="bulk-food-hint" class="text-xs text-slate-500">Existing items and claims are never changed. Duplicates are skipped.</span>
           <button type="button" id="bulk-food-submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">Add these items</button>
         </div>
       </div>
@@ -625,7 +628,7 @@
         <div class="overflow-auto rounded-2xl border border-slate-800 max-h-[62vh]">
           <table class="w-full text-left text-xs border-collapse" id="sheet-table"></table>
         </div>
-        <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <span id="sheet-note"></span><span id="sheet-count"></span>
         </div>
       </div>
@@ -654,7 +657,7 @@
         </div>
         <div class="overflow-auto rounded-2xl border border-slate-800 max-h-[60vh]">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold sticky top-0 z-10">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-xs font-semibold sticky top-0 z-10">
               <tr>
                 <th class="px-3.5 py-3 w-16"><label class="flex items-center gap-1.5 cursor-pointer"><input type="checkbox" id="pay-all"> <span>Paid</span></label></th>
                 <th class="px-3.5 py-3">Name</th><th class="px-3.5 py-3">Age</th><th class="px-3.5 py-3">Songs</th><th class="px-3.5 py-3">Note</th>
@@ -680,19 +683,19 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
           <div id="stat-card-participants" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-orange-500/50 cursor-pointer transition group" title="Click to view all participants">
             <span id="stat-total-performers" class="text-2xl sm:text-3xl font-black text-white font-mono group-hover:text-orange-400 transition">0</span>
-            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Participants</span>
+            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">Participants</span>
           </div>
           <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
             <span id="stat-total-performances" class="text-2xl sm:text-3xl font-black text-orange-400 font-mono">0</span>
-            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Total Acts</span>
+            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">Total Acts</span>
           </div>
           <div id="stat-card-juniors" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-amber-500/50 cursor-pointer transition group" title="Click to view Junior participants in roster">
             <span id="stat-juniors" class="text-2xl sm:text-3xl font-black text-amber-400 font-mono group-hover:text-amber-300 transition">0</span>
-            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Juniors</span>
+            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">Juniors</span>
           </div>
           <div id="stat-card-seniors" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-blue-500/50 cursor-pointer transition group" title="Click to view Senior participants in roster">
             <span id="stat-seniors" class="text-2xl sm:text-3xl font-black text-blue-400 font-mono group-hover:text-blue-300 transition">0</span>
-            <span class="block text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Seniors</span>
+            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-1">Seniors</span>
           </div>
         </div>
 
@@ -761,7 +764,7 @@
         <!-- Participants Table -->
         <div class="overflow-x-auto rounded-2xl border border-slate-800">
           <table class="w-full text-left text-xs">
-            <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800 select-none">
+            <thead class="bg-slate-950 text-slate-400 uppercase text-xs font-semibold border-b border-slate-800 select-none">
               <tr>
                 <th class="px-3.5 py-3 cursor-pointer hover:text-white transition" data-sort-key="seq">
                   <div class="flex items-center gap-1">
@@ -828,7 +831,7 @@
           <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Recent Backup Snapshots</h4>
           <div class="overflow-x-auto rounded-2xl border border-slate-800">
             <table class="w-full text-left text-xs">
-              <thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+              <thead class="bg-slate-950 text-slate-400 uppercase text-xs font-semibold border-b border-slate-800">
                 <tr>
                   <th class="px-4 py-2.5">Time</th>
                   <th class="px-4 py-2.5">Status</th>
@@ -897,7 +900,7 @@
 
         <div class="flex items-center justify-between px-1">
           <span id="activity-count-badge" class="text-xs text-slate-400 font-medium">Loading activity logs...</span>
-          <span class="text-[11px] text-slate-500">Auto-timestamps in local time</span>
+          <span class="text-xs text-slate-500">Auto-timestamps in local time</span>
         </div>
 
         <!-- Activity Timeline / List -->
@@ -1108,13 +1111,13 @@
         <div class="border-t border-slate-800 pt-3 space-y-3">
           <div class="flex items-center justify-between">
             <span class="font-bold text-slate-200">Sign-Up & Claim Details</span>
-            <span id="admin-food-claim-status-pill" class="text-[10px] px-2 py-0.5 rounded-full font-bold"></span>
+            <span id="admin-food-claim-status-pill" class="text-xs px-2 py-0.5 rounded-full font-bold"></span>
           </div>
 
           <div>
             <label class="block font-semibold text-slate-300 mb-1">Signer / Family Name(s)</label>
             <input type="text" id="admin-edit-food-signer-name" placeholder="Leave empty if unclaimed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-            <p class="text-[10px] text-slate-500 mt-1">If this signer is a stage performer, updating their name will cascade to their performance record too. Multiple family signers can be joined with " & ".</p>
+            <p class="text-xs text-slate-500 mt-1">If this signer is a stage performer, updating their name will cascade to their performance record too. Multiple family signers can be joined with " & ".</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -1163,7 +1166,7 @@
       </div>
       <label class="block"><span class="block font-semibold text-slate-300 mb-1">Start from</span>
         <select id="ne-copy" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white"></select>
-        <span class="block text-[11px] text-slate-500 mt-1">Copies rules, switches, branding and the potluck menu. Never copies sign-ups, payments or tracks.</span></label>
+        <span class="block text-xs text-slate-500 mt-1">Copies rules, switches, branding and the potluck menu. Never copies sign-ups, payments or tracks.</span></label>
       <label class="flex items-center gap-2 text-slate-300"><input type="checkbox" id="ne-activate" checked> Switch to it now (every page shows the new event)</label>
       <div id="ne-error" class="hidden text-rose-300 font-semibold"></div>
       <div class="flex justify-end gap-2"><button type="button" data-close-modal class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">Cancel</button>
@@ -1179,7 +1182,7 @@
         <button type="button" data-close-modal class="p-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white" aria-label="Close"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
       <div class="overflow-x-auto rounded-2xl border border-slate-800">
-        <table class="w-full text-left"><thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold"><tr>
+        <table class="w-full text-left"><thead class="bg-slate-950 text-slate-400 uppercase text-xs font-semibold"><tr>
           <th class="px-3 py-2.5">Event</th><th class="px-3 py-2.5">Acts</th><th class="px-3 py-2.5">Potluck</th><th class="px-3 py-2.5">Paid</th><th class="px-3 py-2.5">Media</th><th class="px-3 py-2.5">Last activity</th><th class="px-3 py-2.5 text-right">Actions</th></tr></thead>
           <tbody id="events-table-body" class="divide-y divide-slate-800/80"></tbody></table>
       </div>

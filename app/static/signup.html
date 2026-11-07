@@ -14,13 +14,16 @@
     }
   </style>
   <script src="/static/vendor/lucide.min.js"></script>
+  <script src="/static/js/icons.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/guest-forms.css">
+  <link rel="stylesheet" href="/static/css/a11y.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <!-- Dynamic Ambient Aurora Fluid Light Effect -->
   <aurora-background></aurora-background>
@@ -45,7 +48,7 @@
   <script src="/static/js/nav.js"></script>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
+  <main id="main-content" class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
     <div class="gf-card">
       <h2 id="signup-banner-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight">Sign up</h2>

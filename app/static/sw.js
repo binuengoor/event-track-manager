@@ -1,12 +1,15 @@
 // Service Worker for EMA Paattukoottam Stage Console
 // Enables offline loading of the console UI shell and assets.
 
-const CACHE_NAME = 'paattukoottam-console-v15';
+const CACHE_NAME = 'paattukoottam-console-v16';
 
 const SHELL_URLS = [
   '/console',
   '/static/admin.html',
   '/static/css/style.css',
+  '/static/css/a11y.css',
+  '/static/js/icons.js',
+  '/static/vendor/icons.svg',
   '/static/js/admin.js',
   '/static/js/console/vault-store.js',
   '/static/js/console/offline-actions.js',
