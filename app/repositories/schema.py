@@ -58,72 +58,69 @@ def get_or_create_participant_conn(
 
 def backfill_participants(conn: sqlite3.Connection):
     """Idempotently backfills participants table from existing performances and food signups."""
-    try:
-        # 1. Primary performers from performances
-        rows = conn.execute("""
-            SELECT entry_id, performer_name, contact_info, age_group, guardian_name, guardian_phone, participant_id
-            FROM performances
-        """).fetchall()
+    # 1. Primary performers from performances
+    rows = conn.execute("""
+        SELECT entry_id, performer_name, contact_info, age_group, guardian_name, guardian_phone, participant_id
+        FROM performances
+    """).fetchall()
 
-        for r in rows:
-            name = (r["performer_name"] or "").strip()
-            if not name:
-                continue
-            part_id = r["participant_id"] if "participant_id" in r.keys() and r["participant_id"] else None
-            if not part_id:
-                part_id = get_or_create_participant_conn(
+    for r in rows:
+        name = (r["performer_name"] or "").strip()
+        if not name:
+            continue
+        part_id = r["participant_id"] if "participant_id" in r.keys() and r["participant_id"] else None
+        if not part_id:
+            part_id = get_or_create_participant_conn(
+                conn,
+                name=name,
+                phone=(r["contact_info"] or "").strip(),
+                age_group=(r["age_group"] or "Senior").strip(),
+                guardian_name=(r["guardian_name"] or "").strip(),
+                guardian_phone=(r["guardian_phone"] or "").strip()
+            )
+            conn.execute("UPDATE performances SET participant_id = ? WHERE entry_id = ?", (part_id, r["entry_id"]))
+
+    # 2. Partners from performances
+    partner_rows = conn.execute("""
+        SELECT partner_name, partner_phone, partner_age_group, guardian_name, guardian_phone
+        FROM performances
+        WHERE partner_name IS NOT NULL AND partner_name != ''
+    """).fetchall()
+
+    for r in partner_rows:
+        raw_partner = (r["partner_name"] or "").strip()
+        if not raw_partner:
+            continue
+        tokens = re.split(r'\s*(?:&|,|\band\b)\s*', raw_partner, flags=re.IGNORECASE)
+        for token in tokens:
+            p_name = token.strip()
+            if p_name and len(p_name) >= 2:
+                p_age = (r["partner_age_group"] or "Senior").strip()
+                is_junior = "junior" in p_age.lower()
+                get_or_create_participant_conn(
                     conn,
-                    name=name,
-                    phone=(r["contact_info"] or "").strip(),
-                    age_group=(r["age_group"] or "Senior").strip(),
-                    guardian_name=(r["guardian_name"] or "").strip(),
-                    guardian_phone=(r["guardian_phone"] or "").strip()
+                    name=p_name,
+                    phone=(r["partner_phone"] or "").strip(),
+                    age_group=p_age,
+                    guardian_name=(r["guardian_name"] or "").strip() if is_junior else "",
+                    guardian_phone=(r["guardian_phone"] or "").strip() if is_junior else ""
                 )
-                conn.execute("UPDATE performances SET participant_id = ? WHERE entry_id = ?", (part_id, r["entry_id"]))
 
-        # 2. Partners from performances
-        partner_rows = conn.execute("""
-            SELECT partner_name, partner_phone, partner_age_group, guardian_name, guardian_phone
-            FROM performances
-            WHERE partner_name IS NOT NULL AND partner_name != ''
-        """).fetchall()
-
-        for r in partner_rows:
-            raw_partner = (r["partner_name"] or "").strip()
-            if not raw_partner:
-                continue
-            tokens = re.split(r'\s*(?:&|,|\band\b)\s*', raw_partner, flags=re.IGNORECASE)
-            for token in tokens:
-                p_name = token.strip()
-                if p_name and len(p_name) >= 2:
-                    p_age = (r["partner_age_group"] or "Senior").strip()
-                    is_junior = "junior" in p_age.lower()
-                    get_or_create_participant_conn(
-                        conn,
-                        name=p_name,
-                        phone=(r["partner_phone"] or "").strip(),
-                        age_group=p_age,
-                        guardian_name=(r["guardian_name"] or "").strip() if is_junior else "",
-                        guardian_phone=(r["guardian_phone"] or "").strip() if is_junior else ""
-                    )
-
-        # 3. Signers from food_signups
-        food_rows = conn.execute("SELECT signup_id, signer_name, signer_phone, participant_id FROM food_signups").fetchall()
-        for fr in food_rows:
-            s_name = (fr["signer_name"] or "").strip()
-            part_id = fr["participant_id"] if "participant_id" in fr.keys() and fr["participant_id"] else None
-            if s_name and not part_id:
-                p_id = get_or_create_participant_conn(
-                    conn,
-                    name=s_name,
-                    phone=(fr["signer_phone"] or "").strip()
-                )
-                conn.execute("UPDATE food_signups SET participant_id = ? WHERE signup_id = ?", (p_id, fr["signup_id"]))
-    except Exception as ex:
-        logger.warning("Error backfilling participants: %s", ex)
+    # 3. Signers from food_signups
+    food_rows = conn.execute("SELECT signup_id, signer_name, signer_phone, participant_id FROM food_signups").fetchall()
+    for fr in food_rows:
+        s_name = (fr["signer_name"] or "").strip()
+        part_id = fr["participant_id"] if "participant_id" in fr.keys() and fr["participant_id"] else None
+        if s_name and not part_id:
+            p_id = get_or_create_participant_conn(
+                conn,
+                name=s_name,
+                phone=(fr["signer_phone"] or "").strip()
+            )
+            conn.execute("UPDATE food_signups SET participant_id = ? WHERE signup_id = ?", (p_id, fr["signup_id"]))
 
 
-def ensure_database(conn: sqlite3.Connection):
+def _apply_baseline(conn: sqlite3.Connection):
     """Creates all database tables, columns, indexes and backfills canonical participants."""
     # 1. Performances table
     conn.execute("""
@@ -168,10 +165,8 @@ def ensure_database(conn: sqlite3.Connection):
         ("participant_id", "TEXT DEFAULT ''"),
         ("media_type", "TEXT DEFAULT 'audio'"),
     ]:
-        try:
+        if col_name not in {row[1] for row in conn.execute("PRAGMA table_info(performances)")}:
             conn.execute(f"ALTER TABLE performances ADD COLUMN {col_name} {col_def}")
-        except Exception:
-            pass
 
     conn.execute("""
     CREATE INDEX IF NOT EXISTS idx_perf_sequence ON performances (sequence_order)
@@ -233,10 +228,8 @@ def ensure_database(conn: sqlite3.Connection):
         ("signer_phone", "TEXT DEFAULT ''"),
         ("participant_id", "TEXT DEFAULT ''"),
     ]:
-        try:
+        if col_name not in {row[1] for row in conn.execute("PRAGMA table_info(food_signups)")}:
             conn.execute(f"ALTER TABLE food_signups ADD COLUMN {col_name} {col_def}")
-        except Exception:
-            pass
 
     # 7. Backup log
     conn.execute("""
@@ -296,11 +289,14 @@ def ensure_database(conn: sqlite3.Connection):
         ("paid_at", "TEXT DEFAULT ''"),
         ("payment_note", "TEXT DEFAULT ''"),
     ]:
-        try:
+        if col_name not in {row[1] for row in conn.execute("PRAGMA table_info(participants)")}:
             conn.execute(f"ALTER TABLE participants ADD COLUMN {col_name} {col_def}")
-        except Exception:
-            pass
 
     # Idempotent backfill
     backfill_participants(conn)
-    conn.commit()
+
+
+def ensure_database(conn: sqlite3.Connection):
+    """Initialize or migrate an event database atomically."""
+    from app.repositories.migrations import migrate
+    migrate(conn, _apply_baseline)

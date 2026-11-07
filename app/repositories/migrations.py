@@ -1,0 +1,76 @@
+"""Versioned, per-event SQLite schema initialization."""
+import fcntl
+import os
+import sqlite3
+import uuid
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Callable
+
+SCHEMA_VERSION = 1
+KNOWN_TABLES = {"performances", "sync_meta", "app_settings", "food_groups", "food_items",
+                "food_signups", "backup_log", "activity_logs", "participants"}
+
+
+@contextmanager
+def _event_lock(path: str):
+    if not path:
+        yield
+        return
+    lock_path = path + ".migration.lock"
+    with open(lock_path, "a", encoding="utf-8") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+
+
+def _snapshot(conn: sqlite3.Connection, path: str) -> None:
+    if not path:
+        raise RuntimeError("Cannot back up an existing in-memory database before migration")
+    folder = Path(path).parent / "backups"
+    folder.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    destination = folder / f"pre-migration-{stamp}-{uuid.uuid4().hex[:8]}.db"
+    with sqlite3.connect(f"{Path(path).resolve().as_uri()}?mode=ro", uri=True) as source:
+        with sqlite3.connect(destination) as target:
+            source.backup(target)
+            if target.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
+                raise RuntimeError("Pre-migration database backup failed its integrity check")
+
+
+def migrate(conn: sqlite3.Connection, baseline: Callable[[sqlite3.Connection], None]) -> None:
+    """Apply the legacy-compatible baseline once, backing up before mutation.
+
+    The file lock spans inspection, backup and migration for cooperating processes;
+    the SQLite transaction makes the schema, backfill and version one atomic unit.
+    """
+    path = conn.execute("PRAGMA database_list").fetchone()[2]
+    if conn.in_transaction:
+        raise RuntimeError("Cannot migrate inside an existing database transaction")
+    with _event_lock(path):
+        try:
+            # Reserve the writer before taking the snapshot so no application
+            # write can slip between backup and schema migration. A separate
+            # read-only connection takes the SQLite online backup (WAL-safe).
+            conn.execute("BEGIN IMMEDIATE")
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            if version > SCHEMA_VERSION:
+                raise RuntimeError(f"Database schema version {version} is newer than supported {SCHEMA_VERSION}")
+            if version == SCHEMA_VERSION:
+                conn.commit()
+                return
+            names = {row[0] for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+            if names and not names.intersection(KNOWN_TABLES):
+                raise RuntimeError("Unrecognized event database; migration refused")
+            if names:
+                _snapshot(conn, path)
+            baseline(conn)
+            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise

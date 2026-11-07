@@ -68,10 +68,7 @@ async def lifespan(app: FastAPI):
     #      tracks on disk aligned with the database, and the first export into the event folder
     logger.info("Active event: %s  folder: %s  (switching %s)", event_manager.active_id(), settings.storage.event_dir,
                 "on" if event_manager.switching_enabled() else "off, EVENT_DIR pins one folder")
-    try:
-        event_manager.bootstrap(seed_food=True, migrate_legacy=True)
-    except Exception as ex:
-        logger.warning("Event bootstrap failed: %s", ex)
+    event_manager.bootstrap(seed_food=True, migrate_legacy=True)
 
     # 4. Start background backup debounce loop & pooled downloader client
     backup_service.start()

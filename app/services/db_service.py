@@ -50,11 +50,8 @@ class DBService:
         return self.db_manager.get_connection()
 
     def _ensure_db(self):
-        try:
-            with self._get_connection() as conn:
-                ensure_database(conn)
-        except Exception as ex:
-            logger.error(f"Error initializing SQLite database at {self.db_path}: {ex}")
+        with self._get_connection() as conn:
+            ensure_database(conn)
 
     def _get_or_create_participant_conn(
         self,

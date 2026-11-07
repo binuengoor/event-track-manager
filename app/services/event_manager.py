@@ -218,6 +218,15 @@ class EventManager:
         if event_id == self.active_id():
             return {"id": event_id, "changed": False}
 
+        # Validate and migrate the target before persisting or switching the active event.
+        from app.repositories.schema import ensure_database
+        conn = sqlite3.connect(os.path.join(folder, "event.db"))
+        conn.row_factory = sqlite3.Row
+        try:
+            ensure_database(conn)
+        finally:
+            conn.close()
+
         # remember the choice (atomic) so a restart comes back to the same event
         tmp = os.path.join(self.events_root(), ACTIVE_FILE + ".tmp")
         with open(tmp, "w", encoding="utf-8") as f:
