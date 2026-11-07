@@ -28,6 +28,10 @@ async def get_performer_profile(name: str):
 
     all_perfs = db_service.get_all_performances()
     names = NamePrivacy(all_perfs)
+    try:
+        clean_name = names.resolve_name(clean_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     # Exact (case-insensitive) match only: substring matching let anyone enumerate every performer.
     wanted = clean_name.lower()
     user_perfs = [
@@ -59,17 +63,14 @@ async def get_performer_profile(name: str):
         effective_perfs = []
         other_songs = []
     else:
-        # The caller typed the name they are looking up, so only OTHER people's junior names are shortened.
         def shown(value):
-            return value if (value or "").strip().lower() == wanted else names.name(value)
+            return names.name(value)
 
         def shown_partners(value):
-            if not value or (value or "").strip().lower() == wanted:
-                return value
-            return " & ".join(shown(n) for n in split_signer_names(value)) if names.enabled else value
+            return names.partners(value) if names.active else value
 
         effective_perfs = [
-            {**p, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
+            {**{k: v for k, v in p.items() if k not in ("drive_file_name", "age_group", "partner_age_group", "extra_tags")}, "drive_file_id": "available" if p.get("drive_file_id") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
             for p in user_perfs
         ]
         # Other songs list for transparency
@@ -85,8 +86,8 @@ async def get_performer_profile(name: str):
             for p in all_perfs if p["entry_id"] not in user_ids and not is_placeholder_song_title(p.get("song_title"))
         ]
 
-    return strip_private({
-        "performer_name": clean_name,
+    response = strip_private({
+        "performer_name": names.name(clean_name),
         "performances": effective_perfs,
         "food_signup": food_signup,
         "counts": counts,
@@ -96,9 +97,14 @@ async def get_performer_profile(name: str):
         "track_upload_enabled": track_upload_enabled,
         "edits_enabled": edits_enabled,
         "allow_duets": allow_duets,
-        "all_food_items": all_food_items,
+        "all_food_items": names.food_items(all_food_items),
         "other_songs": other_songs
     })
+    if food_signup and response["food_signup"] is not None:
+        # This is the selected performer's own claim, needed for editing it.
+        response["food_signup"]["signup_id"] = food_signup.get("signup_id")
+        response["food_signup"]["signer_name"] = names.partners(food_signup.get("signer_name"))
+    return response
 
 
 @router.get("/api/performer/names")
@@ -140,10 +146,14 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         raise HTTPException(status_code=400, detail="Performer name is required.")
 
     all_perfs = db_service.get_all_performances()
+    try:
+        clean_name = NamePrivacy(all_perfs).resolve_name(clean_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     user_perfs = [
         p for p in all_perfs
         if clean_name.lower() == (p.get("performer_name") or "").strip().lower()
-        or clean_name.lower() == (p.get("partner_name") or "").strip().lower()
+        or clean_name.lower() in [n.lower() for n in split_signer_names(p.get("partner_name"))]
     ]
     if not user_perfs:
         raise HTTPException(status_code=404, detail=f"No registration found for {clean_name}. Please sign up first.")
@@ -181,12 +191,28 @@ async def add_performer_performance(payload: AddPerformanceRequest):
                     detail=f"A valid 10-digit phone number is required for partner '{partner_name}'."
                 )
 
-    # Inherit demographics from primary performance
-    ref_perf = user_perfs[0]
-    contact_info = ref_perf.get("contact_info") or ""
-    age_group = ref_perf.get("age_group") or ""
-    guardian_name = ref_perf.get("guardian_name") or ""
-    guardian_phone = ref_perf.get("guardian_phone") or ""
+    # Prefer the participant's own record or primary act. Never copy another
+    # person's demographics when the selected performer was only a partner.
+    primary = next((p for p in user_perfs if (p.get("performer_name") or "").strip().casefold() == clean_name.casefold()), None)
+    if primary:
+        contact_info = primary.get("contact_info") or ""
+        age_group = primary.get("age_group") or ""
+        guardian_name = primary.get("guardian_name") or ""
+        guardian_phone = primary.get("guardian_phone") or ""
+    else:
+        # Legacy participant rows may have been backfilled with the primary
+        # singer's guardian. Use only explicitly partner-specific information.
+        ref_perf = next((p for p in user_perfs if len(split_signer_names(p.get("partner_name"))) == 1), None)
+        if not ref_perf:
+            raise HTTPException(status_code=400, detail="Your individual details are missing. Please ask an organizer to update them.")
+        contact_info = ref_perf.get("partner_phone") or ""
+        age_group = ref_perf.get("partner_age_group") or ""
+        guardian_name = ref_perf.get("partner_guardian_name") or ""
+        guardian_phone = ref_perf.get("partner_guardian_phone") or ""
+    if not age_group:
+        raise HTTPException(status_code=400, detail="Your age group is missing. Please ask an organizer to update your details.")
+    if age_group.strip().casefold() == "junior" and (not guardian_name or not guardian_phone):
+        raise HTTPException(status_code=400, detail="Your guardian details are missing. Please ask an organizer to update them.")
 
     track_status = "Acoustic" if payload.is_acoustic else "Pending"
 
@@ -202,6 +228,10 @@ async def add_performer_performance(payload: AddPerformanceRequest):
         age_group=age_group,
         guardian_name=guardian_name,
         guardian_phone=guardian_phone,
+        public_first_name_only=any(
+            p.get("public_first_name_only") and (p.get("performer_name") or "").strip().casefold() == clean_name.casefold()
+            for p in user_perfs
+        ),
         stage_notes=payload.stage_notes.strip() if payload.stage_notes else "",
         track_status=track_status,
         created_via="performer_hub"
@@ -230,6 +260,11 @@ async def rename_performer_endpoint(payload: PerformerRenameRequest):
     new_name = payload.new_name.strip()
     if not old_name or not new_name:
         raise HTTPException(status_code=400, detail="Both old name and new name are required.")
+    old_names = NamePrivacy(db_service.get_all_performances())
+    try:
+        old_name = old_names.resolve_name(old_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     
     try:
         db_service.rename_performer(old_name, new_name)
@@ -243,11 +278,12 @@ async def rename_performer_endpoint(payload: PerformerRenameRequest):
             source="performer_hub"
         )
 
+        names = NamePrivacy(db_service.get_all_performances())
         return {
             "status": "success",
-            "old_name": old_name,
-            "new_name": new_name,
-            "message": f"Successfully renamed '{old_name}' to '{new_name}'."
+            "old_name": old_names.name(old_name),
+            "new_name": names.name(new_name),
+            "message": "Name changed successfully."
         }
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))

@@ -11,6 +11,18 @@ from app.utils.name_matcher import names_match, split_signer_names
 logger = logging.getLogger("food-repo")
 
 
+def _check_food_owner(row, name, phone):
+    """Compare the complete stored phone, never a partial or empty value."""
+    clean_name = lambda value: " ".join((value or "").split()).casefold()
+    def clean_phone(value):
+        digits = re.sub(r"\D", "", value or "")
+        return digits[1:] if len(digits) == 11 and digits.startswith("1") else digits
+    stored = clean_phone(row["signer_phone"])
+    supplied = clean_phone(phone)
+    if not clean_name(name) or clean_name(name) != clean_name(row["signer_name"]) or len(stored) < 10 or stored != supplied:
+        raise PermissionError("Name and phone do not match this food signup. Contact an admin for help.")
+
+
 class FoodRepository(BaseRepository):
     """Repository for managing food groups, items, and signups/claims."""
 
@@ -266,12 +278,18 @@ class FoodRepository(BaseRepository):
         signup_id: str,
         item_id: Optional[str] = None,
         dish_description: Optional[str] = None,
-        signer_phone: Optional[str] = None
+        signer_phone: Optional[str] = None,
+        *, proof_name: Optional[str] = None, proof_phone: Optional[str] = None,
+        verify_owner: bool = False
     ) -> bool:
         with self.get_connection() as conn:
+            if verify_owner:
+                conn.execute("BEGIN IMMEDIATE")
             cur = conn.execute("SELECT * FROM food_signups WHERE signup_id = ?", (signup_id,)).fetchone()
             if not cur:
                 raise ValueError(f"Sign-up {signup_id} not found.")
+            if verify_owner:
+                _check_food_owner(cur, proof_name, proof_phone)
 
             updates = ["updated_at = datetime('now')"]
             params = []
@@ -299,8 +317,15 @@ class FoodRepository(BaseRepository):
             conn.commit()
             return cursor.rowcount > 0
 
-    def release_food_signup(self, signup_id: str) -> bool:
+    def release_food_signup(self, signup_id: str, *, proof_name: Optional[str] = None,
+                            proof_phone: Optional[str] = None, verify_owner: bool = False) -> bool:
         with self.get_connection() as conn:
+            if verify_owner:
+                conn.execute("BEGIN IMMEDIATE")
+                row = conn.execute("SELECT * FROM food_signups WHERE signup_id = ?", (signup_id,)).fetchone()
+                if not row:
+                    return False
+                _check_food_owner(row, proof_name, proof_phone)
             cursor = conn.execute("DELETE FROM food_signups WHERE signup_id = ?", (signup_id,))
             conn.commit()
             return cursor.rowcount > 0

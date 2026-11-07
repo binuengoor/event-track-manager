@@ -106,6 +106,7 @@ def test_performer_names_excludes_food_signups(client):
     item_id = db_service.add_food_item("Test Curry Dish", group_id)
     food_res = client.post("/api/signup/food", json={
         "signer_name": "Rajiv & Anjana Family",
+        "signer_phone": "6105551234",
         "item_id": item_id,
         "dish_description": "Curry"
     })

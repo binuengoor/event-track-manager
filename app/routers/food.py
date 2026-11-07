@@ -1,7 +1,7 @@
 import json
 import logging
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 
 from app.config import settings, get_setting
 from app.features import require_feature
@@ -11,6 +11,7 @@ from app.routers.auth import verify_admin_pin
 from app.schemas import (
     FoodClaimRequest,
     FoodUpdateRequest,
+    FoodOwnershipProof,
     FoodGroupCreateRequest,
     FoodGroupUpdateRequest,
     FoodGroupReorderRequest,
@@ -19,11 +20,19 @@ from app.schemas import (
     FoodServingNoteRequest,
     FoodToggleRequest,
     SignupToggleRequest,
+    validate_phone,
 )
 
 logger = logging.getLogger("food-router")
 
 router = APIRouter(tags=["food"])
+
+
+def _food_admin(request: Request) -> bool:
+    """Supplied admin credentials use the normal lockout and validation path."""
+    if request.headers.get("X-Admin-PIN") or request.cookies.get("admin_session"):
+        return verify_admin_pin(request)
+    return False
 
 
 # =============================================================================
@@ -36,6 +45,8 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
 
     if not payload.signer_name.strip():
         raise HTTPException(status_code=400, detail="Signer name is required.")
+    if not validate_phone(payload.signer_phone):
+        raise HTTPException(status_code=400, detail="A valid phone number is required so you can change this dish later.")
 
     try:
         signup_id = db_service.claim_food_item(
@@ -52,7 +63,7 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
                 item_name = it.get("name", item_name)
                 break
         dish_text = f" ({payload.dish_description})" if payload.dish_description else ""
-        dump_dict = payload.model_dump() if hasattr(payload, "model_dump") else payload.dict()
+        dump_dict = payload.model_dump(exclude={"signer_phone"})
         db_service.log_activity(
             action_type="food_claim",
             performer_name=payload.signer_name,
@@ -67,17 +78,20 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
 
 
 @router.put("/api/signup/food/{signup_id}")
-async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest):
+async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest, request: Request):
     require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
+    admin = _food_admin(request)
     all_items_before = db_service.get_all_food_items_with_signups()
     target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
     signer = target_before.get("signer_name", "Participant") if target_before else "Participant"
 
     try:
-        success = db_service.update_food_signup(
+        success = db_service.food_repo.update_food_signup(
             signup_id=signup_id,
             item_id=payload.item_id,
-            dish_description=payload.dish_description
+            dish_description=payload.dish_description,
+            proof_name=payload.signer_name, proof_phone=payload.signer_phone,
+            verify_owner=not admin,
         )
         if not success:
             raise HTTPException(status_code=404, detail="Food sign-up not found.")
@@ -89,7 +103,7 @@ async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest
             if new_it:
                 new_item_name = new_it.get("name", "")
         dish_txt = f" ({payload.dish_description})" if payload.dish_description else ""
-        dump_dict = payload.model_dump(exclude_unset=True) if hasattr(payload, "model_dump") else payload.dict(exclude_unset=True)
+        dump_dict = payload.model_dump(exclude_unset=True, exclude={"signer_name", "signer_phone"})
         db_service.log_activity(
             action_type="food_update",
             performer_name=signer,
@@ -99,19 +113,29 @@ async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest
         )
 
         return {"status": "success"}
+    except PermissionError as ex:
+        raise HTTPException(status_code=403, detail=str(ex))
     except ValueError as ex:
         raise HTTPException(status_code=409, detail=str(ex))
 
 
 @router.delete("/api/signup/food/{signup_id}")
-async def release_food_signup_endpoint(signup_id: str):
+async def release_food_signup_endpoint(signup_id: str, request: Request, payload: Optional[FoodOwnershipProof] = None):
     require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
+    admin = _food_admin(request)
     all_items_before = db_service.get_all_food_items_with_signups()
     target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
     signer = target_before.get("signer_name", "Participant") if target_before else "Participant"
     item_name = target_before.get("name", "potluck dish") if target_before else "potluck dish"
 
-    success = db_service.release_food_signup(signup_id)
+    try:
+        success = db_service.food_repo.release_food_signup(
+            signup_id, proof_name=payload.signer_name if payload else None,
+            proof_phone=payload.signer_phone if payload else None,
+            verify_owner=not admin,
+        )
+    except PermissionError as ex:
+        raise HTTPException(status_code=403, detail=str(ex))
     if not success:
         raise HTTPException(status_code=404, detail="Food sign-up not found.")
     backup_service.trigger_backup()

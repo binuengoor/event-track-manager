@@ -16,7 +16,7 @@ def connect(path):
 def test_fresh_and_existing_legacy_migrate_and_backup(tmp_path):
     fresh = connect(tmp_path / "fresh.db")
     ensure_database(fresh)
-    assert fresh.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert fresh.execute("PRAGMA user_version").fetchone()[0] == 2
     assert not (tmp_path / "backups").exists()
     fresh.close()
 
@@ -25,7 +25,7 @@ def test_fresh_and_existing_legacy_migrate_and_backup(tmp_path):
     legacy.execute("INSERT INTO app_settings (key, value) VALUES ('event_name', 'Original')")
     legacy.commit()
     ensure_database(legacy)
-    assert legacy.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert legacy.execute("PRAGMA user_version").fetchone()[0] == 2
     assert legacy.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Original'
     backups = list((tmp_path / "backups").glob("pre-migration-*.db"))
     assert len(backups) == 1
@@ -36,6 +36,58 @@ def test_fresh_and_existing_legacy_migrate_and_backup(tmp_path):
     ensure_database(legacy)
     assert len(list((tmp_path / "backups").glob("pre-migration-*.db"))) == 1
     legacy.close()
+
+
+def test_version_one_upgrade_preserves_data_and_backups_previous_schema(tmp_path, monkeypatch):
+    conn = connect(tmp_path / "event.db")
+    with monkeypatch.context() as prior:
+        prior.setattr(migrations, "SCHEMA_VERSION", 1)
+        ensure_database(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    conn.execute("INSERT INTO app_settings (key, value) VALUES ('event_name', 'Before upgrade')")
+    conn.commit()
+    old_columns = {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
+    assert "public_first_name_only" not in old_columns
+
+    ensure_database(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Before upgrade'
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
+    assert {"public_first_name_only", "partner_guardian_name", "partner_guardian_phone"} <= columns
+    backups = list((tmp_path / "backups").glob("pre-migration-*.db"))
+    assert len(backups) == 1
+    with sqlite3.connect(backups[0]) as old:
+        assert old.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert old.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Before upgrade'
+        assert "public_first_name_only" not in {row[1] for row in old.execute("PRAGMA table_info(performances)")}
+    ensure_database(conn)
+    assert len(list((tmp_path / "backups").glob("pre-migration-*.db"))) == 1
+    conn.close()
+
+
+def test_version_two_failure_rolls_back_schema_and_version(tmp_path, monkeypatch):
+    conn = connect(tmp_path / "event.db")
+    with monkeypatch.context() as prior:
+        prior.setattr(migrations, "SCHEMA_VERSION", 1)
+        ensure_database(conn)
+    conn.execute("INSERT INTO app_settings (key, value) VALUES ('event_name', 'Preserved')")
+    conn.commit()
+
+    def fail_after_alter(db):
+        db.execute("ALTER TABLE performances ADD COLUMN public_first_name_only INTEGER DEFAULT 0")
+        raise RuntimeError("failed during upgrade")
+
+    monkeypatch.setitem(migrations.MIGRATIONS, 2, fail_after_alter)
+    with pytest.raises(RuntimeError, match="failed during upgrade"):
+        ensure_database(conn)
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 1
+    assert "public_first_name_only" not in {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
+    assert conn.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Preserved'
+    backup = next((tmp_path / "backups").glob("pre-migration-*.db"))
+    with sqlite3.connect(backup) as old:
+        assert old.execute("PRAGMA user_version").fetchone()[0] == 1
+        assert old.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Preserved'
+    conn.close()
 
 
 def test_failure_rolls_back_and_newer_version_refused(tmp_path, monkeypatch):

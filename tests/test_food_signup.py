@@ -19,6 +19,7 @@ def test_food_claim_update_release(client):
     # 1. Claim food item
     claim_payload = {
         "signer_name": signer,
+        "signer_phone": "6105551234",
         "item_id": item_id,
         "dish_description": "Crispy Veggie Samosas"
     }
@@ -31,6 +32,7 @@ def test_food_claim_update_release(client):
     # 2. Race condition: Another user attempts to claim the same item -> 409
     res_conflict = client.post("/api/signup/food", json={
         "signer_name": f"Late Foodie {uid}",
+        "signer_phone": "6105551235",
         "item_id": item_id,
         "dish_description": "Duplicate attempt"
     })
@@ -47,13 +49,15 @@ def test_food_claim_update_release(client):
     # 4. Update food signup dish description
     update_res = client.put(f"/api/signup/food/{signup_id}", json={
         "item_id": item_id,
+        "signer_name": signer,
+        "signer_phone": "6105551234",
         "dish_description": "Spicy Potato Samosas"
     })
     assert update_res.status_code == 200
     assert update_res.json()["status"] == "success"
 
     # 5. Release food signup
-    del_res = client.delete(f"/api/signup/food/{signup_id}")
+    del_res = client.request("DELETE", f"/api/signup/food/{signup_id}", json={"signer_name": signer, "signer_phone": "6105551234"})
     assert del_res.status_code == 200
     assert del_res.json()["status"] == "success"
 
@@ -76,10 +80,10 @@ def test_smart_food_resolution_and_performer_rename(client):
     item4 = db_service.add_food_item("Item Dhyan", gid)
 
     # Claim them with various realistic name formats
-    client.post("/api/signup/food", json={"signer_name": "Binu", "item_id": item1, "dish_description": "Shrimp"})
-    client.post("/api/signup/food", json={"signer_name": "Ishan (Sarina)", "item_id": item2, "dish_description": "Pulav"})
-    client.post("/api/signup/food", json={"signer_name": "Reema Aby", "item_id": item3, "dish_description": "Curry"})
-    client.post("/api/signup/food", json={"signer_name": "Dhyan Menon & Greeshma", "item_id": item4, "dish_description": "Bread"})
+    client.post("/api/signup/food", json={"signer_name": "Binu", "signer_phone": "6105551234", "item_id": item1, "dish_description": "Shrimp"})
+    client.post("/api/signup/food", json={"signer_name": "Ishan (Sarina)", "signer_phone": "6105551234", "item_id": item2, "dish_description": "Pulav"})
+    client.post("/api/signup/food", json={"signer_name": "Reema Aby", "signer_phone": "6105551234", "item_id": item3, "dish_description": "Curry"})
+    client.post("/api/signup/food", json={"signer_name": "Dhyan Menon & Greeshma", "signer_phone": "6105551234", "item_id": item4, "dish_description": "Bread"})
 
     # 2. Test get_food_signup_for_signer matching
     # Case A: Full name "Binu Pradeep" matches signup under "Binu"
@@ -144,6 +148,7 @@ def test_duet_performers_food_isolation(client):
     # Performer B claims Veg Curry
     claim_b = client.post("/api/signup/food", json={
         "signer_name": performer_b,
+        "signer_phone": "6105550103",
         "item_id": item_veg,
         "dish_description": "Mixed Veg Curry"
     })
@@ -163,6 +168,7 @@ def test_duet_performers_food_isolation(client):
     # Now Performer A claims Non-Veg Curry
     claim_a = client.post("/api/signup/food", json={
         "signer_name": performer_a,
+        "signer_phone": "6105550102",
         "item_id": item_nonveg,
         "dish_description": "Chicken Curry"
     })
@@ -178,6 +184,8 @@ def test_duet_performers_food_isolation(client):
     # Performer A updates their food to Dessert
     res_update_a = client.put(f"/api/signup/food/{signup_a_id}", json={
         "item_id": item_dessert,
+        "signer_name": performer_a,
+        "signer_phone": "6105550102",
         "dish_description": "Payasam"
     })
     assert res_update_a.status_code == 200

@@ -117,6 +117,13 @@ class FoodClaimRequest(BaseModel):
 class FoodUpdateRequest(BaseModel):
     item_id: Optional[str] = None
     dish_description: Optional[str] = None
+    signer_name: Optional[str] = None
+    signer_phone: Optional[str] = None
+
+
+class FoodOwnershipProof(BaseModel):
+    signer_name: Optional[str] = None
+    signer_phone: Optional[str] = None
 
 
 class FoodGroupCreateRequest(BaseModel):

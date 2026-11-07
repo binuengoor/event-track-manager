@@ -16,6 +16,7 @@ let currentMethod = 'file'; // 'file' or 'youtube'
 let currentMediaType = 'audio'; // 'audio' or 'video'
 let sheetUrl = '';
 let performerFoodSignup = null;
+let profileLookupVersion = 0;
 let allFoodGroups = [];
 let allFoodItems = [];
 let foodServingNote = 'Bring one dish to share';
@@ -868,13 +869,19 @@ function setupFoodSelectorEvents() {
 
     try {
       if (performerFoodSignup && performerFoodSignup.signup_id) {
+        const signerName = prompt('Enter the full name used to claim this dish:');
+        if (signerName === null) return;
+        const signerPhone = prompt('Enter the full phone number used to claim this dish:');
+        if (signerPhone === null) return;
         // Update existing food signup
         const res = await fetch(`/api/signup/food/${performerFoodSignup.signup_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             item_id: itemId,
-            dish_description: dishDesc
+            dish_description: dishDesc,
+            signer_name: signerName,
+            signer_phone: signerPhone
           })
         });
         if (!res.ok) {
@@ -882,12 +889,18 @@ function setupFoodSelectorEvents() {
           throw new Error(err.detail || 'Could not update food item');
         }
       } else {
+        const signerName = prompt('Enter your full name for this dish:', selectedPerformer);
+        if (signerName === null) return;
+        const signerPhone = prompt('Enter your full phone number so you can change this dish later:');
+        if (signerPhone === null) return;
+        if (!signerName.trim() || signerPhone.replace(/\D/g, '').length < 10) throw new Error('Enter your full name and a valid phone number.');
         // Create new food signup
         const res = await fetch('/api/signup/food', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            signer_name: selectedPerformer,
+            signer_name: signerName,
+            signer_phone: signerPhone,
             item_id: itemId,
             dish_description: dishDesc
           })
@@ -973,6 +986,20 @@ async function handlePerformerSelected(name) {
   const selectedBar = document.getElementById('selected-performer-bar');
   const selectedNameDisplay = document.getElementById('selected-performer-display-name');
 
+  // Never keep the previous person's actions visible while a new lookup runs.
+  window.performerProfileData = null;
+  performerFoodSignup = null;
+  selectedEntry = null;
+  songSection.classList.add('hidden');
+  uploadSection.classList.add('hidden');
+  document.getElementById('food-cta-section').classList.add('hidden');
+  document.getElementById('food-selector-card').classList.add('hidden');
+  document.getElementById('add-performance-btn')?.classList.add('hidden');
+  document.getElementById('edit-performer-name-btn')?.classList.add('hidden');
+  for (const id of ['edit-song-modal', 'rename-performer-modal', 'add-performance-modal']) {
+    document.getElementById(id)?.classList.add('hidden');
+  }
+
   if (!name) {
     if (selectedBar) selectedBar.classList.add('hidden');
     songSection.classList.add('hidden');
@@ -990,7 +1017,8 @@ async function handlePerformerSelected(name) {
   }
 
   // Load food status
-  await checkPerformerFoodStatus(name);
+  const profileLoaded = await checkPerformerFoodStatus(name);
+  if (selectedPerformer !== name || !profileLoaded) return;
 
   // When stage performances are disabled (e.g. potluck-only event), suppress performance & upload UI completely
   const isStageEnabled = !window.performerProfileData || window.performerProfileData.stage_performances_enabled !== false;
@@ -1010,10 +1038,7 @@ async function handlePerformerSelected(name) {
   }
 
   // Find all performances for this person
-  const userSongs = performances.filter(p => 
-    p.performer_name.trim().toLowerCase() === name.toLowerCase() ||
-    (p.partner_name && p.partner_name.trim().toLowerCase() === name.toLowerCase())
-  );
+  const userSongs = window.performerProfileData.performances || [];
 
   if (userSongs.length === 0) {
     songContainer.innerHTML = '<p class="text-xs text-amber-400">No registered songs found for this name.</p>';
@@ -1142,16 +1167,24 @@ async function handlePerformerSelected(name) {
 
 async function checkPerformerFoodStatus(name) {
   const ctaSection = document.getElementById('food-cta-section');
+  const lookupVersion = ++profileLookupVersion;
   try {
     const res = await fetch(`/api/performer/profile?name=${encodeURIComponent(name)}`);
+    if (selectedPerformer !== name || lookupVersion !== profileLookupVersion) return false;
+    if (!res.ok) {
+      const detail = await res.json().catch(() => ({}));
+      throw new Error(typeof detail.detail === 'string' ? detail.detail : 'Could not load your entry. Please try again.');
+    }
     if (res.ok) {
       const data = await res.json();
+      if (selectedPerformer !== name || lookupVersion !== profileLookupVersion) return false;
       window.performerProfileData = data;
 
       if (data.food_enabled === false) {
         ctaSection.classList.add('hidden');
         document.getElementById('food-selector-card')?.classList.add('hidden');
-        return;
+        performerFoodSignup = null;
+        return true;
       }
 
       performerFoodSignup = data.food_signup;
@@ -1192,14 +1225,21 @@ async function checkPerformerFoodStatus(name) {
 
         document.getElementById('release-food-btn').addEventListener('click', async () => {
           if (!confirm(`Release "${performerFoodSignup.item_name}"?\n\nThis frees the slot for someone else. You can pick another dish any time.`)) return;
+          const signerName = prompt('Enter the full name used to claim this dish:');
+          if (signerName === null) return;
+          const signerPhone = prompt('Enter the full phone number used to claim this dish:');
+          if (signerPhone === null) return;
           try {
-            const delRes = await fetch(`/api/signup/food/${performerFoodSignup.signup_id}`, { method: 'DELETE' });
-            if (!delRes.ok) throw new Error('release failed');
+            const delRes = await fetch(`/api/signup/food/${performerFoodSignup.signup_id}`, {
+              method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signer_name: signerName, signer_phone: signerPhone })
+            });
+            if (!delRes.ok) throw new Error((await delRes.json()).detail || 'Could not release dish.');
             await loadFoodCatalog();
             await checkPerformerFoodStatus(selectedPerformer);
             showToast('Dish released.', 'success');
           } catch (e) {
-            alert('We could not release your dish. Please try again.');
+            alert(e.message || 'We could not release your dish. Please try again.');
           }
         });
 
@@ -1237,9 +1277,22 @@ async function checkPerformerFoodStatus(name) {
 
       ctaSection.classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
+      return true;
     }
   } catch (e) {
+    if (selectedPerformer !== name || lookupVersion !== profileLookupVersion) return false;
+    window.performerProfileData = null;
+    performerFoodSignup = null;
+    selectedEntry = null;
+    ctaSection.classList.add('hidden');
+    document.getElementById('food-selector-card')?.classList.add('hidden');
+    document.getElementById('song-selection-section')?.classList.add('hidden');
+    document.getElementById('upload-methods-section')?.classList.add('hidden');
+    document.getElementById('add-performance-btn')?.classList.add('hidden');
+    document.getElementById('edit-performer-name-btn')?.classList.add('hidden');
+    showToast(e.message || 'Could not load your entry. Please try again.', 'error');
     console.warn('Could not fetch performer food status:', e);
+    return false;
   }
 }
 
@@ -1860,10 +1913,8 @@ function setupAddPerformanceModal() {
     if (!selectedPerformer) return;
     
     // Check if user already has a solo performance
-    const userSongs = performances.filter(p => 
-      p.performer_name.trim().toLowerCase() === selectedPerformer.toLowerCase() ||
-      (p.partner_name && p.partner_name.trim().toLowerCase() === selectedPerformer.toLowerCase())
-    );
+    if (!window.performerProfileData) return;
+    const userSongs = window.performerProfileData.performances || [];
     const soloCount = userSongs.filter(p => (p.performance_type || '').trim().toLowerCase() === 'solo').length;
     const allowDuets = !window.performerProfileData || window.performerProfileData.allow_duets !== false;
     const duetOption = typeSelect.querySelector('option[value="Duet"]');

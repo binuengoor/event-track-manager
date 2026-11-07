@@ -8,7 +8,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+
+# Version 1 is the legacy-compatible baseline (schema._apply_baseline). Later versions are small, idempotent steps.
+_PERFORMANCE_COLUMNS_V2 = (
+    ("public_first_name_only", "INTEGER DEFAULT 0"),
+    ("partner_guardian_name", "TEXT DEFAULT ''"),
+    ("partner_guardian_phone", "TEXT DEFAULT ''"),
+)
+
+
+def _migrate_to_2(conn: sqlite3.Connection) -> None:
+    """Adult 'first name only' opt-in and partner guardian contact, stored on the performance record."""
+    exists = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='performances'").fetchone()
+    if not exists:
+        return
+    have = {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
+    for name, definition in _PERFORMANCE_COLUMNS_V2:
+        if name not in have:
+            conn.execute(f"ALTER TABLE performances ADD COLUMN {name} {definition}")
+
+
+MIGRATIONS = {2: _migrate_to_2}
 KNOWN_TABLES = {"performances", "sync_meta", "app_settings", "food_groups", "food_items",
                 "food_signups", "backup_log", "activity_logs", "participants"}
 
@@ -69,7 +90,11 @@ def migrate(conn: sqlite3.Connection, baseline: Callable[[sqlite3.Connection], N
                 raise RuntimeError("Unrecognized event database; migration refused")
             if names:
                 _snapshot(conn, path)
-            baseline(conn)
+            if version < 1:
+                baseline(conn)
+                version = 1
+            for target in range(version + 1, SCHEMA_VERSION + 1):
+                MIGRATIONS[target](conn)
             conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
             conn.commit()
         except Exception:

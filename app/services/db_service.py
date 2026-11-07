@@ -198,7 +198,10 @@ class DBService:
         guardian_phone: Optional[str] = None,
         stage_notes: Optional[str] = "",
         track_status: str = "Pending",
-        created_via: str = "signup"
+        created_via: str = "signup",
+        public_first_name_only: bool = False,
+        partner_guardian_name: Optional[str] = None,
+        partner_guardian_phone: Optional[str] = None,
     ) -> str:
         return self.performance_repo.create_performance(
             performer_name=performer_name,
@@ -214,7 +217,10 @@ class DBService:
             guardian_phone=guardian_phone,
             stage_notes=stage_notes,
             track_status=track_status,
-            created_via=created_via
+            created_via=created_via,
+            public_first_name_only=public_first_name_only,
+            partner_guardian_name=partner_guardian_name,
+            partner_guardian_phone=partner_guardian_phone,
         )
 
     def update_performance_details(self, entry_id: str, **fields) -> bool:

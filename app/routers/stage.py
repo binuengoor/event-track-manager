@@ -47,7 +47,7 @@ def _run_or_404(fn, *args):
         raise HTTPException(status_code=404, detail=str(ex))
 
 
-PUBLIC_HIDDEN_ENTRY_KEYS = ("age_group", "partner_age_group", "track_status", "stage_notes")
+PUBLIC_HIDDEN_ENTRY_KEYS = ("age_group", "partner_age_group", "track_status", "stage_notes", "extra_tags", "drive_file_name")
 LIVE_ENTRY_LISTS = ("up_next", "upcoming", "performed", "on_hold")
 
 
@@ -57,6 +57,8 @@ def _redact_entry(row: Dict[str, Any], names: NamePrivacy) -> Dict[str, Any]:
     out["performer_name"] = names.name(row.get("performer_name"))
     if "partner_name" in out:
         out["partner_name"] = names.partners(row.get("partner_name"))
+    if out.get("drive_file_id"):
+        out["drive_file_id"] = "available"
     return out
 
 
@@ -155,7 +157,7 @@ def clear_active_performance(_authorized: bool = Depends(require_console_enabled
 
 
 @router.get("/api/track-info/{entry_id}")
-def get_track_info(entry_id: str):
+def get_track_info(entry_id: str, request: Request):
     target = db_service.get_performance(entry_id)
     if not target:
         raise HTTPException(status_code=404, detail="Performance entry not found")
@@ -165,6 +167,10 @@ def get_track_info(entry_id: str):
     meta["performer_name"] = target.get("performer_name")
     meta["song_title"] = target.get("song_title")
     meta["last_updated"] = target.get("last_updated")
+    if not is_admin(request):
+        meta["performer_name"] = NamePrivacy(db_service.get_all_performances()).name(target.get("performer_name"))
+        if meta.get("filename"):
+            meta["filename"] = "Backing track"
     return meta
 
 
@@ -178,9 +184,13 @@ def _entries_response(entries, request: Request) -> JSONResponse:
     names = NamePrivacy(db_service.get_all_performances())
     public_rows = []
     for r in strip_private(rows):
-        r = {k: v for k, v in r.items() if k != "stage_notes"}
+        # Keep track status for the performer hub, but never expose file names,
+        # demographics or free-form tags on unauthenticated responses.
+        r = {k: v for k, v in r.items() if k not in ("stage_notes", "age_group", "partner_age_group", "extra_tags", "drive_file_name")}
         r["performer_name"] = names.name(r.get("performer_name"))
         r["partner_name"] = names.partners(r.get("partner_name"))
+        if r.get("drive_file_id"):
+            r["drive_file_id"] = "available"
         public_rows.append(r)
     return JSONResponse(content=public_rows)
 

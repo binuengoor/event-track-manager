@@ -34,7 +34,10 @@ class PerformanceRepository(BaseRepository):
         guardian_phone: Optional[str] = None,
         stage_notes: Optional[str] = "",
         track_status: str = "Pending",
-        created_via: str = "signup"
+        created_via: str = "signup",
+        public_first_name_only: bool = False,
+        partner_guardian_name: Optional[str] = None,
+        partner_guardian_phone: Optional[str] = None,
     ) -> str:
         from app.config import get_setting
         prefix = str(get_setting("entry_id_prefix", getattr(settings, "entry_id_prefix", "PK")) or "PK").strip().upper() or "PK"
@@ -96,8 +99,8 @@ class PerformanceRepository(BaseRepository):
                     name=partner_name.strip(),
                     phone=partner_phone.strip() if partner_phone else "",
                     age_group=p_age,
-                    guardian_name=guardian_name.strip() if is_junior else "",
-                    guardian_phone=guardian_phone.strip() if is_junior else ""
+                    guardian_name=partner_guardian_name.strip() if (is_junior and partner_guardian_name) else "",
+                    guardian_phone=partner_guardian_phone.strip() if (is_junior and partner_guardian_phone) else ""
                 )
 
             conn.execute("""
@@ -106,8 +109,9 @@ class PerformanceRepository(BaseRepository):
                 partner_phone, song_title, movie_name, sequence_order, performance_status, track_status,
                 duration, drive_file_id, drive_file_name, last_updated, row_index,
                 is_song_name_missing, extra_tags_json, stage_notes, age_group,
-                guardian_name, guardian_phone, created_via, participant_id
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                guardian_name, guardian_phone, created_via, participant_id,
+                public_first_name_only, partner_guardian_name, partner_guardian_phone
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry_id,
                 performer_name.strip(),
@@ -133,7 +137,10 @@ class PerformanceRepository(BaseRepository):
                 guardian_name.strip() if guardian_name else "",
                 guardian_phone.strip() if guardian_phone else "",
                 created_via,
-                participant_id
+                participant_id,
+                1 if public_first_name_only else 0,
+                partner_guardian_name.strip() if partner_guardian_name else "",
+                partner_guardian_phone.strip() if partner_guardian_phone else "",
             ))
             conn.commit()
 
@@ -143,7 +150,8 @@ class PerformanceRepository(BaseRepository):
         allowed_fields = {
             "performer_name", "song_title", "movie_name", "partner_name", "partner_age_group", "partner_phone", "performance_type",
             "age_group", "guardian_name", "guardian_phone", "contact_info",
-            "stage_notes", "track_status", "performance_status", "sequence_order", "media_type"
+            "stage_notes", "track_status", "performance_status", "sequence_order", "media_type",
+            "public_first_name_only", "partner_guardian_name", "partner_guardian_phone",
         }
         updates = []
         params = []
