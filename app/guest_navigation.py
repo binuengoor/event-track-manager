@@ -26,14 +26,11 @@ def render_guest_navigation(html: str, path: str) -> str:
                 f'{escape(label)}</a>')
 
     items = ''.join(link(href, label) for href, label in links)
-    shell = (f'<nav aria-label="Main" class="hidden xl:flex items-center gap-2">{items}</nav>'
-             '<details class="xl:hidden relative"><summary class="cursor-pointer px-4 py-3 '
-             'rounded-xl bg-slate-800 text-slate-100">Menu</summary>'
-             f'<nav aria-label="Mobile" class="absolute right-0 z-50 grid gap-2 p-3 '
-             f'rounded-xl bg-slate-900 shadow-xl">{items}</nav></details>')
+    shell = f'<nav aria-label="Main" class="guest-navigation">{items}</nav>'
     # Page templates each have one simple nav within their first header.
     pattern = r'(<header\b[^>]*>.*?)(<nav\b[^>]*>.*?</nav>)(.*?</header>)'
     result, count = re.subn(pattern, lambda m: m.group(1) + shell + m.group(3), html, count=1, flags=re.S)
     if count != 1:
         raise ValueError('Guest template has no recognizable header navigation')
+    result = result.replace('</head>', '<link rel="stylesheet" href="/static/css/guest-navigation.css"></head>', 1)
     return result.replace('<script src="/static/js/nav.js"></script>', '', 1)

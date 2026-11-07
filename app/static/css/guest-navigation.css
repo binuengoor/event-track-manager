@@ -1,0 +1,39 @@
+/* Guest navigation uses one server-rendered set of links at every width. */
+.guest-navigation {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+.guest-navigation a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  text-align: center;
+}
+.guest-navigation a:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+}
+@media (max-width: 767px) {
+  body { padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+  .guest-navigation {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    justify-content: flex-start;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+    background: #0f172a;
+    border-top: 1px solid #475569;
+  }
+  .guest-navigation a {
+    flex: 1 0 auto;
+    padding: 4px 8px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+}
