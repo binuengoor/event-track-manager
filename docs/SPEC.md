@@ -1,6 +1,6 @@
 # Event & Track Manager: Specification
 
-Status: draft 1, 2026-11-07. Written against commit `aa07405` (code unchanged since `2fc83ae`).
+Status: draft 2, 2026-11-07 (draft 1 plus the review of the external architecture and design plan and the owner's answers). Written against commit `aa07405` (code unchanged since `2fc83ae`).
 Owner: BP. Audience: the owner (non-coder), any developer or AI agent who will change the app.
 
 ## How to read this document
@@ -10,13 +10,15 @@ Owner: BP. Audience: the owner (non-coder), any developer or AI agent who will c
 | **[C]** | **Current behaviour.** Read in the code at the commit above. |
 | **[V]** | Current behaviour that was also **run** (live app or `TestClient`) while writing this spec. |
 | **[T]** | **Target / proposed.** A decision or plan, not yet built. |
+| **[O]** | **Owner-confirmed** fact or decision (stated by the owner in conversation). |
+| *(from external plan)* | Idea that came from the second agent's plan; *adapted* means changed to fit decisions already made. Appendix C lists everything adopted, adapted and rejected. |
 
 Rules used throughout: everything tagged [C] or [V] describes what the code does today, including its flaws. Everything
 tagged [T] is a recommendation until the owner accepts it. Cloud sync (rclone) is **out of scope**: the owner runs it
 outside the app, and this spec only records what the app does and does not provide for it.
 
 Contents: 1 Purpose and users · 2 Domain model · 3 Functional spec · 4 Non-functional · 5 Known gaps · 6 Target architecture
-and design plan · 7 Open questions · Appendices (sources, verification log, external plan review).
+and design plan · 7 Questions for the owner · Appendices (sources, verification log, external plan review).
 
 ---
 
@@ -44,9 +46,19 @@ guardian details from public endpoints.
 
 | Area | Pages today [C] | Primary device and network assumption today [C] | Target assumption [T] |
 |---|---|---|---|
-| **1. Public / guest** | `/` landing, `/signup`, `/performer` (Performer Hub), `/dashboard`, `/live` (venue screen) | Phones for guests; a large screen for `/live`. Assumes **internet in the browser** (CDN scripts). | Phone first, works on a LAN with no internet, one-handed, 44 px targets |
+| **1. Public / guest** | `/` landing, `/signup`, `/performer` (Performer Hub), `/dashboard`, `/live` (venue screen) | Phones for guests; a large screen for `/live`. Assumes **internet in the browser** (CDN scripts). | Phone first, renders without any third-party site, one-handed, 44 px targets (48 px primary), clear message when offline |
 | **2. Console / operator** | `/console` (sound console), `/console/stage-monitor` (video confidence monitor) | One laptop (Chromium-class browser: IndexedDB, BroadcastChannel, service worker), flaky venue Wi-Fi. Stage monitor is a second window **in the same browser** on an HDMI display. | Laptop or tablet, dark, dense, offline-tolerant, no accidental clicks |
 | **3. Admin** | `/admin` (10 tabs, event bar, setup wizard, readiness strip) | Desktop browser; phone works but is cramped | Desktop first, responsive; 5 grouped destinations |
+
+### 1.4 Owner-confirmed deployment facts [O]
+
+| Topic | Fact (owner, 2026-11-07) | Consequence |
+|---|---|---|
+| Where it runs | A Proxmox LXC at Hetzner, reached through a **Cloudflare Tunnel** (Q14 asks to confirm this reading). It is **not** on the venue network. | Venue internet is a hard dependency for every venue device; the console must run from its offline vault; the app is on the public internet (children's names, 4-digit PIN). See 4.6 and 6.12. |
+| Video on stage | A separate display or TV connected by HDMI (to the console laptop, assumed). | Stage monitor stays a second window in the console's browser (works today); no networked monitor needed. |
+| Payments | A manual tracker (Paid checkbox and note) plus a link to the payment page; no payment processing. | The current Payments tab and `payment_url` are the whole feature. |
+| Families | After one registration, offer to add another; no multi-act form. | See 6.10. |
+| Sync | Handled by the owner outside the app. | Out of scope here. |
 
 Note [C]: `/live` is public but is used as a venue display; it is listed with the public pages because it needs no PIN.
 The stage monitor is not networked: it receives cue/play/seek messages from the console through `BroadcastChannel`
@@ -431,6 +443,11 @@ event folder, presets and flags, food, exports, live stream, uploads, downloader
 
 ---
 
+### 4.6 Remote hosting [O][C]
+
+The app itself assumes nothing about where it runs. With the confirmed topology (1.4) these current behaviours matter: uploads pass through Cloudflare (which caps request bodies by plan, 6.12) while the app allows 200 MB audio and 500 MB video;
+the rate limiter trusts the first `X-Forwarded-For` value; guest pages are readable by anyone with the URL and are not marked noindex; the console's offline vault is filled only when the operator presses a button; `/live` has no path to follow the console without the server. Gaps N15 to N23 record these.
+
 ## 5. Known gaps
 
 Carried over from `docs/AUDIT-2026-11.md` (sync finding excluded because sync is out of scope), then new findings from this spec pass.
@@ -441,19 +458,19 @@ IDs `A#` refer to the audit table; `N#` are new.
 | A2 | Medium | Browsers need the internet (CDN scripts; Tailwind browser build is dev-only; Lucide unpinned) | `app/static/*.html`, `sw.js` | Phase 1 |
 | A3 | Medium | Feature switches scattered (92 `get_setting` calls; a new switch touches 6-8 files) | many | Phase 2 |
 | A4 | Medium | Monolithic front end (`admin.js` 2,246, `intake.js` 2,043, `admin-settings.js` 1,930 lines; no modules) | `app/static/js` | Phase 2 |
-| A5 | Medium | No schema versioning; swallowed `ALTER TABLE` errors | `repositories/schema.py` | Phase 4 |
-| A6 | Low | Google-era names (`drive_file_*`, `created_via='sheet'`, `ColumnNamesConfig` + `COL_*` env vars, `push_to_sheet`, `/api/sync`, `backup_target_sheet`) | several | Phase 4 |
-| A7 | Low | `reset_database()` drops all tables and has no callers | `db_service.py` | Phase 4 (delete) |
-| A8 | Low | Pass-through facade in `db_service.py`, re-exports in `main.py` | | Phase 4 |
+| A5 | Medium | No schema versioning; swallowed `ALTER TABLE` errors | `repositories/schema.py` | Phase 2 (runner), Phase 5 |
+| A6 | Low | Google-era names (`drive_file_*`, `created_via='sheet'`, `ColumnNamesConfig` + `COL_*` env vars, `push_to_sheet`, `/api/sync`, `backup_target_sheet`) | several | Phase 5 |
+| A7 | Low | `reset_database()` drops all tables and has no callers | `db_service.py` | Phase 5 (delete) |
+| A8 | Low | Pass-through facade in `db_service.py`, re-exports in `main.py` | | Phase 5 |
 | A9 | Low | Only `.mp4` treated as video; stream always `audio/mpeg` for the rest (hand-delivered `.mov/.webm/.wav/.flac`) | `routers/audio.py` | Phase 0 |
-| A10 | Low | Static session cookie; spoofable rate-limit key; global cap can lock out the admin for 5 min | `routers/auth.py` | Phase 0 (optional) |
+| A10 | Medium (public internet) | Static session cookie; spoofable rate-limit key; 4-digit PIN with a global failure cap that lets anyone lock the admin out for 5 min | `routers/auth.py` | Phase 0 (see N17, N23) |
 | A11 | Low | Branding hard-coded (API titles, SW cache name, success message "Welcome to Paattukoottam", `config.yaml` defaults, brand title fallbacks) | several | Phase 3 |
 | A12 | Low | Event list `singers` always 0; exports `0600`; sidecar hides pull errors; two connection pools for settings | various | Phase 0 |
 | N1 | Medium | **Readiness never reports a failed export**: compares `"error"`, log writes `"failed"` [V] | `readiness_service.py`, `audit_repo.py` | Phase 0 |
 | N2 | Medium | **Public edit is unconstrained**: any entry id, any `track_status` / `performance_type` string, no limit or duet re-check [V] | `routers/signup.py` | Phase 0 |
 | N3 | Low | **Entry ids can be reused** after deleting the highest id; activity-log history for the old act then points at a new person [V] | `performance_repo.py` | Phase 0 |
 | N4 | Medium | **Console keeps the raw PIN in `localStorage`** and sends it as a header on every call; README says sessions use an HMAC cookie, which is true only for the admin page | `js/admin.js` | Phase 2 |
-| N5 | Low | **Stage monitor works only in the same browser** (BroadcastChannel); a second device or machine cannot act as the stage confidence monitor | `js/stage-monitor.js` | Open question Q6 |
+| N5 | Low | **Stage monitor works only in the same browser** (BroadcastChannel); a second device or machine cannot act as the stage confidence monitor | `js/stage-monitor.js` | Resolved: owner confirmed the TV is on HDMI (1.4) |
 | N6 | Low | Public `/api/performances` and `/api/stage-queue` keep private keys with blank values (no leak; confusing API shape) [V] | `routers/stage.py` | Phase 0 |
 | N7 | Low | Blocking calls inside `async def` handlers (sign-up, performer, food, admin) hold the event loop | routers | Phase 2 |
 | N8 | Low | `view-transition` meta tag on every page but no `@view-transition` rule; app is dark-only; `Plus Jakarta Sans` never loaded | `*.html`, `style.css` | Phase 3 |
@@ -463,151 +480,280 @@ IDs `A#` refer to the audit table; `N#` are new.
 | N12 | Low | UI copy "Automated Cloud Backup & One-Way Sync" and `/docs` titles still imply cloud features | `admin-settings.html` | Phase 3 |
 | N13 | Low | `food_items.name` is unique across all groups, so "Rice" cannot exist in two groups (bulk add silently skips duplicates, reported as skipped) | `schema.py` | Open question Q9 |
 | N14 | Low | Participants are unique by name, so two people with the same name share one record (phone, paid flag) | `schema.py` | Open question Q9 |
+| N15 | Medium | Upload limits (200 MB audio, 500 MB video) exceed what Cloudflare accepts on Free/Pro (100 MB per request; Tunnel-specific behaviour not confirmed); a larger file would fail with 413 at the edge | `audio_workflow_service.py`, Cloudflare | Phase 0; Q14 |
+| N16 | Medium | No `robots.txt`, no `X-Robots-Tag`; public pages list children's names [V grep] | `app/` | Phase 0 |
+| N17 | Medium | Rate-limit key is the first `X-Forwarded-For` value (client-settable); behind Cloudflare use `CF-Connecting-IP` | `routers/auth.py` | Phase 0 |
+| N18 | Medium | Offline vault is filled only when the operator presses "Cache All Offline"; nothing tells the operator it is incomplete before doors | `js/admin.js` | Phase 4 |
+| N19 | Low | Track reconcile runs inside read requests (at most every 3 s) instead of a background task | `event_service.py` | Phase 2 |
+| N20 | Low | Reordering saves instantly, but Save Order (file names, exports) is a manual step, and drag has no lock against stray touches | `js/admin.js`, `routers/stage.py` | Phase 4 |
+| N21 | Medium | `/live` has no path to follow the console when the venue loses the internet (no `BroadcastChannel` listener) | `live.html` | Phase 4 |
+| N22 | Low | No UI to restore a replaced or deleted track from `tracks/_archive/` | `track_store.py` | Phase 3 |
+| N23 | Medium | A 4-digit default PIN protects `/admin` and `/console` on a public URL | `readiness_service.py`, `config.py` | Phase 0 (warn below 6 characters) |
 
 ---
 
 ## 6. Target architecture and design plan [T]
 
-Everything in this section is proposed. Decisions marked **Agreed** were made by the owner in conversation before this spec; the rest are recommendations.
+Everything in this section is proposed unless marked **[O]** (owner-confirmed). **(from external plan)** marks ideas that came from the second agent's plan, with "adapted" when
+they were changed to fit decisions already made. Appendix C lists what was adopted, adapted and rejected, and why.
 
 ### 6.1 Principles
 
-1. **Agreed:** keep one folder + one SQLite per event as the source of truth. No central database of file paths. The folder stays copyable, archivable, restorable.
-2. **Agreed:** keep the multi-page app. No single-page-app rewrite. App-like feel comes from CSS (view transitions, container queries) and good structure, not a framework.
-3. **Agreed:** minimize external dependencies. Browsers must not need the internet. yt-dlp remains the one deliberate runtime dependency.
-4. **Agreed:** one feature-flag registry drives server gates, presets, the public payload and navigation.
-5. Make the three areas explicit in the code and the UI (own layout, own navigation, shared tokens).
-6. Calm working screens, a little personality on the landing and live screens, nothing decorative that costs speed or readability.
+1. **[O] Agreed:** one folder plus one SQLite per event stays the source of truth. No central database of file paths. The folder stays copyable, archivable, restorable.
+2. **[O] Agreed:** multi-page app, no single-page-app rewrite. App-like feel comes from CSS (view transitions, container queries) and good structure.
+3. **[O] Agreed:** minimize dependencies. Browsers must not need the internet to render the app. yt-dlp stays the one deliberate runtime dependency.
+4. **[O] Agreed:** one feature-flag registry drives server gates, presets, the public payload and navigation.
+5. Make the areas explicit in code and UI: guest, venue screen, sound console, admin, each with its own shell, sharing tokens and components.
+6. Calm working screens; personality only on the landing and live screens.
+7. **Design for the remote host (6.12).** The server is not on the venue network, so the console must survive losing the internet, and the public internet must not be able to hurt guests or children. (from external plan, adapted: it assumed a venue LAN)
 
-### 6.2 Target module layout
+### 6.2 Decision register (what the external review changed)
+
+| ID | Topic | Decision | Status |
+|---|---|---|---|
+| D1 | How pages are rendered | Keep browser-rendered pages with ES modules (agreed), but **inject the shell (navigation + feature map) from the server** so every page gets one source for navigation and flags. A short **spike** at the start of Phase 2 rebuilds `/dashboard` with Jinja2 + HTMX; if it removes at least half the code and keeps tests green, guest and admin pages may follow. The console stays plain ES modules either way. | Proposed, owner decides after the spike (Q13) |
+| D2 | Track-to-act link | Keep the **entry id in the file name** as the link and the disaster-recovery format (agreed). Add an optional per-event **file-facts table** (sha256, size, duration, loudness gain) as a cache the folder can always rebuild. | Proposed (Phase 5) |
+| D3 | Service worker | **Revised.** Console: full shell cache plus offline vault. Guest pages: cache only versioned static files, never HTML or JSON; show a clear "offline, schedule as of 7:42 PM" banner from the last good response. | Replaces the earlier "offline-tolerant guest pages" idea |
+| D4 | Guest navigation shape | Bottom tab bar on phones, **top bar on desktop** (not a side rail). Admin and console use a left rail on desktop. Hide the bar when fewer than two destinations are enabled. | Proposed |
+| D5 | Admin destinations | Five, grouped by job (Overview, Lineup, People and Potluck, Setup and Rules, System), replacing the 10 tabs and the earlier Setup/People/Food/Data/Events grouping. Event switcher lives in the rail header. | Proposed |
+| D6 | Console hotkeys | **Keep today's keys** (Space, arrows, `M` mute, `Down` next, `Enter` done). Add `F` for a 3-second fade out. | Proposed |
+| D7 | Reorder and Save Order | Add a **reorder lock** (on by default during the show) and **auto-run Save Order** a few seconds after the last drop. The order itself already saves instantly; only file names and exports wait for Save Order. | Proposed |
+| D8 | Guest edit safety | Optional switch `guest_edit_verification` (default off): after sign-up the device gets a signed cookie; other devices must enter the last 4 digits of the sign-up phone, or the admin PIN. Login-free stays the default. | Proposed (Q1) |
+
+### 6.3 Target module layout
 
 ```
 app/
-  features.py              [T] the flag registry (below)
+  features.py              [T] the flag registry (6.4)
+  db/migrations.py         [T] numbered migrations on PRAGMA user_version (6.8)
   routers/ services/ repositories/    unchanged layering
+  templates/               [T] only if D1 spike passes; otherwise a small shell injector in pages.py
   static/
-    vendor/                [T] pinned lucide, wavesurfer, marked (committed, versioned file names)
+    vendor/                [T] pinned htmx (only if D1), wavesurfer, marked, lucide sprite; SHA-256 checked
+    fonts/                 [T] self-hosted variable fonts
     css/tokens.css         [T] design tokens (light + dark)
-    css/app.css            [T] built Tailwind output (one file, committed or built in Docker)
-    js/core/               [T] api.js (fetch + errors), auth.js, features.js, nav.js, dom.js (escape), toast.js, sw-register.js
-    js/pages/              [T] signup.js, hub.js, dashboard.js, live.js, console/*.js, admin/*.js (ES modules)
-    components/            [T] shared HTML snippets or small custom elements (app-header, tab-bar, side-rail, card, sheet)
+    css/app.css            [T] Tailwind output built in Docker
+    js/core/               [T] api.js, auth.js, features.js, nav.js, dom.js, toast.js, offline-banner.js, sw-register.js
+    js/pages/              [T] signup.js, my-entry.js, schedule.js, live.js, admin/*.js
+    js/console/            [T] main.js, deck-machine.js, audio-engine.js, vault-idb.js, offline-actions.js, stage-sync.js, hotkeys.js
 ```
 
-### 6.3 Feature-flag registry
+### 6.4 Feature-flag registry
 
-One list of `Feature(key, label, default, area, public, requires, preset_visible)`. Everything derives from it.
+One list of `Feature(key, label, default, area, public, requires)`. Existing key names stay (renames only through a migration), so old databases keep working.
 
 | Consumer | Today [C] | Target [T] |
 |---|---|---|
 | Defaults | `SignupConfig` and `default_app_settings()` | Registry `default` |
 | Validation | `BOOL_SETTINGS` in `admin_service` | Registry keys |
-| Presets | `FLAG_KEYS`, `SETTING_LABELS`, 8 hand-written dicts | Presets list only `{feature: on/off}` pairs; label from registry |
-| Server gate | Inline `get_setting(..., getattr(...))` (about 25 places) | `Depends(require_feature("food_signup"))` returning a consistent 403/`closed` response |
-| Public payload | Hand-copied booleans in `event.py` | `features: {key: bool}` generated; `GET /api/event-info` keeps the old booleans for one release |
-| Navigation | `adaptNavigationForEventConfig` string matching | Each nav destination declares `requires: [...]`; the client builds menus from `features` |
-| Tests | One file of examples | One generic test: every registry feature has a server gate (or is documented "client only"), appears in the admin UI, and in at least one preset |
+| Presets | `FLAG_KEYS`, `SETTING_LABELS`, 8 hand-written dicts | Presets listed as `{feature: on/off}` pairs; label from registry |
+| Server gate | Inline `get_setting(..., getattr(...))` (about 25 places) | `Depends(require_feature("food_signup"))`, one consistent refusal |
+| Public payload | Hand-copied booleans in `event.py` | Generated `features` map; old booleans kept for one release |
+| Navigation | `adaptNavigationForEventConfig` string matching | Destinations declare `requires`; shell built from the feature map |
+| Tests | Examples in one file | One generic test over every feature and every preset |
 
-Dependencies between flags (for example `track_upload_enabled` needs `stage_performances_enabled`) are expressed once in `requires` and enforced in both the gate and the nav.
+**Presets are patches, not full states** (kept from today, and a correction to the external sample). `freeze` changes only five flags and leaves the rest as the organizer set them.
+A preset written as a complete flag set would silently turn payments off and the potluck back on when freezing, and would re-enable anything the organizer had switched off.
+The external sample also changed three presets (`acoustic`, `karaoke_video`, `rehearsal` lose or gain the potluck and payments) relative to the current table in 3.8; those
+changes should be a deliberate owner decision, not a side effect of a refactor.
+Flag dependencies (`track_upload_enabled` needs `stage_performances_enabled`) are declared once in `requires` and enforced by both gate and navigation.
 
-### 6.4 Navigation model (one list, adaptive)
+### 6.5 Navigation model
 
-Frontier practice used (research appendix; search snippets, not full guideline pages): Apple HIG tab bars (bottom, labelled, 3-5 items, shrink on scroll, glass only
-for the navigation layer); Material 3 (bottom bar on compact screens, navigation rail on medium/expanded, drawer fading out on phones); 2026 web guidance (container
-queries, view transitions for multi-page sites, fluid type, 44 px / 48 dp targets, design tokens, dark mode as a first-class theme, restraint with effects);
-event-app guidance (few features, schedule first, plan for weak connectivity, timely notices, one-handed use).
+Frontier practice used (Appendix A; search snippets): Apple HIG tab bars (bottom, labelled, few items); Material 3 (bar on compact, rail on larger screens, one destination list that adapts);
+2026 web guidance (container queries, view transitions for multi-page sites, 44 and 48 px targets, tokens, dark mode, restraint); event-app guidance (schedule first, plan for weak
+connectivity, one-handed use). The external plan added: peer-level destinations per role, no one-tab bars, safe-area padding (from external plan).
 
-**Rule:** each area defines its destinations once. The component shows them as a **bottom tab bar below 840 px** and a **side rail at 840 px and above**
-(Material "expanded" class; width thresholds to be tuned in Phase 3). A destination is shown only if its `requires` features are on. Staff destinations never appear in guest navigation.
+**Rules**
+1. Each area defines its destinations once, with `requires` flags. A destination appears only when its features are on; disabled features disappear (not greyed).
+2. If fewer than two destinations remain, the bar is not drawn. (from external plan)
+3. Phones (below 768 px): fixed bottom bar, labelled, 48 px targets (44 px floor), `env(safe-area-inset-bottom)` padding. Desktop: guests get a **top bar**; admin and console get a **left rail**. (from external plan, adapted)
+4. Staff destinations never appear in guest navigation. Staff reach `/console` and `/admin` by URL, a printed QR code, or a small "Staff sign-in" link in the guest footer, then one shared sign-in.
+5. Routes: `/dashboard` becomes `/schedule` and `/performer` becomes `/my-entry`, with permanent redirects from the old paths (and the existing `/tracks`, `/upload`, `/intake` aliases). Labels follow the event type ("Food board", "My dish" when stage is off). (from external plan)
+6. View transitions between pages with `@view-transition { navigation: auto; }`, wrapped for reduced motion. The `Live` destination shows a dot when an act is on stage.
 
 | Area | Destinations (max 5) | Requires |
 |---|---|---|
-| Guest | Home (`/`) · Sign up (`/signup`) · My entry (`/performer`) · Schedule (`/dashboard`) · Live (`/live`) | Sign up: `signup_enabled` or `food_signup_enabled`; My entry: any of stage/food; Schedule: `dashboard_enabled`; Live: `live_display_enabled`. Labels follow the event type ("Food board" for potluck-only, "My dish" instead of "My entry"). |
-| Console | Queue · Player · Notes (phone/tablet) ; on laptop one three-pane screen with its own compact header | `console_enabled` |
-| Admin | **Setup** (event details, rules, features and presets, wizard) · **People** (participants, payments) · **Food** (menu, claims) · **Data** (spreadsheet, exports, activity, backup) · **Events** (switch, create, clear media, readiness) | Food only if `food_signup_enabled` |
+| Guest | Home `/` · Schedule `/schedule` (stage lineup and potluck menu as a segmented switch) · Sign up `/signup` (primary accent) · My entry `/my-entry` · Live `/live` | Schedule: `dashboard_enabled`; Sign up: `signup_enabled` or `food_signup_enabled`; My entry: `performer_edits_enabled` or `track_upload_enabled` or food on; Live: `live_display_enabled` (kept in guest navigation because family at home can follow along) |
+| Venue screen | `/live` full-screen, no navigation | `live_display_enabled` |
+| Console | Own compact header, no tab bar on laptop; `/console/monitor` full-screen | `console_enabled` and operator/admin sign-in |
+| Admin | **1 Overview** (readiness, quick preset, wizard banner, totals, show-day quick controls) · **2 Lineup** (running order, track status, incoming matcher) · **3 People and Potluck** (roster, payments, dishes, downloads) · **4 Setup and Rules** (details, features and presets, rules) · **5 System** (events, snapshots, offline ZIP, activity, backups) | Lineup only with `stage_performances_enabled` |
 
-Staff entry: a small "Staff" link in the footer of the guest pages opens one **shared staff sign-in** (admin or operator PIN) that lands on the console for operators and the
-admin home for admins; the console and admin share the session (cookie) so the operator is not asked twice. Role decides which staff destinations exist.
+Where today's 10 tabs go: Event Details, Sign-Up Rules and Features & Presets -> Setup and Rules; Food & Potluck, Participants, Payments, Spreadsheet downloads -> People and Potluck;
+Stats and readiness -> Overview; Backup & Sync, Activity, event bar -> System; the order and track status that live in the console and participant rows -> Lineup. Every old setting must remain reachable in two clicks (acceptance test in Phase 3).
+The on-screen **spreadsheet viewer** is kept for now (owner built it recently); downloads become prominent buttons. Retiring the viewer is Q17.
 
-Behaviour: tab bar can shrink while scrolling and return on scroll up; active destination uses `aria-current`; page-to-page motion via `@view-transition { navigation: auto }`
-with `prefers-reduced-motion` honoured; the Live destination shows a small dot when an act is on stage.
-
-### 6.5 Design system
+### 6.6 Design system
 
 | Piece | Target |
 |---|---|
-| Tokens (`tokens.css`) | Colour roles (surface, surface-raised, text, text-muted, accent, success, warning, danger, focus) in **light and dark**; spacing scale; radius; elevation; type scale with fluid `clamp()`; motion durations/easings; z-index layers. Tailwind is configured to read the tokens, so changing a token restyles every page. |
-| Themes | Dark and light, follows `prefers-color-scheme`, manual override stored locally. Console and `/live` default to dark (booth and venue). |
-| Components | App header, tab bar / side rail, card, button (primary, secondary, danger), field, select, toggle, badge/pill, toast, modal and bottom sheet, table that becomes cards on phones, empty state, skeleton, progress, waveform player bar. Each documented once with states (default, hover, focus, disabled, loading, error). |
-| Layout | Container queries for components; page grids: guest = single column to two; console = 3-pane on laptop (queue, player, notes); admin = side rail + content. |
-| Typography | One self-hosted variable font (or system stack decision, Q4), fluid sizes, tabular numbers for times and counts. |
-| Touch and a11y | 44 px minimum targets, visible focus, labelled controls, contrast at WCAG AA, reduced motion, semantic landmarks, screen-reader labels on icon buttons. |
-| Effects | Aurora background only on landing and live; off on console/admin; always optional and reduced-motion safe. |
-| Copy | One name per concept (Performer Hub / Tracks / Intake / Upload collapse to "My entry"); event name and brand pulled from settings, never hard-coded. |
+| Tokens (`tokens.css`) | Colour roles, spacing (4 px base), radius, elevation, fluid type with `clamp()`, motion, z-index; Tailwind reads them. |
+| Themes | Guest and admin follow `prefers-color-scheme` with a manual override. **Console, stage monitor and `/live` are always dark** (dark booth, projector). (from external plan) |
+| Effects | Aurora/glow only on the landing hero and `/live`; off on console, admin and forms. Reason: contrast, GPU load next to the waveform, glare. (from external plan, adapted) |
+| Type | System stack is the fallback. Proposed self-hosted variable fonts: a sans (Inter) for UI, a monospace (JetBrains Mono) for timecodes, entry codes and counts with tabular numbers; an optional display serif for the event title only (Q4). Inputs 16 px minimum so iOS does not zoom. |
+| Targets and a11y | 48 px primary targets, 44 px floor; visible focus; colour never the only signal (status badges pair colour with icon and text); WCAG AA contrast; reduced motion kills animation and view transitions. |
+| Icons | Replace the `lucide@latest` runtime script with a static SVG sprite of only the icons used (about 35); no icon script at runtime. (from external plan) |
+| Copy | One name per concept; no brand text hard-coded. |
 
-### 6.6 Front-end architecture
+**Proposed palette ("Warm Stage Studio", from external plan, corrected).** Taste is the owner's call; the numbers below were **recomputed** (WCAG relative luminance) and two of the external
+values failed AA, so they are replaced. CI should run a contrast script over this table.
 
-- Plain ES modules, no framework, no bundler required for JS (the browser loads modules directly). Tailwind is the only build step (CLI in a Docker build stage, plus `npm run build` locally).
-- `core/api.js` is the single fetch wrapper (JSON, errors, 401 handling, retry for idempotent GETs); `core/features.js` loads `/api/event-info` once and exposes `has(feature)`.
-- Large files split by screen and by responsibility (for example console: `queue.js`, `player.js`, `vault.js`, `offline-actions.js`, `stage-monitor-bridge.js`, `hotkeys.js`).
-- Service worker: precache the shell of **all** areas from local files (no CDNs); network-first for `/api/live-status`, cache-first for static files with versioned names; the cache name carries a build version so updates are clean.
-- Console auth moves from "raw PIN in localStorage" to the cookie plus an offline-safe unlock flag (decision Q7).
+| Token | Light | Dark | Notes (contrast measured) |
+|---|---|---|---|
+| `--bg-canvas` | `#FAF8F5` | `#0B0D10` | page |
+| `--bg-surface-1` | `#FFFFFF` | `#13161B` | cards, rows |
+| `--bg-surface-2` | `#F2EFE9` | `#1C2027` | hover, inputs, table headers |
+| `--bg-elevated` | `#FFFFFF` | `#252A34` | modals, sticky bars |
+| `--text-primary` | `#141518` | `#F3F4F6` | 17.2 : 1 and 17.7 : 1 on canvas |
+| `--text-secondary` | `#525866` | `#9CA3AF` | 6.7 : 1 and 7.7 : 1 |
+| `--text-muted` | `#5F6778` (was `#6E7687`) | `#8A92A0` (was `#6B7280`) | external values measured 4.30 and 4.02, below the 4.5 AA minimum; replacements measure 5.4 and 6.2 on canvas and 5.0 and 5.2 on surface-2 |
+| `--border-subtle` / `--border-strong` | `#E4E0D8` / `#C7C1B5` | `#262B35` / `#3D4554` | hairlines |
+| `--accent-primary` | `#C84B31` | `#F06449` | **Buttons:** white text on the light accent measures 4.66 (passes); in dark use **dark text** on the accent (6.14); white on the dark accent is 3.17 and fails. **Small accent text or links on canvas:** light `#C84B31` measures 4.40 (fails), use `#B5412A` (5.28) |
+| `--status-playing` | `#0D7A5F` on `#E6F4F0` | `#34D399` on `#064E3B` | 4.68 and 5.06 |
+| `--status-cued` | `#B45309` on `#FEF3C7` | `#FBBF24` on `#451A03` | 4.51 and 8.97 |
+| `--status-danger` | `#B91C1C` on `#FEE2E2` | `#F87171` on `#450A0A` | 5.30 and 5.84 |
 
-### 6.7 Backend adjustments (small)
+**Component primitives** (ten, defined once with states): app shell (header, bar, rail), status badge, act row (guest, admin and console densities), segmented switch (`tablist`),
+file upload with a pre-check (size and duration before upload, progress), confirm dialog on the native `<dialog>` element (focus trap and Esc for free), toast region (`aria-live`),
+empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the table-to-cards pattern for phones. (from external plan, merged with the earlier list)
 
-Registry (6.3); `require_feature` dependency; correctness fixes from section 5 Phase 0; optional `PRAGMA user_version` migrations; `async def` handlers that touch SQLite become plain `def` (thread pool) or use `to_thread`.
-No new services, no new runtime dependencies, no database engine change.
+### 6.7 Front-end architecture
 
-### 6.8 Phased roadmap
+- Plain ES modules; no framework, no JS bundler. One build step: the **standalone Tailwind CLI binary** in a Docker build stage (no Node installed on the host or in the final image). The download must pick the binary by `TARGETARCH` because CI builds amd64 and arm64 (the external sample hard-coded arm64) and verify its SHA-256. A `vendor` script fetches pinned third-party files at build time (or they are committed), checks SHA-256 and fails the build on mismatch. (from external plan, adapted)
+- `core/api.js` is the single fetch wrapper (JSON, errors, 401, backoff for GETs). `core/features.js` reads the server-injected feature map; no extra request before first paint.
+- Console split by responsibility: `deck-machine.js` (transport state machine), `audio-engine.js` (WaveSurfer plus an optional gain stage for fades and loudness), `vault-idb.js`, `offline-actions.js`, `stage-sync.js`, `hotkeys.js`, `main.js`.
+- Service worker (D3): console shell and offline vault as today but from local files; guest pages cache only versioned static assets; HTML and JSON are never served stale. A small `offline-banner.js` shows "offline, showing schedule as of <time>" using the last good response held in `sessionStorage`.
+- Console auth moves from the raw PIN in `localStorage` to the cookie plus an "unlocked on this device" flag (Q7).
+- No Preact/Alpine layer for the console (rejected, Appendix C): the state-machine module gives the safety without a framework.
 
-Order requested by the owner: assets, then registry + JS split + shared navigation, then visual redesign, then renames and migration. Phase 0 is an addition of this spec.
+### 6.8 Backend and data adjustments
+
+- **Feature registry** and `require_feature` (6.4).
+- **Migrations:** `PRAGMA user_version` with numbered steps in `app/db/migrations.py`; an automatic copy of `event.db` to `backups/event.pre_v<N>_<timestamp>.db` before each step; each step in a transaction; failures stop startup loudly. Step 1 is an idempotent baseline equal to today's `ensure_database()` (existing databases report version 0 and already have the schema). (from external plan, adapted)
+- **Background reconcile:** a single background task watches `incoming/` and `tracks/` every few seconds and updates the database; request handlers only read. It tells the console and `/live` by the existing push channel. Must be restarted cleanly on event switch. (from external plan)
+- **Upload checks:** keep streaming with early refusal; add an `ffprobe` check (valid stream, real duration) for audio and video; measure loudness at ingest (6.10). Upload size is limited by Cloudflare (6.12), so choose the per-file cap and consider chunked uploads.
+- **Readiness additions:** `PRAGMA quick_check`, every database track reference exists with the expected size, disk under 2 GB warns, last export failed (fix N1), console vault completeness is shown in the console itself (the server cannot see a browser's vault). (from external plan, adapted)
+- **Activity log:** record the actor role (Guest, Operator, Admin) and drop phone numbers from `details`. Client IPs are not stored by default (they are personal data and, behind Cloudflare, need the right header). (from external plan, adapted)
+- **Handlers:** database-touching `async def` handlers become `def` (thread pool).
+- **Optional per-event file-facts table (Phase 5):** `track_facts(entry_id, file_name, sha256, size, duration, loudness_lufs, gain_db, checked_at)`, rebuilt from the folder at any time; the folder remains the truth.
+- No new services; no change of database engine.
+
+### 6.9 Console and live upgrades
+
+| Upgrade | Detail | Provenance |
+|---|---|---|
+| Transport state machine | `IDLE, ARMED, PLAYING, PAUSED, FADING, ENDED`; selecting a row while `PLAYING` never changes the deck, it sets "on deck" or asks first. Unit-tested. | from external plan |
+| On-deck concept | Active deck plus the next act shown with its notes; "cue next" arms it. The existing disruption modal stays as the confirmation. | from external plan, adapted |
+| Fade out | `F` fades over 3 s through a gain stage, then stops. Keep `M` as mute; do not remap keys (D6). | from external plan, adapted |
+| Reorder lock | Lock toggle (on during the show); unlocked shows drag handles; each drop saves the order; file renames and exports run automatically after a few seconds idle (D7). The manual Save Order button stays for "do it now". | from external plan, adapted (its premise that unsaved orders are lost is wrong, see Appendix C) |
+| Screen wake lock | Request a screen wake lock on `/console`, `/console/monitor`, `/live`; re-request on visibility change (needs HTTPS, which Cloudflare provides). | from external plan |
+| Output device | `setSinkId` lets the operator pin playback to the audio interface; Chromium only, so it is optional and hidden when unsupported. | from external plan |
+| Vault | Auto-cache on console open from a manifest (`entry_id`, file name, sha256, size, duration), with an always-visible pill "Vault 18/18 ready, 142 MB"; manual buttons stay. Blobs stay in IndexedDB (as today). Manifest endpoint is operator-only. | from external plan, adapted (vault already exists, manual) |
+| Live screen offline path | When `/live` runs as a window in the console's browser, it also listens to the `BroadcastChannel`, so the TV keeps updating with no internet. Otherwise it keeps its last state and sponsor gallery. | new (follows from the remote host, 6.12) |
+| Loudness | Measure integrated loudness on ingest; store a gain value; the console applies it at playback; originals are untouched; optional normalized copy in the ZIP (Q16). Two-pass analysis, not single-pass. | from external plan, adapted |
+| ZIP escape hatch | Add a `00_Playlist.m3u8` (opens in VLC in show order) and a printable `00_Run_Sheet.html` next to today's numbered files and text run sheet. | from external plan |
+| "Unplug" acceptance test | Open console and monitor, wait for "all ready", cut the network, reload the console, play act 1, scrub, fade, cue a video act, edit notes; restore the network and watch queued changes sync. | from external plan, adapted to a remote host |
+
+### 6.10 Guest flow and safety upgrades
+
+| Item | Detail | Provenance |
+|---|---|---|
+| Existing-name lookup | While typing a name on `/signup`, compare with `registered_performers` (already returned by the config call) and offer "Edit PK-004 / No, new act". No new endpoint. | from external plan, adapted |
+| After sign-up | Success card offers **Upload track now**, **Add another act**, **Add a dish**. This is the owner's answer to "families registering several people": no multi-act form needed. | [O] |
+| Progressive form | Partner fields only for Duet/Group; upload zone hidden for "acoustic / no track". | from external plan |
+| Edit verification | Optional flag (D8). | from external plan, adapted |
+| Magic upload link | Admin copies a per-act link `/my-entry?code=PK-006&t=<hmac>` for WhatsApp; it opens straight to that act's upload and bypasses verification when verification is on. | from external plan |
+| Restore previous track | Admin can restore a file from `tracks/_archive/` with one click (today it is manual). | from external plan, adapted |
+| Search engines | Send `X-Robots-Tag: noindex, nofollow, noarchive` on every response and serve `/robots.txt` with `Disallow: /` (not present today, verified). | from external plan |
+| Event passcode (optional) | A shared word or a token in the invite link before guest pages show anything, for public deployments. Alternatives outside the app (a Cloudflare access rule) exist. | from external plan, adapted (Q18) |
+| Minor display names | Optional per-act checkbox "show first name and last initial on public screens"; full name stays in admin and console. | from external plan (Q18) |
+| Dietary tags and tent cards | Chips (vegetarian, vegan, halal, nuts, gluten-free, dairy-free, spicy) per dish, and a print stylesheet for 8 table cards per sheet. Backlog, needs a schema column. | from external plan (backlog) |
+
+### 6.11 Roadmap
+
+Order the owner asked for, plus Phase 0 (fixes and hardening) and a console phase. External effort estimates (days per phase) were **not adopted**: they are unvalidated guesses.
 
 | Phase | Scope | Acceptance criteria |
 |---|---|---|
-| **0. Correctness fixes** (small, can ship first or alongside Phase 1) | N1 readiness status; N2 public edit validation (types, track status, limits); N3 id reuse (never reuse: keep a high-water mark in `sync_meta`); N6 consistent redacted shape; N10 redact phones in activity details; A9 media types from `mimetypes`; A12 small items | Each fix has a failing-then-passing test; existing 183 tests still pass; manual note in changelog |
-| **1. Bundle assets** | Vendor Lucide, WaveSurfer, `marked` at pinned versions under `static/vendor/`; precompile Tailwind to `app.css` (Docker build stage + dev script); update 8 pages and `sw.js` | A test greps every HTML/JS/CSS file and fails on any `http(s)://` host except links the owner entered; app renders **identically** with outbound network blocked (Playwright `route.abort` on non-local hosts); screenshot diff vs. today within tolerance on all 8 pages at 390x844 and 1280x800; image build succeeds; no console errors |
-| **2. Registry + modules + shared navigation** | `features.py` and `require_feature`; presets rewritten on the registry; ES module split with `core/`; shared header and nav component per area; staff entry and shared sign-in; console auth change; service worker covers all areas | Adding a throw-away feature touches only the registry, one gate, one page (demonstrated in a test); generic flag test passes; nav shows exactly the enabled destinations for each of the 8 presets (table-driven test); no staff links in guest nav; no file in `static/js` over 600 lines; all pytest tests pass; Playwright smoke covers each page |
-| **3. Visual redesign** | Tokens, themes, components, per-area layouts, view transitions, a11y pass, branding from settings, copy cleanup (N12) | Axe scan has no serious/critical issues on every page; targets measured at least 44 px on phone layouts; light and dark verified on every page; Lighthouse mobile (throttled) Performance >= 90 and Accessibility >= 95 on guest pages (proposed thresholds, owner to confirm); INP under 200 ms on console actions on a mid-range laptop; reduced-motion respected; owner sign-off on screenshots of the five main screens on phone and laptop |
-| **4. Renames and migration** | `PRAGMA user_version` migration runner; rename `drive_file_id` -> `track_version`, `drive_file_name` -> `track_file`, default `created_via` `'sheet'` -> `'signup'`; remove `ColumnNamesConfig`/`COL_*`, `reset_database`, facade layers; `/api/sync` -> `/api/export-now` and `push_to_sheet` -> `save_files` with the old names kept as aliases for one release; `signup_sheet_url` -> `external_link_url` (setting alias) | Fixture databases from `2fc83ae` and from the Google-era layout migrate cleanly and load; round-trip test (old snapshot restored into new code); API alias tests; grep finds no remaining Google-era identifiers (except the changelog); snapshots taken before migration |
+| **0. Fixes and public-internet hardening** | N1 readiness status; N2 public edit validation (types, track status, limits, duet rule); N3 never reuse entry ids (high-water mark in `sync_meta`); N6 consistent redacted shape; N10 no phones in activity details; A9 media types from `mimetypes`; N16 `X-Robots-Tag` and `robots.txt`; N17 optional `TRUST_CLOUDFLARE` to key rate limits on `CF-Connecting-IP`; N15 per-file upload cap behind the tunnel (and chunked upload decision); `ffprobe` check; readiness additions | Each fix has a test that fails before and passes after; the 183 existing tests pass; readiness shows ERROR after a forced export failure; `curl -I` on every page shows the robots header |
+| **1. Bundle assets** | Standalone Tailwind CLI in the Docker build (arch-aware, hash-checked); pinned wavesurfer and marked; Lucide pinned for now (sprite comes in Phase 3); self-hosted fonts; update the 8 pages and `sw.js` | A test fails on any `http(s)://` host in HTML/JS/CSS except links an organizer typed; with all non-local requests aborted every page renders with no console errors; screenshot diff against today within tolerance (8 pages x 390x844 and 1280x800); both images build for amd64 and arm64; compiled CSS size recorded (the external target was under 25 KB gzipped; unverified) |
+| **2. Registry, modules, shared shell** | `features.py` + `require_feature`; presets as patches on the registry; migration runner (no renames yet); background reconcile; ES module split; server-injected shell and navigation per area; route renames with redirects; staff sign-in and console auth change; guest service-worker policy (D3); **D1 spike** | Adding a throw-away feature touches only the registry, one gate and one page (shown by a test); generic flag test passes; navigation matches the enabled destinations for each of the 8 presets (table-driven); no staff links in guest navigation; no JS file over 600 lines; all tests pass; old URLs redirect |
+| **3. Visual redesign and guest/admin flows** | Tokens, themes, components, icon sprite, guest flows (6.10), admin consolidation to 5 destinations with Overview and readiness, copy and branding from settings | Axe scan has no serious or critical issues on every page; measured targets at least 44 px (48 px for primary controls) on phone layouts; every old admin setting reachable in two clicks (checklist test); light and dark verified; contrast script passes on the token table; Lighthouse mobile (throttled) Performance 90+ and Accessibility 95+ on guest pages (proposed; external plan wanted Accessibility 100); owner sign-off on screenshots of five main screens on phone and laptop |
+| **4. Console and live** | 6.9 items: state machine, reorder lock plus auto Save Order, fade, wake lock, sink id, auto vault with pill, `/live` BroadcastChannel path, loudness gain, ZIP extras | "Unplug" test passes end to end; selecting a row during playback never interrupts audio (tested); a dropped order is saved and files renamed without pressing a button; operator confirms hotkeys feel unchanged |
+| **5. Renames, migration, file facts** | Migrations 2+: `drive_file_id` -> `track_version`, `drive_file_name` -> `track_file`, `created_via` default `'sheet'` -> `'signup'`; remove `ColumnNamesConfig`/`COL_*`, `reset_database`, facade layers; `/api/sync` -> `/api/export-now`, `push_to_sheet` -> `save_files` (old names kept as aliases for one release); `signup_sheet_url` -> `external_link_url`; optional file-facts table | Fixture databases from `2fc83ae` and from the Google-era layout migrate and load; old snapshot restores into new code; pre-migration backup created; alias tests; grep finds no Google-era identifiers outside the changelog |
+| **Backlog** | Allergen tags and tent cards, minor display names, event passcode, edit verification, magic links, restore-previous-track UI, Cloudflare gating notes | Each needs an owner yes first (Q15, Q18, Q19) |
 
-### 6.9 Test plan
+### 6.12 Remote hosting behind a Cloudflare Tunnel [O][T]
+
+Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached through a Cloudflare Tunnel (Q14 asks to confirm the reading). Consequences:
+
+| Topic | Effect | What to do |
+|---|---|---|
+| Venue internet drops | Every venue device (console laptop, TV, guests on venue Wi-Fi) loses the app. Guests on cellular are unaffected. | Console runs from its vault and service worker; stage monitor works (same browser); `/live` follows the console by `BroadcastChannel`; offline ZIP is the last resort. The vault must be complete before doors (auto-cache, pill). |
+| Server or tunnel down | Same as above for everyone | Same fallbacks; runbook step "cache all, then check the pill" before every show |
+| Upload size | Cloudflare caps request bodies at 100 MB on Free and Pro (200 Business, 500 Enterprise by default), per Cloudflare's documentation as found by search; whether Tunnel traffic follows the same cap was not confirmed. The app allows 200 MB audio and 500 MB video. | Check the plan; set the app cap at or below the plan limit; offer chunked upload or "paste a link" for big videos; show a clear message on HTTP 413 |
+| Client IP | The rate limiter keys on the first `X-Forwarded-For` value, which a client can set. Behind Cloudflare the trustworthy value is `CF-Connecting-IP`. | `TRUST_CLOUDFLARE` setting; only then use that header |
+| PIN on the open internet | A 4-digit PIN has 10,000 possibilities; the global failure cap also lets anyone lock the admin out for 5 minutes | Longer PIN (6+) recommended by the readiness check; optionally put `/admin*`, `/console*`, `/api/admin*` behind a Cloudflare Access rule as a second lock (outside the app) |
+| Children's data | Public pages show names of minors to anyone with the URL | Robots header, optional passcode, optional short display names (6.10) |
+| HTTPS | Provided by Cloudflare; the app already marks cookies `Secure` when `x-forwarded-proto` is https; wake lock needs a secure context | Nothing to build |
+| Venue video | A separate TV on HDMI is driven from the console laptop [O]; the stage monitor window must run in the console's browser (works today) | Document in the runbook; keep the monitor window same-browser |
+
+### 6.13 Test plan
 
 | Layer | What | Tool |
 |---|---|---|
 | Unit and API (exists) | Rules, privacy, presets, exports, live, uploads | `pytest` (183 today) |
-| New backend | Flag registry invariants; every public JSON endpoint scanned for private keys with a seeded junior duet (generalizes the verification run in Appendix B); migration fixtures; id high-water mark; readiness failure path; public-edit validation | `pytest` |
-| Static checks | No external hosts in assets; no JS file over the size cap; no inline `onclick` with user data; every nav destination maps to a route | `pytest` + a small script in CI |
-| Browser smoke (new) | Per area at 390x844 and 1280x800: load, nav items correct for each preset, sign-up happy path and one rule error, upload a small MP3, cue/play in the console, Save Order, live screen updates after a cue (SSE), admin preset preview/apply, event create/switch | Playwright (Chromium; WebKit if available) in CI |
-| Offline | Console reload with `context.setOffline(true)` after caching; action queue replays on reconnect | Playwright |
-| Accessibility and visual | Axe on every page; screenshot comparison for the 8 pages x 2 viewports x 2 themes | Playwright + axe-core |
-| Performance | Lighthouse CI on guest pages; a simple concurrent sign-up script (about 100 users) against a compose stack | Lighthouse CI; k6 or a Python script |
-| Container | Build both images, run the stack, hit `/api/health`, upload a track, check folder layout | CI job |
+| New backend | Flag registry invariants (every feature has a gate, an admin control, and appears in a preset); every public JSON endpoint scanned for private keys with a seeded junior duet (generalizes Appendix B); migration fixtures and pre-migration backup; id high-water mark; readiness failure path; public-edit validation; rate-limit key with and without `TRUST_CLOUDFLARE`; robots header on every response | `pytest` |
+| Static checks | No external hosts in assets; no JS file over the size cap; every navigation destination maps to a route; contrast script over the token table (fails below AA) | `pytest` plus a small script in CI |
+| Console logic | `deck-machine` transitions (selecting a row while `PLAYING` must not change the active deck), timecode helpers, vault manifest diff | Browser tests, or Node's built-in test runner in CI only (no Node at run time) |
+| Browser smoke | Per area at 390x844 and 1280x800: load, navigation correct for each of the 8 presets, sign-up happy path plus one rule error, upload a small MP3, cue and play in the console, reorder lock, live screen updates after a cue (push), admin preset preview and apply, event create and switch | `pytest-playwright` (Chromium; WebKit if available) in CI |
+| Offline | All third-party requests aborted: every page renders without console errors; the "unplug" test from 6.9 (set the context offline after the vault is full, reload, play, fade, edit notes, reconnect, verify sync) | Playwright |
+| Accessibility and visual | Axe on every page; screenshots for 8 pages x 4 viewports (375x667, 393x852, 1024x768 console, 1920x1080 live) x 2 themes | Playwright, axe-core |
+| Performance | Lighthouse CI on guest pages; a script that signs up about 100 people concurrently against a compose stack | Lighthouse CI; k6 or Python |
+| Container | Build both images (amd64 and arm64), run the stack, hit `/api/health`, upload a track, check the folder layout | CI job |
 
 ---
 
-## 7. Open questions for the owner
+## 7. Questions for the owner
+
+**Answered by the owner on 2026-11-07 (recorded, no longer open)**
+
+| Topic | Answer | Where it landed |
+|---|---|---|
+| Where does video play? | On a separate display or TV connected by HDMI (to the console laptop; confirm in Q14) | 1.4, 6.12; closes the old Q6 about a second device |
+| Payments | A manual tracker only (Paid checkbox, note) plus a deep link to the payment page; no payment processing | 1.4, existing Payments tab; optional QR/link on the landing and success card |
+| Several people per family | After a registration, offer to add another; no multi-act form | 6.10 |
+| Where does it run? | Proxmox LXC at Hetzner, through a Cloudflare Tunnel | 1.4, 4.6, 6.12 |
+
+**Open**
 
 | # | Question | Why it matters | Default if unanswered |
 |---|---|---|---|
-| Q1 | Is the 4-digit PIN and login-free editing still right for every future event, or do some events want a per-person code? | Drives whether N2 fixes are enough | Keep login-free; add validation only |
-| Q2 | Should Operator and Admin share one staff sign-in screen with role-based landing? | Shapes the nav and the console auth change | Yes |
-| Q3 | Guest nav: is "My entry" the right name, and should potluck-only events say "My dish"? | Copy and nav labels | Yes to both |
-| Q4 | Self-host a font or use the system font stack? | Look vs. weight and dependencies | System stack plus one self-hosted variable font only if it clearly helps |
-| Q5 | Default theme for guests: follow the phone setting, or always dark as today? | Visual identity | Follow the phone, with a toggle; console and live stay dark |
-| Q6 | Do you ever need the stage confidence monitor on a **different** computer than the console? | Today it cannot (same browser only) | Not needed; revisit if yes |
-| Q7 | Console offline reload today relies on the PIN in `localStorage`. Accept a cookie plus an "unlocked on this device" flag instead? | Security vs. offline reload | Yes |
-| Q8 | Lighthouse and speed thresholds in Phase 3 (90 / 95 / 200 ms): acceptable? | Acceptance criteria | Yes |
-| Q9 | Same-name people and a dish name used in two groups: keep today's behaviour or allow duplicates? | Data model | Keep, document |
-| Q10 | After Phase 4, how many releases should the old API names stay as aliases? | Compatibility vs. cleanup | One release |
-| Q11 | Should `/live` and `/dashboard` show phone-free data only (as now), or may admins see a private view on the same pages? | Privacy surface | Phone-free only |
-| Q12 | Is the cloud sync story staying fully outside the app, including removing the bundled `rclone/` sidecar from the repo later? | Repo scope | Keep the sidecar, document its limits |
+| Q1 | Keep login-free editing for every event, or enable the optional verification (signed cookie plus phone last 4) for public deployments? | Hardening vs. friction for older guests | Keep login-free; ship verification as an off-by-default switch |
+| Q2 | One shared staff sign-in with role-based landing? | Navigation and console auth | Yes |
+| Q3 | Guest names: "Schedule" and "My entry" (and "My dish" for potluck-only)? Old URLs redirect. | Copy | Yes |
+| Q4 | Fonts: self-host Inter and JetBrains Mono, or system fonts only? Display serif for the event title? | Look vs. weight | Self-host the two; no display serif |
+| Q5 | Guests follow the phone's light/dark setting, with console, monitor and live always dark? | Visual identity | Yes |
+| Q7 | Console reload offline: replace the raw PIN in `localStorage` with a cookie plus an "unlocked on this device" flag? | Security vs. offline reload | Yes |
+| Q8 | Phase 3 thresholds (Lighthouse 90 and 95, INP 200 ms) acceptable? | Acceptance | Yes |
+| Q9 | Same-name people and one dish name in two groups: keep today's behaviour? | Data model | Keep, document |
+| Q10 | How long to keep old API names as aliases? | Compatibility | One release |
+| Q11 | Public pages stay phone-free only? | Privacy | Yes |
+| Q12 | Keep the bundled `rclone/` sidecar in the repo (sync is yours to run)? | Repo scope | Keep, document limits |
+| Q13 | After the Phase 2 spike, move guest and admin pages to server-rendered Jinja2 + HTMX if it clearly cuts code, or stay with ES modules? | Biggest architecture choice; adds two small dependencies | Decide from the spike result |
+| Q14 | Confirm: the server is at a Hetzner data centre (not at home), the TV is driven from the console laptop, and which Cloudflare plan applies (upload cap)? | Upload limits, offline needs | As stated in 6.12 |
+| Q15 | Allow the optional event passcode and minor short names? | Child privacy on a public URL | Build both as off-by-default switches |
+| Q16 | Loudness: apply gain at playback only, or also bake a normalized copy? | Changes the audio the PA plays vs. preserving originals | Playback gain; optional copy in the ZIP |
+| Q17 | Retire the on-screen spreadsheet viewer once downloads are prominent? | Less to maintain vs. a feature you just built | Keep for now |
+| Q18 | Per-act "short name on public screens" and event passcode wording acceptable? | Public-facing copy | As in 6.10 |
+| Q19 | Dietary tags and printable table cards worth doing before the next event? | Scope | Backlog |
+| Q20 | Keep today's console hotkeys unchanged and add only `F` for fade? | Muscle memory | Yes |
 
 ---
 
-## Appendix A. Sources for the research behind section 6
+## Appendix A. Sources for the research behind sections 5 and 6
 
-These were obtained from web search result snippets, not by reading the full guideline pages. Treat them as directional and confirm details on the official sites
-before treating a number or rule as binding.
+Obtained from web search result snippets, not from reading the full pages. Treat as directional; confirm on the official sites before treating a number or rule as binding.
 
 - Apple Human Interface Guidelines, Tab bars: https://developer.apple.com/design/human-interface-guidelines/tab-bars.md
 - Apple Human Interface Guidelines, Toolbars: https://developer.apple.com/design/human-interface-guidelines/toolbars.md
@@ -623,13 +769,16 @@ before treating a number or rule as binding.
 - UX Magazine, event apps (think tapas, not smorgasbord): https://uxmag.com/articles/event-apps-think-tapas-not-smorgasbord
 - Ticket Fairy, mobile event apps in 2026 (offline, engagement): https://ticketfairy.com/blog/maximizing-mobile-event-apps-in-2026-offline-capabilities-engagement-tactics-real-world-lessons
 - Swoogo, attendee mobile experience: https://swoogo.events/blog/attendee-mobile-experience/
+- Cloudflare upload limits, plan caps and error 413 (search snippets; Tunnel behaviour not confirmed): https://fast.io/resources/cloudflare-upload-limit/ and https://developers.cloudflare.com/support/troubleshooting/http-status-codes/4xx-client-error/error-413
 
-The searches returned nothing specific about Luma, Partiful or Eventbrite navigation; those products still need a direct look if the owner wants them as references.
-Material window-size thresholds in 6.4 (compact below 600, medium 600-839, expanded 840 and up, in dp) come from general knowledge, not from the snippets; verify before building.
+Cited by the external plan but **not opened by this spec's author** (listed so they can be checked): MDN View Transition API, MDN `<dialog>`, MDN Screen Wake Lock API, W3C WCAG 2.2 target size, use of color and animation from interactions,
+Material 3 navigation bar specs and dark-theme elevation, web.dev learn forms.
+The searches returned nothing specific about Luma, Partiful or Eventbrite navigation.
+Material window-size classes (compact below 600, medium 600 to 839, expanded 840 and up, in dp) come from general knowledge, not the snippets; verify before building. The 768 px phone/desktop switch in 6.5 follows the external plan and is tunable.
 
 ## Appendix B. Verification log
 
-Run on 2026-11-06/07 against commit `aa07405`, scratch folders under the session scratchpad; no app code or user data touched.
+Run on 2026-11-06 and 2026-11-07 against commit `aa07405` (code unchanged), scratch folders only; no app code or user data touched.
 
 | Check | Result |
 |---|---|
@@ -644,11 +793,84 @@ Run on 2026-11-06/07 against commit `aa07405`, scratch folders under the session
 | Failed export vs readiness | `backup_log.status` = `failed`; readiness `backup` check = `ok` |
 | Auth on operator/admin routes without a PIN | 401 for `/api/admin/summary`, `/api/download-track/{id}`, `/api/sync`; 200 for `/api/performances`, `/api/stage-queue`, `/api/track-info/{id}` |
 | Entry id after deleting the highest id | The deleted id was issued again |
+| Reorder persistence | `POST /api/reorder-queue` changed `sequence_order` in the database immediately (1/2 swapped) and set the dirty flag; only file names and exports wait for Save Order |
+| `robots.txt` / noindex | No handling anywhere under `app/` |
+| Vault caching trigger | `cacheAllTracksOffline` is only called from a button handler; nothing caches automatically |
+| Contrast of the external palette | Computed with the WCAG formula: `--text-muted` measures 4.30 (light) and 4.02 (dark) against claims of 4.6 and 4.5; muted text on surface-2 measures 3.97 and 3.38; light accent as small text on canvas 4.40; white on the dark accent 3.17. Other listed pairs pass AA. Replacement values in 6.6 were measured the same way. |
+| Cloudflare request-body caps | Free and Pro 100 MB, Business 200 MB, Enterprise 500 MB by default, per search results quoting Cloudflare documentation; Tunnel-specific behaviour not confirmed |
 
-Not observed: any page in a real browser (layout, view transitions, service worker, offline vault, WebGL), the stage monitor, SSE timing under load, a Docker build,
-real YouTube extraction, rclone, behaviour on iOS Safari, load with many concurrent users.
+Not observed: any page in a real browser (layout, view transitions, service worker, offline vault, WebGL), the stage monitor, SSE timing under load, a Docker build, real YouTube extraction, rclone,
+iOS Safari behaviour, load with many concurrent users, Cloudflare Tunnel behaviour, the external plan's performance and size claims (500 readers, 8 ms p99, under 25 KB CSS, under 15 KB guest JS).
 
 ## Appendix C. External plan review
 
-Not yet received. After the owner pastes the other agent's architecture and design plan, this appendix will list what was adopted (marked "from external plan" in the sections above),
-what was rejected and why, and what was missing from this draft.
+The second agent's plan ("Principal Architecture & Product Design Specification") was reviewed on 2026-11-07 against this spec, the code and the owner's answers.
+
+### C.1 Adopted (placed in the sections shown, marked "from external plan")
+
+| Idea | Where |
+|---|---|
+| Standalone Tailwind CLI in a Docker stage, hash-verified vendoring, no Node on the host | 6.7, Phase 1 |
+| Static Lucide sprite instead of the runtime icon script | 6.6, Phase 3 |
+| Self-hosted variable fonts, 16 px minimum inputs, tabular numbers | 6.6 |
+| Palette and token structure (with two corrected values and extra contrast rules) | 6.6 |
+| Console, monitor and live always dark; aurora only on hero and live | 6.6 |
+| Ten component primitives, native `<dialog>`, toast region, PIN pad | 6.6 |
+| Hide navigation when fewer than two destinations; top bar for desktop guests; left rail for admin; safe-area padding; 48 px targets | 6.5 |
+| Route renames `/schedule` and `/my-entry` with redirects | 6.5 |
+| Admin consolidated to five job-based destinations with an Overview and readiness home | 6.5, Phase 3 |
+| Numbered migrations on `PRAGMA user_version` with automatic pre-migration backup | 6.8 |
+| Background reconcile instead of scanning inside requests | 6.8, N19 |
+| `ffprobe` validation, loudness measurement, extra readiness checks (`quick_check`, file sizes, disk) | 6.8, 6.9 |
+| Transport state machine, fade out, reorder lock, auto-save of order, wake lock, output device, auto vault with manifest and pill | 6.9 |
+| `.m3u8` playlist and printable run sheet in the offline ZIP; "unplug the router" acceptance test | 6.9 |
+| Existing-name lookup on sign-up, progressive form, magic upload links, restore-previous-track | 6.10 |
+| `X-Robots-Tag` and `robots.txt`; optional event passcode; optional short names for minors | 6.10, Phase 0 |
+| Actor labels in the activity log | 6.8 |
+| `pytest-playwright`, four-viewport visual checks, unit tests for the deck state machine | 6.13, Phases 2 to 4 |
+
+### C.2 Adapted (changed to fit decisions already made or facts in the code)
+
+| External idea | Change |
+|---|---|
+| Jinja2 + HTMX for guest and admin pages | Not adopted by default (adds two dependencies and rewrites most pages). Server-injected shell now; D1 spike decides later. |
+| Database `tracks` table as the runtime link, filenames only an export | Kept filename token as the link (agreed; also what drop-in and rclone workflows use). Offered an optional rebuildable file-facts table instead. |
+| Guest pages must never use a service worker | Accepted in part: no stale HTML or JSON; versioned static assets only; banner for offline. |
+| Phone-last-4 and cookie verification for edits | Optional off-by-default switch, not a change of philosophy. |
+| Reorder auto-save | Order already saves instantly; auto-run only the file renames and export. |
+| Offline table assuming a venue LAN | Rewritten for a remote host (6.12). |
+| Activity log with client IPs | Roles yes, IPs no by default. |
+| Effort estimates | Dropped (unvalidated). |
+
+### C.3 Rejected, with one-line reasons
+
+| Suggestion | Reason |
+|---|---|
+| Preact or Alpine for the console | A state-machine module gives the safety without adding a framework (agreed principle 3). |
+| Remap `M` to "push to live" and `Enter` to "cue next" | Breaks the operator's current muscle memory (mute, mark done) for no gain. |
+| Delete the spreadsheet viewer now | The owner built it recently; downloads become prominent, retirement is Q17. |
+| Full-state preset classes (`EventFlags`) | Would change presets from patches to full states, so `freeze` would flip payments and potluck; also silently changes `acoustic`, `karaoke_video`, `rehearsal` (6.4). |
+| Flag renames (`stage_enabled`, `live_screen_enabled`, ...) in the sample | Would orphan stored settings; renames only through a migration. |
+| Renames and `tracks` table in Phase 1 with the asset work | The owner's order is assets, then registry and shell, then redesign, then renames; the migration runner arrives in Phase 2, renames in Phase 5. |
+| Hard-coded arm64 Tailwind binary in the Dockerfile | CI builds amd64 and arm64; pick by `TARGETARCH`. |
+| Guest-visible "no Live link" (Live only for the venue) | Family and friends at home may follow along; kept as a guest destination that is hidden when the feature is off. |
+| IP addresses in the activity log | Personal data; not needed. |
+
+### C.4 Statements in the external plan that do not match the code (corrected here)
+
+| Claim | Fact |
+|---|---|
+| "About 6,000 lines of JS" | 9,301 lines across 12 files; three files exceed 1,900 lines. |
+| Forgetting Save Order loses the order change | The order is stored in the database on every drop; Save Order only renames files and rewrites exports (verified). |
+| Clicking a queue row interrupts playback | A confirmation dialog appears first (`confirmIfPlaying`). A stronger deck model is still a fair improvement. |
+| Vault should use IndexedDB blobs, stage monitor should use BroadcastChannel | Both already do. |
+| Filename parsing breaks on Unicode normalization of Malayalam names | Linking uses the ASCII entry-id token, not the name part of the file name. |
+| Reconcile "scans disk synchronously during requests" | True, throttled to once per 3 s; moved to a background task (N19). |
+| Palette contrast "AA / AAA verified" | Two muted-text values and two accent uses fail; corrected (6.6). |
+| Preset sample matches the current presets | It differs for `acoustic`, `karaoke_video`, `rehearsal`, `freeze` (6.4). |
+| Server on the venue network | The owner's server is remote (6.12); the offline table was redone. |
+
+### C.5 Claims not verified
+
+The plan's performance numbers (500 readers, 20 writes per second, 8 ms p99), asset sizes (CSS under 25 KB gzipped, guest JS under 15 KB, HTMX 14 KB, WaveSurfer 28 KB, sprite 8 KB, fonts 48 KB and 32 KB), and
+Lighthouse targets were not measured; they are carried only as proposed targets where stated.
