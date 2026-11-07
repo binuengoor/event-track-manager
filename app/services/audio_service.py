@@ -287,7 +287,7 @@ class AudioService:
 
         size_bytes = os.path.getsize(cache_path)
         duration_sec = None
-        media_type = "video" if cache_path.lower().endswith(".mp4") else "audio"
+        media_type = media_type_for(cache_path)
 
         try:
             from mutagen import File as MutagenFile

@@ -60,7 +60,19 @@ class PerformanceRepository(BaseRepository):
                 m = re.match(rf"{prefix}-(\d+)", r["entry_id"])
                 if m:
                     max_num = max(max_num, int(m.group(1)))
-            next_num = max_num + 1
+            # Never reuse an id: the high-water mark (kept in sync_meta) survives deleting the highest entry.
+            # First use backfills from the largest id currently in the table.
+            hw_key = "entry_id_high_water" if prefix == "PK" else f"entry_id_high_water_{prefix}"
+            hw_row = conn.execute("SELECT value FROM sync_meta WHERE key = ?", (hw_key,)).fetchone()
+            try:
+                high_water = int(hw_row["value"]) if hw_row else 0
+            except (TypeError, ValueError):
+                high_water = 0
+            next_num = max(max_num, high_water) + 1
+            conn.execute(
+                "INSERT INTO sync_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (hw_key, str(next_num)),
+            )
             entry_id = f"{prefix}-{next_num:03d}"
 
             seq_row = conn.execute("SELECT COALESCE(MAX(sequence_order), 0) + 1 AS next_seq FROM performances").fetchone()

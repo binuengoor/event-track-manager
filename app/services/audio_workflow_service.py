@@ -1,6 +1,7 @@
 import os
 import json
 import shutil
+import subprocess
 import logging
 import asyncio
 from typing import Optional, Dict, Any
@@ -26,6 +27,11 @@ logger = logging.getLogger("audio-workflow-service")
 
 class AudioWorkflowService:
     """Orchestrates track ingestion, validation, transcoding, and external synchronization."""
+
+    @staticmethod
+    def too_large_message(limit_bytes: int) -> str:
+        return (f"File exceeds maximum allowed size of {limit_bytes // (1024 * 1024)}MB. "
+                "Please compress or trim the file (for video, lower the resolution) and try again.")
 
     @staticmethod
     def max_upload_bytes(is_video: bool) -> int:
@@ -111,7 +117,7 @@ class AudioWorkflowService:
             if size > max_bytes:
                 if file_path and os.path.exists(file_path):
                     os.remove(file_path)
-                raise FileTooLargeError(f"File exceeds maximum allowed size of {max_bytes // (1024 * 1024)}MB")
+                raise FileTooLargeError(self.too_large_message(max_bytes))
 
             raw_upload_path = cache_path + ".upload"
             if file_path:
@@ -192,8 +198,45 @@ class AudioWorkflowService:
             "message": f"Successfully uploaded and queued '{canonical_filename}' for playback."
         }
 
+    def _ffprobe_duration(self, path: str) -> Optional[float]:
+        """Asks ffprobe for the real duration. Raises InvalidAudioError when there is no playable stream or the
+        duration is not positive. Returns None (after logging) when ffprobe is unavailable, so dev machines still work."""
+        if not shutil.which("ffprobe"):
+            logger.warning("ffprobe not found; skipping stream validation for %s", os.path.basename(path))
+            return None
+        try:
+            proc = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type",
+                 "-of", "json", path],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as ex:
+            logger.warning("ffprobe could not be run for %s: %s", os.path.basename(path), ex)
+            return None
+        if proc.returncode != 0:
+            raise InvalidAudioError("Invalid media file: it could not be read as audio or video. Please upload a standard MP3, M4A, WAV or MP4 file.")
+        try:
+            info = json.loads(proc.stdout or "{}")
+        except ValueError:
+            logger.warning("ffprobe returned unreadable output for %s", os.path.basename(path))
+            return None
+        if not any(s.get("codec_type") in ("audio", "video") for s in info.get("streams", [])):
+            raise InvalidAudioError("Invalid media file: no playable audio or video stream found.")
+        try:
+            duration = float((info.get("format") or {}).get("duration") or 0)
+        except (TypeError, ValueError):
+            duration = 0.0
+        if duration <= 0:
+            raise InvalidAudioError("Unplayable media file: its duration is 0 seconds or corrupted.")
+        return duration
+
     def _verify_audio(self, cache_path: str) -> str:
         """Verifies that the generated audio/video file is playable and returns its duration as mm:ss."""
+        try:
+            self._ffprobe_duration(cache_path)
+        except InvalidAudioError:
+            self._discard(cache_path)
+            raise
         try:
             from mutagen import File as MutagenFile
             audio = MutagenFile(cache_path)

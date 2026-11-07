@@ -124,6 +124,9 @@ Files are matched to acts by the **entry id** in the file name (the id shown in 
 | Pages look unstyled / no icons / no waveform at the venue | Browsers fetch Tailwind, icons and WaveSurfer from public CDNs and the network has no internet | Use a network with internet, or open `/console` once online first (it caches its own files); keep the offline USB ZIP as the fallback |
 | Forgot PIN | | Edit `ADMIN_PIN` in `.env`, `docker compose up -d` |
 | "Too many failed attempts" (HTTP 429) | Rate limit (8 per client / 100 overall per 5 min) | Wait 5 minutes, or `docker compose restart app` |
+| Readiness: "Last export failed" (error) | The last export or snapshot threw (disk full, folder permissions) | Free space or fix permissions, then **Export signups now**; readiness clears after a successful export |
+| Readiness: "Track files on disk" error, or "Database integrity" error | A listed track is missing from `tracks/`, or SQLite reports damage | Re-upload or copy the file back with its entry id in the name; for damage restore the latest snapshot from `backups/` |
+| Upload refused with "exceeds maximum allowed size" (413) | File over the per-file cap (or Cloudflare's 100 MB request limit before it reaches the app) | Compress or trim the file; the cap is `MAX_UPLOAD_SIZE_MB` (audio is allowed at least 200 MB, video 500 MB) |
 | Live screen frozen | Network on the display device | Reload `/live` |
 | Old audio plays in the console | Browser vault | Console **Clear Cache** then re-cache the track |
 

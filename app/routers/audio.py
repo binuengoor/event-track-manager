@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from app.services.event_service import event_service
 from app.services.audio_service import audio_service
+from app.services.track_store import mime_type_for
 from app.services.audio_workflow_service import audio_workflow_service
 from app.services.db_service import db_service
 from app.routers.auth import verify_operator_pin
@@ -53,7 +54,7 @@ async def upload_track(
                         break
                     written += len(chunk)
                     if written > limit:
-                        raise FileTooLargeError(f"File exceeds maximum allowed size of {limit // (1024 * 1024)}MB")
+                        raise FileTooLargeError(audio_workflow_service.too_large_message(limit))
                     out.write(chunk)
         return await audio_workflow_service.process_track_upload(
             entry_id=entry_id,
@@ -91,8 +92,7 @@ async def stream_audio(entry_id: str, request: Request, range: Optional[str] = H
         raise HTTPException(status_code=404, detail="No audio/video track available for this performance")
 
     file_size = os.path.getsize(cache_path)
-    is_video = cache_path.lower().endswith(".mp4")
-    content_type = "video/mp4" if is_video else "audio/mpeg"
+    content_type = mime_type_for(cache_path)
 
     no_cache_headers = {
         "Cache-Control": "no-cache, no-store, must-revalidate",
@@ -145,6 +145,4 @@ async def download_track(entry_id: str, _authorized: bool = Depends(verify_opera
     if not cache_path or not os.path.isfile(cache_path):
         raise HTTPException(status_code=404, detail="No audio/video track file available")
 
-    ext = os.path.splitext(cache_path)[1] or ".mp3"
-    media_type = "video/mp4" if ext.lower() == ".mp4" else "audio/mpeg"
-    return FileResponse(cache_path, media_type=media_type, filename=os.path.basename(cache_path))
+    return FileResponse(cache_path, media_type=mime_type_for(cache_path), filename=os.path.basename(cache_path))

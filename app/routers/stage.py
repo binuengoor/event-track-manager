@@ -4,6 +4,7 @@ import logging
 from typing import Optional, List, Dict, Any
 import asyncio
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.config import settings, get_setting
 from app.services.stage_service import stage_service
@@ -128,11 +129,18 @@ def get_track_info(entry_id: str):
     return meta
 
 
+def _entries_response(entries, request: Request) -> JSONResponse:
+    """Same shape for everyone except the private keys: admins get them, everyone else gets them absent (not blank).
+    Built here rather than by response_model, which would put the removed keys back as null/empty."""
+    from fastapi.encoders import jsonable_encoder
+    rows = jsonable_encoder([PerformanceEntry.model_validate(e).model_dump() for e in entries])
+    return JSONResponse(content=rows if is_admin(request) else strip_private(rows))
+
+
 @router.get("/api/performances", response_model=List[PerformanceEntry])
 def list_performances(request: Request):
     try:
-        entries = event_service.get_performances()
-        return entries if is_admin(request) else strip_private(entries)
+        return _entries_response(event_service.get_performances(), request)
     except Exception as e:
         logger.exception("Failed to fetch performances: %s", e)
         raise HTTPException(status_code=500, detail="Failed to read performances")
@@ -161,8 +169,7 @@ def sync_data(_authorized: bool = Depends(verify_operator_pin)):
 @router.get("/api/stage-queue", response_model=List[PerformanceEntry])
 def stage_queue(request: Request):
     try:
-        entries = event_service.get_stage_queue()
-        return entries if is_admin(request) else strip_private(entries)
+        return _entries_response(event_service.get_stage_queue(), request)
     except Exception as e:
         logger.exception("Failed to fetch stage queue: %s", e)
         raise HTTPException(status_code=500, detail="Failed to read queue")

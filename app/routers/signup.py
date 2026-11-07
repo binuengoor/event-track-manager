@@ -36,6 +36,61 @@ async def register_participant(payload: SignupRequest):
         raise HTTPException(status_code=400, detail=str(ex))
 
 
+# Public edit limits. Admin edits go through /api/admin/participants and are not constrained by these.
+PUBLIC_TRACK_STATUSES = ("Pending", "Acoustic")      # "Uploaded" is set only by the upload workflow
+FIELD_LIMITS = {
+    "song_title": 150, "movie_name": 150, "partner_name": 100, "partner_age_group": 50, "partner_phone": 40,
+    "age_group": 50, "guardian_name": 100, "guardian_phone": 40, "contact_info": 40, "stage_notes": 500,
+}
+
+
+def _allowed_performance_types() -> List[str]:
+    types = get_setting("performance_types")
+    if isinstance(types, str):
+        try:
+            types = json.loads(types)
+        except Exception:
+            types = [t.strip() for t in types.split(",") if t.strip()]
+    if not types:
+        types = settings.signup.performance_types
+    return [str(t) for t in types]
+
+
+def _canonical_type(value: str) -> str:
+    wanted = value.strip().lower()
+    return next((t for t in _allowed_performance_types() if t.strip().lower() == wanted), value.strip())
+
+
+def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str, Any]) -> None:
+    """Rejects values the public edit endpoint must never accept (400 with a plain-language reason)."""
+    if payload.track_status is not None and payload.track_status.strip() not in PUBLIC_TRACK_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Track status must be one of: {', '.join(PUBLIC_TRACK_STATUSES)}.")
+    if payload.performance_type is not None:
+        allowed = [t.strip().lower() for t in _allowed_performance_types()]
+        if payload.performance_type.strip().lower() not in allowed:
+            raise HTTPException(status_code=400, detail=f"Performance type must be one of: {', '.join(_allowed_performance_types())}.")
+    for field, limit in FIELD_LIMITS.items():
+        value = getattr(payload, field, None)
+        if isinstance(value, str) and len(value.strip()) > limit:
+            raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').capitalize()} is too long (max {limit} characters).")
+
+    ptype = _canonical_type(payload.performance_type) if payload.performance_type else (old_perf.get("performance_type") or "Solo")
+    if payload.performance_type and ptype.lower() != "solo" and not bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True))):
+        raise HTTPException(status_code=400, detail="Duet and group performances are currently disabled for this event (Solo only).")
+
+    # Re-check the duet partner rule whenever the edit touches the type or the partner.
+    if ptype.strip().capitalize() == "Duet" and (payload.performance_type or payload.partner_name is not None or payload.partner_phone is not None):
+        partner = (payload.partner_name if payload.partner_name is not None else old_perf.get("partner_name")) or ""
+        partner = partner.strip()
+        if not partner:
+            raise HTTPException(status_code=400, detail="Partner name is required for Duet performance.")
+        registered = {(p.get("performer_name") or "").strip().lower() for p in db_service.get_all_performances() if p.get("performer_name")}
+        if partner.lower() not in registered:
+            phone = (payload.partner_phone or "").strip() or (old_perf.get("partner_phone") or "").strip()
+            if not validate_phone(phone):
+                raise HTTPException(status_code=400, detail=f"A valid 10-digit phone number is required for partner '{partner}'.")
+
+
 @router.put("/api/signup/performance/{entry_id}")
 async def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
     if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
@@ -44,7 +99,12 @@ async def update_performance_song(entry_id: str, payload: PerformanceUpdateReque
             detail="Performer self-service editing is currently locked for this event."
         )
 
-    old_perf = db_service.get_performance(entry_id) or {}
+    old_perf = db_service.get_performance(entry_id)
+    if not old_perf:
+        raise HTTPException(status_code=404, detail=f"Performance entry {entry_id} not found")
+    _validate_public_edit(payload, old_perf)
+    if payload.performance_type:
+        payload.performance_type = _canonical_type(payload.performance_type)
     update_kwargs = {
         "song_title": payload.song_title,
         "movie_name": payload.movie_name,
