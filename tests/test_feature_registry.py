@@ -28,3 +28,16 @@ def test_guard_preserves_error_and_rejects_unknown_flags(monkeypatch):
     assert (error.value.status_code, error.value.detail) == (403, "unavailable")
     with pytest.raises(KeyError):
         features.feature_enabled("typo_enabled")
+
+
+def test_dataset_flags_follow_config_and_database_precedence(monkeypatch):
+    from app.repositories.settings_repo import SettingsRepository
+    from app.services.datasets import event_kind
+
+    monkeypatch.setattr(features.settings.signup, "stage_performances_enabled", False)
+    monkeypatch.setattr(features.settings.signup, "food_signup_enabled", False)
+    monkeypatch.setattr(SettingsRepository, "get_setting", lambda self, key: None)
+    assert event_kind() == {"stage": False, "potluck": False}
+
+    monkeypatch.setattr(SettingsRepository, "get_setting", lambda self, key: "true")
+    assert event_kind() == {"stage": True, "potluck": True}
