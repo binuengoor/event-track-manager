@@ -293,6 +293,20 @@ let snapshotUnavailable = false;
 const unsavedOfflineActions = new Map();
 let nextActionSequence = 0;
 const consoleIntentSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+let offlineAckChannel = null;
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    offlineAckChannel = new BroadcastChannel('event-track-manager-offline-ack');
+    offlineAckChannel.onmessage = event => {
+      const acknowledged = event.data;
+      if (acknowledged?.intent?.session === consoleIntentSession) {
+        actionReachedServer(acknowledged.type, acknowledged.entryId, acknowledged.intent);
+      }
+    };
+  }
+} catch (error) {
+  console.warn('Offline acknowledgments across tabs are unavailable:', error);
+}
 function actionKey(type, entryId) { return `${type}:${entryId || ''}`; }
 function beginAction(payload = {}) {
   return { sequence: ++nextActionSequence, value: JSON.stringify(payload) };
@@ -350,6 +364,12 @@ async function syncOfflineActions() {
     syncedCount = await drainOfflineQueue(getAuthHeaders, fetch, undefined, queued => {
       if (queued.intent?.session === consoleIntentSession) {
         actionReachedServer(queued.type, queued.entryId, queued.intent);
+      } else if (queued.intent?.session && offlineAckChannel) {
+        try {
+          offlineAckChannel.postMessage({type: queued.type, entryId: queued.entryId, intent: queued.intent});
+        } catch (error) {
+          console.warn('Could not notify another console tab:', error);
+        }
       }
     });
   } catch (error) {
