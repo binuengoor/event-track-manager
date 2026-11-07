@@ -1,6 +1,16 @@
 import { createStageMonitorSync, openStageMonitor } from "./console/stage-monitor-sync.js";
 import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions, appendSynchronized, drainSynchronized, appendOfflineAction, drainOfflineQueue, coordinatedOfflineQueueAvailable } from "./console/offline-actions.js";
-import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
+import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds, getAllCachedMeta } from "./console/vault-store.js";
+import { createTransport } from "./console/transport.js";
+import { selectAct, resolveCueNext, findNextEligible, isDoneItem } from "./console/deck-policy.js";
+import { createHoldConfirm, bindHoldButton } from "./console/hold-confirm.js";
+import { createFader, createGainStage, FADE_MS } from "./console/fade.js";
+import { createReorderLock, createIdlePusher, moveItem } from "./console/reorder.js";
+import { describeLoginFailure } from "./console/login.js";
+import { createScreens } from "./console/screens.js";
+import { createWakeLock } from "./console/wake-lock.js";
+import { sinkSupported, applySink, listOutputs, rememberedSink, rememberSink } from "./console/output-device.js";
+import { pillText, fetchManifest, runVaultSync, planVaultSync } from "./console/vault-sync.js";
 
 // EMA Paattukoottam Stage Playback Console
 let queue = [];
@@ -16,6 +26,14 @@ let draggedItemIndex = null;
 let autoSyncInterval = null;
 let isSequenceDirty = false;
 let lastSyncedAt = null;
+const transport = createTransport();
+let onDeckId = null;
+let gainStage = null;
+let vaultManifest = null;
+let vaultSyncRunning = false;
+let vaultSyncStarted = false;
+let vaultFailures = new Map();
+const reorderLock = createReorderLock();
 
 // =============================================================================
 // POP-OUT STAGE CONFIDENCE MONITOR (BroadcastChannel Sync)
@@ -26,6 +44,30 @@ const stageMonitor = createStageMonitorSync(() => ({
   isPlaying: typeof isAudioPlaying === 'function' ? isAudioPlaying() : false
 }));
 const broadcastStageMonitor = stageMonitor.broadcast;
+
+// Screens: announcement, fade to black and lyrics go to the stage monitor; LIVE_STATE and
+// ANNOUNCEMENT go to /live over etm-live. Both channels are optional.
+function openChannel(name) {
+  try { return (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel(name) : null; } catch (e) { return null; }
+}
+const monitorChannel = openChannel('stage_monitor_channel');
+const liveChannel = openChannel('etm-live');
+const screensState = { announcement: '', fadeBlack: false, lyrics: '' };
+const screens = createScreens({ monitorChannel, liveChannel, getHeaders: () => getAuthHeaders() });
+let relayTimer = null;
+function relayLiveSoon() {
+  clearTimeout(relayTimer);
+  relayTimer = setTimeout(() => { screens.relayLiveState(); }, 400);
+}
+if (monitorChannel) {
+  // A monitor opened late asks for state; replay the screen settings it cannot get from the cue.
+  monitorChannel.addEventListener('message', event => {
+    if (!event.data || event.data.type !== 'REQUEST_STATE') return;
+    monitorChannel.postMessage({ type: 'ANNOUNCEMENT', text: screensState.announcement });
+    monitorChannel.postMessage({ type: 'FADE_BLACK', on: screensState.fadeBlack });
+    if (screensState.lyrics) monitorChannel.postMessage({ type: 'LYRICS', text: screensState.lyrics });
+  });
+}
 
 function syncConsolePreviewVideo(play) {
   const previewVid = document.getElementById('console-preview-video');
@@ -139,19 +181,116 @@ async function updateVaultStatusDisplay() {
   cachedVaultEntryIds = await getVaultTrackIds();
   const vaultText = document.getElementById('vault-status-text');
   if (vaultText) {
-    const stats = await getVaultStats();
-    const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
-    const mb = (stats.totalBytes / (1024 * 1024)).toFixed(1);
-    if (readyTracks.length > 0) {
-      vaultText.textContent = `Vault: ${stats.count}/${readyTracks.length} Ready (${mb} MB)`;
+    const meta = await getAllCachedMeta();
+    let ready;
+    let total;
+    let bytes;
+    if (vaultManifest) {
+      const plan = planVaultSync(vaultManifest.tracks, meta);
+      ready = plan.ready.length;
+      total = plan.total;
+      bytes = meta.reduce((n, r) => n + (r.size_bytes || 0), 0);
     } else {
-      vaultText.textContent = `Vault: ${stats.count} Tracks (${mb} MB)`;
+      const readyTracks = queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded');
+      total = readyTracks.length;
+      ready = readyTracks.filter(it => cachedVaultEntryIds.has(it.entry_id)).length;
+      bytes = meta.reduce((n, r) => n + (r.size_bytes || 0), 0);
     }
+    vaultText.textContent = pillText({ ready, total, bytes });
   }
   updateRowCachePills();
+  renderVaultSheet();
+}
+
+// Vault sheet: per-act list, failures first so they can be retried.
+async function renderVaultSheet() {
+  const sheet = document.getElementById('vault-sheet');
+  if (!sheet || sheet.classList.contains('hidden')) return;
+  const list = document.getElementById('vault-sheet-list');
+  const summary = document.getElementById('vault-sheet-summary');
+  const meta = new Map((await getAllCachedMeta()).map(r => [r.entry_id, r]));
+  const entries = vaultManifest ? vaultManifest.tracks
+    : queue.filter(it => (it.track_status || '').toLowerCase() === 'uploaded').map(it => ({ entry_id: it.entry_id, size: 0 }));
+  const rows = entries.map(e => {
+    const item = queue.find(q => q.entry_id === e.entry_id) || {};
+    const rec = meta.get(e.entry_id);
+    const failed = vaultFailures.get(e.entry_id);
+    const state = failed ? 'failed' : (rec ? 'ready' : 'missing');
+    return { e, item, rec, state, failed };
+  }).sort((a, b) => ({ failed: 0, missing: 1, ready: 2 })[a.state] - ({ failed: 0, missing: 1, ready: 2 })[b.state]);
+  const readyCount = rows.filter(r => r.state === 'ready').length;
+  const bytes = [...meta.values()].reduce((n, r) => n + (r.size_bytes || 0), 0);
+  if (summary) summary.textContent = `${readyCount} of ${rows.length} acts ready, ${Math.round(bytes / (1024 * 1024))} MB`;
+  list.innerHTML = rows.length === 0 ? '<p class="p-4 text-slate-500">No ready acts yet.</p>' : rows.map(r => `
+    <div class="flex items-center justify-between gap-3 px-4 py-2.5" data-vault-row="${escapeHtml(r.e.entry_id)}">
+      <div class="min-w-0">
+        <p class="font-semibold text-white truncate">${escapeHtml(r.item.song_title || r.e.file || r.e.entry_id)}</p>
+        <p class="text-slate-400 truncate">${escapeHtml(r.item.performer_name || '')} &middot; ${escapeHtml(r.e.entry_id)}${r.e.kind === 'video' ? ' &middot; video' : ''}</p>
+        ${r.failed ? `<p class="text-rose-300">${escapeHtml(r.failed)}</p>` : ''}
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <span class="text-slate-400 font-mono">${r.rec ? (r.rec.size_bytes / (1024 * 1024)).toFixed(1) + ' MB' : ''}</span>
+        ${r.state === 'ready'
+          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Ready</span>'
+          : `<button type="button" class="vault-retry-btn px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700" data-entry-id="${escapeHtml(r.e.entry_id)}">${r.state === 'failed' ? 'Retry' : 'Cache'}</button>`}
+      </div>
+    </div>`).join('');
+  list.querySelectorAll('.vault-retry-btn').forEach(btn => btn.addEventListener('click', () => autoVaultSync(btn.dataset.entryId)));
+}
+
+// Auto-cache from the manifest. onlyId limits the run to one act (retry). A missing
+// manifest (404) leaves the manual "Cache all" flow in charge.
+async function autoVaultSync(onlyId = null) {
+  if (vaultSyncRunning || !userAdminPin || !navigator.onLine) return;
+  vaultManifest = await fetchManifest(fetch, getAuthHeaders) || vaultManifest;
+  if (!vaultManifest) { await updateVaultStatusDisplay(); return; }
+  vaultSyncRunning = true;
+  const pill = document.getElementById('vault-status-indicator');
+  try {
+    const tracks = onlyId ? vaultManifest.tracks.filter(t => t.entry_id === onlyId) : vaultManifest.tracks;
+    if (onlyId) vaultFailures.delete(onlyId);
+    const result = await runVaultSync({
+      tracks,
+      cachedMeta: await getAllCachedMeta(),
+      downloadTrack: async entry => {
+        const res = await fetch(`${entry.url || `/api/stream/${entry.entry_id}`}${(entry.url || '').includes('?') ? '&' : '?'}t=${Date.now()}`, { headers: getAuthHeaders() });
+        if (!res.ok) throw new Error(`server answered ${res.status}`);
+        return res.blob();
+      },
+      saveTrack: (entry, blob, sha256) => {
+        const item = queue.find(q => q.entry_id === entry.entry_id) || {};
+        return saveCachedTrack(entry.entry_id, blob, {
+          song_title: item.song_title, performer_name: item.performer_name, sequence_order: item.sequence_order,
+          drive_file_id: item.drive_file_id, last_updated: item.last_updated, kind: entry.kind, sha256,
+        });
+      },
+      onProgress: p => { if (pill) pill.title = `Caching ${p.done}/${p.of}${p.failed ? `, ${p.failed} failed` : ''}`; },
+    });
+    result.failed.forEach(f => vaultFailures.set(f.entry_id, f.reason));
+    if (result.failed.length) showToast(`${result.failed.length} act(s) could not be cached. Open the vault to retry.`, 'error');
+  } catch (err) {
+    console.warn('Vault sync failed:', err);
+  } finally {
+    vaultSyncRunning = false;
+    if (pill) pill.title = 'Open the vault: audio and video stored in this browser for offline playback';
+    await updateVaultStatusDisplay();
+  }
 }
 
 async function cacheAllTracksOffline() {
+  if (userAdminPin && navigator.onLine) {
+    const manifest = await fetchManifest(fetch, getAuthHeaders);
+    if (manifest) {
+      vaultManifest = manifest;
+      vaultFailures.clear();
+      const text = document.getElementById('cache-all-text');
+      if (text) text.textContent = 'Caching...';
+      await autoVaultSync();
+      if (text) text.textContent = 'Cache all';
+      showToast('Vault is up to date with the server.');
+      return;
+    }
+  }
   const btn = document.getElementById('cache-all-btn');
   const icon = document.getElementById('cache-all-icon');
   const text = document.getElementById('cache-all-text');
@@ -197,7 +336,7 @@ async function cacheAllTracksOffline() {
   await updateVaultStatusDisplay();
   if (btn) btn.disabled = false;
   if (icon) icon.classList.remove('animate-spin');
-  if (text) text.textContent = 'Cache All Offline';
+  if (text) text.textContent = 'Cache all';
 
   if (failedCount === 0) {
     showToast(`✓ All ${cachedCount} tracks stored in Vault! Ready for 100% offline playback.`);
@@ -400,6 +539,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupActionButtons();
   setupDisruptionModal();
   setupSearch();
+  setupConsoleUpgrades();
   fetchEventInfo();
 
   // Register Service Worker for offline app loading
@@ -414,6 +554,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateNetworkStatusDisplay();
     showToast('✓ Internet restored. Connected to server.', 'success');
     syncOfflineActions();
+    autoVaultSync();
   });
   window.addEventListener('offline', () => {
     updateNetworkStatusDisplay();
@@ -543,14 +684,21 @@ function setupAuth() {
         body: JSON.stringify({ pin })
       });
 
-      if (!res.ok) throw new Error('Incorrect PIN');
+      if (!res.ok) {
+        const failure = await describeLoginFailure(res);
+        errorMsg.textContent = failure.message;
+        errorMsg.classList.remove('hidden');
+        input.value = '';
+        input.focus();
+        return;
+      }
 
       userAdminPin = pin;
       localStorage.setItem('paattukoottam_pin', pin);
       hideAuthModal();
       await loadQueue();
     } catch (err) {
-      errorMsg.textContent = 'Invalid PIN. Please try again.';
+      errorMsg.textContent = 'Could not sign in. Check the connection and try again.';
       errorMsg.classList.remove('hidden');
       input.value = '';
       input.focus();
@@ -571,8 +719,14 @@ function hideAuthModal() {
 async function testAuthAndLoad() {
   try {
     const res = await fetch('/api/stage-queue', { headers: getAuthHeaders() });
-    if (res.status === 401) {
+    if (res.status === 401 || res.status === 429) {
       showAuthModal();
+      if (res.status === 429) {
+        const failure = await describeLoginFailure(res);
+        const errorMsg = document.getElementById('pin-error');
+        errorMsg.textContent = failure.message;
+        errorMsg.classList.remove('hidden');
+      }
     } else {
       hideAuthModal();
       await loadQueue();
@@ -639,6 +793,8 @@ async function loadQueue(silent = false) {
         liveData = await liveRes.json();
         lastSyncedAt = liveData.last_synced_at;
         setDirtyState(Boolean(liveData.is_dirty));
+        screens.relayStatus(liveData);
+        if (typeof liveData.announcement === 'string') adoptServerAnnouncement(liveData.announcement);
       }
     } catch (e) {
       console.warn("Could not check dirty status:", e);
@@ -647,6 +803,7 @@ async function loadQueue(silent = false) {
     updateSyncStatusBadge();
     applyFilter();
     updateVaultStatusDisplay();
+    if (!vaultSyncStarted) { vaultSyncStarted = true; autoVaultSync(); }
 
     // Auto-restore active / cued track on load if not already cued, or refresh current cued item
     if (currentCuedItem) {
@@ -674,10 +831,10 @@ async function loadQueue(silent = false) {
     }
 
     if (!silent) {
-      showToast(`Loaded ${total} performances from Event Database`);
+      showToast(`Loaded ${queue.length} performances from Event Database`);
     }
   } catch (err) {
-    syncText.textContent = navigator.onLine ? 'Sync Error' : 'Offline';
+    if (syncText) syncText.textContent = navigator.onLine ? 'Sync Error' : 'Offline';
     const savedQueue = localStorage.getItem('paattukoottam_cached_queue');
     if (savedQueue && (!queue || queue.length === 0)) {
       try {
@@ -753,6 +910,7 @@ function renderQueueList() {
   const container = document.getElementById('queue-container');
   if (filteredQueue.length === 0) {
     container.innerHTML = `<div class="p-8 text-center text-slate-500 text-sm">No performances match "${escapeHtml(searchQuery)}"</div>`;
+    renderOnDeck();
     return;
   }
 
@@ -768,10 +926,12 @@ function renderQueueList() {
     row.id = `queue-row-${item.entry_id}`;
     row.dataset.entryId = item.entry_id;
     row.dataset.index = index;
-    row.draggable = !searchQuery; // only allow drag-reorder when not in search filter
+    row.draggable = reorderLock.canDrag(searchQuery); // drag only when unlocked and not searching
     row.className = `p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition border-l-4 ${
       isCued
         ? 'cued-active bg-orange-500/10 border-orange-500'
+        : (onDeckTarget() && onDeckTarget().entry_id === item.entry_id)
+        ? 'ondeck-row bg-amber-500/5 border-amber-400'
         : isDone
         ? 'opacity-60 bg-slate-950/40 border-slate-700'
         : isSkipped
@@ -828,7 +988,7 @@ function renderQueueList() {
     row.innerHTML = `
       <div class="flex items-center gap-3">
         <!-- Drag Handle (hidden during search) -->
-        ${!searchQuery ? `
+        ${reorderLock.canDrag(searchQuery) ? `
         <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-300 transition shrink-0" title="Drag to re-order sequence">
           <i data-lucide="grip-vertical" class="w-4 h-4"></i>
         </div>
@@ -933,14 +1093,14 @@ function renderQueueList() {
     if (cueBtn) {
       cueBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        cueTrack(item, false);
+        selectRow(item);
       });
     }
 
     row.addEventListener('click', (e) => {
       if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('.btn-edit-note')) return;
       if (isUploaded || item.drive_file_id || isAcoustic) {
-        cueTrack(item, false);
+        selectRow(item);
       }
     });
 
@@ -966,7 +1126,8 @@ function renderQueueList() {
       });
     }
 
-    row.querySelector('.btn-done-row').addEventListener('click', () => {
+    const doneBtn = row.querySelector('.btn-done-row');
+    const runRowDone = () => {
       const action = () => {
         const nextStatus = isDone ? 'Upcoming' : 'Performed';
         updateStatus(item.entry_id, nextStatus).then(() => {
@@ -980,10 +1141,20 @@ function renderQueueList() {
       } else {
         action();
       }
-    });
+    };
+    if (isDone) {
+      doneBtn.addEventListener('click', runRowDone); // Undo stays a click
+    } else {
+      doneBtn.classList.add('hold-fill');
+      doneBtn.title = 'Hold for 1 second to mark as completed';
+      bindHoldButton(doneBtn, createHoldConfirm({
+        onProgress: p => doneBtn.style.setProperty('--hold', p),
+        onConfirm: runRowDone,
+      }));
+    }
 
     // Drag-and-drop sequencing listeners
-    if (!searchQuery) {
+    if (reorderLock.canDrag(searchQuery)) {
       row.addEventListener('dragstart', (e) => {
         draggedItemIndex = index;
         row.classList.add('drag-ghost');
@@ -1012,13 +1183,8 @@ function renderQueueList() {
         if (draggedItemIndex === null || draggedItemIndex === index) return;
 
         // Move item in queue array
-        const [movedItem] = queue.splice(draggedItemIndex, 1);
-        queue.splice(index, 0, movedItem);
-
-        // Recalculate sequence numbers
-        queue.forEach((it, i) => {
-          it.sequence_order = i + 1;
-        });
+        queue = moveItem(queue, draggedItemIndex, index);
+        draggedItemIndex = null;
 
         filteredQueue = [...queue];
         renderQueueList();
@@ -1031,6 +1197,7 @@ function renderQueueList() {
     container.appendChild(row);
   });
 
+  renderOnDeck();
   if (window.lucide) lucide.createIcons();
 }
 
@@ -1053,7 +1220,10 @@ async function saveReorderedSequence() {
     if (!res.ok) throw new Error('Failed to update stage queue');
     const data = await res.json();
     setDirtyState(true);
-    showToast('New order is live. Click "Save Order" to rename track files and update the export.', 'info');
+    idlePusher.touch();
+    persistQueueSnapshot();
+    relayLiveSoon();
+    showToast('Order saved. Track files are renamed in a few seconds, or press Save Order to do it now.', 'info');
   } catch (err) {
     showToast(`Sequence staging failed: ${err.message}`, 'error');
   }
@@ -1079,7 +1249,11 @@ function initWaveSurfer() {
 
     let lastBroadcastSyncTime = 0;
 
+    ensureGainStage();
+
     wavesurfer.on('play', () => {
+      if (gainStage) gainStage.resume();
+      transport.send('PLAY');
       isPlaying = true;
       updatePlayPauseButton();
       broadcastStageMonitor('PLAY');
@@ -1087,6 +1261,8 @@ function initWaveSurfer() {
     });
 
     wavesurfer.on('pause', () => {
+      if (fader.active) { fader.cancel(); setOutputLevel(1); } // pausing mid-fade keeps the act audible next time
+      transport.send('PAUSE');
       isPlaying = false;
       updatePlayPauseButton();
       broadcastStageMonitor('PAUSE');
@@ -1116,10 +1292,12 @@ function initWaveSurfer() {
     wavesurfer.on('ready', (duration) => {
       document.getElementById('player-duration').textContent = formatTime(duration);
       document.getElementById('waveform-placeholder').classList.add('hidden');
+      updateTransportUi();
       broadcastStageMonitor('CUE');
     });
 
     wavesurfer.on('finish', () => {
+      transport.send('FINISH');
       isPlaying = false;
       updatePlayPauseButton();
       broadcastStageMonitor('PAUSE');
@@ -1137,7 +1315,7 @@ function isAudioPlaying() {
       if (typeof wavesurfer.isPlaying === 'function' && wavesurfer.isPlaying()) return true;
     } catch (e) {}
   }
-  return Boolean(isPlaying);
+  return Boolean(isPlaying) || transport.isLive();
 }
 
 function toggleMute() {
@@ -1202,6 +1380,20 @@ function setupDisruptionModal() {
   const cancelBtn = document.getElementById('disruption-cancel-btn');
   const confirmBtn = document.getElementById('disruption-confirm-btn');
 
+  const fadeBtn = document.getElementById('disruption-fade-btn');
+  if (fadeBtn) {
+    fadeBtn.addEventListener('click', () => {
+      if (modal) modal.classList.add('hidden');
+      const cb = disruptionPendingCallback;
+      disruptionPendingCallback = null;
+      if (transport.state === 'PLAYING' || transport.state === 'FADING') {
+        fadeOut(() => { if (typeof cb === 'function') cb(); });
+      } else if (typeof cb === 'function') {
+        cb();
+      }
+    });
+  }
+
   if (cancelBtn) {
     cancelBtn.addEventListener('click', () => {
       if (modal) modal.classList.add('hidden');
@@ -1213,7 +1405,10 @@ function setupDisruptionModal() {
     confirmBtn.addEventListener('click', () => {
       if (modal) modal.classList.add('hidden');
       if (wavesurfer && isAudioPlaying()) {
+        fader.cancel();
+        setOutputLevel(1);
         try { wavesurfer.stop(); } catch (e) {}
+        transport.send('STOP');
         isPlaying = false;
         updatePlayPauseButton();
       }
@@ -1258,14 +1453,15 @@ function updatePlayerBarState() {
   if (markDoneBtn) {
     markDoneBtn.disabled = false;
     if (isCuedDone) {
-      markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
-      markDoneBtn.title = 'Undo completed status [Enter]';
+      markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.title = 'Undo completed status';
       markDoneBtn.innerHTML = '<i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Undo</span>';
     } else {
-      markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
-      markDoneBtn.title = 'Mark as Performed [Enter]';
+      markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.title = 'Hold to mark as performed (hold Enter)';
       markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
     }
+    markDoneBtn.style.setProperty('--hold', 0);
   }
 
   if (holdBtn) {
@@ -1286,6 +1482,9 @@ function updatePlayerBarState() {
 
 function resetPlayerBar() {
   currentCuedItem = null;
+  fader.cancel();
+  setOutputLevel(1);
+  transport.send('UNCUE');
   localStorage.removeItem('paattukoottam_cued_entry_id');
 
   if (currentCuedObjectUrl) {
@@ -1316,8 +1515,8 @@ function resetPlayerBar() {
   if (playBtn) playBtn.disabled = true;
   if (markDoneBtn) {
     markDoneBtn.disabled = true;
-    markDoneBtn.className = 'px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
-    markDoneBtn.title = 'Mark as Performed [Enter]';
+    markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+    markDoneBtn.title = 'Hold to mark as performed (hold Enter)';
     markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
   }
   if (holdBtn) {
@@ -1359,6 +1558,8 @@ function resetPlayerBar() {
   if (playerBadge) playerBadge.classList.remove('hidden');
 
   broadcastStageMonitor('UNCUE');
+  updateTransportUi();
+  relayLiveSoon();
 
   renderQueueList();
 }
@@ -1396,6 +1597,7 @@ async function uncueTrack() {
       });
       if (!res.ok) throw new Error('Failed to uncue track on server');
       actionReachedServer('uncue', null, action);
+      relayLiveSoon();
       showToast(`✓ Uncued "${songName}". Live Program restored to countdown.`);
     } catch (err) {
       if (!await enqueueOfflineAction('uncue', null, {}, action)) return;
@@ -1411,6 +1613,8 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
   }
 
   const applyCue = async () => {
+    if (onDeckId === item.entry_id) onDeckId = null;
+    transport.send('CUE');
     currentCuedItem = item;
     localStorage.setItem('paattukoottam_cued_entry_id', item.entry_id);
 
@@ -1638,6 +1842,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     isPlaying = false;
     updatePlayPauseButton();
+    updateTransportUi();
     renderQueueList();
     broadcastStageMonitor('CUE');
 
@@ -1651,6 +1856,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
           });
           if (!response.ok) throw new Error('Failed to set active act');
           actionReachedServer('set_active', item.entry_id, action);
+          relayLiveSoon();
         } catch (error) {
           await enqueueOfflineAction('set_active', item.entry_id, {}, action);
         }
@@ -1680,46 +1886,117 @@ function updatePlayPauseButton() {
 
 function togglePlayPause() {
   if (!currentCuedItem || !wavesurfer) return;
+  if (gainStage) gainStage.resume();
   wavesurfer.playPause();
 }
 
-function isEligibleForStage(item) {
-  const ptype = (item.performance_type || '').toLowerCase();
-  if (ptype.includes('acoustic') || ptype.includes('live')) return true;
-  if (ptype.includes('group')) return true;
-  if (item.track_status === 'Uploaded' || item.drive_file_id) return true;
-  return false;
+function cueNextTrack(autoPlay = false) {
+  const next = resolveCueNext({ queue, currentId: currentCuedItem ? currentCuedItem.entry_id : null, onDeckId });
+  if (next) cueTrack(next, autoPlay);
 }
 
-function cueNextTrack(autoPlay = false) {
-  if (queue.length === 0) return;
+// Row click or row Cue: never touches the deck or audio while sound is live.
+function selectRow(item) {
+  const result = selectAct({
+    transport, item, currentId: currentCuedItem ? currentCuedItem.entry_id : null,
+    loadAct: it => cueTrack(it, false),
+    setOnDeck: it => { onDeckId = it.entry_id; renderQueueList(); showToast(`On deck: ${it.song_title}`, 'info'); },
+  });
+  return result;
+}
 
-  let currentIndex = -1;
-  if (currentCuedItem) {
-    currentIndex = queue.findIndex(q => q.entry_id === currentCuedItem.entry_id);
+function onDeckTarget() {
+  if (!currentCuedItem && !onDeckId) return null;
+  return resolveCueNext({ queue, currentId: currentCuedItem ? currentCuedItem.entry_id : null, onDeckId });
+}
+
+function renderOnDeck() {
+  const strip = document.getElementById('on-deck-strip');
+  if (!strip) return;
+  const target = onDeckTarget();
+  if (!target) { strip.classList.add('hidden'); return; }
+  strip.classList.remove('hidden');
+  const who = target.partner_name ? `${target.performer_name} & ${target.partner_name}` : target.performer_name;
+  document.getElementById('on-deck-text').textContent = ` ${String(target.sequence_order || 0).padStart(2, '0')} \u00b7 ${target.song_title} \u00b7 ${who}`;
+  const note = (target.stage_notes || '').trim();
+  document.getElementById('on-deck-note').textContent = note ? ` \u00b7 Note: ${note}` : '';
+}
+
+function handleCueNext() {
+  confirmIfPlaying('Cueing the on-deck act', () => cueNextTrack(false));
+}
+
+// Fade through the gain stage, then stop. afterDone runs once the fade has finished.
+let fadeAfterDone = null;
+function setOutputLevel(v) {
+  if (gainStage) gainStage.setGain(v);
+  else if (wavesurfer && typeof wavesurfer.setVolume === 'function') { try { wavesurfer.setVolume(v); } catch (e) {} }
+}
+const fader = createFader({
+  duration: FADE_MS,
+  setLevel: v => setOutputLevel(v),
+  onDone: () => {
+    transport.send('FADE_DONE');
+    try { wavesurfer.stop(); } catch (e) {}
+    setOutputLevel(1);
+    isPlaying = false;
+    updatePlayPauseButton();
+    updateTransportUi();
+    const cb = fadeAfterDone;
+    fadeAfterDone = null;
+    if (typeof cb === 'function') cb();
+  },
+});
+function fadeOut(afterDone = null) {
+  if (transport.state !== 'PLAYING' || !wavesurfer) return false;
+  fadeAfterDone = afterDone;
+  transport.send('FADE_START');
+  fader.start(1);
+  updateTransportUi();
+  return true;
+}
+
+function ensureGainStage() {
+  if (gainStage || !wavesurfer || typeof wavesurfer.getMediaElement !== 'function') return;
+  gainStage = createGainStage(wavesurfer.getMediaElement());
+  setupOutputDevice();
+}
+
+async function setupOutputDevice() {
+  const wrap = document.getElementById('output-device-wrap');
+  const select = document.getElementById('output-device-select');
+  const element = wavesurfer && wavesurfer.getMediaElement ? wavesurfer.getMediaElement() : null;
+  if (!wrap || !select || !sinkSupported(element, gainStage)) return;
+  const outputs = await listOutputs();
+  if (outputs.length === 0) return;
+  select.innerHTML = '<option value="">System default</option>' + outputs.map(o => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.label)}</option>`).join('');
+  const saved = rememberedSink();
+  if (saved && outputs.some(o => o.id === saved)) {
+    select.value = saved;
+    applySink(saved, element, gainStage).catch(() => {});
   }
-
-  for (let i = currentIndex + 1; i < queue.length; i++) {
-    const item = queue[i];
-    const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
-    const isSkipped = item.performance_status === 'On Hold' || item.track_status === 'Skipped';
-    if (!isDone && !isSkipped && isEligibleForStage(item)) {
-      cueTrack(item, autoPlay);
-      return;
+  wrap.classList.remove('hidden');
+  wrap.classList.add('flex');
+  select.addEventListener('change', async () => {
+    try {
+      await applySink(select.value, element, gainStage);
+      rememberSink(select.value);
+      showToast('Output device changed');
+    } catch (err) {
+      showToast(`Could not use that output: ${err.message}`, 'error');
     }
-  }
+  });
+}
 
-  if (currentIndex > 0) {
-    for (let i = 0; i < currentIndex; i++) {
-      const item = queue[i];
-      const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
-      const isSkipped = item.performance_status === 'On Hold' || item.track_status === 'Skipped';
-      if (!isDone && !isSkipped && isEligibleForStage(item)) {
-        cueTrack(item, autoPlay);
-        return;
-      }
-    }
+function updateTransportUi() {
+  const fadeBtn = document.getElementById('btn-fade');
+  if (fadeBtn) {
+    fadeBtn.disabled = transport.state !== 'PLAYING';
+    const label = fadeBtn.querySelector('span');
+    if (label) label.firstChild.textContent = transport.state === 'FADING' ? 'Fading... ' : 'Fade out ';
   }
+  const playBtn = document.getElementById('btn-play-pause');
+  if (playBtn && currentCuedItem && currentCuedItem.track_status !== 'Acoustic') playBtn.disabled = transport.state === 'FADING';
 }
 
 async function updateStatus(entryId, newStatus) {
@@ -1765,6 +2042,7 @@ async function updateStatus(entryId, newStatus) {
 
     if (!res.ok) throw new Error('Status update failed');
     actionReachedServer('update_status', entryId, action);
+    try { relayLiveSoon(); } catch (relayError) { /* relay is best effort and must never turn a saved change into an offline one */ }
     showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${normalizedPerfStatus}`);
   } catch (err) {
     if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus }, action)) return;
@@ -1832,7 +2110,8 @@ function updatePlayerBarNotes(notes) {
 
 function setupKeyboardHotkeys() {
   window.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (!document.getElementById('auth-modal').classList.contains('hidden')) return;
 
     if (e.code === 'Space') {
@@ -1849,25 +2128,12 @@ function setupKeyboardHotkeys() {
       handleMuteClick();
     } else if (e.code === 'ArrowDown') {
       e.preventDefault();
-      confirmIfPlaying('Skipping to next track', () => {
-        cueNextTrack(false);
-      });
-    } else if (e.code === 'Enter') {
+      handleCueNext();
+    } else if (e.code === 'KeyF') {
       e.preventDefault();
-      if (currentCuedItem) {
-        const isCuedDone = currentCuedItem.performance_status === 'Performed' || currentCuedItem.track_status === 'Performed';
-        const promptMsg = isCuedDone ? 'Restoring track as upcoming' : 'Marking current track as completed';
-        confirmIfPlaying(promptMsg, async () => {
-          const nextStatus = isCuedDone ? 'Upcoming' : 'Performed';
-          await updateStatus(currentCuedItem.entry_id, nextStatus);
-          if (nextStatus === 'Performed') {
-            cueNextTrack(false);
-          } else {
-            updatePlayerBarState();
-          }
-        });
-      }
+      fadeOut();
     }
+    // No bare Enter hotkey: Done is hold-to-confirm on its own button.
   });
 }
 
@@ -1887,27 +2153,32 @@ function setupActionButtons() {
     muteBtn.addEventListener('click', handleMuteClick);
   }
 
-  document.getElementById('btn-cue-next').addEventListener('click', () => {
-    confirmIfPlaying('Cueing next track', () => {
-      cueNextTrack(false);
-    });
-  });
+  document.getElementById('btn-cue-next').addEventListener('click', handleCueNext);
+  document.getElementById('btn-ondeck-cue').addEventListener('click', handleCueNext);
+  document.getElementById('btn-fade').addEventListener('click', () => fadeOut());
 
-  document.getElementById('btn-mark-done').addEventListener('click', async () => {
-    if (currentCuedItem) {
-      const isCuedDone = currentCuedItem.performance_status === 'Performed' || currentCuedItem.track_status === 'Performed';
-      const promptMsg = isCuedDone ? 'Restoring track as upcoming' : 'Marking track as completed';
-      confirmIfPlaying(promptMsg, async () => {
-        const nextStatus = isCuedDone ? 'Upcoming' : 'Performed';
-        await updateStatus(currentCuedItem.entry_id, nextStatus);
-        if (nextStatus === 'Performed') {
-          cueNextTrack(false);
-        } else {
-          updatePlayerBarState();
-        }
-      });
-    }
-  });
+  // Done is press-and-hold (about 1 s). Undo, shown once the act is done, stays a click.
+  const markDoneBtn = document.getElementById('btn-mark-done');
+  const cuedIsDone = () => isDoneItem(currentCuedItem);
+  const runMarkDone = () => {
+    if (!currentCuedItem) return;
+    const isCuedDone = cuedIsDone();
+    const promptMsg = isCuedDone ? 'Restoring track as upcoming' : 'Marking track as completed';
+    confirmIfPlaying(promptMsg, async () => {
+      const nextStatus = isCuedDone ? 'Upcoming' : 'Performed';
+      await updateStatus(currentCuedItem.entry_id, nextStatus);
+      if (nextStatus === 'Performed') {
+        cueNextTrack(false);
+      } else {
+        updatePlayerBarState();
+      }
+    });
+  };
+  bindHoldButton(markDoneBtn, createHoldConfirm({
+    onProgress: p => markDoneBtn.style.setProperty('--hold', p),
+    onConfirm: () => { if (currentCuedItem && !cuedIsDone()) runMarkDone(); },
+  }), { enabled: () => Boolean(currentCuedItem) && !cuedIsDone() });
+  markDoneBtn.addEventListener('click', () => { if (currentCuedItem && cuedIsDone()) runMarkDone(); });
 
   document.getElementById('btn-hold-skip').addEventListener('click', async () => {
     if (currentCuedItem) {
@@ -2027,19 +2298,130 @@ function setupActionButtons() {
   if (openStageMonitorBtn) {
     openStageMonitorBtn.addEventListener('click', openStageMonitor);
   }
+}
 
-  const btnStageMonitorPlayer = document.getElementById('btn-stage-monitor-player');
-  if (btnStageMonitorPlayer) {
-    btnStageMonitorPlayer.addEventListener('click', openStageMonitor);
+// =============================================================================
+// REORDER LOCK, SCREENS, VAULT SHEET, WAKE LOCK
+// =============================================================================
+async function pushSequenceQuiet() {
+  if (!isSequenceDirty || !navigator.onLine) return;
+  try {
+    const res = await fetch('/api/push-sequence', { method: 'POST', headers: getAuthHeaders() });
+    if (!res.ok) throw new Error('Failed to save the order');
+    const data = await res.json();
+    lastSyncedAt = data.last_synced_at;
+    setDirtyState(false);
+    relayLiveSoon();
+    showToast(`✓ Order saved for ${data.synced_count} acts. Track files renamed and export updated.`);
+  } catch (err) {
+    showToast(`Order is saved, but file renames did not run: ${err.message}. Press Save Order to retry.`, 'error');
+  }
+}
+const idlePusher = createIdlePusher({ push: pushSequenceQuiet });
+
+function updateReorderLockUi() {
+  const btn = document.getElementById('reorder-lock-btn');
+  if (!btn) return;
+  const locked = reorderLock.locked;
+  btn.setAttribute('aria-pressed', String(!locked));
+  document.getElementById('reorder-lock-text').textContent = locked ? 'Order locked · Unlock' : 'Order unlocked · Lock';
+  document.getElementById('reorder-lock-icon').setAttribute('data-lucide', locked ? 'lock' : 'lock-open');
+  btn.title = locked ? 'Unlock to drag rows into a new running order' : 'Lock the running order (saves pending changes)';
+  btn.className = `px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition ${locked
+    ? 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
+    : 'bg-amber-500/15 border-amber-500/50 text-amber-200 hover:bg-amber-500/25'}`;
+  if (window.lucide) lucide.createIcons();
+}
+
+function adoptServerAnnouncement(text) {
+  const input = document.getElementById('announcement-input');
+  screensState.announcement = text;
+  if (input && document.activeElement !== input && !input.dataset.dirty) input.value = text;
+  const state = document.getElementById('announcement-state');
+  if (state) state.textContent = text ? 'Currently showing.' : '';
+}
+
+function openSheet(id) {
+  const sheet = document.getElementById(id);
+  if (!sheet) return;
+  sheet.classList.remove('hidden');
+  const first = sheet.querySelector('button, input, textarea');
+  if (first) first.focus();
+  if (id === 'vault-sheet') renderVaultSheet();
+  if (window.lucide) lucide.createIcons();
+}
+function closeSheet(id) {
+  const sheet = document.getElementById(id);
+  if (sheet) sheet.classList.add('hidden');
+}
+
+function setupConsoleUpgrades() {
+  // Reorder lock
+  const lockBtn = document.getElementById('reorder-lock-btn');
+  if (lockBtn) {
+    lockBtn.addEventListener('click', () => {
+      reorderLock.toggle();
+      if (reorderLock.locked) idlePusher.flush();
+      updateReorderLockUi();
+      renderQueueList();
+    });
+    updateReorderLockUi();
   }
 
-  const playerVideoPreview = document.getElementById('player-video-preview');
-  if (playerVideoPreview) {
-    playerVideoPreview.addEventListener('click', openStageMonitor);
+  // Announcement (inline)
+  const annInput = document.getElementById('announcement-input');
+  const sendAnnouncement = async (text) => {
+    const out = await screens.sendAnnouncement(text);
+    screensState.announcement = out.text;
+    if (annInput) { annInput.value = out.text; delete annInput.dataset.dirty; }
+    const state = document.getElementById('announcement-state');
+    if (state) state.textContent = out.text ? (out.persisted ? 'Sent to all screens.' : 'Sent to screens in this browser only (could not reach the server).') : 'Cleared.';
+    if (!out.persisted) showToast('Announcement was not saved on the server.', 'warning');
+  };
+  if (annInput) annInput.addEventListener('input', () => { annInput.dataset.dirty = '1'; });
+  const annSend = document.getElementById('announcement-send-btn');
+  if (annSend) annSend.addEventListener('click', () => sendAnnouncement(annInput ? annInput.value : ''));
+  const annClear = document.getElementById('announcement-clear-btn');
+  if (annClear) annClear.addEventListener('click', () => sendAnnouncement(''));
+  if (annInput) annInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); sendAnnouncement(annInput.value); } });
+
+  // Screens sheet
+  const screensBtn = document.getElementById('open-screens-btn');
+  if (screensBtn) screensBtn.addEventListener('click', () => openSheet('screens-sheet'));
+  const screensClose = document.getElementById('screens-sheet-close');
+  if (screensClose) screensClose.addEventListener('click', () => closeSheet('screens-sheet'));
+  const fadeBlack = document.getElementById('fade-black-toggle');
+  if (fadeBlack) {
+    fadeBlack.addEventListener('click', () => {
+      screensState.fadeBlack = !screensState.fadeBlack;
+      screens.setFadeBlack(screensState.fadeBlack);
+      fadeBlack.textContent = screensState.fadeBlack ? 'On' : 'Off';
+      fadeBlack.setAttribute('aria-checked', String(screensState.fadeBlack));
+    });
   }
+  const lyricsInput = document.getElementById('lyrics-input');
+  const lyricsSend = document.getElementById('lyrics-send-btn');
+  if (lyricsSend && lyricsInput) lyricsSend.addEventListener('click', () => { screensState.lyrics = lyricsInput.value; screens.sendLyrics(lyricsInput.value); });
+  const lyricsClear = document.getElementById('lyrics-clear-btn');
+  if (lyricsClear && lyricsInput) lyricsClear.addEventListener('click', () => { lyricsInput.value = ''; screensState.lyrics = ''; screens.sendLyrics(''); });
+
+  // Vault sheet
+  const vaultChip = document.getElementById('vault-status-indicator');
+  if (vaultChip) vaultChip.addEventListener('click', () => openSheet('vault-sheet'));
+  const vaultClose = document.getElementById('vault-sheet-close');
+  if (vaultClose) vaultClose.addEventListener('click', () => closeSheet('vault-sheet'));
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeSheet('vault-sheet'); closeSheet('screens-sheet'); }
+  });
+
+  // Screen wake lock; the first tap also unlocks audio output in browsers that start suspended.
+  const wake = createWakeLock();
+  wake.enable();
+  document.addEventListener('pointerdown', () => { wake.enable(); if (gainStage) gainStage.resume(); }, { once: false });
 }
 
 async function handleSyncButtonClick() {
+  idlePusher.cancel();
   const refreshBtn = document.getElementById('refresh-queue-btn');
   const icon = document.getElementById('refresh-icon');
   refreshBtn.classList.add('opacity-50', 'pointer-events-none');
@@ -2071,6 +2453,7 @@ async function handleSyncButtonClick() {
   }
 
   await loadQueue(false);
+  autoVaultSync();
   refreshBtn.classList.remove('opacity-50', 'pointer-events-none');
   if (icon) icon.classList.remove('animate-spin');
 }

@@ -24,10 +24,24 @@
     .drag-over {
       border-top: 2px solid #f97316 !important;
     }
+    /* Touch targets: at least 40px for header controls, vault chips, player and row buttons. */
+    #console-subheader button, #console-subheader a, #console-subheader select, #console-subheader .tt40,
+    header nav a, #player-bar button, #queue-container button, .sheet button, .tt40 {
+      min-height: 40px;
+      min-width: 40px;
+    }
+    /* Hold-to-confirm progress fill driven by --hold (0..1). */
+    .hold-fill {
+      background-image: linear-gradient(to right, rgba(52,211,153,0.55) calc(var(--hold, 0) * 100%), transparent calc(var(--hold, 0) * 100%));
+      touch-action: none;
+      user-select: none;
+    }
+    .ondeck-row { border-left-color: #fbbf24 !important; }
+    .sheet-backdrop { background: rgba(2,6,23,0.8); }
   </style>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-36">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-52">
 
   <!-- Floating Toast Notification -->
   <div id="toast" class="fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs pointer-events-none">
@@ -43,11 +57,11 @@
       </div>
       <div>
         <h2 class="text-xl font-bold text-white">Stage Sound Console</h2>
-        <p class="text-xs text-slate-400 mt-1">Enter sound coordinator PIN to access playback console</p>
+        <p class="text-xs text-slate-400 mt-1">Enter the Admin PIN to open the sound console</p>
       </div>
       <form id="pin-form" class="space-y-4">
-        <input type="password" id="pin-input" maxlength="10" placeholder="Enter PIN" class="w-full text-center text-2xl tracking-widest font-mono py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-        <p id="pin-error" class="hidden text-xs text-rose-400"></p>
+        <input type="password" id="pin-input" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" class="w-full text-center text-2xl tracking-widest font-mono py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <p id="pin-error" role="alert" class="hidden text-xs text-rose-400"></p>
         <button type="submit" class="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition">
           Unlock Console
         </button>
@@ -70,6 +84,9 @@
       <div class="flex items-center gap-3 pt-2">
         <button id="disruption-cancel-btn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
           Keep Playing
+        </button>
+        <button id="disruption-fade-btn" class="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 transition">
+          Fade out first
         </button>
         <button id="disruption-confirm-btn" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition">
           Stop & Proceed
@@ -158,8 +175,8 @@
   </div>
 
   <div id="console-active-content" class="flex-1 flex flex-col">
-  <!-- Dedicated Sub-Header: Database Single Source of Truth, Mirror Status & Action Controls -->
-  <div class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
+  <!-- Dedicated Sub-Header: vault, connection, screens and sync controls -->
+  <div id="console-subheader" class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
     <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
       <div class="flex items-center gap-2.5 text-xs flex-wrap">
         <!-- Connection Status Indicator (Online / Offline Mode) -->
@@ -168,34 +185,29 @@
           <span id="network-status-text">Online</span>
         </div>
 
-        <!-- IndexedDB Offline Audio Vault Status -->
-        <div id="vault-status-indicator" class="flex items-center gap-1.5 text-xs text-cyan-400 font-medium px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20" title="Audio tracks stored in browser IndexedDB for 100% offline playback">
+        <!-- Vault chip: opens the vault sheet -->
+        <button id="vault-status-indicator" type="button" class="flex items-center gap-1.5 text-xs text-cyan-400 font-medium px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition" title="Open the vault: audio and video stored in this browser for offline playback">
           <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span id="vault-status-text">Vault: 0 Tracks</span>
-        </div>
+          <span id="vault-status-text">Vault 0/0 ready, 0 MB</span>
+        </button>
 
         <span id="stats-summary" class="text-xs text-slate-400 ml-1">Loading stage queue...</span>
       </div>
 
-      <div class="flex items-center gap-2">
-        <button id="cache-all-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition active:scale-95" title="Pre-download and store all ready audio tracks into local browser IndexedDB for offline playback">
-          <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400" id="cache-all-icon"></i>
-          <span id="cache-all-text">Cache All Offline</span>
-        </button>
-
-        <button id="clear-vault-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition active:scale-95" title="Clear all locally cached audio tracks from this browser">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          <span>Clear Cache</span>
-        </button>
+      <div class="flex items-center gap-2 flex-wrap">
+        <label id="output-device-wrap" class="hidden items-center gap-1.5 text-xs text-slate-400" title="Send playback to this output (for example the audio interface)">
+          <i data-lucide="speaker" class="w-3.5 h-3.5 text-slate-400"></i>
+          <select id="output-device-select" class="bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 px-2"></select>
+        </label>
 
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
           <i data-lucide="archive" class="w-3.5 h-3.5"></i>
           <span>Offline ZIP</span>
         </button>
 
-        <button id="open-stage-monitor-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 transition active:scale-95 shadow-sm" title="Launch Pop-out Stage Confidence Monitor on second screen / projector">
+        <button id="open-screens-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 transition active:scale-95 shadow-sm" title="Announcement, fade to black, lyrics and the stage monitor">
           <i data-lucide="tv" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Stage Monitor</span>
+          <span>Screens</span>
         </button>
 
         <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Event Database">
@@ -219,13 +231,24 @@
         </button>
       </div>
 
-      <!-- Quick Info / Mode Badge -->
+      <!-- Reorder lock -->
       <div class="flex items-center gap-2 text-xs text-slate-400 shrink-0">
-        <span class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 flex items-center gap-1.5">
-          <i data-lucide="move" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Drag rows to re-order sequence</span>
-        </span>
+        <button id="reorder-lock-btn" type="button" aria-pressed="false" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 hover:bg-slate-800 transition" title="Unlock to drag rows into a new running order">
+          <i data-lucide="lock" class="w-3.5 h-3.5 text-orange-400" id="reorder-lock-icon"></i>
+          <span id="reorder-lock-text">Order locked &middot; Unlock</span>
+        </button>
       </div>
+    </div>
+
+    <!-- Announcement: event-wide, shown on every public screen until cleared -->
+    <div class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
+      <label for="announcement-input" class="block text-[11px] font-bold tracking-wide text-slate-400">ANNOUNCEMENT &middot; ALL SCREENS, ALL ACTS</label>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input id="announcement-input" type="text" maxlength="140" placeholder="For example: Dinner starts after act 12." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        <button id="announcement-send-btn" type="button" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition">Send to screen</button>
+        <button id="announcement-clear-btn" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">Clear</button>
+      </div>
+      <p class="text-[11px] text-slate-500">Shows on the live screen and stage monitor across all acts until you clear it. <span id="announcement-state" class="text-amber-300"></span></p>
     </div>
 
     <!-- Unsynced Staged Changes Banner (Shows when the new order has not been saved to track file names and exports yet) -->
@@ -267,6 +290,16 @@
   <div id="player-bar" class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 shadow-2xl p-3 sm:p-4">
     <div class="max-w-6xl mx-auto flex flex-col gap-2.5">
 
+      <!-- On deck: the next act. Picking a row while playing only sets this. -->
+      <div id="on-deck-strip" class="hidden flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl bg-amber-950/30 border border-amber-500/30">
+        <div class="min-w-0 text-xs">
+          <span class="font-bold text-amber-300 tracking-wide">ON DECK</span>
+          <span id="on-deck-text" class="text-slate-200 truncate"></span>
+          <span id="on-deck-note" class="text-amber-300/80 truncate"></span>
+        </div>
+        <button id="btn-ondeck-cue" type="button" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shrink-0" title="Cue the on-deck act [Down]">Cue next &darr;</button>
+      </div>
+
       <!-- Top Row: Track details, controls, quick actions -->
       <div class="flex flex-col md:flex-row items-center justify-between gap-3">
         
@@ -276,7 +309,7 @@
             <i data-lucide="music-2" class="w-5 h-5" id="player-badge-icon"></i>
           </div>
           <!-- Mini Video Preview Tile (shown when cued track is video) -->
-          <div id="player-video-preview" class="hidden relative w-16 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-purple-500/50 cursor-pointer shadow group" title="Video Track with Lyrics - Click to pop out Stage Monitor">
+          <div id="player-video-preview" class="hidden relative w-16 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-purple-500/50 cursor-pointer shadow group" title="Video act preview (the stage monitor opens from Screens)">
             <video id="console-preview-video" class="w-full h-full object-contain" muted playsinline></video>
             <div class="absolute bottom-0 inset-x-0 bg-purple-950/80 text-[8px] text-center text-purple-300 font-mono">STAGE</div>
           </div>
@@ -311,6 +344,9 @@
           <button id="btn-mute" class="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition" title="Mute / Unmute Audio [M]">
             <i data-lucide="volume-2" id="mute-icon" class="w-4 h-4"></i>
           </button>
+          <button id="btn-fade" class="px-2.5 py-2 text-amber-300 hover:text-amber-200 rounded-lg hover:bg-slate-800 transition text-xs font-semibold flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none" disabled title="Fade out over 3 seconds, then stop [F]">
+            <i data-lucide="trending-down" class="w-4 h-4"></i><span>Fade out <kbd class="text-[10px] text-slate-500">F</kbd></span>
+          </button>
           <button id="btn-cue-next" class="p-2 text-slate-400 hover:text-orange-400 rounded-lg hover:bg-slate-800 transition ml-1" title="Cue Next Sequenced Track [↓]">
             <i data-lucide="skip-forward" class="w-4 h-4"></i>
           </button>
@@ -323,17 +359,13 @@
             <i data-lucide="download" class="w-4 h-4 text-orange-400"></i>
             <span class="hidden sm:inline">Download</span>
           </a>
-          <button id="btn-mark-done" class="px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Mark as Performed [Enter]">
+          <button id="btn-mark-done" class="hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Hold to mark as performed (hold Enter)">
             <i data-lucide="check-check" class="w-4 h-4"></i>
             <span>Done</span>
           </button>
           <button id="btn-hold-skip" class="px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="No-Show / Put On Hold">
             <i data-lucide="pause-circle" class="w-4 h-4"></i>
             <span>Hold</span>
-          </button>
-          <button id="btn-stage-monitor-player" class="px-3 py-2 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 hover:text-purple-200 font-semibold text-xs border border-purple-500/40 flex items-center gap-1.5 transition" title="Pop out Stage Confidence Monitor on second screen">
-            <i data-lucide="tv" class="w-4 h-4 text-purple-400"></i>
-            <span class="hidden sm:inline">Stage</span>
           </button>
           <button id="btn-uncue" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-rose-200 font-semibold text-xs border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Uncue Track & Return to Queue">
             <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
@@ -358,6 +390,59 @@
     </div>
   </div>
   </div><!-- /#console-active-content -->
+
+  <!-- Vault sheet -->
+  <div id="vault-sheet" class="sheet hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sheet-backdrop p-4" role="dialog" aria-modal="true" aria-labelledby="vault-sheet-title">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between gap-3">
+        <div>
+          <h3 id="vault-sheet-title" class="text-base font-bold text-white">Vault</h3>
+          <p id="vault-sheet-summary" class="text-xs text-slate-400"></p>
+        </div>
+        <button id="vault-sheet-close" type="button" class="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 border border-slate-700">Close</button>
+      </div>
+      <div class="p-3 flex items-center gap-2 flex-wrap border-b border-slate-800">
+        <button id="cache-all-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition active:scale-95" title="Download every ready act into this browser for offline playback">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400" id="cache-all-icon"></i>
+          <span id="cache-all-text">Cache all</span>
+        </button>
+        <button id="clear-vault-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition active:scale-95" title="Remove every cached file from this browser">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Clear cache</span>
+        </button>
+      </div>
+      <div id="vault-sheet-list" class="overflow-y-auto divide-y divide-slate-800/60 text-xs"></div>
+      <p class="p-3 text-[11px] text-slate-500">Cached files live in this browser only. Renumbering the order does not invalidate them.</p>
+    </div>
+  </div>
+
+  <!-- Screens sheet -->
+  <div id="screens-sheet" class="sheet hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sheet-backdrop p-4" role="dialog" aria-modal="true" aria-labelledby="screens-sheet-title">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-5 space-y-5">
+      <div class="flex items-center justify-between gap-3">
+        <h3 id="screens-sheet-title" class="text-base font-bold text-white">Screens</h3>
+        <button id="screens-sheet-close" type="button" class="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 border border-slate-700">Close</button>
+      </div>
+      <button id="open-stage-monitor-btn" type="button" class="w-full flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 border border-purple-500/40 transition">
+        <i data-lucide="tv" class="w-4 h-4 text-purple-400"></i><span>Open stage monitor</span>
+      </button>
+      <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
+        <div>
+          <p class="text-sm font-semibold text-white">Fade stage monitor to black</p>
+          <p class="text-[11px] text-slate-500">Blacks out the confidence monitor until you turn it off.</p>
+        </div>
+        <button id="fade-black-toggle" type="button" role="switch" aria-checked="false" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition">Off</button>
+      </div>
+      <div class="space-y-2">
+        <label for="lyrics-input" class="block text-[11px] font-bold tracking-wide text-slate-400">LYRICS &middot; STAGE MONITOR</label>
+        <textarea id="lyrics-input" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Paste lyrics to show on the stage monitor"></textarea>
+        <div class="flex gap-2">
+          <button id="lyrics-send-btn" type="button" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition">Send lyrics</button>
+          <button id="lyrics-clear-btn" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Footer -->
   <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">

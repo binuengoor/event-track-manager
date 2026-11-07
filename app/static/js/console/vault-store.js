@@ -85,3 +85,21 @@ export async function getVaultTrackIds() {
   });
 }
 
+
+// Metadata for every cached track, without the blobs.
+export async function getAllCachedMeta() {
+  const db = await getVaultDb();
+  if (!db) return [];
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(VAULT_STORE_NAME, 'readonly');
+      const req = tx.objectStore(VAULT_STORE_NAME).getAll();
+      req.onsuccess = () => resolve((req.result || []).map(({blob, ...meta}) => ({
+        ...meta, size_bytes: meta.size_bytes || (blob ? blob.size : 0),
+      })));
+      req.onerror = () => resolve([]);
+    } catch (e) {
+      resolve([]);
+    }
+  });
+}
