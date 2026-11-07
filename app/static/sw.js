@@ -1,7 +1,7 @@
 // Service Worker for EMA Paattukoottam Stage Console
 // Enables offline loading of the console UI shell and assets.
 
-const CACHE_NAME = 'paattukoottam-console-v2';
+const CACHE_NAME = 'paattukoottam-console-v3';
 
 const SHELL_URLS = [
   '/console',
@@ -58,8 +58,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // HTML Navigation request for /console
-  if (request.mode === 'navigate' || url.pathname === '/console') {
+  // The console alone has an offline HTML shell. Other navigations use the
+  // network directly; they must never receive a stale page or the console.
+  if (request.mode === 'navigate' && url.pathname !== '/console') return;
+
+  if (request.mode === 'navigate' && url.pathname === '/console') {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -76,7 +79,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Static assets (CSS, JS, icons, vendored libs): Network-first with cache fallback
+  // Only same-origin static assets may use this cache; never cache HTML, JSON,
+  // event data or cross-origin responses from other pages.
+  if (url.origin !== self.location.origin || !url.pathname.startsWith('/static/') ||
+      /\.(?:html?|json)$/i.test(url.pathname)) return;
+
+  // Static assets: network first, then cache.
   event.respondWith(
     fetch(request)
       .then((response) => {
