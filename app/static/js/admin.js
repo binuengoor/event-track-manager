@@ -1,3 +1,4 @@
+import { getOfflineActions, saveOfflineActions, replayOfflineActions } from "./console/offline-actions.js";
 import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
 
 // EMA Paattukoottam Stage Playback Console
@@ -287,22 +288,6 @@ async function clearVaultStorage() {
 // =============================================================================
 // OFFLINE ACTIONS & NETWORK RECOVERY SYNC
 // =============================================================================
-const OFFLINE_QUEUE_KEY = 'paattukoottam_offline_actions';
-
-function getOfflineActions() {
-  try {
-    return JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]');
-  } catch (e) {
-    return [];
-  }
-}
-
-function saveOfflineActions(actions) {
-  try {
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(actions));
-  } catch (e) {}
-}
-
 function enqueueOfflineAction(type, entryId, payload = {}) {
   const actions = getOfflineActions();
   actions.push({
@@ -324,47 +309,7 @@ async function syncOfflineActions() {
   }
 
   showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
-  const remaining = [];
-
-  for (const act of actions) {
-    try {
-      let res;
-      if (act.type === 'update_status') {
-        res = await fetch(`/api/status/${act.entryId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-          body: JSON.stringify(act.payload)
-        });
-      } else if (act.type === 'stage_notes') {
-        res = await fetch(`/api/performance-notes/${act.entryId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-          body: JSON.stringify(act.payload)
-        });
-      } else if (act.type === 'set_active') {
-        res = await fetch(`/api/set-active/${act.entryId}`, {
-          method: 'POST',
-          headers: getAuthHeaders()
-        });
-      } else if (act.type === 'uncue') {
-        res = await fetch('/api/clear-active', {
-          method: 'POST',
-          headers: getAuthHeaders()
-        });
-      } else if (act.type === 'reorder') {
-        res = await fetch('/api/reorder-queue', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-          body: JSON.stringify(act.payload)
-        });
-      }
-      if (!res || !res.ok) {
-        remaining.push(act);
-      }
-    } catch (err) {
-      remaining.push(act);
-    }
-  }
+  const remaining = await replayOfflineActions(actions, getAuthHeaders);
 
   saveOfflineActions(remaining);
   updateNetworkStatusDisplay();
