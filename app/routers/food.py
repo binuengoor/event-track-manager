@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Depends
 
 from app.config import settings, get_setting
+from app.features import require_feature
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.routers.auth import verify_admin_pin
@@ -31,9 +32,7 @@ router = APIRouter(tags=["food"])
 
 @router.post("/api/signup/food")
 async def claim_food_item_endpoint(payload: FoodClaimRequest):
-    food_enabled = bool(get_setting("food_signup_enabled", settings.signup.food_signup_enabled))
-    if not food_enabled:
-        raise HTTPException(status_code=400, detail="Food sign-up is currently disabled.")
+    require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
 
     if not payload.signer_name.strip():
         raise HTTPException(status_code=400, detail="Signer name is required.")

@@ -4,6 +4,7 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException
 
 from app.config import settings, get_setting
+from app.features import feature_enabled, require_feature
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.schemas import (
@@ -75,7 +76,7 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
             raise HTTPException(status_code=400, detail=f"{field.replace('_', ' ').capitalize()} is too long (max {limit} characters).")
 
     ptype = _canonical_type(payload.performance_type) if payload.performance_type else (old_perf.get("performance_type") or "Solo")
-    if payload.performance_type and ptype.lower() != "solo" and not bool(get_setting("allow_duets", getattr(settings.signup, "allow_duets", True))):
+    if payload.performance_type and ptype.lower() != "solo" and not feature_enabled("allow_duets"):
         raise HTTPException(status_code=400, detail="Duet and group performances are currently disabled for this event (Solo only).")
 
     # Re-check the duet partner rule whenever the edit touches the type or the partner.
@@ -93,11 +94,7 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
 
 @router.put("/api/signup/performance/{entry_id}")
 async def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
-    if not bool(get_setting("performer_edits_enabled", getattr(settings.signup, "performer_edits_enabled", True))):
-        raise HTTPException(
-            status_code=400,
-            detail="Performer self-service editing is currently locked for this event."
-        )
+    require_feature("performer_edits_enabled", "Performer self-service editing is currently locked for this event.")
 
     old_perf = db_service.get_performance(entry_id)
     if not old_perf:
