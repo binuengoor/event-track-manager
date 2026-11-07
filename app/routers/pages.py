@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.config import settings, get_setting
+from app.guest_navigation import render_guest_navigation
 
 router = APIRouter(tags=["pages"])
 
@@ -19,6 +20,7 @@ async def serve_landing_page():
         landing_path = os.path.join(STATIC_DIR, "index.html")
     with open(landing_path, "r", encoding="utf-8") as f:
         html = f.read()
+    html = render_guest_navigation(html, "/")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -35,6 +37,7 @@ async def serve_signup_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/signup.js', f'/static/js/signup.js?v={version}')
 
+    html = render_guest_navigation(html, "/signup")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -49,6 +52,7 @@ async def serve_performer_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
 
+    html = render_guest_navigation(html, "/performer")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -75,6 +79,7 @@ async def serve_dashboard_page():
     dash_path = os.path.join(STATIC_DIR, "dashboard.html")
     with open(dash_path, "r", encoding="utf-8") as f:
         html = f.read()
+    html = render_guest_navigation(html, "/dashboard")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -140,6 +145,7 @@ async def serve_live_page():
     with open(live_path, "r", encoding="utf-8") as f:
         html = f.read()
 
+    html = render_guest_navigation(html, "/live")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
