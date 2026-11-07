@@ -1,4 +1,4 @@
-import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions, appendSynchronized, drainSynchronized } from "./console/offline-actions.js";
+import { getOfflineActions, saveOfflineActions, replayOfflineActions, drainOfflineActions, appendSynchronized, drainSynchronized, appendOfflineAction, drainOfflineQueue, coordinatedOfflineQueueAvailable } from "./console/offline-actions.js";
 import { VAULT_STORE_NAME, getVaultDb, getCachedTrack, saveCachedTrack, getVaultTrackIds } from "./console/vault-store.js";
 
 // EMA Paattukoottam Stage Playback Console
@@ -288,13 +288,27 @@ async function clearVaultStorage() {
 // =============================================================================
 // OFFLINE ACTIONS & NETWORK RECOVERY SYNC
 // =============================================================================
+let offlineSaveFailure = false;
+function persistQueueSnapshot() {
+  try {
+    localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+    return true;
+  } catch (error) {
+    offlineSaveFailure = true;
+    updateNetworkStatusDisplay();
+    showToast(`Change is local only and was not saved for sync: ${error.message}`, 'error');
+    return false;
+  }
+}
 async function enqueueOfflineAction(type, entryId, payload = {}) {
   try {
-    await appendSynchronized({type, entryId, payload, timestamp: Date.now()});
+    await appendOfflineAction({type, entryId, payload, timestamp: Date.now()});
     updateNetworkStatusDisplay();
     return true;
   } catch (error) {
-    showToast(`Could not save action for offline sync: ${error.message}`, 'error');
+    offlineSaveFailure = true;
+    updateNetworkStatusDisplay();
+    showToast(`Change is local only and was not saved for sync: ${error.message}`, 'error');
     return false;
   }
 }
@@ -310,7 +324,7 @@ async function syncOfflineActions() {
   showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
   let syncedCount;
   try {
-    syncedCount = await drainSynchronized(getAuthHeaders);
+    syncedCount = await drainOfflineQueue(getAuthHeaders);
   } catch (error) {
     showToast(`Could not sync offline actions: ${error.message}`, 'error');
     return;
@@ -331,18 +345,24 @@ function updateNetworkStatusDisplay() {
   const isOnline = navigator.onLine;
   const offlineCount = getOfflineActions().length;
 
+  if (offlineSaveFailure) {
+    dot.className = 'w-2 h-2 rounded-full bg-rose-500';
+    text.textContent = 'Unsaved local change — not queued for sync';
+    if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-rose-400 font-medium px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20';
+    return;
+  }
   if (isOnline) {
     dot.className = 'w-2 h-2 rounded-full bg-emerald-500';
     if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20';
     if (offlineCount > 0) {
-      text.textContent = `Online (${offlineCount} syncing...)`;
+      text.textContent = `Online (${offlineCount} syncing...)${coordinatedOfflineQueueAvailable() ? '' : ' · use one console tab'}`;
     } else {
       text.textContent = 'Online';
     }
   } else {
     dot.className = 'w-2 h-2 rounded-full bg-amber-500 animate-pulse';
     if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-amber-400 font-medium px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20';
-    text.textContent = `Offline Mode${offlineCount > 0 ? ` (${offlineCount} pending)` : ''}`;
+    text.textContent = `Offline Mode${offlineCount > 0 ? ` (${offlineCount} pending)` : ''}${coordinatedOfflineQueueAvailable() ? '' : ' · use one console tab'}`;
   }
 }
 
@@ -1691,7 +1711,7 @@ async function updateStatus(entryId, newStatus) {
   }
   updateQueueStatsSummary();
   applyFilter();
-  localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+  if (!persistQueueSnapshot()) return;
 
   if (!navigator.onLine) {
     if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
@@ -1727,7 +1747,7 @@ async function updateStageNotes(entryId, notes) {
   }
 
   renderQueueList();
-  localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+  if (!persistQueueSnapshot()) return;
 
   if (!navigator.onLine) {
     if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;

@@ -52,3 +52,39 @@ test('unsupported locking fails safely without changing or sending queued action
   await assert.rejects(tab.drainSynchronized(()=>({}), async()=>{throw Error('must not send');}), /Web Locks/);
   assert.deepEqual(tab.getOfflineActions(), [action]);
 });
+
+test('HTTP without Web Locks keeps single-tab offline queue usable', async () => {
+  const values = new Map();
+  global.localStorage = {getItem:k=>values.get(k), setItem:(k,v)=>values.set(k,v)};
+  Object.defineProperty(globalThis, 'navigator', {value:{}, configurable:true});
+  const tab = await import(url+'#lan-http');
+  const action = {type:'uncue',entryId:null,payload:{}};
+  assert.equal(tab.coordinatedOfflineQueueAvailable(), false);
+  await tab.appendOfflineAction(action);
+  assert.deepEqual(tab.getOfflineActions(), [action]);
+  assert.equal(await tab.drainOfflineQueue(()=>({}), async()=>({ok:true}), 50), 1);
+  assert.deepEqual(tab.getOfflineActions(), []);
+});
+
+test('hung fetch times out, retains head, and releases cross-tab replay lock', async () => {
+  const values = new Map();
+  global.localStorage = {getItem:k=>values.get(k), setItem:(k,v)=>values.set(k,v)};
+  Object.defineProperty(globalThis, 'navigator', {value:{locks:fakeLocks()}, configurable:true});
+  const a = await import(url+'#hung1');
+  const b = await import(url+'#hung2');
+  const action = {type:'uncue',entryId:null,payload:{}};
+  await a.appendOfflineAction(action);
+  let aborted = false;
+  assert.equal(await a.drainOfflineQueue(()=>({}), (url,opts)=>new Promise(()=>{opts.signal.addEventListener('abort',()=>{aborted=true;});}), 20), 0);
+  assert.equal(aborted,true);
+  assert.deepEqual(a.getOfflineActions(),[action]);
+  assert.equal(await b.drainOfflineQueue(()=>({}), async()=>({ok:true}), 100),1);
+  assert.deepEqual(b.getOfflineActions(),[]);
+});
+
+test('queue storage failure propagates so the UI can show unsaved status', async () => {
+  global.localStorage = {getItem:()=>null,setItem:()=>{throw Error('storage full');}};
+  Object.defineProperty(globalThis, 'navigator', {value:{}, configurable:true});
+  const tab = await import(url+'#full');
+  await assert.rejects(tab.appendOfflineAction({type:'uncue'}),/storage full/);
+});

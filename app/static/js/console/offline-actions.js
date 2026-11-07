@@ -132,3 +132,45 @@ export async function drainSynchronized(getHeaders, fetchRequest = fetch) {
     }
   });
 }
+
+const REPLAY_TIMEOUT_MS = 15000;
+export function coordinatedOfflineQueueAvailable() {
+  return typeof globalThis.navigator?.locks?.request === 'function';
+}
+
+// Web Locks are unavailable on some HTTP LAN deployments. The fallback keeps
+// the existing single-tab queue working; it cannot coordinate separate tabs.
+export async function appendOfflineAction(action) {
+  if (coordinatedOfflineQueueAvailable()) return appendSynchronized(action);
+  const queue = getOfflineActions();
+  if (!Array.isArray(queue)) throw new Error('Offline queue is invalid.');
+  queue.push(action);
+  localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+}
+
+export function boundedReplayFetch(fetchRequest, timeoutMs = REPLAY_TIMEOUT_MS) {
+  return async (url, options) => {
+    const controller = new AbortController();
+    let timer;
+    try {
+      return await Promise.race([
+        fetchRequest(url, {...options, signal: controller.signal}),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            reject(new Error('Offline action replay timed out'));
+          }, timeoutMs);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+}
+
+export async function drainOfflineQueue(getHeaders, fetchRequest = fetch, timeoutMs = REPLAY_TIMEOUT_MS) {
+  const boundedFetch = boundedReplayFetch(fetchRequest, timeoutMs);
+  return coordinatedOfflineQueueAvailable()
+    ? drainSynchronized(getHeaders, boundedFetch)
+    : drainOfflineActions(getHeaders, boundedFetch);
+}
