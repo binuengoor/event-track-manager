@@ -5,739 +5,189 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
-  <meta name="view-transition" content="same-origin">
   <title>Live Stage Program - EMA Paattukoottam</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
   <script src="/static/vendor/lucide.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
-<link rel="stylesheet" href="/static/css/app.css?v=1">
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-16 relative">
+  <link rel="stylesheet" href="/static/css/app.css?v=1">
+  <style>
+    :root, html, body { background-color: #000; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: #f1f5f9; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 24px; line-height: 1.3; }
+    .hidden { display: none !important; }
+    :focus-visible { outline: 3px solid #f06449; outline-offset: 2px; }
+    /* Every visible string on this screen is at least 24px; long names wrap, never truncate. */
+    .tv-wrap { overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
+    .tv-clamp2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .muted { color: #94a3b8; }
+    .orange { color: #fb923c; }
+    .amber { color: #fbbf24; }
 
-  <!-- Dynamic Ambient Aurora Fluid Light Effect -->
+    #announcement { position: relative; z-index: 20; width: 100%; padding: 14px 32px; background: #f59e0b; color: #1a1205; font-size: 32px; font-weight: 800; text-align: center; }
+    header.top { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; border-bottom: 1px solid #1e293b; background: rgba(15, 23, 42, .6); }
+    header.top h1 { margin: 0; font-size: 32px; font-weight: 800; }
+    header.top .sub { margin: 0; color: #fb923c; font-weight: 600; font-size: 24px; }
+    .chip { display: inline-flex; align-items: center; gap: 10px; padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: 24px; border: 1px solid #334155; }
+    .chip .dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
+    .chip.live { color: #fb7185; border-color: rgba(244, 63, 94, .4); background: rgba(244, 63, 94, .1); }
+    .chip.wait { color: #fbbf24; border-color: rgba(245, 158, 11, .4); background: rgba(245, 158, 11, .1); }
+    .chip.ended { color: #34d399; border-color: rgba(52, 211, 153, .4); background: rgba(52, 211, 153, .1); }
+
+    main { position: relative; z-index: 5; flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 24px; }
+    .label { font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #fb923c; margin: 0 0 8px; font-size: 24px; }
+    .card { border-radius: 28px; padding: 28px 32px; background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(124, 45, 18, .35)); border: 3px solid rgba(249, 115, 22, .55); }
+    .card.wait { border-color: rgba(245, 158, 11, .55); background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(120, 53, 15, .4)); text-align: center; }
+    .card.end { border-color: rgba(52, 211, 153, .5); background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(6, 78, 59, .4)); text-align: center; padding: 48px 32px; }
+    .seq { display: inline-block; padding: 4px 16px; border-radius: 14px; background: #f97316; color: #fff; font-family: ui-monospace, monospace; font-weight: 800; font-size: 28px; }
+    .pill { display: inline-block; margin-left: 12px; padding: 4px 16px; border-radius: 999px; font-weight: 700; font-size: 24px; background: rgba(14, 165, 233, .2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, .4); }
+    .now-name { margin: 12px 0 4px; font-size: 64px; font-weight: 900; line-height: 1.1; }
+    .now-song { margin: 0; font-size: 36px; font-weight: 600; color: #fb923c; }
+    .cd-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 760px; margin: 24px auto 0; }
+    .cd-tile { padding: 14px 8px; border-radius: 20px; background: rgba(2, 6, 23, .85); border: 1px solid rgba(245, 158, 11, .3); }
+    .cd-num { display: block; font-family: ui-monospace, monospace; font-weight: 900; font-size: 56px; }
+    .cd-lbl { display: block; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 24px; }
+    h2.big { margin: 0 0 8px; font-size: 48px; font-weight: 900; }
+    p.lead { margin: 8px 0 0; font-size: 28px; }
+
+    .next-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+    @media (min-width: 1000px) { .next-grid { grid-template-columns: 1fr 1fr; } }
+    .next-card { padding: 18px 24px; border-radius: 22px; background: rgba(15, 23, 42, .9); border: 2px solid rgba(245, 158, 11, .35); min-width: 0; }
+    .next-card .tag { color: #fbbf24; font-weight: 800; text-transform: uppercase; font-size: 24px; }
+    .next-card .nm { margin: 4px 0; font-size: 36px; font-weight: 800; }
+    .next-card .sg { margin: 0; color: #fb923c; font-size: 28px; }
+    .qrow { display: flex; gap: 18px; align-items: flex-start; padding: 14px 24px; border-top: 1px solid rgba(30, 41, 59, .8); min-width: 0; }
+    .qrow:first-child { border-top: 0; }
+    .qrow .n { flex: 0 0 auto; min-width: 72px; text-align: center; padding: 2px 8px; border-radius: 12px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; font-family: ui-monospace, monospace; font-weight: 800; font-size: 24px; }
+    .qrow .body { flex: 1; min-width: 0; }
+    .qrow .nm { font-weight: 800; font-size: 28px; }
+    .qrow .sg { color: #fb923c; font-size: 24px; }
+    .qrow .ty { flex: 0 0 auto; color: #94a3b8; font-size: 24px; font-weight: 700; }
+    .panel { border: 1px solid #1e293b; border-radius: 22px; background: rgba(15, 23, 42, .6); overflow: hidden; }
+    .row-between { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .done-btn { width: 100%; text-align: left; padding: 14px 24px; border-radius: 18px; background: rgba(15, 23, 42, .5); border: 1px solid #1e293b; color: #cbd5e1; font: inherit; font-weight: 700; cursor: pointer; }
+    .done-list .qrow { opacity: .65; }
+    .done-list .nm { text-decoration: line-through; }
+
+    #hero-gallery { border-radius: 28px; background: rgba(15, 23, 42, .9); border: 3px solid #1e293b; padding: 16px; height: 340px; display: flex; align-items: center; justify-content: center; position: relative; }
+    #carousel-img { max-width: 94%; max-height: 94%; object-fit: contain; border-radius: 16px; transition: opacity .5s; opacity: 0; }
+    .hero-grid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: stretch; }
+    .hero-grid.with-gallery { grid-template-columns: 2fr 1fr; }
+    @media (max-width: 1000px) { .hero-grid.with-gallery { grid-template-columns: 1fr; } }
+
+    footer.bottom { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding: 16px 32px; border-top: 1px solid #1e293b; background: rgba(15, 23, 42, .6); }
+    #signup-qr { width: 120px; height: 120px; border-radius: 10px; overflow: hidden; background: #fff; flex: 0 0 auto; }
+    #signup-qr svg { display: block; width: 100%; height: 100%; }
+    .qr-wrap { display: flex; align-items: center; gap: 18px; }
+    #refresh-data-btn { padding: 10px 22px; border-radius: 14px; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; font: inherit; font-weight: 700; cursor: pointer; }
+    #refresh-data-btn[disabled] { opacity: .6; }
+  </style>
+</head>
+<body>
   <aurora-background></aurora-background>
 
-  <!-- Header with Live Status Pulse -->
-  <header class="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-30 shadow-lg">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/" class="flex items-center gap-3 group">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
-          <i data-lucide="music" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <h1 id="live-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
-          <p id="live-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
-        </div>
-      </a>
+  <!-- Full-width announcement strip (event-wide; empty means hidden) -->
+  <div id="announcement" class="hidden" role="status" aria-live="polite"></div>
 
-      <!-- Navigation Bar -->
-      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <a href="/" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Home">
-          <i data-lucide="home" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Home</span>
-        </a>
-        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>Sign Up</span>
-        </a>
-        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
-          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Performer</span>
-        </a>
-        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-rose-600 text-white shadow-md shadow-rose-600/30 transition" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-white"></i>
-          <span>Live Program</span>
-        </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Console</span>
-        </a>
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Admin</span>
-        </a>
-      </nav>
+  <header class="top">
+    <div>
+      <h1 id="live-event-title">EMA Paattukoottam</h1>
+      <p id="live-event-subtitle" class="sub">Musical Night</p>
     </div>
+    <!-- Required by the page shell; the venue screen has no navigation, so it stays empty. -->
+    <nav aria-label="Main" class="hidden"></nav>
+    <span id="live-badge" class="chip wait"><span class="dot"></span><span id="live-badge-text">COUNTDOWN</span></span>
   </header>
-  <script src="/static/js/nav.js"></script>
 
-  <!-- Main Container -->
-  <main class="flex-1 max-w-5xl lg:max-w-6xl w-full mx-auto px-4 py-6 space-y-6">
-
-    <!-- INACTIVE LIVE DISPLAY NOTICE (When live_display_enabled is False) -->
-    <div id="live-inactive-card" class="hidden p-8 sm:p-12 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-4 max-w-lg mx-auto my-8">
-      <div class="w-14 h-14 rounded-3xl bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
-        <i data-lucide="radio" class="w-7 h-7"></i>
-      </div>
-      <div>
-        <h3 class="text-lg font-bold text-white">Live Stage Display Inactive</h3>
-        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
-          The audience live stage display is currently inactive for this event. Please check back during scheduled stage hours or contact the organizers.
-        </p>
-      </div>
-      <div class="pt-2">
-        <a href="/" class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
-          <i data-lucide="home" class="w-3.5 h-3.5"></i>
-          <span>Return Home</span>
-        </a>
-      </div>
+  <main>
+    <!-- OFF -->
+    <div id="live-inactive-card" class="hidden card wait" style="max-width: 900px; margin: 48px auto;">
+      <h2 class="big">Live stage display is off</h2>
+      <p class="lead muted">The live program is not switched on for this event. Please check with the organizers.</p>
     </div>
 
-    <div id="live-active-content" class="space-y-6">
+    <!-- ENDED -->
+    <div id="ended-card" class="hidden card end">
+      <p class="label" style="color:#34d399">The show has ended</p>
+      <h2 class="big" id="ended-title">Thank you for coming</h2>
+      <p class="lead" id="ended-count">One great night.</p>
+      <p class="lead muted">Thank you to our performers, sponsors and volunteers. See you next year.</p>
+    </div>
 
-    <!-- Section 1: COUNTDOWN (Pre-Show) or NOW ON STAGE (Live) -->
-    <div class="space-y-2">
-      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <span id="section-status-label" class="font-semibold uppercase tracking-wider text-orange-400 flex items-center gap-1.5">
-          <i data-lucide="radio" class="w-4 h-4 text-orange-400"></i>
-          <span id="section-status-text">Now on Stage</span>
-        </span>
-        <span id="live-sync-timestamp" class="font-mono text-[11px]">Syncing live...</span>
-      </div>
-
-      <!-- Hero Section Grid (Adaptive: full width by default, 70/30 split when gallery images exist) -->
-      <div id="hero-section-grid" class="grid grid-cols-1 gap-4 items-stretch">
-        
-        <!-- Main Column (Countdown Card OR Now Performing Card) -->
-        <div id="hero-main-column" class="w-full">
-          <!-- Pre-Show Countdown Card -->
-          <div id="countdown-card" class="hidden relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border-2 border-amber-500/50 shadow-2xl shadow-amber-500/10 h-full flex flex-col justify-center">
-            <div class="absolute -right-8 -bottom-8 opacity-10 text-white pointer-events-none">
-              <i data-lucide="clock" class="w-64 h-64"></i>
-            </div>
-
-            <div class="relative z-10 space-y-5 text-center">
-              <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold uppercase tracking-wider">
-                <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                <span>Stage Countdown</span>
+    <div id="live-active-content" style="display:flex; flex-direction:column; gap:24px;">
+      <section>
+        <div class="row-between">
+          <p class="label"><span id="section-status-text">Now on Stage</span></p>
+          <span id="live-sync-timestamp" class="muted">Syncing live...</span>
+        </div>
+        <div id="hero-section-grid" class="hero-grid">
+          <div id="hero-main-column">
+            <!-- PRESTART -->
+            <div id="countdown-card" class="hidden card wait">
+              <h2 class="big">The Program Begins Soon</h2>
+              <p id="countdown-datetime-display" class="lead amber">Starting soon</p>
+              <div class="cd-grid">
+                <div class="cd-tile"><span id="cd-days" class="cd-num">00</span><span class="cd-lbl">Days</span></div>
+                <div class="cd-tile"><span id="cd-hours" class="cd-num">00</span><span class="cd-lbl">Hours</span></div>
+                <div class="cd-tile"><span id="cd-mins" class="cd-num">00</span><span class="cd-lbl">Minutes</span></div>
+                <div class="cd-tile"><span id="cd-secs" class="cd-num amber">00</span><span class="cd-lbl">Seconds</span></div>
               </div>
-
+            </div>
+            <!-- LIVE -->
+            <div id="now-performing-card" class="card">
               <div>
-                <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">The Program Begins Soon</h2>
-                <p id="countdown-datetime-display" class="text-xs sm:text-sm text-amber-400/90 font-medium mt-1">Starting soon</p>
+                <span id="now-seq-badge" class="seq">#--</span>
+                <span id="now-acoustic-badge" class="pill hidden">LIVE ACOUSTIC</span>
               </div>
-
-              <!-- 4 Countdown Tiles -->
-              <div class="grid grid-cols-4 gap-2 sm:gap-4 max-w-lg mx-auto w-full">
-                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-                  <span id="cd-days" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Days</span>
-                </div>
-                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-                  <span id="cd-hours" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Hours</span>
-                </div>
-                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-                  <span id="cd-mins" class="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">00</span>
-                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Minutes</span>
-                </div>
-                <div class="p-3 sm:p-4 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-col items-center">
-                  <span id="cd-secs" class="text-2xl sm:text-4xl font-black text-amber-400 font-mono tracking-tight">00</span>
-                  <span class="text-[10px] sm:text-xs text-slate-400 font-semibold uppercase mt-1">Seconds</span>
-                </div>
-              </div>
-
-              <p class="text-xs text-slate-400 max-w-md mx-auto">
-                Explore the official performance lineup and sequence below. The stage program will automatically go live when performances begin!
-              </p>
+              <h2 id="now-performer-name" class="now-name tv-wrap">Loading program...</h2>
+              <p id="now-song-title" class="now-song tv-wrap">Please wait...</p>
             </div>
           </div>
-
-          <!-- Hero Card for Current Performance -->
-          <div id="now-performing-card" class="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-orange-950/30 border-2 border-orange-500/50 shadow-2xl shadow-orange-500/10 h-full flex flex-col justify-center">
-            <div class="absolute -right-10 -bottom-10 opacity-10 text-white pointer-events-none">
-              <i data-lucide="mic" class="w-64 h-64"></i>
-            </div>
-
-            <div class="relative z-10 space-y-4">
-              <div class="flex items-center gap-3 flex-wrap">
-                <span id="now-seq-badge" class="px-3.5 py-1.5 rounded-xl bg-orange-500 text-white font-mono font-bold text-sm shadow">
-                  #01
-                </span>
-                <span id="now-category-badge"></span>
-                <span id="now-acoustic-badge" class="hidden text-xs font-bold px-3 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center gap-1.5">
-                  <i data-lucide="guitar" class="w-3.5 h-3.5"></i>
-                  <span>LIVE ACOUSTIC PERFORMANCE</span>
-                </span>
-                <span id="now-regular-badge" class="text-xs font-bold px-3 py-1 rounded-full bg-orange-500/20 text-orange-300 border border-orange-500/30 flex items-center gap-1.5">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                  <span>CURRENT PERFORMANCE</span>
-                </span>
-              </div>
-
-              <div>
-                <h2 id="now-performer-name" class="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                  Loading program...
-                </h2>
-                <p id="now-song-title" class="text-base sm:text-lg text-orange-400 font-semibold mt-1">
-                  Please wait...
-                </p>
-                <div id="now-stage-notes-container" class="hidden mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-medium w-fit max-w-full">
-                  <i data-lucide="info" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
-                  <span id="now-stage-notes" class="truncate"></span>
-                </div>
-              </div>
-            </div>
+          <div id="hero-gallery" class="hidden">
+            <img id="carousel-img" src="" alt="Event highlight">
           </div>
         </div>
+      </section>
 
-        <!-- Gallery / Sponsor Carousel Column (30% width on desktop, hidden when no images) -->
-        <div id="hero-gallery-container" class="hidden relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 h-[320px] sm:h-[340px] shrink-0">
-          <!-- Carousel Image Viewer (Strictly fixed height & absolute centering, 0 layout jump) -->
-          <div class="relative w-full h-[250px] sm:h-[270px] overflow-hidden rounded-2xl bg-slate-950/70 p-2 border border-slate-800/60 flex items-center justify-center">
-            <img id="carousel-img" src="" alt="Event Highlight" class="absolute inset-0 m-auto max-w-[90%] max-h-[90%] object-contain transition-opacity duration-500 opacity-0 rounded-xl" />
-          </div>
+      <section id="up-next-section">
+        <p class="label">Up Next (Please Be Ready)</p>
+        <div id="up-next-container" class="next-grid"></div>
+      </section>
 
-          <!-- Carousel Indicators & Badge -->
-          <div class="mt-2.5 flex items-center justify-between w-full px-1 text-[10px] text-slate-400 shrink-0 h-5">
-            <span class="flex items-center gap-1.5 text-slate-400 font-semibold tracking-wide uppercase text-[9px]">
-              <i data-lucide="image" class="w-3 h-3 text-orange-400"></i>
-              <span>Event Highlights</span>
-            </span>
-            <div id="carousel-dots" class="flex items-center gap-1.5">
-              <!-- Dynamically populated dots -->
-            </div>
-          </div>
+      <section>
+        <div class="row-between">
+          <p class="label" style="color:#cbd5e1">Upcoming Performances</p>
+          <span id="upcoming-count" class="muted">0 scheduled</span>
         </div>
+        <div class="panel"><div id="upcoming-list"></div></div>
+      </section>
 
-
-
-      </div>
-    </div>
-
-
-    <!-- Section 2: UP NEXT (Prepare Backstage) -->
-    <div class="space-y-3">
-      <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 px-1 flex items-center gap-1.5">
-        <i data-lucide="fast-forward" class="w-4 h-4 text-amber-400"></i>
-        <span>Up Next (Please Be Ready)</span>
-      </h3>
-
-      <div id="up-next-container" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <!-- Dynamic Up Next Cards -->
-      </div>
-    </div>
-
-    <!-- Section 3: FULL UPCOMING SCHEDULE -->
-    <div class="space-y-3 pt-2">
-      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
-        <h3 class="font-semibold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-          <i data-lucide="list-ordered" class="w-4 h-4 text-slate-400"></i>
-          <span>Upcoming Performances</span>
-        </h3>
-        <span id="upcoming-count" class="font-mono">0 scheduled</span>
-      </div>
-
-      <div class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div id="upcoming-list" class="divide-y divide-slate-800/60">
-          <!-- Dynamically populated -->
-        </div>
-      </div>
-    </div>
-
-    <!-- Section 4: COMPLETED PERFORMANCES (Collapsible) -->
-    <div id="completed-section" class="hidden space-y-3 pt-2">
-      <button id="toggle-completed-btn" class="w-full p-4 rounded-2xl bg-slate-900/40 hover:bg-slate-900 border border-slate-800/80 flex items-center justify-between text-xs font-semibold text-slate-400 transition">
-        <span class="flex items-center gap-2 text-slate-300">
-          <i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i>
+      <section id="completed-section" class="hidden">
+        <button id="toggle-completed-btn" class="done-btn" aria-expanded="false" aria-controls="completed-list-container">
           <span id="completed-header-text">Completed Performances (0)</span>
-        </span>
-        <i data-lucide="chevron-down" id="completed-chevron" class="w-4 h-4 transition-transform"></i>
-      </button>
-
-      <div id="completed-list-container" class="hidden bg-slate-900/40 border border-slate-800/60 rounded-2xl overflow-hidden divide-y divide-slate-800/40">
-        <!-- Dynamically populated -->
-      </div>
+        </button>
+        <div id="completed-list-container" class="hidden panel done-list" style="margin-top:12px;"></div>
+      </section>
     </div>
-  </div>
-
   </main>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
-    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
+  <footer class="bottom">
+    <div class="qr-wrap">
+      <div id="signup-qr"></div>
+      <div>
+        <div style="font-weight:800">Want to sing next time?</div>
+        <div id="signup-url" class="muted tv-wrap">Scan to sign up</div>
       </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>
-        <a href="/signup" class="hover:text-slate-300 transition">Sign Up</a>
-        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
-        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
-        <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Console</a>
-        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
-      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:18px;">
+      <span id="source-note" class="muted"></span>
+      <button id="refresh-data-btn" type="button" aria-label="Refresh the live program">Refresh</button>
     </div>
   </footer>
 
   <script src="/static/js/utils.js"></script>
-  <script>
-    let showCompleted = false;
-    let latestData = null;
-    let targetStartTime = new Date("2026-09-19T17:00:00-04:00");
-    let galleryImages = [];
-    let currentGalleryIndex = 0;
-    let galleryInterval = null;
-
-    document.addEventListener('DOMContentLoaded', () => {
-      fetchLiveStatus();
-      // Live updates: the server pushes a tiny "changed" ping (SSE); fetch only when something changed.
-      // A slow poll stays as a safety net, and becomes the fast 5 s poll if the stream is unavailable.
-      let pollMs = 20000, pollTimer = setInterval(fetchLiveStatus, pollMs);
-      const setPoll = (ms) => { if (ms !== pollMs) { clearInterval(pollTimer); pollMs = ms; pollTimer = setInterval(fetchLiveStatus, ms); } };
-      if (window.EventSource) {
-        const es = new EventSource('/api/live-stream');
-        es.onmessage = () => { setPoll(20000); fetchLiveStatus(); };
-        es.onerror = () => setPoll(5000);
-      } else {
-        setPoll(5000);
-      }
-      setInterval(updateCountdown, 1000);  // 1-second countdown tick
-
-      document.getElementById('toggle-completed-btn').addEventListener('click', () => {
-        showCompleted = !showCompleted;
-        const container = document.getElementById('completed-list-container');
-        const chevron = document.getElementById('completed-chevron');
-        if (showCompleted) {
-          container.classList.remove('hidden');
-          chevron.classList.add('rotate-180');
-        } else {
-          container.classList.add('hidden');
-          chevron.classList.remove('rotate-180');
-        }
-      });
-
-      const refreshBtn = document.getElementById('refresh-data-btn');
-      if (refreshBtn) {
-        refreshBtn.addEventListener('click', async () => {
-          refreshBtn.classList.add('opacity-75', 'pointer-events-none');
-          try {
-            await fetch('/api/sync', { method: 'POST' });
-          } catch (e) {
-            console.warn('Sync error:', e);
-          }
-          await fetchLiveStatus();
-          setTimeout(() => refreshBtn.classList.remove('opacity-75', 'pointer-events-none'), 500);
-        });
-      }
-    });
-
-    function formatTimeAgo(isoString) {
-      if (!isoString) return 'Live';
-      const date = new Date(isoString);
-      const now = new Date();
-      const diffSec = Math.floor((now - date) / 1000);
-      if (diffSec < 15) return 'Just now';
-      if (diffSec < 60) return `${diffSec}s ago`;
-      const diffMin = Math.floor(diffSec / 60);
-      if (diffMin < 60) return `${diffMin}m ago`;
-      const diffHr = Math.floor(diffMin / 60);
-      return `${diffHr}h ago`;
-    }
-
-    function renderTypePill(perfType) {
-      const raw = (perfType || 'Solo').trim();
-      const lower = raw.toLowerCase();
-      let colorClasses = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
-      if (lower.includes('duet')) {
-        colorClasses = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-      } else if (lower.includes('group')) {
-        colorClasses = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-      } else if (lower.includes('acoustic') || lower.includes('live')) {
-        colorClasses = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-      }
-      return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
-    }
-
-    function renderCategoryBadge(ageGroup) {
-      if (!ageGroup || !ageGroup.trim()) return '';
-      const raw = ageGroup.trim();
-      const lower = raw.toLowerCase();
-      let colorClasses = 'bg-sky-500/20 text-sky-300 border-sky-500/30';
-      if (lower.includes('junior')) {
-        colorClasses = 'bg-teal-500/20 text-teal-300 border-teal-500/40';
-      } else if (lower.includes('senior')) {
-        colorClasses = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-      } else if (lower.includes('adult') || lower.includes('open')) {
-        colorClasses = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
-      }
-      return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
-    }
-
-    function updateCountdown() {
-      if (!targetStartTime) return;
-      const now = new Date();
-      const diff = targetStartTime - now;
-      const countdownCard = document.getElementById('countdown-card');
-      const nowCard = document.getElementById('now-performing-card');
-      const liveBadge = document.getElementById('live-badge');
-      const liveBadgeDot = document.getElementById('live-badge-dot');
-      const liveBadgeText = document.getElementById('live-badge-text');
-      const sectionLabel = document.getElementById('section-status-text');
-
-      // Pre-show is active if start time is in future AND no performance is cued/on stage
-      const hasActivePerformance = Boolean(latestData && latestData.now_performing && latestData.now_performing.entry_id);
-      if (diff > 0 && !hasActivePerformance) {
-        countdownCard.classList.remove('hidden');
-        nowCard.classList.add('hidden');
-        if (sectionLabel) sectionLabel.textContent = 'Stage Countdown';
-
-        if (liveBadge) {
-          liveBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-semibold';
-          if (liveBadgeDot) liveBadgeDot.className = 'w-2 h-2 rounded-full bg-amber-400';
-          if (liveBadgeText) liveBadgeText.textContent = 'COUNTDOWN';
-        }
-
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
-        const mins = Math.floor((diff / (1000 * 60)) % 60);
-        const secs = Math.floor((diff / 1000) % 60);
-
-        document.getElementById('cd-days').textContent = String(days).padStart(2, '0');
-        document.getElementById('cd-hours').textContent = String(hours).padStart(2, '0');
-        document.getElementById('cd-mins').textContent = String(mins).padStart(2, '0');
-        document.getElementById('cd-secs').textContent = String(secs).padStart(2, '0');
-      } else {
-        countdownCard.classList.add('hidden');
-        nowCard.classList.remove('hidden');
-        if (sectionLabel) sectionLabel.textContent = 'Now on Stage';
-
-        if (liveBadge) {
-          liveBadge.className = 'flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold';
-          if (liveBadgeDot) liveBadgeDot.className = 'w-2 h-2 rounded-full bg-rose-500 animate-ping';
-          if (liveBadgeText) liveBadgeText.textContent = 'LIVE PROGRAM';
-        }
-      }
-    }
-
-    async function fetchLiveStatus() {
-      try {
-        const res = await fetch('/api/live-status');
-        if (!res.ok) return;
-        const data = await res.json();
-        renderLiveStatus(data);
-        // Subtle ambient pulse on live data sync
-        window.auroraEffect?.setActive(true, 1500);
-      } catch (e) {
-        console.warn('Live status fetch error:', e);
-      }
-    }
-
-    function renderLiveStatus(data) {
-      latestData = data;
-
-      const inactiveCard = document.getElementById('live-inactive-card');
-      const activeContent = document.getElementById('live-active-content');
-      if (data.live_display_enabled === false) {
-        if (inactiveCard) inactiveCard.classList.remove('hidden');
-        if (activeContent) activeContent.classList.add('hidden');
-        if (window.lucide) lucide.createIcons();
-        return;
-      } else {
-        if (inactiveCard) inactiveCard.classList.add('hidden');
-        if (activeContent) activeContent.classList.remove('hidden');
-      }
-
-      const titleEl = document.getElementById('live-event-title');
-      if (titleEl) {
-        titleEl.textContent = data.header_brand_title || 'EMA Paattukoottam';
-      }
-      document.title = `Live Stage Program - ${data.header_brand_title || 'EMA Paattukoottam'}`;
-
-      const sub = document.getElementById('live-event-subtitle');
-      if (sub) {
-        sub.textContent = data.header_brand_subtitle || data.event_subtitle || 'Musical Night';
-      }
-      if (data.event_start_time_iso) {
-        const parsed = new Date(data.event_start_time_iso);
-        if (!isNaN(parsed.getTime())) {
-          targetStartTime = parsed;
-        }
-        const displayEl = document.getElementById('countdown-datetime-display');
-        if (displayEl && data.event_start_time) {
-          displayEl.textContent = `Scheduled Start: ${data.event_start_time}`;
-        }
-      }
-
-      updateCountdown();
-
-      const syncEl = document.getElementById('live-sync-timestamp');
-      if (syncEl) {
-        syncEl.textContent = `● Synced ${formatTimeAgo(data.last_synced_at)}`;
-        if (data.last_synced_at) {
-          syncEl.title = `Last updated: ${new Date(data.last_synced_at).toLocaleString()}`;
-        }
-      }
-
-      // 1. Now Performing
-      const nowCard = document.getElementById('now-performing-card');
-      const nowSeq = document.getElementById('now-seq-badge');
-      const nowCategory = document.getElementById('now-category-badge');
-      const nowPerformer = document.getElementById('now-performer-name');
-      const nowSong = document.getElementById('now-song-title');
-      const nowStageNotesContainer = document.getElementById('now-stage-notes-container');
-      const nowStageNotes = document.getElementById('now-stage-notes');
-      const nowAcousticBadge = document.getElementById('now-acoustic-badge');
-      const nowRegularBadge = document.getElementById('now-regular-badge');
-
-      if (data.now_performing) {
-        const item = data.now_performing;
-        const isAcoustic = item.track_status === 'Acoustic' || (item.performance_type && item.performance_type.toLowerCase().includes('acoustic'));
-
-        if (nowAcousticBadge && nowRegularBadge) {
-          if (isAcoustic) {
-            nowAcousticBadge.classList.remove('hidden');
-            nowRegularBadge.classList.add('hidden');
-          } else {
-            nowAcousticBadge.classList.add('hidden');
-            nowRegularBadge.classList.remove('hidden');
-          }
-        }
-        nowSeq.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')}`;
-        if (nowCategory) {
-          nowCategory.innerHTML = renderCategoryBadge(item.age_group);
-        }
-        
-        let nameText = escapeHtml(item.performer_name);
-        if (item.partner_name) {
-          nameText = `Duet: <span class="text-orange-400 font-bold">${escapeHtml(item.performer_name)}</span> & <span class="text-amber-300 font-bold">${escapeHtml(item.partner_name)}</span>`;
-        }
-        nowPerformer.innerHTML = nameText;
-        nowSong.textContent = `"${item.song_title}"`;
-        
-        if (item.stage_notes && item.stage_notes.trim()) {
-          nowStageNotes.textContent = item.stage_notes.trim();
-          nowStageNotesContainer.classList.remove('hidden');
-        } else {
-          nowStageNotes.textContent = '';
-          nowStageNotesContainer.classList.add('hidden');
-        }
-      } else {
-        nowSeq.textContent = '#--';
-        if (nowCategory) nowCategory.innerHTML = '';
-        nowPerformer.innerHTML = '<span class="text-slate-400 font-normal italic">Waiting for next performance to cue...</span>';
-        nowSong.textContent = 'Stage in preparation';
-        nowStageNotes.textContent = '';
-        nowStageNotesContainer.classList.add('hidden');
-      }
-
-      // 2. Up Next
-      const upNextContainer = document.getElementById('up-next-container');
-      if (!data.up_next || data.up_next.length === 0) {
-        upNextContainer.innerHTML = '<div class="col-span-2 p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-500 text-center">No immediate upcoming items</div>';
-      } else {
-        upNextContainer.innerHTML = '';
-        data.up_next.forEach((item, idx) => {
-          let nameText = escapeHtml(item.performer_name);
-          if (item.partner_name) {
-            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
-          }
-
-          const card = document.createElement('div');
-          card.className = 'p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-1.5 shadow-lg';
-          card.innerHTML = `
-            <div class="flex items-center justify-between text-xs">
-              <span class="px-2.5 py-0.5 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-bold">
-                #${String(item.sequence_order || 0).padStart(2, '0')}
-              </span>
-              <span class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">
-                ${idx === 0 ? '⏭️ Immediate Next' : '⏳ In 2 Songs'}
-              </span>
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              <h4 class="font-bold text-white text-base truncate">${nameText}</h4>
-              ${renderCategoryBadge(item.age_group)}
-            </div>
-            <p class="text-xs text-orange-400 truncate">"${escapeHtml(item.song_title)}"</p>
-          `;
-          upNextContainer.appendChild(card);
-        });
-      }
-
-      // 3. Upcoming List
-      const upcomingList = document.getElementById('upcoming-list');
-      const upcomingCount = document.getElementById('upcoming-count');
-      const allUpcoming = data.upcoming || [];
-      upcomingCount.textContent = `${allUpcoming.length} scheduled`;
-
-      if (allUpcoming.length === 0) {
-        upcomingList.innerHTML = '<div class="p-6 text-center text-xs text-slate-500">No further performances scheduled</div>';
-      } else {
-        upcomingList.innerHTML = '';
-        allUpcoming.forEach(item => {
-          let nameText = escapeHtml(item.performer_name);
-          if (item.partner_name) {
-            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
-          }
-
-          const row = document.createElement('div');
-          row.className = 'p-3.5 flex items-center justify-between gap-3 text-xs hover:bg-slate-800/30 transition';
-          row.innerHTML = `
-            <div class="flex items-center gap-3 overflow-hidden">
-              <span class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 font-mono font-bold flex items-center justify-center shrink-0 border border-slate-700">
-                #${String(item.sequence_order || 0).padStart(2, '0')}
-              </span>
-              <div class="overflow-hidden space-y-0.5">
-                <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-bold text-white truncate">${nameText}</span>
-                  ${renderCategoryBadge(item.age_group)}
-                </div>
-                <div class="text-orange-400 font-medium truncate">"${escapeHtml(item.song_title)}"</div>
-              </div>
-            </div>
-            ${renderTypePill(item.performance_type)}
-          `;
-          upcomingList.appendChild(row);
-        });
-      }
-
-      // 4. Completed List
-      const completedSection = document.getElementById('completed-section');
-      const completedHeader = document.getElementById('completed-header-text');
-      const completedList = document.getElementById('completed-list-container');
-      const performed = data.performed || [];
-
-      if (performed.length > 0) {
-        completedSection.classList.remove('hidden');
-        completedHeader.textContent = `Completed Performances (${performed.length})`;
-        completedList.innerHTML = '';
-        performed.forEach(item => {
-          let nameText = escapeHtml(item.performer_name);
-          if (item.partner_name) {
-            nameText = `Duet: ${escapeHtml(item.performer_name)} & ${escapeHtml(item.partner_name)}`;
-          }
-
-          const row = document.createElement('div');
-          row.className = 'p-3 flex items-center justify-between gap-3 text-xs text-slate-400 opacity-60';
-          row.innerHTML = `
-            <div class="flex items-center gap-2.5 truncate">
-              <i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 shrink-0"></i>
-              <span class="font-mono">#${String(item.sequence_order || 0).padStart(2, '0')}</span>
-              <span class="line-through truncate">${nameText} - "${escapeHtml(item.song_title)}"</span>
-            </div>
-          `;
-          completedList.appendChild(row);
-        });
-      } else {
-        completedSection.classList.add('hidden');
-      }
-
-      // 5. Gallery Carousel & Adaptive 70/30 Grid
-      updateGalleryCarousel(data.gallery_images || []);
-
-      if (window.lucide) lucide.createIcons();
-    }
-
-    function updateGalleryCarousel(images) {
-      const grid = document.getElementById('hero-section-grid');
-      const mainCol = document.getElementById('hero-main-column');
-      const galleryContainer = document.getElementById('hero-gallery-container');
-      const carouselImg = document.getElementById('carousel-img');
-      const dotsContainer = document.getElementById('carousel-dots');
-
-      if (!grid || !galleryContainer || !carouselImg) return;
-
-      if (!images || images.length === 0) {
-        // Fall back to 100% full width
-        grid.className = 'grid grid-cols-1 gap-4 items-stretch';
-        mainCol.className = 'w-full';
-        galleryContainer.classList.add('hidden');
-        if (galleryInterval) {
-          clearInterval(galleryInterval);
-          galleryInterval = null;
-        }
-        galleryImages = [];
-        return;
-      }
-
-      // Check if image list changed
-      const imagesChanged = JSON.stringify(galleryImages) !== JSON.stringify(images);
-      galleryImages = images;
-
-      // Enable 70/30 adaptive split (approx 70% / 30% on lg screens)
-      grid.className = 'grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch';
-      mainCol.className = 'w-full lg:col-span-8 xl:col-span-8 flex flex-col';
-      galleryContainer.className = 'relative overflow-hidden rounded-3xl bg-slate-900/90 border-2 border-slate-800/80 shadow-2xl flex flex-col justify-between p-3.5 sm:p-4 h-[320px] sm:h-[340px] shrink-0 lg:col-span-4 xl:col-span-4';
-      galleryContainer.classList.remove('hidden');
-
-      // Setup dots
-      if (dotsContainer) {
-        dotsContainer.innerHTML = '';
-        if (galleryImages.length > 1) {
-          galleryImages.forEach((_, idx) => {
-            const dot = document.createElement('button');
-            dot.className = `w-2 h-2 rounded-full transition-all ${idx === currentGalleryIndex ? 'bg-orange-500 w-4' : 'bg-slate-700 hover:bg-slate-500'}`;
-            dot.title = `Slide ${idx + 1}`;
-            dot.onclick = () => showGallerySlide(idx);
-            dotsContainer.appendChild(dot);
-          });
-        }
-      }
-
-      if (imagesChanged || !galleryInterval) {
-        currentGalleryIndex = currentGalleryIndex % galleryImages.length;
-        showGallerySlide(currentGalleryIndex);
-
-        if (galleryInterval) clearInterval(galleryInterval);
-        if (galleryImages.length > 1) {
-          // Rotate every 6 seconds
-          galleryInterval = setInterval(() => {
-            currentGalleryIndex = (currentGalleryIndex + 1) % galleryImages.length;
-            showGallerySlide(currentGalleryIndex);
-          }, 6000);
-        }
-      }
-    }
-
-    function showGallerySlide(index) {
-      if (!galleryImages || galleryImages.length === 0) return;
-      currentGalleryIndex = index;
-      const carouselImg = document.getElementById('carousel-img');
-      const dotsContainer = document.getElementById('carousel-dots');
-      if (!carouselImg) return;
-
-      // Smooth crossfade
-      carouselImg.classList.add('opacity-0');
-      setTimeout(() => {
-        carouselImg.src = galleryImages[currentGalleryIndex];
-        carouselImg.onload = () => {
-          carouselImg.classList.remove('opacity-0');
-        };
-      }, 300);
-
-      // Update dots indicator
-      if (dotsContainer) {
-        const dots = dotsContainer.querySelectorAll('button');
-        dots.forEach((d, idx) => {
-          d.className = `w-2 h-2 rounded-full transition-all ${idx === currentGalleryIndex ? 'bg-orange-500 w-4' : 'bg-slate-700 hover:bg-slate-500'}`;
-        });
-      }
-    }
-
-
-    function escapeHtml(str) {
-      if (!str) return '';
-      return String(str).replace(/[&<>"']/g, (m) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      })[m]);
-    }
-  </script>
+  <script src="/static/js/live/qr.js"></script>
+  <script src="/static/js/live/live-logic.js"></script>
+  <script src="/static/js/live/wake-lock-lite.js"></script>
+  <script src="/static/js/live/live-view.js"></script>
 </body>
 </html>

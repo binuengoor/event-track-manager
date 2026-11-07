@@ -1,35 +1,39 @@
 /**
  * Stage Confidence Monitor
- * Communicates with the sound console in real-time over native BroadcastChannel.
- * Receives sync events (CUE, PLAY, PAUSE, SEEK, UNCUE, SYNC) with zero audio output.
+ * Communicates with the sound console over BroadcastChannel `stage_monitor_channel`.
+ * Messages: CUE, PLAY, PAUSE, SEEK, UNCUE, SYNC (transport), ANNOUNCEMENT, FADE_BLACK, LYRICS.
+ * Video is always muted. Late open: the page asks the console for state (REQUEST_STATE).
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  if (window.lucide) {
-    window.lucide.createIcons();
-  }
+  const L = window.EtmLive;
+  const $ = (id) => document.getElementById(id);
 
-  const videoContainer = document.getElementById('video-container');
-  const stageVideo = document.getElementById('stage-video');
-  const standbyCard = document.getElementById('standby-card');
-  const stagePerformer = document.getElementById('stage-performer-name');
-  const stageSong = document.getElementById('stage-song-title');
-  const stageActType = document.getElementById('stage-act-type');
-  const standbyBadge = document.getElementById('standby-badge');
-  const cuedSummary = document.getElementById('cued-track-summary');
-  const timeDisplay = document.getElementById('time-display');
-  const fullscreenBtn = document.getElementById('fullscreen-btn');
-  const fullscreenIcon = document.getElementById('fullscreen-icon');
-  const syncStatusIndicator = document.getElementById('sync-status-indicator');
-  const syncStatusText = document.getElementById('sync-status-text');
+  const videoContainer = $('video-container');
+  const stageVideo = $('stage-video');
+  const standbyCard = $('standby-card');
+  const stagePerformer = $('stage-performer-name');
+  const stageSong = $('stage-song-title');
+  const stageActType = $('stage-act-type');
+  const standbyBadge = $('standby-badge');
+  const cuedSummary = $('cued-track-summary');
+  const timeDisplay = $('time-display');
+  const syncIndicator = $('sync-status-indicator');
+  const syncText = $('sync-status-text');
+  const announcementEl = $('announcement');
+  const lyricsPanel = $('lyrics-panel');
+  const lyricsText = $('lyrics-text');
+  const disconnectedEl = $('disconnected');
+  const blackOverlay = $('black-overlay');
+  const blackCorner = $('black-corner');
 
   // Hard-enforce muting at all times to prevent stage HDMI audio hijack
   stageVideo.muted = true;
   stageVideo.volume = 0;
 
-  let currentEntryId = null;
-  let currentMediaType = null;
+  const view = { entryId: null, mediaType: null, streamUrl: null, fadeBlack: false, lyrics: '', performer: '' };
   let lastSyncTime = Date.now();
+  let connected = false;
 
   function formatTime(seconds) {
     if (!seconds || isNaN(seconds)) return '0:00';
@@ -38,98 +42,100 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   }
 
-  // Setup BroadcastChannel communication
+  // Render the mutually exclusive layers from the pure mode selector.
+  function renderMode() {
+    const mode = L.monitorMode(view);
+    blackOverlay.classList.toggle('hidden', mode !== 'black');
+    blackCorner.textContent = view.performer ? `On stage: ${view.performer}` : '';
+    lyricsPanel.classList.toggle('hidden', mode !== 'lyrics');
+    // Video keeps running underneath the black fade and lyrics layers.
+    const showVideo = Boolean(view.entryId && view.mediaType === 'video' && view.streamUrl);
+    videoContainer.classList.toggle('hidden', !showVideo);
+    standbyCard.classList.toggle('hidden', showVideo);
+  }
+
+  function setAnnouncement(text) {
+    const clean = L.cleanAnnouncement(text);
+    announcementEl.textContent = clean;
+    announcementEl.classList.toggle('hidden', !clean);
+  }
+
+  function updateConnectionStatus(isConnected) {
+    connected = isConnected;
+    disconnectedEl.classList.toggle('hidden', isConnected);
+    syncText.textContent = isConnected ? 'Connected to the console' : 'Waiting for the console';
+    syncIndicator.className = isConnected ? 'ok' : 'bad';
+  }
+
   let channel = null;
   try {
     channel = new BroadcastChannel('stage_monitor_channel');
     channel.onmessage = handleBroadcastMessage;
   } catch (e) {
     console.error('BroadcastChannel unsupported or blocked:', e);
-    syncStatusText.textContent = 'Sync Unsupported';
-    syncStatusIndicator.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/20 border border-rose-500/30 text-xs font-semibold text-rose-400';
+    syncText.textContent = 'Sync not supported in this browser';
   }
 
   function handleBroadcastMessage(event) {
     const data = event.data;
     if (!data || !data.type) return;
+    if (data.type === 'REQUEST_STATE') return; // another monitor asking the console
 
     lastSyncTime = Date.now();
     updateConnectionStatus(true);
 
     switch (data.type) {
-      case 'CUE':
-        handleCue(data);
-        break;
-      case 'PLAY':
-        handlePlay(data);
-        break;
-      case 'PAUSE':
-        handlePause(data);
-        break;
-      case 'SEEK':
-        handleSeek(data);
-        break;
-      case 'UNCUE':
-        handleUncue();
-        break;
-      case 'SYNC':
-        handleSync(data);
+      case 'CUE': handleCue(data); break;
+      case 'PLAY': handlePlay(data); break;
+      case 'PAUSE': handlePause(data); break;
+      case 'SEEK': handleSeek(data); break;
+      case 'UNCUE': handleUncue(); break;
+      case 'SYNC': handleSync(data); break;
+      case 'ANNOUNCEMENT': setAnnouncement(data.text); break;
+      case 'FADE_BLACK': view.fadeBlack = Boolean(data.on); renderMode(); break;
+      case 'LYRICS':
+        view.lyrics = String(data.text == null ? '' : data.text);
+        lyricsText.textContent = view.lyrics;
+        renderMode();
         break;
     }
   }
 
   function handleCue(data) {
-    currentEntryId = data.entryId;
-    currentMediaType = data.mediaType;
+    view.entryId = data.entryId;
+    view.mediaType = data.mediaType;
+    view.streamUrl = data.mediaType === 'video' ? data.streamUrl : null;
 
     const performerText = data.performerName + (data.partnerName ? ` & ${data.partnerName}` : '');
     const songText = data.songTitle || 'Performance';
+    view.performer = performerText;
 
     stagePerformer.textContent = performerText;
     stageSong.textContent = songText;
     cuedSummary.textContent = `${performerText} - ${songText}`;
 
     if (data.mediaType === 'video' && data.streamUrl) {
-      // Switch to video mode
-      standbyCard.classList.add('hidden');
-      videoContainer.classList.remove('hidden');
-
       if (stageVideo.src !== data.streamUrl && !stageVideo.src.endsWith(data.streamUrl)) {
         stageVideo.src = data.streamUrl;
         stageVideo.load();
       }
-
-      if (typeof data.currentTime === 'number') {
-        stageVideo.currentTime = data.currentTime;
-      }
-
-      if (data.isPlaying) {
-        stageVideo.play().catch(e => console.warn('Video auto-play prevented:', e));
-      } else {
-        stageVideo.pause();
-      }
+      if (typeof data.currentTime === 'number') stageVideo.currentTime = data.currentTime;
+      if (data.isPlaying) stageVideo.play().catch(e => console.warn('Video auto-play prevented:', e));
+      else stageVideo.pause();
     } else {
-      // Audio or acoustic mode: Show presentation card
-      videoContainer.classList.add('hidden');
-      standbyCard.classList.remove('hidden');
       stageVideo.pause();
-      stageVideo.src = '';
-
-      standbyBadge.textContent = 'Live on Stage';
-      stageActType.textContent = data.mediaType === 'acoustic' ? 'Acoustic / Live Instruments' : 'Audio Track Playing';
+      stageVideo.removeAttribute('src');
+      stageVideo.load();
+      standbyBadge.textContent = 'Now on stage';
+      stageActType.textContent = data.mediaType === 'acoustic' ? 'Acoustic / live instruments' : 'Audio track playing';
     }
-
-    if (data.currentTime !== undefined) {
-      timeDisplay.textContent = formatTime(data.currentTime);
-    }
+    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    renderMode();
   }
 
   function handlePlay(data) {
-    if (data.currentTime !== undefined) {
-      timeDisplay.textContent = formatTime(data.currentTime);
-    }
-
-    if (currentMediaType === 'video') {
+    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    if (view.mediaType === 'video') {
       if (typeof data.currentTime === 'number' && Math.abs(stageVideo.currentTime - data.currentTime) > 0.3) {
         stageVideo.currentTime = data.currentTime;
       }
@@ -138,11 +144,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePause(data) {
-    if (data.currentTime !== undefined) {
-      timeDisplay.textContent = formatTime(data.currentTime);
-    }
-
-    if (currentMediaType === 'video') {
+    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    if (view.mediaType === 'video') {
       stageVideo.pause();
       if (typeof data.currentTime === 'number' && Math.abs(stageVideo.currentTime - data.currentTime) > 0.2) {
         stageVideo.currentTime = data.currentTime;
@@ -153,123 +156,79 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleSeek(data) {
     if (typeof data.currentTime === 'number') {
       timeDisplay.textContent = formatTime(data.currentTime);
-      if (currentMediaType === 'video') {
-        stageVideo.currentTime = data.currentTime;
-      }
+      if (view.mediaType === 'video') stageVideo.currentTime = data.currentTime;
     }
   }
 
   function handleSync(data) {
-    if (!currentEntryId && data.entryId) {
-      handleCue(data);
-      return;
-    }
-
+    if (!view.entryId && data.entryId) { handleCue(data); return; }
     if (typeof data.currentTime === 'number') {
       timeDisplay.textContent = formatTime(data.currentTime);
-
-      if (currentMediaType === 'video') {
-        const drift = Math.abs(stageVideo.currentTime - data.currentTime);
-        if (drift > 0.4) {
-          stageVideo.currentTime = data.currentTime;
-        }
-
-        if (data.isPlaying && stageVideo.paused) {
-          stageVideo.play().catch(() => {});
-        } else if (!data.isPlaying && !stageVideo.paused) {
-          stageVideo.pause();
-        }
+      if (view.mediaType === 'video') {
+        if (Math.abs(stageVideo.currentTime - data.currentTime) > 0.4) stageVideo.currentTime = data.currentTime;
+        if (data.isPlaying && stageVideo.paused) stageVideo.play().catch(() => {});
+        else if (!data.isPlaying && !stageVideo.paused) stageVideo.pause();
       }
     }
   }
 
   function handleUncue() {
-    currentEntryId = null;
-    currentMediaType = null;
-
-    videoContainer.classList.add('hidden');
-    standbyCard.classList.remove('hidden');
-
+    view.entryId = null;
+    view.mediaType = null;
+    view.streamUrl = null;
+    view.performer = '';
     stageVideo.pause();
-    stageVideo.src = '';
-
-    standbyBadge.textContent = 'Stage Confidence Monitor';
+    stageVideo.removeAttribute('src');
+    stageVideo.load();
+    standbyBadge.textContent = 'Standby';
     stagePerformer.textContent = 'EMA Paattukoottam';
-    stageSong.textContent = 'Live Music & Stage Program';
-    stageActType.textContent = 'Ready for Next Act';
+    stageSong.textContent = 'Waiting for the next act';
+    stageActType.textContent = 'Standing by';
     cuedSummary.textContent = 'Standing by...';
     timeDisplay.textContent = '0:00';
+    renderMode();
   }
 
-  function updateConnectionStatus(isConnected) {
-    if (isConnected) {
-      syncStatusText.textContent = 'Connected to Console';
-      syncStatusIndicator.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-400';
-    } else {
-      syncStatusText.textContent = 'Waiting for Console...';
-      syncStatusIndicator.className = 'flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-xs font-semibold text-amber-400';
-    }
-  }
-
-  // Periodic liveness check
+  // Liveness: the notice shows after 8 s without messages and stays until one arrives.
   setInterval(() => {
-    const isAlive = (Date.now() - lastSyncTime) < 8000;
-    updateConnectionStatus(isAlive);
-  }, 4000);
+    const alive = L.isConnected(lastSyncTime, Date.now(), L.DISCONNECT_MS);
+    if (alive !== connected) updateConnectionStatus(alive);
+  }, 1000);
+  // First 8 s: no notice yet, indicator says Connecting; the tick above flips to the notice.
+  connected = true;
+  syncText.textContent = 'Connecting...';
+  syncIndicator.className = 'bad';
 
-  // Request current state from Console upon opening
-  if (channel) {
-    channel.postMessage({ type: 'REQUEST_STATE' });
-  }
+  // Late open: ask the console to replay current state.
+  if (channel) channel.postMessage({ type: 'REQUEST_STATE' });
 
-  // Fullscreen support
+  if (window.EtmWakeLock) window.EtmWakeLock.start();
+
+  // Fullscreen
+  const fullscreenBtn = $('fullscreen-btn');
+  const fullscreenLabel = $('fullscreen-label');
   function toggleFullscreen() {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.warn(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-    } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+      document.documentElement.requestFullscreen().catch(err => console.warn(`Fullscreen failed: ${err.message}`));
+    } else if (document.exitFullscreen) {
+      document.exitFullscreen();
     }
   }
-
-  if (fullscreenBtn) {
-    fullscreenBtn.addEventListener('click', toggleFullscreen);
-  }
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'f' || e.key === 'F') {
-      toggleFullscreen();
-    }
-  });
-
-  document.addEventListener('dblclick', (e) => {
-    // Only toggle if not clicking interactive buttons
-    if (e.target.closest('button')) return;
-    toggleFullscreen();
-  });
-
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
+  document.addEventListener('keydown', (e) => { if (e.key === 'f' || e.key === 'F') toggleFullscreen(); });
+  document.addEventListener('dblclick', (e) => { if (!e.target.closest('button')) toggleFullscreen(); });
   document.addEventListener('fullscreenchange', () => {
-    if (document.fullscreenElement) {
-      if (fullscreenIcon) fullscreenIcon.setAttribute('data-lucide', 'minimize-2');
-    } else {
-      if (fullscreenIcon) fullscreenIcon.setAttribute('data-lucide', 'maximize-2');
-    }
-    if (window.lucide) window.lucide.createIcons();
+    fullscreenLabel.textContent = document.fullscreenElement ? 'Exit fullscreen (F)' : 'Fullscreen (F)';
   });
 
-  // Fade out control overlays on mouse inactivity
+  // Fade control overlays on inactivity (the disconnected notice and announcement never fade)
   let idleTimer = null;
-  const controlOverlay = document.getElementById('control-overlay');
-  const progressOverlay = document.getElementById('progress-overlay');
-
+  const controlOverlay = $('control-overlay');
+  const progressOverlay = $('progress-overlay');
   function resetIdleTimer() {
     controlOverlay.classList.remove('idle-fade');
     progressOverlay.classList.remove('idle-fade');
     document.body.style.cursor = 'default';
-
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
       controlOverlay.classList.add('idle-fade');
@@ -277,7 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.style.cursor = 'none';
     }, 3500);
   }
-
   document.addEventListener('mousemove', resetIdleTimer);
   resetIdleTimer();
+  renderMode();
 });

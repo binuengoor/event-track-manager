@@ -5,101 +5,105 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
-  <meta name="view-transition" content="same-origin">
   <title>Stage Confidence Monitor - EMA Paattukoottam</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
   <script src="/static/vendor/lucide.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=1">
   <style>
-    body {
-      background-color: #000000;
-      color: #ffffff;
-      overflow: hidden;
-      user-select: none;
-    }
-    .fade-overlay {
-      transition: opacity 0.5s ease;
-    }
-    .idle-fade {
-      opacity: 0;
-      pointer-events: none;
-    }
+    :root, html, body { background-color: #000; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; height: 100vh; width: 100vw; overflow: hidden; user-select: none; background: #000; color: #fff; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 24px; line-height: 1.25; }
+    .hidden { display: none !important; }
+    :focus-visible { outline: 3px solid #f06449; outline-offset: 2px; }
+    .wrap { overflow-wrap: anywhere; word-break: break-word; }
+    .layer { position: absolute; inset: 0; }
+
+    #video-container { z-index: 10; display: flex; align-items: center; justify-content: center; background: #000; }
+    #stage-video { width: 100%; height: 100%; object-fit: contain; }
+
+    #standby-card { z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px; gap: 24px; }
+    .badge { display: inline-flex; align-items: center; gap: 12px; padding: 8px 24px; border-radius: 999px; background: rgba(15, 23, 42, .85); border: 1px solid #334155; color: #fbbf24; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 24px; }
+    .badge .dot { width: 14px; height: 14px; border-radius: 50%; background: #fbbf24; }
+    #stage-performer-name { margin: 0; font-size: clamp(48px, 8vw, 120px); font-weight: 800; line-height: 1.05; max-width: 92vw; }
+    #stage-song-title { margin: 0; font-size: clamp(32px, 4vw, 64px); font-weight: 500; color: #cbd5e1; max-width: 92vw; }
+    #stage-act-type { display: inline-block; padding: 8px 24px; border-radius: 999px; background: rgba(30, 41, 59, .85); color: #fb923c; border: 1px solid #334155; font-weight: 600; font-size: 24px; }
+
+    #lyrics-panel { z-index: 25; display: flex; align-items: center; justify-content: center; padding: 72px 64px; background: rgba(0, 0, 0, .92); text-align: center; }
+    #lyrics-text { margin: 0; max-width: 1500px; width: 100%; font-family: inherit; font-size: clamp(36px, 5vw, 80px); font-weight: 700; line-height: 1.3; white-space: pre-wrap; max-height: 100%; overflow: hidden; }
+
+    #announcement { z-index: 35; inset: 0 0 auto 0; padding: 14px 32px; background: #f59e0b; color: #1a1205; font-size: 36px; font-weight: 800; text-align: center; }
+
+    #control-overlay { z-index: 30; inset: 0 0 auto 0; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: linear-gradient(to bottom, rgba(0, 0, 0, .85), transparent); transition: opacity .5s ease; }
+    #progress-overlay { z-index: 30; inset: auto 0 0 0; padding: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; background: linear-gradient(to top, rgba(0, 0, 0, .85), transparent); transition: opacity .5s ease; }
+    .idle-fade { opacity: 0; pointer-events: none; }
+    #announcement:not(.hidden) ~ #control-overlay { top: 70px; }
+    #sync-status-indicator { display: inline-flex; align-items: center; gap: 10px; padding: 6px 20px; border-radius: 999px; font-weight: 700; font-size: 24px; border: 1px solid; }
+    #sync-status-indicator .dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
+    #sync-status-indicator.ok { color: #34d399; background: rgba(16, 185, 129, .2); border-color: rgba(16, 185, 129, .4); }
+    #sync-status-indicator.bad { color: #fbbf24; background: rgba(245, 158, 11, .2); border-color: rgba(245, 158, 11, .5); }
+    #fullscreen-btn { padding: 10px 22px; border-radius: 14px; background: rgba(30, 41, 59, .9); color: #fff; border: 1px solid #334155; font: inherit; font-weight: 600; cursor: pointer; }
+    #cued-track-summary { font-weight: 600; color: #cbd5e1; min-width: 0; }
+    #time-display { font-family: ui-monospace, monospace; font-weight: 800; color: #e2e8f0; flex: 0 0 auto; }
+
+    /* Disconnected: large, never auto-hides, stays above everything except the black fade. */
+    #disconnected { z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 20px; padding: 48px; background: rgba(0, 0, 0, .94); }
+    #disconnected h2 { margin: 0; font-size: clamp(48px, 7vw, 96px); font-weight: 800; color: #fbbf24; }
+    #disconnected p { margin: 0; font-size: 32px; color: #e2e8f0; max-width: 1100px; }
+    /* Black fade: faint corner line only */
+    #black-overlay { z-index: 50; background: #000; transition: opacity .6s ease; }
+    #black-corner { position: absolute; left: 32px; bottom: 28px; color: #9aa4b2; font-size: 24px; }
   </style>
-<link rel="stylesheet" href="/static/css/app.css?v=1">
 </head>
-<body class="bg-black text-white h-screen w-screen flex flex-col items-center justify-center relative font-sans">
+<body>
 
-  <!-- Stage Video Playback Container -->
-  <div id="video-container" class="absolute inset-0 w-full h-full flex items-center justify-center bg-black hidden z-10">
-    <!-- MUST ALWAYS REMAIN MUTED TO PREVENT SOUNDBOARD FEEDBACK / HDMI AUDIO HIJACK -->
-    <video
-      id="stage-video"
-      class="w-full h-full object-contain"
-      muted
-      playsinline
-      preload="auto"
-    ></video>
+  <!-- Event-wide announcement (hidden when empty) -->
+  <div id="announcement" class="layer hidden" role="status" aria-live="polite"></div>
+
+  <!-- Stage video (always muted: the master audio is on the sound console) -->
+  <div id="video-container" class="layer hidden">
+    <video id="stage-video" muted playsinline preload="auto"></video>
   </div>
 
-  <!-- Standby Stage Presentation Card (Visible when idle, acoustic, or audio-only track) -->
-  <div id="standby-card" class="relative z-20 flex flex-col items-center justify-center text-center p-8 max-w-4xl w-full mx-auto space-y-6">
-    <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/80 border border-slate-700/80 text-xs uppercase tracking-widest text-amber-400 font-semibold shadow-lg">
-      <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-      <span id="standby-badge">Stage Confidence Monitor</span>
-    </div>
-
-    <div class="space-y-3">
-      <h1 id="stage-performer-name" class="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white drop-shadow-md">
-        EMA Paattukoottam
-      </h1>
-      <p id="stage-song-title" class="text-2xl sm:text-3xl md:text-4xl font-medium text-slate-300 drop-shadow">
-        Live Music & Stage Program
-      </p>
-    </div>
-
-    <div id="stage-act-type-container" class="pt-2">
-      <span id="stage-act-type" class="text-sm px-4 py-1.5 rounded-full bg-slate-800/80 text-orange-400 border border-slate-700 font-medium">
-        Ready for Next Act
-      </span>
-    </div>
+  <!-- Name card / standby -->
+  <div id="standby-card" class="layer">
+    <div class="badge"><span class="dot"></span><span id="standby-badge">Standby</span></div>
+    <h1 id="stage-performer-name" class="wrap">EMA Paattukoottam</h1>
+    <p id="stage-song-title" class="wrap">Waiting for the next act</p>
+    <div id="stage-act-type-container"><span id="stage-act-type">Standing by</span></div>
   </div>
 
-  <!-- Floating Utility Header (disappears after 3s of mouse inactivity) -->
-  <header id="control-overlay" class="fade-overlay absolute top-0 inset-x-0 z-30 p-4 flex items-center justify-between bg-gradient-to-b from-black/80 to-transparent">
-    <div class="flex items-center gap-2">
-      <div id="sync-status-indicator" class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-        <span id="sync-status-text">Connected to Console</span>
-      </div>
-      <div class="text-[11px] text-slate-400 hidden sm:block">
-        Muted on Stage &bull; Master Audio on Sound Console
-      </div>
-    </div>
+  <!-- Lyrics -->
+  <div id="lyrics-panel" class="layer hidden" aria-live="polite">
+    <pre id="lyrics-text" class="wrap"></pre>
+  </div>
 
-    <div class="flex items-center gap-3">
-      <span class="text-xs text-slate-400 font-mono hidden md:inline">Press [F] or Double-Click for Fullscreen</span>
-      <button id="fullscreen-btn" class="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-white text-xs border border-slate-700 transition flex items-center gap-1.5">
-        <i data-lucide="maximize-2" class="w-4 h-4" id="fullscreen-icon"></i>
-        <span>Fullscreen</span>
-      </button>
+  <header id="control-overlay" class="layer">
+    <div id="sync-status-indicator" class="bad" role="status">
+      <span class="dot"></span>
+      <span id="sync-status-text">Waiting for the console</span>
     </div>
+    <button id="fullscreen-btn" type="button" aria-label="Toggle fullscreen">
+      <span id="fullscreen-label">Fullscreen (F)</span>
+    </button>
   </header>
 
-  <!-- Bottom Floating Timer / Progress Pill (optional subtle visual queue) -->
-  <footer id="progress-overlay" class="fade-overlay absolute bottom-0 inset-x-0 z-30 p-4 flex items-center justify-between text-xs text-slate-400 bg-gradient-to-t from-black/80 to-transparent">
-    <div id="cued-track-summary" class="truncate font-medium text-slate-300">
-      Standing by...
-    </div>
-    <div id="time-display" class="font-mono text-slate-200 font-bold shrink-0 ml-4">
-      0:00
-    </div>
+  <footer id="progress-overlay" class="layer">
+    <div id="cued-track-summary" class="wrap">Standing by...</div>
+    <div id="time-display">0:00</div>
   </footer>
 
+  <!-- Disconnected notice: visible whenever no console message arrived for 8 s -->
+  <div id="disconnected" class="layer hidden" role="alert">
+    <h2>Waiting for the console</h2>
+    <p>Open the stage monitor again from the sound console in this browser. Nothing is wrong on stage.</p>
+  </div>
+
+  <!-- Fade to black -->
+  <div id="black-overlay" class="layer hidden" aria-hidden="true">
+    <div id="black-corner"></div>
+  </div>
+
+  <script src="/static/js/live/live-logic.js"></script>
+  <script src="/static/js/live/wake-lock-lite.js"></script>
   <script src="/static/js/stage-monitor.js"></script>
 </body>
 </html>
