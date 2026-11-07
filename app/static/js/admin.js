@@ -289,14 +289,24 @@ async function clearVaultStorage() {
 // OFFLINE ACTIONS & NETWORK RECOVERY SYNC
 // =============================================================================
 let offlineSaveFailure = false;
+let snapshotUnavailable = false;
+const unsavedOfflineActions = new Set();
+function actionKey(type, entryId) { return `${type}:${entryId || ''}`; }
+function actionReachedServer(type, entryId) {
+  unsavedOfflineActions.delete(actionKey(type, entryId));
+  offlineSaveFailure = unsavedOfflineActions.size > 0;
+  updateNetworkStatusDisplay();
+}
 function persistQueueSnapshot() {
   try {
     localStorage.setItem('paattukoottam_cached_queue', JSON.stringify(queue));
+    snapshotUnavailable = false;
+    updateNetworkStatusDisplay();
     return true;
   } catch (error) {
-    offlineSaveFailure = true;
+    snapshotUnavailable = true;
     updateNetworkStatusDisplay();
-    showToast(`Change is local only and was not saved for sync: ${error.message}`, 'error');
+    showToast(`Offline copy could not be saved: ${error.message}`, 'error');
     return false;
   }
 }
@@ -306,6 +316,7 @@ async function enqueueOfflineAction(type, entryId, payload = {}) {
     updateNetworkStatusDisplay();
     return true;
   } catch (error) {
+    unsavedOfflineActions.add(actionKey(type, entryId));
     offlineSaveFailure = true;
     updateNetworkStatusDisplay();
     showToast(`Change is local only and was not saved for sync: ${error.message}`, 'error');
@@ -349,6 +360,12 @@ function updateNetworkStatusDisplay() {
     dot.className = 'w-2 h-2 rounded-full bg-rose-500';
     text.textContent = 'Unsaved local change — not queued for sync';
     if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-rose-400 font-medium px-2.5 py-1 rounded-full bg-rose-500/10 border border-rose-500/20';
+    return;
+  }
+  if (snapshotUnavailable) {
+    dot.className = 'w-2 h-2 rounded-full bg-amber-500';
+    text.textContent = 'Offline copy unavailable';
+    if (indicator) indicator.className = 'flex items-center gap-1.5 text-xs text-amber-400 font-medium px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20';
     return;
   }
   if (isOnline) {
@@ -1711,7 +1728,7 @@ async function updateStatus(entryId, newStatus) {
   }
   updateQueueStatsSummary();
   applyFilter();
-  if (!persistQueueSnapshot()) return;
+  persistQueueSnapshot();
 
   if (!navigator.onLine) {
     if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
@@ -1730,6 +1747,7 @@ async function updateStatus(entryId, newStatus) {
     });
 
     if (!res.ok) throw new Error('Status update failed');
+    actionReachedServer('update_status', entryId);
     showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${normalizedPerfStatus}`);
   } catch (err) {
     if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
@@ -1747,7 +1765,7 @@ async function updateStageNotes(entryId, notes) {
   }
 
   renderQueueList();
-  if (!persistQueueSnapshot()) return;
+  persistQueueSnapshot();
 
   if (!navigator.onLine) {
     if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
@@ -1767,6 +1785,7 @@ async function updateStageNotes(entryId, notes) {
 
     if (!res.ok) throw new Error('Failed to update stage note');
     const data = await res.json();
+    actionReachedServer('stage_notes', entryId);
     showToast(data.stage_notes ? '✓ Stage note updated' : '✓ Stage note cleared');
   } catch (err) {
     if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
