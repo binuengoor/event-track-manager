@@ -172,6 +172,19 @@ pip install -r app/requirements-dev.txt
 uvicorn app.main:app --port 8000          # data goes to ./events/<event id>/
 ```
 
+The UI loads nothing from the internet. Tailwind CSS (v3.4.17, standalone CLI, no Node) is compiled into
+`app/static/css/app.css`, which is committed so running from source works; the Docker build regenerates it
+(arch-aware, SHA-256-checked download). After you add or change Tailwind classes in `app/static/**/*.html|js`,
+regenerate it from the repo root with the matching binary from the
+[v3.4.17 release](https://github.com/tailwindlabs/tailwindcss/releases/tag/v3.4.17):
+
+```bash
+tailwindcss -c app/tailwind.config.js -i app/static/css/tailwind.input.css -o app/static/css/app.css --minify
+```
+
+Pinned browser libraries (wavesurfer.js 7.12.12, marked 18.1.3, lucide 1.70.0) live in `app/static/vendor/`;
+`scripts/vendor.sh` re-fetches and verifies them against `CHECKSUMS.sha256` (`--update` after a version bump).
+
 Build locally: `docker compose -f docker-compose.local.yml up -d --build`. Pre-built multi-arch images publish to GHCR:
 `ghcr.io/binuengoor/event-track-manager-app` and `...-downloader`.
 

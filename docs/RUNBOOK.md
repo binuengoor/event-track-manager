@@ -123,6 +123,7 @@ Files are matched to acts by the **entry id** in the file name (the id shown in 
 | "Too many failed attempts" (HTTP 429) | Rate limit (8 per client / 100 overall per 5 min) | Wait 5 minutes, or `docker compose restart app` |
 | Live screen frozen | Network on the display device | Reload `/live` |
 | Old audio plays in the console | Browser vault | Console **Clear Cache** then re-cache the track |
+| Page unstyled or icons missing after an update | Browser kept the old service worker cache | Hard reload once (cache name is bumped on asset changes); styles are local `app.css`, nothing comes from a CDN |
 
 ## 9. Privacy rules for organizers
 
