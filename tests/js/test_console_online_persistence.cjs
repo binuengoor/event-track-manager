@@ -47,3 +47,52 @@ test('unsaved action warning remains through unrelated success and clears after 
   await context.updateStatus('PK-001','Done');
   assert.equal(nodes['network-status-text'].textContent,'Online');
 });
+
+test('an older or different status success cannot clear a newer failed intent', async()=>{
+  const {context,nodes,setStorage,setFetch,setAppend} = consoleContext();
+  setStorage(false);setFetch(true);setAppend(true);
+  const old = context.beginAction({status:'Performed'});
+  await context.updateStatus('PK-001','Done');
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  context.actionReachedServer('update_status','PK-001',old);
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  setFetch(false);
+  await context.updateStatus('PK-001','Upcoming');
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  await context.updateStatus('PK-001','Done');
+  assert.equal(nodes['network-status-text'].textContent,'Online');
+});
+
+test('cue and uncue failures clear only after the matching newer action succeeds', async()=>{
+  const {context,nodes,setStorage,setAppend} = consoleContext();
+  setStorage(false);setAppend(true);
+  const cueOld = context.beginAction();
+  const cueFailed = context.beginAction();
+  await context.enqueueOfflineAction('set_active','PK-001',{},cueFailed);
+  const uncueFailed = context.beginAction();
+  await context.enqueueOfflineAction('uncue',null,{},uncueFailed);
+  context.actionReachedServer('set_active','PK-001',cueOld);
+  context.actionReachedServer('uncue',null,context.beginAction());
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  context.actionReachedServer('set_active','PK-001',context.beginAction());
+  assert.equal(nodes['network-status-text'].textContent,'Online');
+});
+
+test('a successfully replayed matching queued intent clears its own unsaved warning', async()=>{
+  const {context,nodes,setStorage,setAppend} = consoleContext();
+  setStorage(false);setAppend(true);
+  const failure = context.beginAction({});
+  await context.enqueueOfflineAction('uncue',null,{},failure);
+  assert.match(nodes['network-status-text'].textContent,/not queued/);
+  const queued = [];
+  context.appendOfflineAction = async action=>queued.push(action);
+  context.getOfflineActions = ()=>queued;
+  context.drainOfflineQueue = async (headers, fetch, timeout, acknowledged)=>{
+    acknowledged(queued.shift());
+    return 1;
+  };
+  context.loadQueue = async()=>{};
+  await context.enqueueOfflineAction('uncue',null,{},context.beginAction({}));
+  await context.syncOfflineActions();
+  assert.equal(nodes['network-status-text'].textContent,'Online');
+});

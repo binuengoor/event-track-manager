@@ -64,7 +64,7 @@ export async function replayOfflineActions(actions, getHeaders, fetchRequest = f
 // Only one replay can run in this tab. Remove an action immediately after its
 // successful response, re-reading storage so actions queued during fetch stay.
 let replayInFlight = null;
-export function drainOfflineActions(getHeaders, fetchRequest = fetch) {
+export function drainOfflineActions(getHeaders, fetchRequest = fetch, onSynced = () => {}) {
   if (replayInFlight) return replayInFlight;
   replayInFlight = (async () => {
     let synced = 0;
@@ -82,6 +82,7 @@ export function drainOfflineActions(getHeaders, fetchRequest = fetch) {
         return synced; // Keep the queue intact if it could not be saved.
       }
       synced += 1;
+      onSynced(action);
     }
   })().finally(() => { replayInFlight = null; });
   return replayInFlight;
@@ -109,7 +110,7 @@ export async function appendSynchronized(action) {
   });
 }
 
-export async function drainSynchronized(getHeaders, fetchRequest = fetch) {
+export async function drainSynchronized(getHeaders, fetchRequest = fetch, onSynced = () => {}) {
   return locks().request(REPLAY_LOCK, async () => {
     let synced = 0;
     while (true) {
@@ -129,6 +130,7 @@ export async function drainSynchronized(getHeaders, fetchRequest = fetch) {
       });
       if (!removed) return synced;
       synced += 1;
+      onSynced(action);
     }
   });
 }
@@ -168,9 +170,9 @@ export function boundedReplayFetch(fetchRequest, timeoutMs = REPLAY_TIMEOUT_MS) 
   };
 }
 
-export async function drainOfflineQueue(getHeaders, fetchRequest = fetch, timeoutMs = REPLAY_TIMEOUT_MS) {
+export async function drainOfflineQueue(getHeaders, fetchRequest = fetch, timeoutMs = REPLAY_TIMEOUT_MS, onSynced = () => {}) {
   const boundedFetch = boundedReplayFetch(fetchRequest, timeoutMs);
   return coordinatedOfflineQueueAvailable()
-    ? drainSynchronized(getHeaders, boundedFetch)
-    : drainOfflineActions(getHeaders, boundedFetch);
+    ? drainSynchronized(getHeaders, boundedFetch, onSynced)
+    : drainOfflineActions(getHeaders, boundedFetch, onSynced);
 }

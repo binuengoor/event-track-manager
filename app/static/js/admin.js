@@ -290,10 +290,19 @@ async function clearVaultStorage() {
 // =============================================================================
 let offlineSaveFailure = false;
 let snapshotUnavailable = false;
-const unsavedOfflineActions = new Set();
+const unsavedOfflineActions = new Map();
+let nextActionSequence = 0;
+const consoleIntentSession = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 function actionKey(type, entryId) { return `${type}:${entryId || ''}`; }
-function actionReachedServer(type, entryId) {
-  unsavedOfflineActions.delete(actionKey(type, entryId));
+function beginAction(payload = {}) {
+  return { sequence: ++nextActionSequence, value: JSON.stringify(payload) };
+}
+function actionReachedServer(type, entryId, action) {
+  const key = actionKey(type, entryId);
+  const unsaved = unsavedOfflineActions.get(key);
+  if (unsaved && action && action.sequence >= unsaved.sequence && action.value === unsaved.value) {
+    unsavedOfflineActions.delete(key);
+  }
   offlineSaveFailure = unsavedOfflineActions.size > 0;
   updateNetworkStatusDisplay();
 }
@@ -310,13 +319,16 @@ function persistQueueSnapshot() {
     return false;
   }
 }
-async function enqueueOfflineAction(type, entryId, payload = {}) {
+async function enqueueOfflineAction(type, entryId, payload = {}, action = beginAction(payload)) {
   try {
-    await appendOfflineAction({type, entryId, payload, timestamp: Date.now()});
+    await appendOfflineAction({type, entryId, payload, timestamp: Date.now(),
+      intent: {session: consoleIntentSession, sequence: action.sequence, value: action.value}});
     updateNetworkStatusDisplay();
     return true;
   } catch (error) {
-    unsavedOfflineActions.add(actionKey(type, entryId));
+    const key = actionKey(type, entryId);
+    const previous = unsavedOfflineActions.get(key);
+    if (!previous || action.sequence > previous.sequence) unsavedOfflineActions.set(key, action);
     offlineSaveFailure = true;
     updateNetworkStatusDisplay();
     showToast(`Change is local only and was not saved for sync: ${error.message}`, 'error');
@@ -335,7 +347,11 @@ async function syncOfflineActions() {
   showToast(`⚡ Syncing ${actions.length} offline actions to server...`);
   let syncedCount;
   try {
-    syncedCount = await drainOfflineQueue(getAuthHeaders);
+    syncedCount = await drainOfflineQueue(getAuthHeaders, fetch, undefined, queued => {
+      if (queued.intent?.session === consoleIntentSession) {
+        actionReachedServer(queued.type, queued.entryId, queued.intent);
+      }
+    });
   } catch (error) {
     showToast(`Could not sync offline actions: ${error.message}`, 'error');
     return;
@@ -1358,6 +1374,7 @@ async function uncueTrack() {
   const songName = itemToUncue ? itemToUncue.song_title : 'Active Track';
 
   confirmIfPlaying(`Uncueing "${songName}"`, async () => {
+    const action = beginAction();
     if (itemToUncue) {
       const target = queue.find(q => q.entry_id === itemToUncue.entry_id);
       if (target && target.performance_status === 'On Stage') {
@@ -1373,7 +1390,7 @@ async function uncueTrack() {
     resetPlayerBar();
 
     if (!navigator.onLine) {
-      if (!await enqueueOfflineAction('uncue', null, {})) return;
+      if (!await enqueueOfflineAction('uncue', null, {}, action)) return;
       showToast(`✓ Uncued "${songName}" locally. Live Program restored.`);
       return;
     }
@@ -1384,9 +1401,10 @@ async function uncueTrack() {
         headers: getAuthHeaders()
       });
       if (!res.ok) throw new Error('Failed to uncue track on server');
+      actionReachedServer('uncue', null, action);
       showToast(`✓ Uncued "${songName}". Live Program restored to countdown.`);
     } catch (err) {
-      if (!await enqueueOfflineAction('uncue', null, {})) return;
+      if (!await enqueueOfflineAction('uncue', null, {}, action)) return;
       showToast(`Uncued locally (network error, will sync when online)`, 'warning');
     }
   });
@@ -1631,15 +1649,19 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     // Notify Live View of currently cued / active performer (skip during page reload restoration)
     if (!isRestoration) {
+      const action = beginAction();
       if (navigator.onLine) {
-        fetch(`/api/set-active/${item.entry_id}`, {
-          method: 'POST',
-          headers: getAuthHeaders()
-        }).catch(async () => {
-          await enqueueOfflineAction('set_active', item.entry_id, {});
-        });
+        try {
+          const response = await fetch(`/api/set-active/${item.entry_id}`, {
+            method: 'POST', headers: getAuthHeaders()
+          });
+          if (!response.ok) throw new Error('Failed to set active act');
+          actionReachedServer('set_active', item.entry_id, action);
+        } catch (error) {
+          await enqueueOfflineAction('set_active', item.entry_id, {}, action);
+        }
       } else {
-        await enqueueOfflineAction('set_active', item.entry_id, {});
+        await enqueueOfflineAction('set_active', item.entry_id, {}, action);
       }
     }
   };
@@ -1718,6 +1740,7 @@ async function updateStatus(entryId, newStatus) {
     normalizedPerfStatus = 'Upcoming';
   }
 
+  const action = beginAction({ status: normalizedPerfStatus });
   const target = queue.find(q => q.entry_id === entryId);
   if (target) {
     target.performance_status = normalizedPerfStatus;
@@ -1731,7 +1754,7 @@ async function updateStatus(entryId, newStatus) {
   persistQueueSnapshot();
 
   if (!navigator.onLine) {
-    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
+    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus }, action)) return;
     showToast(`✓ Marked ${normalizedPerfStatus} locally (will sync when online)`, 'info');
     return;
   }
@@ -1747,15 +1770,16 @@ async function updateStatus(entryId, newStatus) {
     });
 
     if (!res.ok) throw new Error('Status update failed');
-    actionReachedServer('update_status', entryId);
+    actionReachedServer('update_status', entryId, action);
     showToast(`✓ Updated ${target ? target.performer_name : entryId} status to ${normalizedPerfStatus}`);
   } catch (err) {
-    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus })) return;
+    if (!await enqueueOfflineAction('update_status', entryId, { status: normalizedPerfStatus }, action)) return;
     showToast(`Saved locally (network error, will sync when online)`, 'warning');
   }
 }
 
 async function updateStageNotes(entryId, notes) {
+  const action = beginAction({ notes: notes });
   const target = queue.find(q => q.entry_id === entryId);
   if (target) target.stage_notes = notes || '';
 
@@ -1768,7 +1792,7 @@ async function updateStageNotes(entryId, notes) {
   persistQueueSnapshot();
 
   if (!navigator.onLine) {
-    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
+    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes }, action)) return;
     showToast('✓ Stage note updated locally (will sync when online)', 'info');
     return;
   }
@@ -1785,10 +1809,10 @@ async function updateStageNotes(entryId, notes) {
 
     if (!res.ok) throw new Error('Failed to update stage note');
     const data = await res.json();
-    actionReachedServer('stage_notes', entryId);
+    actionReachedServer('stage_notes', entryId, action);
     showToast(data.stage_notes ? '✓ Stage note updated' : '✓ Stage note cleared');
   } catch (err) {
-    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes })) return;
+    if (!await enqueueOfflineAction('stage_notes', entryId, { notes: notes }, action)) return;
     showToast('Saved locally (network error, will sync when online)', 'warning');
   }
 }

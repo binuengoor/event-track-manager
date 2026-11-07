@@ -88,3 +88,18 @@ test('queue storage failure propagates so the UI can show unsaved status', async
   const tab = await import(url+'#full');
   await assert.rejects(tab.appendOfflineAction({type:'uncue'}),/storage full/);
 });
+
+test('replay reports only the exact action removed after server acknowledgment', async () => {
+  const values = new Map();
+  global.localStorage = {getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)};
+  Object.defineProperty(globalThis, 'navigator', {value:{locks:fakeLocks()}, configurable:true});
+  const tab = await import(url+'#ack');
+  const a = {type:'uncue',entryId:null,payload:{},intent:{session:'s',sequence:1,value:'{}'}};
+  const b = {type:'set_active',entryId:'PK-002',payload:{},intent:{session:'s',sequence:2,value:'{}'}};
+  await tab.appendOfflineAction(a); await tab.appendOfflineAction(b);
+  const acknowledged = [];
+  const count = await tab.drainOfflineQueue(()=>({}),async (target)=>({ok:target==='/api/clear-active'}),100,action=>acknowledged.push(action));
+  assert.equal(count,1);
+  assert.deepEqual(acknowledged,[a]);
+  assert.deepEqual(tab.getOfflineActions(),[b]);
+});
