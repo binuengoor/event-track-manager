@@ -16,6 +16,7 @@
   <script src="/static/vendor/lucide.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/app.css?v=1">
+<link rel="stylesheet" href="/static/css/admin-shell.css?v=1">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white">
 
@@ -62,7 +63,7 @@
           <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
           <span>Console</span>
         </a>
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-purple-600 text-white shadow-md shadow-purple-600/30 transition" title="Admin Settings">
+        <a href="/admin" aria-current="page" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-purple-600 text-white shadow-md shadow-purple-600/30 transition" title="Admin Settings">
           <i data-lucide="settings" class="w-3.5 h-3.5 text-white"></i>
           <span>Admin</span>
         </a>
@@ -72,70 +73,54 @@
   <script src="/static/js/nav.js"></script>
 
   <!-- PIN Protection Overlay (If not authenticated) -->
-  <div id="pin-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+  <div id="pin-modal" role="dialog" aria-modal="true" aria-labelledby="pin-title" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
     <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl text-center space-y-4">
       <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shadow-lg">
         <i data-lucide="lock" class="w-7 h-7"></i>
       </div>
       <div>
-        <h2 class="text-xl font-black text-white">Admin Access</h2>
+        <h2 id="pin-title" class="text-xl font-black text-white">Admin PIN</h2>
         <p class="text-xs text-slate-400 mt-1">Enter your admin security PIN to configure event rules.</p>
       </div>
       <form id="pin-form" class="space-y-3">
-        <input type="password" id="pin-input" autofocus placeholder="Enter 4-digit PIN" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono tracking-widest text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
+        <input type="password" id="pin-input" autofocus placeholder="Enter 4-digit PIN" inputmode="numeric" autocomplete="current-password" aria-label="Admin PIN" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono tracking-widest text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
         <button type="submit" class="w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition">
           Unlock Admin Panel
         </button>
-        <p id="pin-error" class="hidden text-xs text-rose-400 font-semibold"></p>
+        <p id="pin-error" role="alert" class="hidden text-xs text-rose-400 font-semibold"></p>
       </form>
+      <div id="pin-success" class="hidden space-y-3">
+        <p class="text-sm font-bold text-emerald-300">Signed in as Admin</p>
+        <div class="admin-login-links">
+          <button type="button" id="pin-go-admin" class="admin-btn admin-btn-primary">Open Admin</button>
+          <a href="/console" id="pin-go-console" class="admin-btn admin-btn-secondary">Open Sound Console</a>
+        </div>
+      </div>
     </div>
   </div>
 
   <!-- Main Administration Area -->
-  <main id="admin-main-container" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 space-y-6">
+  <main id="admin-main-container" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8">
+   <div class="admin-layout">
+    <!-- Desktop rail: five destinations -->
+    <nav id="admin-rail" class="admin-rail" aria-label="Admin sections"></nav>
+    <div id="admin-content" class="admin-content space-y-6">
 
-    <!-- Admin Navigation Tabs -->
-    <div class="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-800">
-      <button data-tab="event" class="admin-tab-btn active px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow">
-        <i data-lucide="file-text" class="w-4 h-4"></i>
-        <span>Event Details</span>
-      </button>
-      <button data-tab="rules" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="mic" class="w-4 h-4"></i>
-        <span>Sign-Up Rules</span>
-      </button>
-      <button data-tab="features" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="sliders" class="w-4 h-4"></i>
-        <span>Features & Presets</span>
-      </button>
-      <button data-tab="food" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="utensils" class="w-4 h-4"></i>
-        <span>Food & Potluck</span>
-      </button>
-      <button data-tab="participants" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="users" class="w-4 h-4"></i>
-        <span>Participants</span>
-      </button>
-      <button data-tab="sheet" id="tab-btn-sheet" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="table-2" class="w-4 h-4"></i>
-        <span>Spreadsheet</span>
-      </button>
-      <button data-tab="payments" id="tab-btn-payments" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="badge-dollar-sign" class="w-4 h-4"></i>
-        <span>Payments</span>
-      </button>
-      <button data-tab="stats" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-        <span>Event Summary</span>
-      </button>
-      <button data-tab="backup" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="save" class="w-4 h-4"></i>
-        <span>Backup & Sync</span>
-      </button>
-      <button data-tab="activity" class="admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800">
-        <i data-lucide="history" class="w-4 h-4"></i>
-        <span>Activity Log</span>
-      </button>
+    <!-- Sub-sections of the current destination (the original ten tabs, regrouped) -->
+    <div id="admin-subtabs" class="admin-subtabs" role="group" aria-label="Sections in this area">
+      <button type="button" data-tab="overview" data-dest="overview" class="admin-tab-btn admin-subtab"><span>Overview</span></button>
+      <button type="button" data-tab="stats" data-dest="overview" class="admin-tab-btn admin-subtab"><span>Event Summary</span></button>
+      <button type="button" data-tab="lineup" data-dest="lineup" class="admin-tab-btn admin-subtab"><span>Running order</span></button>
+      <button type="button" data-tab="participants" data-dest="people" class="admin-tab-btn admin-subtab"><span>Participants</span></button>
+      <button type="button" data-tab="food" data-dest="people" class="admin-tab-btn admin-subtab"><span>Food &amp; Potluck</span></button>
+      <button type="button" data-tab="payments" data-dest="people" id="tab-btn-payments" class="admin-tab-btn admin-subtab"><span>Payments</span></button>
+      <button type="button" data-tab="sheet" data-dest="people" id="tab-btn-sheet" class="admin-tab-btn admin-subtab"><span>Spreadsheet &amp; downloads</span></button>
+      <button type="button" data-tab="event" data-dest="setup" class="admin-tab-btn admin-subtab"><span>Event Details</span></button>
+      <button type="button" data-tab="rules" data-dest="setup" class="admin-tab-btn admin-subtab"><span>Sign-Up Rules</span></button>
+      <button type="button" data-tab="features" data-dest="setup" class="admin-tab-btn admin-subtab"><span>Features &amp; Presets</span></button>
+      <button type="button" data-tab="system" data-dest="system" class="admin-tab-btn admin-subtab"><span>Events &amp; Snapshots</span></button>
+      <button type="button" data-tab="backup" data-dest="system" class="admin-tab-btn admin-subtab"><span>Backups</span></button>
+      <button type="button" data-tab="activity" data-dest="system" class="admin-tab-btn admin-subtab"><span>Activity Log</span></button>
     </div>
 
     <!-- Alert / Toast Banner -->
@@ -154,11 +139,110 @@
       </div>
     </div>
 
-    <!-- Event readiness strip (filled by admin-setup.js) -->
-    <div id="readiness-card" class="hidden rounded-2xl border bg-slate-900/90 overflow-hidden"></div>
+    <!-- OVERVIEW -->
+    <section id="panel-overview" class="admin-panel space-y-5" aria-label="Overview">
+      <div id="overview-wizard-banner" class="hidden admin-banner">
+        <div>
+          <h3 class="text-sm font-bold text-white">Finish setting up your event</h3>
+          <p class="text-xs text-slate-300">The setup wizard was not finished. Pick up where you left off.</p>
+        </div>
+        <button type="button" id="overview-wizard-resume" class="admin-btn admin-btn-primary">Resume setup</button>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Is the event ready?</h3>
+          <p class="text-xs text-slate-400">Things to check before doors open. Each item links to where it is fixed.</p>
+        </div>
+        <!-- Readiness list (filled by admin-setup.js) -->
+        <div id="readiness-card" class="rounded-2xl border border-slate-800 bg-slate-950/70 overflow-hidden"><p class="p-4 text-xs text-slate-400">Checking...</p></div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Totals</h3>
+        </div>
+        <div id="overview-totals" class="admin-totals" aria-live="polite"></div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Show-day switches</h3>
+          <p class="text-xs text-slate-400">Open or close things instantly. Nothing is deleted.</p>
+        </div>
+        <div id="overview-switches" class="admin-switch-list"></div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Quick switch</h3>
+          <p class="text-xs text-slate-400">Change the whole event type in one tap. You see what will change first. Use Freeze on show day to stop new sign-ups and uploads.</p>
+        </div>
+        <div id="overview-presets" class="admin-chip-row" role="group" aria-label="Event presets"></div>
+        <div id="overview-preset-preview" class="hidden p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3"></div>
+      </div>
+    </section>
+
+    <!-- LINEUP -->
+    <section id="panel-lineup" class="admin-panel hidden space-y-5" aria-label="Lineup">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Running order and tracks</h3>
+            <p class="text-xs text-slate-400">The order is changed in the sound console. Here you see each act and whether its track is ready.</p>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="lineup-refresh" class="admin-btn admin-btn-secondary">Refresh</button>
+            <a href="/console" class="admin-btn admin-btn-secondary">Open Sound Console</a>
+          </div>
+        </div>
+        <div id="lineup-list" class="space-y-2"></div>
+      </div>
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-3">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Unmatched files</h3>
+          <p class="text-xs text-slate-400">Files that arrived but are not attached to an act yet (for example sent by email or copied in).</p>
+        </div>
+        <div id="lineup-incoming" class="space-y-2"></div>
+      </div>
+    </section>
+
+    <!-- SYSTEM -->
+    <section id="panel-system" class="admin-panel hidden space-y-5" aria-label="System">
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Events</h3>
+            <p class="text-xs text-slate-400">Every event keeps its own sign-ups, potluck, payments and settings.</p>
+          </div>
+          <button type="button" id="system-manage-events" class="admin-btn admin-btn-secondary">Manage events and clear media</button>
+        </div>
+        <div id="system-events" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div>
+            <h3 class="text-base font-bold text-white">Database snapshots</h3>
+            <p class="text-xs text-slate-400">Copies of all sign-ups and settings. Restoring replaces today's data with the snapshot, after saving a safety copy first.</p>
+          </div>
+          <button type="button" id="system-snapshots-refresh" class="admin-btn admin-btn-secondary">Refresh</button>
+        </div>
+        <div id="system-snapshots" class="space-y-2"></div>
+        <div id="snapshot-restore-box" class="hidden p-4 rounded-2xl bg-rose-950/30 border border-rose-500/40 space-y-3" role="alertdialog" aria-labelledby="snapshot-restore-title"></div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-3">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Offline copy of all tracks</h3>
+          <p class="text-xs text-slate-400">One ZIP with every ready track in running order, so the show can run without the network.</p>
+        </div>
+        <a id="system-offline-zip" href="/api/export-zip" download class="admin-btn admin-btn-primary">Download offline ZIP</a>
+      </div>
+    </section>
 
     <!-- TAB 1: EVENT DETAILS -->
-    <section id="panel-event" class="admin-panel space-y-5">
+    <section id="panel-event" class="admin-panel hidden space-y-5">
       <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
         <div class="border-b border-slate-800 pb-3 flex items-center justify-between">
           <div>
@@ -321,6 +405,25 @@
                 <input type="checkbox" id="allowed-media-video" class="rounded bg-slate-950 border-slate-700 text-purple-500"> <span>Video (MP4 with lyrics, plays on the stage monitor)</span>
               </label>
             </div>
+          </div>
+
+          <div>
+            <label for="setting-max-audio-mb" class="block font-semibold text-slate-300 mb-1">Largest audio file (MB)</label>
+            <input type="number" id="setting-max-audio-mb" min="1" max="2000" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <div>
+            <label for="setting-max-video-mb" class="block font-semibold text-slate-300 mb-1">Largest video file (MB)</label>
+            <input type="number" id="setting-max-video-mb" min="1" max="5000" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-white">
+          </div>
+          <p class="sm:col-span-2 text-[11px] text-slate-500 -mt-2">Audio: MP3, WAV, M4A. Video: MP4, WebM. Bigger files are refused with a plain message.</p>
+
+          <!-- Junior names -->
+          <div class="sm:col-span-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+            <div>
+              <span id="shorten-junior-label" class="block font-semibold text-slate-200">Shorten junior names on public screens</span>
+              <span id="shorten-junior-help" class="block text-[11px] text-slate-400 mt-0.5">Juniors are shown as first name and last initial (for example Anika M.) on the schedule and live screen. Admin and the sound console always show full names.</span>
+            </div>
+            <button type="button" role="switch" id="setting-shorten-junior-names" class="sw" aria-checked="true" aria-labelledby="shorten-junior-label" aria-describedby="shorten-junior-help"></button>
           </div>
 
           <!-- Performance Types Chips -->
@@ -708,7 +811,7 @@
       <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
         <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <div>
-            <h3 class="text-base font-bold text-white">Automated Cloud Backup & One-Way Sync</h3>
+            <h3 class="text-base font-bold text-white">Automatic backups</h3>
             <p class="text-xs text-slate-400">Automatic export of signups.xlsx / CSV and database snapshots into the event folder, a few seconds after every change.</p>
           </div>
           <button id="force-backup-btn" class="px-4 py-2 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold shadow transition flex items-center gap-1.5">
@@ -803,7 +906,11 @@
         </div>
       </div>
     </section>
+    </div>
+   </div>
   </main>
+  <!-- Phone bottom bar: same five destinations -->
+  <nav id="admin-bottom-bar" class="admin-bottom-bar" aria-label="Admin sections (phone)"></nav>
 
   <!-- Footer -->
   <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
@@ -1100,9 +1207,10 @@
   </div>
 
   <script src="/static/js/utils.js"></script>
-  <script src="/static/js/admin-settings.js?v=2.1"></script>
+  <script src="/static/js/admin-settings.js?v=3.0"></script>
   <script src="/static/js/admin-setup.js"></script>
   <script src="/static/js/admin-data.js"></script>
   <script src="/static/js/admin-events.js"></script>
+  <script src="/static/js/admin-dashboard.js"></script>
 </body>
 </html>

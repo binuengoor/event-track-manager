@@ -258,6 +258,7 @@
 
   function bindWizard() {
     document.getElementById('open-wizard-btn')?.addEventListener('click', openWizard);
+    document.getElementById('overview-wizard-resume')?.addEventListener('click', openWizard);
     document.getElementById('wizard-close')?.addEventListener('click', closeWizard);
     document.getElementById('wizard-back')?.addEventListener('click', () => { collectStep(); wiz.step = Math.max(0, wiz.step - 1); renderWizard(); });
     document.getElementById('wizard-next')?.addEventListener('click', async () => {
@@ -280,30 +281,46 @@
   }
 
   // ------------------------------------------------------------------ readiness
-  let readinessOpen = false;
+  // Where each check is fixed: a tab id, or "wizard". Checks fixed outside the app (PIN in .env) have no link.
+  const FIX_TARGET = {
+    storage: ['system', 'Open System'], disk: ['system', 'Open System'], db_integrity: ['system', 'Open System'],
+    ffmpeg: ['system', 'Open System'], ffprobe: ['system', 'Open System'], downloader: ['system', 'Open System'],
+    acts: ['lineup', 'Open Lineup'], songs: ['lineup', 'Open Lineup'], tracks: ['lineup', 'Open Lineup'],
+    track_files: ['lineup', 'Open Lineup'], incoming: ['lineup', 'Match files in Lineup'],
+    backup: ['backup', 'Open Backups'], wizard: ['wizard', 'Resume setup'],
+  };
+  window.readinessFixTarget = (id) => FIX_TARGET[id] || null;
+
   async function loadReadiness() {
     const card = document.getElementById('readiness-card');
     if (!card) return;
     let data;
-    try { data = await api('/api/admin/readiness'); } catch (e) { return; }
-    const tone = { ok: ['border-emerald-500/30', 'text-emerald-300', 'check-circle-2'], warn: ['border-amber-500/40', 'text-amber-300', 'alert-triangle'], error: ['border-rose-500/50', 'text-rose-300', 'x-circle'] }[data.overall];
-    const dot = { ok: 'text-emerald-400', warn: 'text-amber-400', error: 'text-rose-400', info: 'text-sky-400' };
-    const icon = { ok: 'check', warn: 'alert-triangle', error: 'x-circle', info: 'info' };
+    try { data = await api('/api/admin/readiness'); } catch (e) {
+      card.innerHTML = '<p class="p-4 text-xs text-amber-300">Could not check readiness right now. It will retry in a minute.</p>';
+      return;
+    }
     const issues = data.counts.warn + data.counts.error;
-    card.className = `rounded-2xl border bg-slate-900/90 overflow-hidden ${tone[0]}`;
+    const label = { ok: 'OK', warn: 'Check', error: 'Fix now', info: 'Info' };
+    const order = { error: 0, warn: 1, info: 2, ok: 3 };
+    const checks = data.checks.slice().sort((x, y) => order[x.status] - order[y.status]);
     card.innerHTML = `
-      <button type="button" id="readiness-toggle" class="w-full px-4 py-3 flex items-center justify-between gap-3 text-left">
-        <span class="flex items-center gap-2.5 text-xs font-bold ${tone[1]}"><i data-lucide="${tone[2]}" class="w-4 h-4"></i>
-          ${data.overall === 'ok' ? 'Event readiness: all good' : `Event readiness: ${issues} thing${issues === 1 ? '' : 's'} to check`}</span>
-        <i data-lucide="${readinessOpen ? 'chevron-up' : 'chevron-down'}" class="w-4 h-4 text-slate-400"></i>
-      </button>
-      <ul class="${readinessOpen ? '' : 'hidden'} border-t border-slate-800 divide-y divide-slate-800/70 text-xs">
-        ${data.checks.map((c) => `<li class="px-4 py-2.5 flex gap-3"><i data-lucide="${icon[c.status]}" class="w-4 h-4 mt-0.5 shrink-0 ${dot[c.status]}"></i>
-          <div class="min-w-0"><div class="font-semibold text-white">${esc(c.label)}</div><div class="text-slate-400">${esc(c.detail)}</div>${c.fix ? `<div class="text-slate-500 mt-0.5">Fix: ${esc(c.fix)}</div>` : ''}</div></li>`).join('')}
-      </ul>`;
-    if (window.lucide) lucide.createIcons();
-    document.getElementById('readiness-toggle').onclick = () => { readinessOpen = !readinessOpen; loadReadiness(); };
+      <div class="rd-summary ${data.overall === 'ok' ? 'text-emerald-300' : data.overall === 'warn' ? 'text-amber-300' : 'text-rose-300'}" role="status">
+        ${data.overall === 'ok' ? 'All good. Nothing needs attention.' : `${issues} thing${issues === 1 ? '' : 's'} to check`}</div>
+      <ul>${checks.map((c) => {
+        const fix = FIX_TARGET[c.id];
+        return `<li class="rd-row">
+          <span class="rd-status rd-${esc(c.status)}">${label[c.status] || esc(c.status)}</span>
+          <div class="rd-main"><div class="rd-label">${esc(c.label)}</div><div class="rd-detail">${esc(c.detail)}</div>
+            ${c.fix ? `<div class="rd-fix">Fix: ${esc(c.fix)}</div>` : ''}
+            ${fix && c.status !== 'ok' ? `<button type="button" class="rd-link" data-fix="${esc(fix[0])}">${esc(fix[1])}</button>` : ''}</div></li>`;
+      }).join('')}</ul>`;
+    card.querySelectorAll('[data-fix]').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.fix === 'wizard') openWizard();
+      else if (typeof window.showAdminTab === 'function') window.showAdminTab(b.dataset.fix);
+    }));
+    document.dispatchEvent(new CustomEvent('etm:readiness', { detail: data }));
   }
+  window.loadReadiness = loadReadiness;
 
   // ------------------------------------------------------------------ boot
   async function initExtras() {

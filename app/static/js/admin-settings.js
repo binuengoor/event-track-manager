@@ -15,10 +15,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   await checkAuthAndLoad();
 });
 
+function loginErrorMessage(res, data) {
+  if (res.status === 429) {
+    const header = parseInt(res.headers.get("Retry-After") || "", 10);
+    const secs = (data && Number.isFinite(Number(data.retry_after)) && Number(data.retry_after) > 0) ? Number(data.retry_after) : (header > 0 ? header : 60);
+    const mins = Math.max(1, Math.ceil(secs / 60));
+    return `Too many attempts, try again in ${mins} min`;
+  }
+  if (res.status === 401 || res.status === 403) return "That PIN is not right. Check it and try again.";
+  return `The server had a problem (error ${res.status}). Try again in a moment.`;
+}
+window.loginErrorMessage = loginErrorMessage;
+
 function setupPinAuth() {
   const pinForm = document.getElementById("pin-form");
   const pinInput = document.getElementById("pin-input");
   const pinError = document.getElementById("pin-error");
+  const showError = (msg) => { pinError.textContent = msg; pinError.classList.remove("hidden"); };
+
+  document.getElementById("pin-go-admin")?.addEventListener("click", async () => {
+    document.getElementById("pin-modal").classList.add("hidden");
+    document.getElementById("auth-status-badge")?.classList.remove("hidden");
+    await loadAllAdminData();
+  });
 
   pinForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -26,24 +45,26 @@ function setupPinAuth() {
     const pin = pinInput.value.trim();
     if (!pin) return;
 
+    let res;
     try {
-      const res = await fetch("/api/auth/login", {
+      res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin })
       });
-
-      if (!res.ok) throw new Error("Invalid PIN. Please try again.");
-      const loginData = await res.json().catch(() => ({}));
-      if (loginData.role && loginData.role !== "admin") throw new Error("This PIN only opens the sound console. Use the admin PIN here.");
-
-      document.getElementById("pin-modal").classList.add("hidden");
-      document.getElementById("auth-status-badge")?.classList.remove("hidden");
-      await loadAllAdminData();
     } catch (err) {
-      pinError.textContent = err.message;
-      pinError.classList.remove("hidden");
+      showError("Cannot reach the server. Check your connection and try again.");
+      return;
     }
+    let data = {};
+    try { data = await res.json(); } catch (err) { /* no body */ }
+    if (!res.ok) { showError(loginErrorMessage(res, data)); return; }
+    if (data.role && data.role !== "admin") { showError("This PIN only opens the sound console. Use the Admin PIN here."); return; }
+
+    pinInput.value = "";
+    pinForm.classList.add("hidden");
+    document.getElementById("pin-success")?.classList.remove("hidden");
+    document.getElementById("pin-go-admin")?.focus();
   });
 }
 
@@ -64,25 +85,86 @@ async function checkAuthAndLoad() {
   }
 }
 
-function setupTabs() {
-  const tabs = document.querySelectorAll(".admin-tab-btn");
-  tabs.forEach(btn => {
-    btn.addEventListener("click", () => {
-      tabs.forEach(t => {
-        t.className = "admin-tab-btn px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-slate-900 text-slate-400 hover:text-white border border-slate-800";
-      });
-      btn.className = "admin-tab-btn active px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow";
+// Five destinations, each grouping some of the original ten tabs (kept as sub-sections).
+const ADMIN_DESTINATIONS = [
+  { id: "overview", label: "Overview", icon: "layout-dashboard", tabs: ["overview", "stats"] },
+  { id: "lineup", label: "Lineup", icon: "list-ordered", tabs: ["lineup"], requires: "stage_performances_enabled" },
+  { id: "people", label: "People & Food", icon: "users", tabs: ["participants", "food", "payments", "sheet"] },
+  { id: "setup", label: "Setup & Rules", icon: "sliders", tabs: ["event", "rules", "features"] },
+  { id: "system", label: "System", icon: "server", tabs: ["system", "backup", "activity"] }
+];
+window.ADMIN_DESTINATIONS = ADMIN_DESTINATIONS;
+let currentAdminTab = "overview";
 
-      const targetTab = btn.dataset.tab;
-      document.querySelectorAll(".admin-panel").forEach(p => p.classList.add("hidden"));
-      document.getElementById(`panel-${targetTab}`)?.classList.remove("hidden");
+function destinationOf(tab) {
+  return ADMIN_DESTINATIONS.find(d => d.tabs.includes(tab)) || ADMIN_DESTINATIONS[0];
+}
 
-      if (targetTab === "participants") loadParticipants();
-      if (targetTab === "stats") loadSummary();
-      if (targetTab === "backup") loadBackupStatus();
-      if (targetTab === "activity") loadActivityLogs();
+function renderNavButtons() {
+  ["admin-rail", "admin-bottom-bar"].forEach(id => {
+    const nav = document.getElementById(id);
+    if (!nav) return;
+    nav.innerHTML = ADMIN_DESTINATIONS.map(d =>
+      `<button type="button" class="admin-dest" data-dest="${d.id}"><i data-lucide="${d.icon}" class="w-4 h-4" aria-hidden="true"></i><span>${d.label}</span></button>`
+    ).join("");
+    nav.querySelectorAll(".admin-dest").forEach(btn => {
+      btn.addEventListener("click", () => showAdminTab(ADMIN_DESTINATIONS.find(d => d.id === btn.dataset.dest).tabs[0]));
     });
   });
+}
+
+function showAdminTab(targetTab) {
+  if (!document.getElementById(`panel-${targetTab}`)) targetTab = "overview";
+  const dest = destinationOf(targetTab);
+  currentAdminTab = targetTab;
+
+  document.querySelectorAll(".admin-dest").forEach(b => {
+    if (b.dataset.dest === dest.id) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+
+  const bar = document.getElementById("admin-subtabs");
+  let visible = 0;
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+    const inDest = btn.dataset.dest === dest.id;
+    btn.hidden = !inDest;
+    if (inDest && !btn.classList.contains("hidden")) visible++;
+    if (btn.dataset.tab === targetTab) { btn.setAttribute("aria-current", "page"); btn.classList.add("active"); }
+    else { btn.removeAttribute("aria-current"); btn.classList.remove("active"); }
+  });
+  if (bar) bar.hidden = visible <= 1;
+
+  document.querySelectorAll(".admin-panel").forEach(p => p.classList.add("hidden"));
+  document.getElementById(`panel-${targetTab}`)?.classList.remove("hidden");
+
+  if (targetTab === "participants") loadParticipants();
+  if (targetTab === "stats") loadSummary();
+  if (targetTab === "backup") loadBackupStatus();
+  if (targetTab === "activity") loadActivityLogs();
+  try { history.replaceState(null, "", `#${targetTab}`); } catch (e) { /* ignore */ }
+  document.dispatchEvent(new CustomEvent("etm:admin-tab", { detail: { tab: targetTab, dest: dest.id } }));
+}
+window.showAdminTab = showAdminTab;
+
+function updateDestinationAvailability() {
+  const lineupOn = adminSettings.stage_performances_enabled !== false;
+  document.querySelectorAll('.admin-dest[data-dest="lineup"]').forEach(b => { b.hidden = !lineupOn; });
+  if (!lineupOn && currentAdminTab === "lineup") showAdminTab("overview");
+}
+
+function setupTabs() {
+  renderNavButtons();
+  if (window.lucide) lucide.createIcons();
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => showAdminTab(btn.dataset.tab));
+  });
+  document.getElementById("setting-shorten-junior-names")?.addEventListener("click", (ev) => {
+    const el = ev.currentTarget;
+    el.setAttribute("aria-checked", el.getAttribute("aria-checked") === "true" ? "false" : "true");
+  });
+
+  document.querySelectorAll("[data-goto]").forEach(el => el.addEventListener("click", () => showAdminTab(el.dataset.goto)));
+  const initial = (location.hash || "").replace("#", "");
+  showAdminTab(document.getElementById(`panel-${initial}`) ? initial : "overview");
 }
 
 async function loadAllAdminData() {
@@ -128,6 +210,9 @@ async function loadSettings() {
     // Rules
     setValue("setting-max-perfs", adminSettings.max_performances_per_participant || 2);
     setValue("setting-max-solo", adminSettings.max_solo_per_participant !== undefined ? adminSettings.max_solo_per_participant : 1);
+    setValue("setting-max-audio-mb", adminSettings.max_audio_upload_mb ?? 200);
+    setValue("setting-max-video-mb", adminSettings.max_video_upload_mb ?? 500);
+    setSwitch("setting-shorten-junior-names", adminSettings.shorten_junior_names !== false);
 
     perfTypes = adminSettings.performance_types || ["Solo", "Duet", "Group"];
     renderPerformanceTypeChips();
@@ -143,10 +228,17 @@ async function loadSettings() {
     setValue("setting-food-serving-note", adminSettings.food_serving_note || "Bring one dish to share");
     updateFoodToggleButton(Boolean(adminSettings.food_signup_enabled !== false));
     renderFeatureToggles();
+    updateDestinationAvailability();
+    document.dispatchEvent(new CustomEvent("etm:settings-loaded"));
 
   } catch (e) {
     console.error("Error loading settings:", e);
   }
+}
+
+function setSwitch(id, on) {
+  const el = document.getElementById(id);
+  if (el) el.setAttribute("aria-checked", on ? "true" : "false");
 }
 
 function setValue(id, val) {
@@ -736,6 +828,10 @@ function filterAndRenderActivityLogs() {
       actorBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">Performer Hub</span>`;
     }
 
+    if (item.role) {
+      actorBadge += ` <span class="act-role" title="Who did it">Role: ${escapeHtml(String(item.role))}</span>`;
+    }
+
     // Try to parse details JSON for diff display
     let parsedDetails = null;
     if (item.details) {
@@ -878,6 +974,9 @@ function setupActionHandlers() {
     const payload = {
       max_performances_per_participant: parseInt(document.getElementById("setting-max-perfs").value, 10) || 2,
       max_solo_per_participant: parseInt(document.getElementById("setting-max-solo").value, 10) || 1,
+      max_audio_upload_mb: parseInt(document.getElementById("setting-max-audio-mb").value, 10) || 200,
+      max_video_upload_mb: parseInt(document.getElementById("setting-max-video-mb").value, 10) || 500,
+      shorten_junior_names: document.getElementById("setting-shorten-junior-names").getAttribute("aria-checked") === "true",
       performance_types: perfTypes,
       age_groups: ageGroups,
       allowed_media: (window.readAllowedMedia ? window.readAllowedMedia() : ["audio", "video"])
