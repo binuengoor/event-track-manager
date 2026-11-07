@@ -5,21 +5,12 @@ deleted by a preset; it only changes which pages/actions are open and the sign-u
 """
 from typing import Any, Dict, List
 
-from app.features import FEATURES
+from app.features import FEATURES, feature_labels
 
 FLAG_KEYS = list(FEATURES)
 
 SETTING_LABELS: Dict[str, str] = {
-    "stage_performances_enabled": "Stage performances",
-    "signup_enabled": "Performer sign-up",
-    "food_signup_enabled": "Potluck food sign-up",
-    "track_upload_enabled": "Backing track uploads",
-    "allow_duets": "Duets and groups",
-    "performer_edits_enabled": "Performers can edit their entries",
-    "live_display_enabled": "Live audience screen",
-    "dashboard_enabled": "Public dashboard",
-    "console_enabled": "Sound console",
-    "payment_enabled": "Payment links",
+    **feature_labels(),
     "max_performances_per_participant": "Songs per person",
     "max_solo_per_participant": "Solo songs per person",
     "performance_types": "Performance types",
@@ -123,7 +114,7 @@ def diff_against(preset_id: str, current: Dict[str, Any]) -> List[Dict[str, Any]
     for key, new in preset_settings(preset_id).items():
         old = current.get(key)
         if key in FLAG_KEYS and old is None:
-            old = True  # flags default to on
+            old = FEATURES[key].default
         if isinstance(old, str) and old.lower() in ("true", "false"):
             old = old.lower() == "true"
         if old != new:

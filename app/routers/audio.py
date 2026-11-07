@@ -1,4 +1,5 @@
 import os
+import hashlib
 import logging
 from typing import Optional
 from fastapi import (
@@ -10,10 +11,11 @@ from fastapi.responses import FileResponse
 from app.features import feature_enabled
 from app.services.event_service import event_service
 from app.services.audio_service import audio_service
-from app.services.track_store import mime_type_for
+from app.services.track_store import mime_type_for, media_type_for
 from app.services.audio_workflow_service import audio_workflow_service
 from app.services.db_service import db_service
-from app.routers.auth import verify_operator_pin
+from app.routers.auth import verify_operator_pin, verify_admin_pin
+from app.config import get_setting, settings
 from app.exceptions import (
     UploadDisabledError,
     PerformanceNotFoundError,
@@ -43,7 +45,9 @@ async def upload_track(
         original_filename = file.filename if file else None
         if file:
             # Stream to disk in 1 MB chunks and stop early when too big (a 500 MB video must not sit in RAM)
-            limit = audio_workflow_service.max_upload_bytes((media_type or "").strip().lower() == "video")
+            is_video = (media_type or "").strip().lower() == "video"
+            audio_workflow_service.check_extension(original_filename, is_video)
+            limit = audio_workflow_service.max_upload_bytes(is_video)
             safe = "".join(c for c in entry_id if c.isalnum() or c in ("-", "_"))[:60] or "upload"
             raw_path = os.path.join(audio_service.cache_dir, f"{safe}.incoming_{os.getpid()}")
             written = 0
@@ -133,6 +137,61 @@ async def export_offline_zip(_authorized: bool = Depends(verify_operator_pin)):
     except Exception as e:
         logger.exception("Failed to export offline ZIP: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to generate offline ZIP: {str(e)}")
+
+
+_SHA_CACHE: dict = {}
+
+
+def _sha256_cached(path: str) -> str:
+    """sha256 of a file, cached by (path, size, mtime) so repeated manifest calls do not re-read big videos."""
+    st = os.stat(path)
+    key = (path, st.st_size, st.st_mtime_ns)
+    cached = _SHA_CACHE.get(key)
+    if cached:
+        return cached
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    for old in [k for k in _SHA_CACHE if k[0] == path]:
+        _SHA_CACHE.pop(old, None)
+    _SHA_CACHE[key] = h.hexdigest()
+    return _SHA_CACHE[key]
+
+
+def _duration_seconds(text) -> Optional[float]:
+    parts = str(text or "").strip().split(":")
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if not 1 < len(nums) <= 3:
+        return None
+    total = 0
+    for n in nums:
+        total = total * 60 + n
+    return float(total)
+
+
+@router.get("/api/vault/manifest")
+def vault_manifest(_authorized: bool = Depends(verify_admin_pin)):
+    """Every ready track (audio and video) with its checksum, for backup/verification tools."""
+    tracks = []
+    for perf in db_service.get_all_performances():
+        entry_id = perf.get("entry_id")
+        path = audio_service.get_track_path(entry_id) if entry_id else None
+        if not path or not os.path.isfile(path):
+            continue
+        tracks.append({
+            "entry_id": entry_id,
+            "file": os.path.basename(path),
+            "kind": media_type_for(path),
+            "sha256": _sha256_cached(path),
+            "size": os.path.getsize(path),
+            "duration": _duration_seconds(perf.get("duration")),
+            "url": f"/api/stream/{entry_id}",
+        })
+    return {"event_id": get_setting("event_id") or settings.event.id, "tracks": tracks}
 
 
 @router.get("/api/download-track/{entry_id}")

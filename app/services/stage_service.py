@@ -4,7 +4,7 @@ import urllib.parse
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from app.config import settings
+from app.config import settings, get_setting
 from app.services.db_service import db_service
 
 logger = logging.getLogger("stage-service")
@@ -138,7 +138,8 @@ class StageService:
             "last_synced_at": last_sync,
             "is_dirty": db_service.is_sequence_dirty(),
             "active_entry_id": active_id,
-            "gallery_images": self.get_gallery_images()
+            "gallery_images": self.get_gallery_images(),
+            "announcement": str(get_setting("announcement", "") or ""),
         }
 
 

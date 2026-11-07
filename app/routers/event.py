@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from app.features import feature_enabled
 from app.config import settings, get_setting, parse_event_datetime
 from app.services.downloader_client import downloader_client
+from app.services.audio_workflow_service import audio_workflow_service
 
 logger = logging.getLogger("event-router")
 
@@ -60,7 +61,10 @@ def get_event_info():
         "console_enabled": feature_enabled("console_enabled"),
         "allowed_media": get_setting("allowed_media", ["audio", "video"]),
         "setup_completed": bool(get_setting("setup_completed", False)),
-        "max_upload_size_mb": settings.storage.max_upload_size_mb,
+        "max_audio_upload_mb": audio_workflow_service.upload_limit_mb(False),
+        "max_video_upload_mb": audio_workflow_service.upload_limit_mb(True),
+        "max_upload_size_mb": audio_workflow_service.upload_limit_mb(False),
+        "allowed_extensions": list(audio_workflow_service.ALLOWED_EXTENSIONS),
         "sheet_url": sheet_url
     }
 

@@ -294,7 +294,8 @@ class DBService:
         summary: str,
         entry_id: str = "",
         details: str = "",
-        source: str = "system"
+        source: str = "system",
+        role: Optional[str] = None,
     ) -> str:
         return self.audit_repo.log_activity(
             action_type=action_type,
@@ -302,7 +303,8 @@ class DBService:
             summary=summary,
             entry_id=entry_id,
             details=details,
-            source=source
+            source=source,
+            role=role,
         )
 
     def get_activity_logs(

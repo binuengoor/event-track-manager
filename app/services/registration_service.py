@@ -7,7 +7,7 @@ from app.config import settings, get_setting
 from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
-from app.privacy import strip_private
+from app.privacy import strip_private, NamePrivacy
 from app.schemas import SignupRequest, PerformanceUpdateRequest, validate_phone
 
 logger = logging.getLogger("registration-service")
@@ -41,12 +41,17 @@ class RegistrationService:
         all_items = db_service.get_all_food_items_with_signups()
 
         perfs = db_service.get_all_performances()
-        registered_names = sorted(list({p["performer_name"] for p in perfs if p.get("performer_name")}))
+        privacy = NamePrivacy(perfs)
+        registered_names = sorted({privacy.name(p["performer_name"]) for p in perfs if p.get("performer_name")})
+        registered_entries = [
+            {"name": privacy.name(p["performer_name"]), "entry_id": p.get("entry_id")}
+            for p in perfs if p.get("performer_name")
+        ]
         existing_songs = [
             {
                 "song_title": (p.get("song_title") or "").strip(),
-                "performer_name": (p.get("performer_name") or "").strip(),
-                "partner_name": (p.get("partner_name") or "").strip(),
+                "performer_name": (privacy.name((p.get("performer_name") or "").strip()) or ""),
+                "partner_name": (privacy.partners((p.get("partner_name") or "").strip()) or ""),
                 "performance_type": p.get("performance_type", "Solo"),
                 "entry_id": p.get("entry_id")
             }
@@ -78,6 +83,7 @@ class RegistrationService:
             "food_groups": visible_groups,
             "food_items": strip_private(all_items),
             "registered_performers": registered_names,
+            "registered_entries": registered_entries,
             "existing_songs": existing_songs
         }
 
@@ -96,7 +102,7 @@ class RegistrationService:
             raise RegistrationError("Name is required.")
 
         reg_type = (payload.registration_type or "performer").strip().lower()
-        is_food_only = (reg_type == "food_only") or (not payload.performances and payload.food_signup and payload.food_signup.item_id)
+        is_food_only = (reg_type in ("food_only", "food")) or (not payload.performances and payload.food_signup and payload.food_signup.item_id)
         contact_phone = (payload.contact_info or "").strip()
 
         # 1. Food-only attendee registration
@@ -142,6 +148,9 @@ class RegistrationService:
                 "food_signup_id": food_signup_id,
                 "message": f"Thank you, {clean_name}! Your potluck food contribution has been registered."
             }
+
+        if reg_type == "both" and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
+            raise RegistrationError("Choose a dish or switch off the dish part.")
 
         # 2. Stage performance validation
         if not perf_signup_enabled:

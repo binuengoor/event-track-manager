@@ -7,7 +7,7 @@ from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
-from app.privacy import strip_private
+from app.privacy import strip_private, NamePrivacy
 from app.utils.name_matcher import split_signer_names
 from app.schemas import (
     AddPerformanceRequest,
@@ -27,6 +27,7 @@ async def get_performer_profile(name: str):
         raise HTTPException(status_code=400, detail="Name parameter is required.")
 
     all_perfs = db_service.get_all_performances()
+    names = NamePrivacy(all_perfs)
     # Exact (case-insensitive) match only: substring matching let anyone enumerate every performer.
     wanted = clean_name.lower()
     user_perfs = [
@@ -58,13 +59,25 @@ async def get_performer_profile(name: str):
         effective_perfs = []
         other_songs = []
     else:
-        effective_perfs = user_perfs
+        # The caller typed the name they are looking up, so only OTHER people's junior names are shortened.
+        def shown(value):
+            return value if (value or "").strip().lower() == wanted else names.name(value)
+
+        def shown_partners(value):
+            if not value or (value or "").strip().lower() == wanted:
+                return value
+            return " & ".join(shown(n) for n in split_signer_names(value)) if names.enabled else value
+
+        effective_perfs = [
+            {**p, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
+            for p in user_perfs
+        ]
         # Other songs list for transparency
         user_ids = {up["entry_id"] for up in user_perfs}
         other_songs = [
             {
                 "entry_id": p["entry_id"],
-                "performer_name": p["performer_name"],
+                "performer_name": names.name(p["performer_name"]),
                 "song_title": p.get("song_title") or "",
                 "movie_name": p.get("movie_name") or "",
                 "performance_type": p.get("performance_type", "Solo")
@@ -98,20 +111,21 @@ async def get_registered_participant_names():
 
     names = set()
     perfs = db_service.get_all_performances()
+    privacy = NamePrivacy(perfs)
     for perf in perfs:
         pname = (perf.get("performer_name") or "").strip()
         if pname:
-            names.add(pname)
+            names.add(privacy.name(pname))
         partner = (perf.get("partner_name") or "").strip()
         if partner:
-            names.add(partner)
+            names.add(privacy.partners(partner))
 
     if not stage_performances_enabled:
         participants = db_service.get_all_participants()
         for p in participants:
             n = (p.get("name") or "").strip()
             if n:
-                names.add(n)
+                names.add(privacy.name(n))
 
     return sorted(list(names), key=lambda x: x.lower())
 

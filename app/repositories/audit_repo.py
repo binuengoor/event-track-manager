@@ -12,6 +12,19 @@ logger = logging.getLogger("audit-repo")
 BACKUP_PENDING, BACKUP_SUCCESS, BACKUP_FAILED = "pending", "success", "failed"
 
 
+ACTOR_ROLES = ("admin", "guest", "system")
+# Legacy source labels written before roles were recorded explicitly.
+GUEST_SOURCES = {"performer_hub", "public_signup", "upload", "youtube", "guest"}
+
+
+def role_for_source(source: str) -> str:
+    """Actor role (admin|guest|system) encoded in an activity-log source: 'admin', 'admin:upload', 'guest:upload'..."""
+    head = (source or "").strip().lower().split(":", 1)[0]
+    if head in ACTOR_ROLES:
+        return head
+    return "guest" if head in GUEST_SOURCES else "system"
+
+
 class AuditRepository(BaseRepository):
     """Repository for managing activity audit trail and database backup logs."""
 
@@ -78,8 +91,17 @@ class AuditRepository(BaseRepository):
         summary: str,
         entry_id: str = "",
         details: str = "",
-        source: str = "system"
+        source: str = "system",
+        role: Optional[str] = None,
     ) -> str:
+        """``role`` (admin|guest|system) is encoded as a source prefix ('admin:upload') so no column is needed."""
+        if role:
+            role = role.strip().lower()
+            if role not in ACTOR_ROLES:
+                raise ValueError(f"Unknown actor role '{role}'")
+            clean = (source or "").strip().lower()
+            if clean.split(":", 1)[0] != role:
+                source = role if clean in ("", role) else f"{role}:{clean}"
         try:
             log_id = f"act_{uuid.uuid4().hex[:10]}"
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -133,7 +155,12 @@ class AuditRepository(BaseRepository):
                 params.append(limit)
 
                 rows = conn.execute(query, params).fetchall()
-                return [dict(r) for r in rows]
+                out = []
+                for r in rows:
+                    item = dict(r)
+                    item["role"] = role_for_source(item.get("source", ""))
+                    out.append(item)
+                return out
         except Exception as ex:
             logger.error(f"Failed to fetch activity logs: {ex}")
             return []

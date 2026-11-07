@@ -13,6 +13,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from app.features import feature_defaults
 from app.config import settings, get_setting
 from app.services.db_service import db_service
 from app.services.track_store import MEDIA_EXTS
@@ -238,8 +239,8 @@ class EventManager:
 
             self._point_at(folder, event_id)
             self.bootstrap(seed_food=False)
-            db_service.log_activity(action_type="admin_edit", performer_name="Admin",
-                                    summary=f"Activated event '{event_id}'", source="admin")
+            db_service.log_activity(action_type="admin_edit", performer_name="",
+                                    summary=f"Activated event '{event_id}'", source="admin", role="admin")
             logger.warning("Active event is now %s (%s)", event_id, folder)
         return {"id": event_id, "changed": True}
 
@@ -326,8 +327,8 @@ class EventManager:
         finally:
             conn.close()
         if event_id == self.active_id():
-            db_service.log_activity(action_type="admin_edit", performer_name="Admin",
-                                    summary=f"Cleared media ({files} file(s), {freed // (1024 * 1024)} MB freed)", source="admin")
+            db_service.log_activity(action_type="admin_edit", performer_name="",
+                                    summary=f"Cleared media ({files} file(s), {freed // (1024 * 1024)} MB freed)", source="admin", role="admin")
         logger.warning("Cleared media for %s: %d files, %d bytes", event_id, files, freed)
         return {"event_id": event_id, "files_deleted": files, "bytes_freed": freed}
 
@@ -335,6 +336,7 @@ class EventManager:
 def default_app_settings() -> Dict[str, Any]:
     """Defaults seeded into a fresh event database (existing values are never overwritten)."""
     return {
+        **feature_defaults(),
         "event_name": settings.event.name,
         "event_subtitle": settings.event.subtitle,
         "event_date_time": settings.event.start_time,
@@ -344,14 +346,6 @@ def default_app_settings() -> Dict[str, Any]:
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url or "",
         "signup_sheet_url": settings.event.signup_sheet_url or "",
-        "food_signup_enabled": settings.signup.food_signup_enabled,
-        "signup_enabled": settings.signup.signup_enabled,
-        "track_upload_enabled": settings.signup.track_upload_enabled,
-        "allow_duets": settings.signup.allow_duets,
-        "performer_edits_enabled": settings.signup.performer_edits_enabled,
-        "live_display_enabled": settings.signup.live_display_enabled,
-        "dashboard_enabled": settings.signup.dashboard_enabled,
-        "payment_enabled": settings.signup.payment_enabled,
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,
         "max_solo_per_participant": settings.signup.max_solo_per_participant,

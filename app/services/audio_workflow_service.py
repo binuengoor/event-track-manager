@@ -34,10 +34,34 @@ class AudioWorkflowService:
         return (f"File exceeds maximum allowed size of {limit_bytes // (1024 * 1024)}MB. "
                 "Please compress or trim the file (for video, lower the resolution) and try again.")
 
+    AUDIO_EXTENSIONS = ("mp3", "wav", "m4a")
+    VIDEO_EXTENSIONS = ("mp4", "webm")
+    ALLOWED_EXTENSIONS = AUDIO_EXTENSIONS + VIDEO_EXTENSIONS
+
     @staticmethod
-    def max_upload_bytes(is_video: bool) -> int:
-        max_mb = 500 if is_video else max(settings.storage.max_upload_size_mb, 200)
-        return max_mb * 1024 * 1024
+    def upload_limit_mb(is_video: bool) -> int:
+        key, default = ("max_video_upload_mb", 500) if is_video else ("max_audio_upload_mb", 200)
+        try:
+            value = int(get_setting(key, default))
+        except (TypeError, ValueError):
+            value = default
+        return value if value > 0 else default
+
+    @classmethod
+    def max_upload_bytes(cls, is_video: bool) -> int:
+        return cls.upload_limit_mb(is_video) * 1024 * 1024
+
+    @classmethod
+    def check_extension(cls, filename: Optional[str], is_video: bool) -> None:
+        """Rejects files whose extension is not an accepted audio/video type (plain-language 400 message)."""
+        ext = os.path.splitext(filename or "")[1].lower().lstrip(".")
+        wanted = cls.VIDEO_EXTENSIONS if is_video else cls.AUDIO_EXTENSIONS
+        if ext not in wanted:
+            kind = "Video" if is_video else "Audio"
+            raise InvalidAudioError(
+                f"{kind} files must be {', '.join('.' + e for e in wanted)}. "
+                f"This file ({'.' + ext if ext else 'no extension'}) is not supported."
+            )
 
     async def process_track_upload(
         self,

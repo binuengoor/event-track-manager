@@ -19,6 +19,10 @@ class StatusUpdateRequest(BaseModel):
     status: str
 
 
+class AnnouncementRequest(BaseModel):
+    text: str = ""
+
+
 class PerformanceNotesRequest(BaseModel):
     notes: str = ""
 

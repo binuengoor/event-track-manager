@@ -68,6 +68,7 @@ async def claim_food_item_endpoint(payload: FoodClaimRequest):
 
 @router.put("/api/signup/food/{signup_id}")
 async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest):
+    require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
     all_items_before = db_service.get_all_food_items_with_signups()
     target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
     signer = target_before.get("signer_name", "Participant") if target_before else "Participant"
@@ -104,6 +105,7 @@ async def update_food_signup_endpoint(signup_id: str, payload: FoodUpdateRequest
 
 @router.delete("/api/signup/food/{signup_id}")
 async def release_food_signup_endpoint(signup_id: str):
+    require_feature("food_signup_enabled", "Food sign-up is currently disabled.")
     all_items_before = db_service.get_all_food_items_with_signups()
     target_before = next((it for it in all_items_before if it.get("signup_id") == signup_id), None)
     signer = target_before.get("signer_name", "Participant") if target_before else "Participant"

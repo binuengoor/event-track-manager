@@ -119,7 +119,12 @@ class TrackStore:
     def _archive_path(self, path: str) -> str:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         base, ext = os.path.splitext(os.path.basename(path))
-        return os.path.join(self.archive_dir, f"{base}_archived_{stamp}{ext}")
+        dest = os.path.join(self.archive_dir, f"{base}_archived_{stamp}{ext}")
+        counter = 1
+        while os.path.exists(dest):
+            dest = os.path.join(self.archive_dir, f"{base}_archived_{stamp}-{counter}{ext}")
+            counter += 1
+        return dest
 
     def archive_existing(self, entry_id: str) -> List[str]:
         """Moves every current track of an entry into tracks/_archive/ (never deletes)."""

@@ -72,7 +72,7 @@ async def save_payments(payload: PaymentSaveRequest, _authorized: bool = Depends
         raise HTTPException(status_code=400, detail="Payments are tracked for events with stage performances.")
     changed = db_service.set_paid([u.model_dump() for u in payload.updates])
     backup_service.trigger_backup()
-    db_service.log_activity(action_type="admin_edit", performer_name="Admin",
-                            summary=f"Updated payment status for {changed} singer(s)", source="admin")
+    db_service.log_activity(action_type="admin_edit", performer_name="",
+                            summary=f"Updated payment status for {changed} singer(s)", source="admin", role="admin")
     singers = db_service.get_singers()
     return {"status": "success", "changed": changed, "paid": sum(1 for s in singers if s["paid"]), "total": len(singers)}

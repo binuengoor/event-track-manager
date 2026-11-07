@@ -328,6 +328,23 @@ class AudioService:
         from app.utils.streaming import stream_file_range
         return stream_file_range(filepath, range_header)
 
+    @staticmethod
+    def _run_sheet_html(event_title: str, rows) -> str:
+        """Printable run sheet: the same lines as the text run sheet, HTML-escaped."""
+        from html import escape
+        head = "".join(f"<th>{h}</th>" for h in ("Seq", "Performer(s)", "Song Title", "Type", "Status", "Stage Notes"))
+        body = "".join("<tr>" + "".join(f"<td>{escape(str(c))}</td>" for c in r) + "</tr>" for r in rows)
+        stamp = escape(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        return (
+            "<!DOCTYPE html><html><head><meta charset=\"utf-8\">"
+            f"<title>{escape(str(event_title))} - Run Sheet</title>"
+            "<style>body{font-family:sans-serif;margin:24px}table{border-collapse:collapse;width:100%}"
+            "th,td{border:1px solid #444;padding:6px 8px;text-align:left}th{background:#eee}"
+            "@media print{body{margin:0}}</style></head><body>"
+            f"<h1>{escape(str(event_title))} - Live Stage Show Run Sheet</h1><p>Generated: {stamp}</p>"
+            f"<table><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table></body></html>"
+        )
+
     def generate_sequenced_zip_file(self) -> Tuple[str, str]:
         """Builds offline sequenced ZIP file on disk using tempfile to prevent RAM exhaustion."""
         import tempfile
@@ -351,6 +368,8 @@ class AudioService:
                 "-" * 120,
             ]
 
+            playlist = ["#EXTM3U"]
+            table_rows = []
             for item in queue:
                 seq_num = f"{item.sequence_order:02d}" if getattr(item, "sequence_order", None) is not None else "XX"
                 singer_clean = sanitize_filename(getattr(item, "performer_name", "") or "Performer")
@@ -374,10 +393,15 @@ class AudioService:
                     ext = os.path.splitext(cache_file)[1] or ".mp3"
                     zip_entry_name = f"{seq_num}_{singer_clean}{partner_suffix}_{song_clean}{ext}"
                     zf.write(cache_file, arcname=zip_entry_name)
+                    playlist.append(f"#EXTINF:-1,{performer_display} - {getattr(item, 'song_title', '') or 'Track'}")
+                    playlist.append(zip_entry_name)
+                table_rows.append((seq_num, performer_display, getattr(item, "song_title", "") or "-", perf_type, track_status, stage_notes))
 
             manifest_content = "\n".join(run_sheet_lines)
             zf.writestr("00_Show_Run_Sheet.txt", manifest_content)
             zf.writestr("00_SEQUENCE_MANIFEST.txt", manifest_content)
+            zf.writestr("00_Playlist.m3u8", "\n".join(playlist) + "\n")
+            zf.writestr("00_Run_Sheet.html", self._run_sheet_html(event_title, table_rows))
 
         return tmp_path, zip_filename
 

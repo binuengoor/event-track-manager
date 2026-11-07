@@ -6,6 +6,7 @@ The tables themselves come from ``datasets`` so the file, the admin viewer and t
 """
 import io
 import os
+import re
 import csv
 import glob
 import json
@@ -14,7 +15,7 @@ import logging
 import tempfile
 import threading
 import zipfile
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, List, Tuple
 
 from app.config import settings, get_setting
@@ -22,6 +23,14 @@ from app.config import settings, get_setting
 logger = logging.getLogger("export-service")
 
 SNAPSHOT_MIN_INTERVAL_SECONDS = 300
+
+# Strict allowlists: the only names the snapshot endpoints will ever touch (no separators, no traversal).
+SNAPSHOT_NAME_RE = re.compile(r"^event_\d{8}-\d{6}\.db$")
+PRE_MIGRATION_NAME_RE = re.compile(r"^pre-migration-\d{8}-\d{6}-[0-9a-f]{8}\.db$")
+
+
+class SnapshotError(Exception):
+    """Invalid snapshot name, missing file, or a snapshot that cannot be restored."""
 
 # file names written to the event folder (kept stable for people who point tools at them)
 CSV_FILE_FOR = {"songs": "signups.csv", "singers": "singers.csv", "potluck": "potluck.csv"}
@@ -120,14 +129,19 @@ class ExportService:
     # ------------------------------------------------------------------ snapshots
     def snapshot_database(self) -> str:
         from app.services.db_service import db_service
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        dest = os.path.join(self.backups_dir, f"event_{stamp}.db")
+        stamp_time = datetime.now()
+        while True:
+            dest = os.path.join(self.backups_dir, f"event_{stamp_time.strftime('%Y%m%d-%H%M%S')}.db")
+            if not os.path.exists(dest):
+                break
+            stamp_time += timedelta(seconds=1)  # never overwrite an earlier snapshot taken in the same second
         src = db_service._get_connection()
         dst = sqlite3.connect(dest)
         try:
             src.backup(dst)
         finally:
             dst.close()
+        os.chmod(dest, 0o600)
         keep = max(int(getattr(settings.backup, "keep_snapshots", 30)), 1)
         for old in sorted(glob.glob(os.path.join(self.backups_dir, "event_*.db")))[:-keep]:
             try:
@@ -136,6 +150,55 @@ class ExportService:
                 pass
         self._last_snapshot = datetime.now().timestamp()
         return dest
+
+    # ------------------------------------------------------------------ snapshot list / download / restore
+    def _list_matching(self, pattern: "re.Pattern") -> List[Dict[str, Any]]:
+        out = []
+        for name in sorted(os.listdir(self.backups_dir), reverse=True):
+            path = os.path.join(self.backups_dir, name)
+            if pattern.fullmatch(name) and os.path.isfile(path):
+                st = os.stat(path)
+                out.append({"name": name, "size": st.st_size,
+                            "modified": datetime.fromtimestamp(st.st_mtime).astimezone().isoformat()})
+        return out
+
+    def list_snapshots(self) -> Dict[str, Any]:
+        return {"snapshots": self._list_matching(SNAPSHOT_NAME_RE),
+                "pre_migration": self._list_matching(PRE_MIGRATION_NAME_RE)}
+
+    def snapshot_path(self, name: str) -> str:
+        """Resolves an allowlisted snapshot name to its file; anything else raises SnapshotError."""
+        if not isinstance(name, str) or not (SNAPSHOT_NAME_RE.fullmatch(name) or PRE_MIGRATION_NAME_RE.fullmatch(name)):
+            raise SnapshotError("Invalid snapshot name.")
+        path = os.path.join(self.backups_dir, name)
+        if os.path.dirname(os.path.realpath(path)) != os.path.realpath(self.backups_dir) or not os.path.isfile(path):
+            raise FileNotFoundError(name)
+        return path
+
+    def restore_snapshot(self, name: str) -> Dict[str, Any]:
+        """Replaces the live database with a snapshot, after taking a safety snapshot of the current one."""
+        from app.services.db_service import db_service
+        from app.repositories.migrations import SCHEMA_VERSION
+        path = self.snapshot_path(name)
+        check = sqlite3.connect(f"{os.path.abspath(path)}", timeout=15)
+        try:
+            if check.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
+                raise SnapshotError("That snapshot failed its integrity check and was not restored.")
+            if check.execute("PRAGMA user_version").fetchone()[0] > SCHEMA_VERSION:
+                raise SnapshotError("That snapshot is from a newer version of the app.")
+        finally:
+            check.close()
+        with self._lock:
+            safety = self.snapshot_database()
+            src = sqlite3.connect(path)
+            try:
+                src.backup(db_service._get_connection())
+            finally:
+                src.close()
+        db_service.db_manager.close_all()
+        db_service._ensure_db()
+        logger.warning("Restored snapshot %s (safety snapshot %s)", name, os.path.basename(safety))
+        return {"restored": name, "safety_snapshot": os.path.basename(safety)}
 
     # ------------------------------------------------------------------ public: event folder export
     def export_now(self, snapshot: bool = True, force_snapshot: bool = False) -> Dict[str, Any]:

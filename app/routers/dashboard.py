@@ -5,7 +5,7 @@ from fastapi import APIRouter
 from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.db_service import db_service
-from app.privacy import strip_private
+from app.privacy import strip_private, NamePrivacy, public_status
 
 logger = logging.getLogger("dashboard-router")
 
@@ -18,20 +18,20 @@ def dashboard_performances():
         return []
 
     perfs = db_service.get_all_performances()
+    active_id = db_service.get_active_entry_id()
+    names = NamePrivacy(perfs)
     results = []
     for p in perfs:
         has_track = bool(p.get("drive_file_id") or p.get("track_status") == "Uploaded")
         results.append({
             "entry_id": p.get("entry_id"),
-            "performer_name": p.get("performer_name"),
+            "performer_name": names.name(p.get("performer_name")),
             "performance_type": p.get("performance_type", "Solo"),
-            "partner_name": p.get("partner_name"),
+            "partner_name": names.partners(p.get("partner_name")),
             "song_title": p.get("song_title", ""),
             "movie_name": p.get("movie_name", ""),
-            "age_group": p.get("age_group", ""),
             "sequence_order": p.get("sequence_order"),
-            "performance_status": p.get("performance_status", "Upcoming"),
-            "track_status": p.get("track_status", "Pending"),
+            "status": public_status(p.get("performance_status"), p.get("entry_id") == active_id),
             "duration": p.get("duration"),
             "has_track": has_track
         })

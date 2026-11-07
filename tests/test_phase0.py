@@ -177,22 +177,32 @@ def _request(headers, host="10.0.0.9"):
     return Request(scope)
 
 
-def test_rate_limit_key_default_uses_first_forwarded_for(monkeypatch):
+def test_rate_limit_key_default_ignores_spoofable_forwarded_headers(monkeypatch):
     from app.routers.auth import client_key
     monkeypatch.delenv("TRUST_CLOUDFLARE", raising=False)
+    monkeypatch.delenv("TRUST_PROXY", raising=False)
+    req = _request({"X-Forwarded-For": "1.2.3.4, 5.6.7.8", "CF-Connecting-IP": "9.9.9.9"})
+    assert client_key(req) == "10.0.0.9"
+    assert client_key(_request({})) == "10.0.0.9"
+
+
+def test_rate_limit_key_uses_first_forwarded_for_only_when_proxy_trusted(monkeypatch):
+    from app.routers.auth import client_key
+    monkeypatch.delenv("TRUST_CLOUDFLARE", raising=False)
+    monkeypatch.setenv("TRUST_PROXY", "true")
     req = _request({"X-Forwarded-For": "1.2.3.4, 5.6.7.8", "CF-Connecting-IP": "9.9.9.9"})
     assert client_key(req) == "1.2.3.4"
-    assert client_key(_request({})) == "10.0.0.9"
 
 
 def test_rate_limit_key_trusts_cloudflare_header_only_when_enabled(monkeypatch):
     from app.routers.auth import client_key
+    monkeypatch.delenv("TRUST_PROXY", raising=False)
     monkeypatch.setenv("TRUST_CLOUDFLARE", "true")
     req = _request({"X-Forwarded-For": "1.2.3.4", "CF-Connecting-IP": "9.9.9.9"})
     assert client_key(req) == "9.9.9.9"
     assert client_key(_request({"X-Forwarded-For": "1.2.3.4"})) == "1.2.3.4"   # header absent: fall back
     monkeypatch.setenv("TRUST_CLOUDFLARE", "false")
-    assert client_key(req) == "1.2.3.4"
+    assert client_key(req) == "10.0.0.9"
 
 
 # ----------------------------------------------------------------------------- PIN readiness
@@ -209,8 +219,10 @@ def test_readiness_warns_only_for_default_admin_pin(monkeypatch):
 
 # ----------------------------------------------------------------------------- N15 upload cap and message
 def test_max_upload_size_setting_raises_the_audio_cap_and_413_is_friendly(client, monkeypatch):
+    # The cap now comes from the admin settings max_audio_upload_mb / max_video_upload_mb (not the old env value).
     from app.services.audio_workflow_service import audio_workflow_service as aws
-    monkeypatch.setattr(settings.storage, "max_upload_size_mb", 300)
+    assert aws.max_upload_bytes(False) == 200 * 1024 * 1024
+    db_service.set_app_setting("max_audio_upload_mb", 300)
     assert aws.max_upload_bytes(False) == 300 * 1024 * 1024
     assert aws.max_upload_bytes(True) == 500 * 1024 * 1024
     monkeypatch.setattr(aws, "max_upload_bytes", staticmethod(lambda is_video: 1024))

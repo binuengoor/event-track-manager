@@ -1,5 +1,6 @@
 """'Is this event ready?' checks shown to the admin. Each check says what is wrong and how to fix it."""
 import os
+import re
 import shutil
 import logging
 from typing import Dict, Any, List
@@ -14,6 +15,14 @@ from app.repositories.audit_repo import BACKUP_FAILED
 logger = logging.getLogger("readiness")
 
 OK, WARN, ERROR, INFO = "ok", "warn", "error", "info"
+DISK_WARN_GB, DISK_ERROR_GB = 2, 1   # spec 6.8
+_VERSION_SIZE_RE = re.compile(r"^v(\d+)-\d+$")  # drive_file_id written by event_service.file_version: v<size>-<mtime>
+
+
+def expected_track_size(perf: Dict[str, Any]):
+    """Size in bytes recorded when the track was stored, or None when not known."""
+    m = _VERSION_SIZE_RE.match(str(perf.get("drive_file_id") or ""))
+    return int(m.group(1)) if m else None
 
 
 def _check(cid: str, label: str, status: str, detail: str, fix: str = "") -> Dict[str, Any]:
@@ -28,6 +37,7 @@ class ReadinessService:
         checks.append(self._disk())
         checks.append(self._db_integrity())
         checks.append(self._ffmpeg())
+        checks.append(self._ffprobe())
         checks.append(await self._downloader())
         checks.extend(self._acts())
         checks.append(self._track_files())
@@ -61,9 +71,9 @@ class ReadinessService:
             free_gb = shutil.disk_usage(settings.storage.event_dir).free / (1024 ** 3)
         except OSError:
             return _check("disk", "Free disk space", WARN, "Could not read disk usage.")
-        if free_gb < 1:
+        if free_gb < DISK_ERROR_GB:
             return _check("disk", "Free disk space", ERROR, f"Only {free_gb:.1f} GB free.", "Free space before accepting uploads.")
-        if free_gb < 5:
+        if free_gb < DISK_WARN_GB:
             return _check("disk", "Free disk space", WARN, f"{free_gb:.1f} GB free.", "Video tracks can be large; free more space if you expect many.")
         return _check("disk", "Free disk space", OK, f"{free_gb:.0f} GB free.")
 
@@ -85,12 +95,33 @@ class ReadinessService:
                       "Restore the latest snapshot from backups/ (Backup & Sync).")
 
     def _track_files(self):
-        """Every track the database says exists must exist in tracks/."""
-        missing = [p["entry_id"] for p in db_service.get_all_performances()
-                   if (p.get("drive_file_name") or p.get("drive_file_id")) and not track_store.find(p["entry_id"])]
+        """Every track the database says exists must exist in tracks/, at the size it was stored with."""
+        missing, wrong_size = [], []
+        for p in db_service.get_all_performances():
+            if not (p.get("drive_file_name") or p.get("drive_file_id")):
+                continue
+            path = track_store.find(p["entry_id"])
+            if not path:
+                missing.append(p["entry_id"])
+                continue
+            expected = expected_track_size(p)
+            try:
+                if expected is not None and os.path.getsize(path) != expected:
+                    wrong_size.append(p["entry_id"])
+            except OSError:
+                missing.append(p["entry_id"])
+
+        def names(ids):
+            return ", ".join(ids[:5]) + ("..." if len(ids) > 5 else "")
+
+        problems = []
         if missing:
-            return _check("track_files", "Track files on disk", ERROR,
-                          f"{len(missing)} act(s) list a track that is not in the tracks/ folder: " + ", ".join(missing[:5]) + ("..." if len(missing) > 5 else ""),
+            problems.append(f"{len(missing)} act(s) list a track that is not in the tracks/ folder: {names(missing)}")
+        if wrong_size:
+            problems.append(f"{len(wrong_size)} act(s) have a track whose size differs from when it was stored "
+                            f"(possibly truncated or replaced): {names(wrong_size)}")
+        if problems:
+            return _check("track_files", "Track files on disk", ERROR, "; ".join(problems),
                           "Upload the track again, or copy the file back into tracks/ (or incoming/) with the entry id in its name.")
         return _check("track_files", "Track files on disk", OK, "Every listed track is on disk.")
 
@@ -98,6 +129,12 @@ class ReadinessService:
         if shutil.which("ffmpeg"):
             return _check("ffmpeg", "Audio/video conversion (ffmpeg)", OK, "Installed.")
         return _check("ffmpeg", "Audio/video conversion (ffmpeg)", ERROR, "ffmpeg not found, uploads cannot be converted.", "Use the Docker image, or install ffmpeg.")
+
+    def _ffprobe(self):
+        if shutil.which("ffprobe"):
+            return _check("ffprobe", "Track validation (ffprobe)", OK, "Installed.")
+        return _check("ffprobe", "Track validation (ffprobe)", ERROR, "ffprobe not found, uploaded tracks cannot be checked for playability.",
+                      "Use the Docker image, or install ffmpeg (it includes ffprobe).")
 
     async def _downloader(self):
         try:

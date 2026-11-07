@@ -62,6 +62,10 @@ class AdminService:
             "active_preset": "",
             "stage_performances_enabled": getattr(settings.signup, "stage_performances_enabled", True),
             "console_enabled": getattr(settings.signup, "console_enabled", True),
+            "shorten_junior_names": True,
+            "announcement": "",
+            "max_audio_upload_mb": 200,
+            "max_video_upload_mb": 500,
         }
 
         return {**defaults, **result}
@@ -122,15 +126,18 @@ class AdminService:
         "setup_completed",
         "stage_performances_enabled", "signup_enabled", "food_signup_enabled", "track_upload_enabled",
         "allow_duets", "performer_edits_enabled", "live_display_enabled", "dashboard_enabled",
-        "console_enabled", "payment_enabled", "backup_enabled",
+        "console_enabled", "payment_enabled", "backup_enabled", "shorten_junior_names",
     }
-    INT_SETTINGS = {"max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20)}
+    INT_SETTINGS = {
+        "max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20),
+        "max_audio_upload_mb": (1, 2000), "max_video_upload_mb": (1, 5000),
+    }
     LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns", "allowed_media"}
     STR_SETTINGS = {
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
         "hero_tag_status", "event_poster_url", "payment_url", "signup_sheet_url", "food_serving_note",
-        "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset",
+        "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset", "announcement",
     }
 
     def _validate_settings(self, items: Dict[str, Any]) -> Dict[str, Any]:
@@ -174,6 +181,10 @@ class AdminService:
                     v = ""
                 if not isinstance(v, str):
                     raise ValueError(f"Setting '{k}' must be text.")
+                if k == "announcement":
+                    v = v.strip()
+                    if len(v) > 140:
+                        raise ValueError("Announcement cannot exceed 140 characters.")
                 if len(v) > 5000:
                     raise ValueError(f"Setting '{k}' is too long.")
             else:

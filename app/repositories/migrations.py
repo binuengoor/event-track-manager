@@ -39,6 +39,7 @@ def _snapshot(conn: sqlite3.Connection, path: str) -> None:
             source.backup(target)
             if target.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
                 raise RuntimeError("Pre-migration database backup failed its integrity check")
+    os.chmod(destination, 0o600)
 
 
 def migrate(conn: sqlite3.Connection, baseline: Callable[[sqlite3.Connection], None]) -> None:

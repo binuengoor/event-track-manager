@@ -13,12 +13,13 @@ from app.services.audio_service import audio_service
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.routers.auth import verify_admin_pin, verify_operator_pin, is_admin
-from app.privacy import strip_private
+from app.privacy import strip_private, NamePrivacy, public_status
 from app.services.live_broadcaster import live_broadcaster
 from app.schemas import (
     StatusUpdateRequest,
     PerformanceNotesRequest,
     ReorderRequest,
+    AnnouncementRequest,
 )
 
 from app.services.event_service import event_service
@@ -46,6 +47,33 @@ def _run_or_404(fn, *args):
         raise HTTPException(status_code=404, detail=str(ex))
 
 
+PUBLIC_HIDDEN_ENTRY_KEYS = ("age_group", "partner_age_group", "track_status", "stage_notes")
+LIVE_ENTRY_LISTS = ("up_next", "upcoming", "performed", "on_hold")
+
+
+def _redact_entry(row: Dict[str, Any], names: NamePrivacy) -> Dict[str, Any]:
+    """Public view of one schedule row: shortened junior names, no age group, track status or stage notes."""
+    out = {k: v for k, v in row.items() if k not in PUBLIC_HIDDEN_ENTRY_KEYS}
+    out["performer_name"] = names.name(row.get("performer_name"))
+    if "partner_name" in out:
+        out["partner_name"] = names.partners(row.get("partner_name"))
+    return out
+
+
+def _redact_live_status(status: Dict[str, Any], active_id: Optional[str]) -> Dict[str, Any]:
+    names = NamePrivacy(db_service.get_all_performances())
+    def one(row):
+        r = _redact_entry(row, names)
+        r["status"] = public_status(row.get("performance_status"), bool(active_id) and row.get("entry_id") == active_id)
+        return r
+    out = dict(status)
+    if isinstance(out.get("now_performing"), dict):
+        out["now_performing"] = one(out["now_performing"])
+    for key in LIVE_ENTRY_LISTS:
+        out[key] = [one(r) for r in out.get(key) or []]
+    return out
+
+
 @router.get("/api/live-status")
 def get_live_status(request: Request):
     status = stage_service.get_live_status()
@@ -65,7 +93,7 @@ def get_live_status(request: Request):
     from fastapi.encoders import jsonable_encoder
 
     # The live feed is public: never include phone numbers or guardian details.
-    serializable_status = strip_private(jsonable_encoder(status))
+    serializable_status = strip_private(_redact_live_status(jsonable_encoder(status), status.get("active_entry_id")))
     body = json.dumps(serializable_status, sort_keys=True)
     etag = f'"{hashlib.sha1(body.encode()).hexdigest()}"'
     if_none_match = request.headers.get("if-none-match")
@@ -77,6 +105,16 @@ def get_live_status(request: Request):
         media_type="application/json",
         headers={"ETag": etag, "Cache-Control": "public, max-age=1"}
     )
+
+
+@router.put("/api/announcement")
+def set_announcement(payload: AnnouncementRequest, _authorized: bool = Depends(verify_admin_pin)):
+    from app.services.admin_service import admin_service
+    try:
+        admin_service.update_settings({"announcement": payload.text})
+    except ValueError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    return {"text": payload.text.strip()}
 
 
 @router.get("/api/live-stream")
@@ -135,7 +173,16 @@ def _entries_response(entries, request: Request) -> JSONResponse:
     Built here rather than by response_model, which would put the removed keys back as null/empty."""
     from fastapi.encoders import jsonable_encoder
     rows = jsonable_encoder([PerformanceEntry.model_validate(e).model_dump() for e in entries])
-    return JSONResponse(content=rows if is_admin(request) else strip_private(rows))
+    if is_admin(request):
+        return JSONResponse(content=rows)
+    names = NamePrivacy(db_service.get_all_performances())
+    public_rows = []
+    for r in strip_private(rows):
+        r = {k: v for k, v in r.items() if k != "stage_notes"}
+        r["performer_name"] = names.name(r.get("performer_name"))
+        r["partner_name"] = names.partners(r.get("partner_name"))
+        public_rows.append(r)
+    return JSONResponse(content=public_rows)
 
 
 @router.get("/api/performances", response_model=List[PerformanceEntry])
@@ -176,8 +223,13 @@ def stage_queue(request: Request):
         raise HTTPException(status_code=500, detail="Failed to read queue")
 
 
+VALID_STATUSES = ("Uploaded", "Upcoming", "Reset", "Performed", "Done", "Skipped", "On Hold", "On Stage", "Live")
+
+
 @router.patch("/api/status/{entry_id}")
 def update_status(entry_id: str, payload: StatusUpdateRequest, _authorized: bool = Depends(require_console_enabled)):
+    if payload.status not in VALID_STATUSES:
+        raise HTTPException(status_code=400, detail=f"Status must be one of: {', '.join(VALID_STATUSES)}.")
     try:
         event_service.update_status(entry_id, payload.status)
         backup_service.trigger_backup()
