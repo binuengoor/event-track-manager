@@ -42,3 +42,24 @@ def test_each_guest_route_serves_its_own_current_navigation(path):
     shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
     assert f'href="{path}" aria-current="page"' in shell
     assert '/static/js/nav.js' not in response.text
+
+
+@pytest.mark.parametrize(('alias', 'target'), [
+    ('landing', '/'), ('index', '/performer'), ('signup', '/signup'),
+    ('dashboard', '/dashboard'), ('live', '/live'),
+])
+def test_guest_static_aliases_redirect_to_dynamic_pages(alias, target):
+    with TestClient(app) as client:
+        response = client.get(f'/static/{alias}.html', follow_redirects=False)
+        css = client.get('/static/css/app.css')
+    assert response.status_code == 307
+    assert response.headers['location'] == target
+    assert css.status_code == 200
+
+
+def test_active_link_has_visible_style():
+    with TestClient(app) as client:
+        response = client.get('/signup')
+    shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
+    active = shell.split('href="/signup" aria-current="page"', 1)[1].split('</a>', 1)[0]
+    assert 'bg-orange-600' in active

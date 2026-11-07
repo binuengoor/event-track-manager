@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
 
 from app.config import settings
 from app.services.db_service import db_service
@@ -98,8 +98,21 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 PUBLIC_IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".ico")
 PUBLIC_BLOCKED_TOP_LEVEL = {"tracks", "incoming", "backups", "cache", "db", "secrets"}
 
+class AppStaticFiles(StaticFiles):
+    # Do not serve guest HTML templates directly: the page routes inject event navigation.
+    GUEST_ALIASES = {
+        "landing.html": "/", "index.html": "/performer", "signup.html": "/signup",
+        "dashboard.html": "/dashboard", "live.html": "/live",
+    }
+
+    async def get_response(self, path, scope):
+        if path in self.GUEST_ALIASES:
+            return RedirectResponse(self.GUEST_ALIASES[path], status_code=307)
+        return await super().get_response(path, scope)
+
+
 os.makedirs(settings.storage.event_dir, exist_ok=True)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", AppStaticFiles(directory=STATIC_DIR), name="static")
 
 
 @app.api_route("/data/{file_path:path}", methods=["GET", "HEAD"], include_in_schema=False)

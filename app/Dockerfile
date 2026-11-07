@@ -18,6 +18,7 @@ RUN set -eu; \
     chmod +x /usr/local/bin/tailwindcss
 WORKDIR /src
 COPY app/tailwind.config.js app/tailwind.config.js
+COPY app/guest_navigation.py app/guest_navigation.py
 COPY app/static app/static
 RUN tailwindcss -c app/tailwind.config.js -i app/static/css/tailwind.input.css \
       -o /out/app.css --minify

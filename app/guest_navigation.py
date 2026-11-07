@@ -20,9 +20,9 @@ def render_guest_navigation(html: str, path: str) -> str:
 
     def link(href: str, label: str) -> str:
         active = ' aria-current="page"' if href == path else ''
+        colors = 'bg-orange-600 text-white' if active else 'text-slate-100 bg-slate-800 hover:bg-slate-700'
         return (f'<a href="{escape(href, quote=True)}"{active} '
-                'class="px-3 py-3 rounded-xl text-sm font-semibold text-slate-100 '
-                'bg-slate-800 hover:bg-slate-700">'
+                f'class="px-3 py-3 rounded-xl text-sm font-semibold {colors}">'
                 f'{escape(label)}</a>')
 
     items = ''.join(link(href, label) for href, label in links)
