@@ -1,7 +1,7 @@
 // Service Worker for EMA Paattukoottam Stage Console
 // Enables offline loading of the console UI shell and assets.
 
-const CACHE_NAME = 'paattukoottam-console-v4';
+const CACHE_NAME = 'paattukoottam-console-v5';
 
 const SHELL_URLS = [
   '/console',
@@ -17,23 +17,23 @@ const SHELL_URLS = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      // Cache core shell files, a failed fetch must not block install
-      return Promise.allSettled(
-        SHELL_URLS.map((url) =>
-          fetch(url, { cache: 'reload' })
-            .then((res) => {
-              if (res.ok) return cache.put(url, res);
-            })
-            .catch((err) => {
-              console.warn('[SW] Failed to pre-cache', url, err);
-            })
-        )
-      );
-    })
-  );
+  // Do not replace the active worker unless the complete offline shell is ready.
+  event.waitUntil((async () => {
+    const existed = (await caches.keys()).includes(CACHE_NAME);
+    try {
+      const responses = await Promise.all(SHELL_URLS.map(async (url) => {
+        const response = await fetch(url, { cache: 'reload' });
+        if (!response.ok) throw new Error(`Could not cache console shell: ${url}`);
+        return response;
+      }));
+      const cache = await caches.open(CACHE_NAME);
+      await Promise.all(SHELL_URLS.map((url, i) => cache.put(url, responses[i])));
+      await self.skipWaiting();
+    } catch (error) {
+      if (!existed) await caches.delete(CACHE_NAME);
+      throw error;
+    }
+  })());
 });
 
 self.addEventListener('activate', (event) => {
@@ -41,7 +41,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          if (key.startsWith('paattukoottam-console-') && key !== CACHE_NAME) {
             return caches.delete(key);
           }
         })
@@ -85,18 +85,21 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin || !url.pathname.startsWith('/static/') ||
       /\.(?:html?|json)$/i.test(url.pathname)) return;
 
+  // Console HTML uses a timestamp query on admin.js. Cache it under one
+  // stable key so the installed shell works before the first online visit.
+  const cacheKey = url.pathname === '/static/js/admin.js' ? url.origin + url.pathname : request;
   // Static assets: network first, then cache.
   event.respondWith(
     fetch(request)
       .then((response) => {
         if (response.ok) {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          caches.open(CACHE_NAME).then((cache) => cache.put(cacheKey, clone));
         }
         return response;
       })
       .catch(() => {
-        return caches.match(request);
+        return caches.match(cacheKey);
       })
   );
 });
