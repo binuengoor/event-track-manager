@@ -1,6 +1,6 @@
 # Design coverage: every existing feature and where it is drawn
 
-Design canvas: "Event Track Manager Design" (45 boards, Warm Stage Studio look), updated 2026-11-07.
+Design canvas: "Event Track Manager Design" (69 boards, Warm Stage Studio look), round 2, updated 2026-11-07. Round 2 adds the owner's review decisions (see SPEC Appendix D) and the previously missing states: dish-only sign-up, junior and partner flows, validation errors, upload progress and errors, closed states, Admin PIN with lockout and chooser, console login, monitor disconnected, long names, venue pre-show/ended/phone views, wizard steps 1 to 5, empty states, dark guest variants.
 Every screen below exists as a board unless marked **Pattern** (same components as a drawn board, no separate board).
 Boards are static mock-ups: they were written as code and **not yet reviewed in rendered form by the assistant**; fit and spacing need an owner look.
 
@@ -55,7 +55,7 @@ Upstream check (2026-11-07): `origin/main` was `2fc83ae` and nothing upstream wa
 | Admin on a phone | Admin phone: overview; Admin phone: More sheet |
 
 ## Still Pattern only (no own board)
-Wizard steps 1, 3, 4, 5; sign-up error states; upload progress and error states; console search and filter; admin empty states; light-theme console; dark-theme admin.
+Light-theme console, dark-theme admin, skeleton and loading states, reduced-motion variants.
 
 ## New in the design (not in the app today)
 Poster/GIF/video hero, sponsor reel (Home, Live), faded image or solid backdrop per act, announcement vs act note, stage monitor fade to black and optional lyrics, minor short names, existing-name lookup, order lock with auto Save Order, vault pill with auto-cache, fade out, Cue next, readiness PIN-length warning, show-day controls, Screens sheet, Admin left rail and phone bottom bar, guest bottom tab bar.

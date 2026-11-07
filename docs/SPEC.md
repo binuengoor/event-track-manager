@@ -751,6 +751,24 @@ Owner-confirmed: the stack runs on a Proxmox LXC at Hetzner and is reached throu
 
 ---
 
+## Appendix D. Owner decisions from the design review (round 2, 2026-11-07)
+
+Recorded from the owner's answers to `docs/DESIGN-REVIEW-2.md`. They override earlier text in this spec where they differ. The design canvas (69 boards) already follows them.
+
+| Topic | Decision |
+|---|---|
+| PIN | One 4-digit Admin PIN opens both the console and the admin screens. No operator PIN in the UI. No "6 or more characters" warning (remove readiness warning N23). The only PIN warning is "still the default PIN", without printing the digits. The word "Staff" becomes "Admin" everywhere. |
+| Phone numbers | Not treated as private for this community. The sign-up name lookup may pre-fill the phone. Public Schedule and Live still show no phones. |
+| Dish-only sign-up | Anyone can sign up for a dish alone, also at a full event. Sign-up step 1 offers Perform / Bring a dish / Both. |
+| Juniors | Guardian name and phone fields stay. Age groups are configurable (list, not a 2-way toggle). Full name is stored; juniors are always shown publicly as first name plus last initial; admin and console show the full name. Adults may opt in to the short form. Admin switch "Always shorten junior names on public screens" (default on). |
+| Partners | Duet and group partner entry keeps the existing-name check: "already signed up, same person?" with Yes / No, plus phone (and guardian for a junior) for a new person. |
+| Uploads | Limits and allowed types come from admin settings (default audio 200 MB, video 500 MB). Audio MP3, WAV, M4A. Video MP4 and WebM. No MOV. YouTube and SoundCloud links stay. |
+| TV text | Minimum 24 px on /live and the stage monitor; the Announcement is a prominent full-width strip. Stage monitor shows no developer notes. |
+| Background | Live and stage monitor backgrounds are slow ambient moving lights (colours drift over minutes) or one solid colour; no per-act image upload. Sponsor reel panel defaults to black. |
+| Console | Announcement inline; background, fade timer and stage monitor controls in a "Screens" sheet. "Done" is hold-to-confirm, not a bare Enter. Status chip and Admin button look different. Wording is "cue", never "arm". |
+| Public schedule | Never shows "Needs track" or "Junior". |
+| Stage notes | Split into an act note (stays with the act, console only) and an event-wide Announcement (stays across acts; shown on Live and the stage monitor). This changes today's behaviour, where stage notes are public per act. |
+
 ## Appendix A. Sources for the research behind sections 5 and 6
 
 Obtained from web search result snippets, not from reading the full pages. Treat as directional; confirm on the official sites before treating a number or rule as binding.
