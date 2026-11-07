@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
   <meta name="view-transition" content="same-origin">
-  <title>Event Registration - EMA Paattukoottam</title>
+  <title>Sign up - EMA Paattukoottam</title>
   <style>
     :root, html, body {
       background-color: #000000 !important;
@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
+<link rel="stylesheet" href="/static/css/guest-forms.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
 
@@ -38,522 +39,183 @@
       </a>
 
       <!-- Quick Nav Links -->
-      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <a href="/" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Home">
-          <i data-lucide="home" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Home</span>
-        </a>
-        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-emerald-600 text-white shadow-md shadow-emerald-600/30 transition" title="New Participant Registration">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-white"></i>
-          <span>Sign Up</span>
-        </a>
-        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
-          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Performer</span>
-        </a>
-        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span>Live Program</span>
-        </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Console</span>
-        </a>
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Admin</span>
-        </a>
-      </nav>
+      <nav aria-label="Main"></nav>
     </div>
   </header>
   <script src="/static/js/nav.js"></script>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-10 space-y-8">
+  <main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
-    <!-- Header Banner -->
-    <div class="bg-gradient-to-br from-slate-900 via-slate-900/90 to-amber-950/20 border border-slate-800 p-6 sm:p-8 rounded-3xl shadow-xl relative overflow-hidden">
-      <div class="space-y-2">
-        <h2 id="signup-banner-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight">Performer & Food Sign-Up</h2>
-        <p id="signup-banner-desc" class="text-sm text-slate-400 leading-relaxed max-w-xl">
-          Register your performances for the stage lineup and choose a dish to bring for our community potluck dinner.
-        </p>
-      </div>
+    <div class="gf-card">
+      <h2 id="signup-banner-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight">Sign up</h2>
+      <p id="signup-banner-desc" class="gf-muted mt-1">Perform on stage, bring a dish, or both. It takes about a minute.</p>
     </div>
 
-    <!-- Registration Form -->
-    <form id="signup-form" novalidate class="space-y-6">
+    <div id="signup-closed-banner" class="gf-box" role="status" hidden>
+      <strong>Sign-ups are closed.</strong> Thanks for your interest. Please reach out to the organizers for more information.
+    </div>
 
-      <!-- Closed Registration Alert Banner -->
-      <div id="signup-closed-banner" class="hidden p-5 rounded-3xl bg-amber-500/15 border border-amber-500/30 text-amber-200">
-        <div class="flex items-start gap-3">
-          <i data-lucide="lock" class="w-5 h-5 text-amber-400 shrink-0 mt-0.5"></i>
-          <div class="space-y-1">
-            <h4 class="font-bold text-sm text-amber-300">Sign-Ups Closed</h4>
-            <p class="text-xs text-amber-200/90 leading-relaxed">
-              Thanks for your interest, but the sign-ups for this event are currently closed. Please reach out to the organizers for more information.
-            </p>
+    <form id="signup-form" novalidate aria-label="Sign-up form">
+      <ol id="stepper" class="gf-stepper" aria-hidden="true"></ol>
+      <p id="step-status" class="gf-step-status" aria-live="polite"></p>
+
+      <!-- STEP: ABOUT YOU -->
+      <section id="step-about" data-step="about" class="gf-card" aria-labelledby="step-about-title">
+        <h3 id="step-about-title" class="gf-title">About you</h3>
+
+        <fieldset id="choice-section" class="gf-fieldset">
+          <legend class="gf-label">I want to</legend>
+          <div class="gf-choices">
+            <label class="gf-choice" id="choice-perform-label"><input type="radio" name="signup_choice" value="perform" checked><span>Perform</span></label>
+            <label class="gf-choice" id="choice-dish-label"><input type="radio" name="signup_choice" value="dish"><span>Bring a dish</span></label>
+            <label class="gf-choice" id="choice-both-label"><input type="radio" name="signup_choice" value="both"><span>Both</span></label>
+          </div>
+        </fieldset>
+
+        <div class="gf-field">
+          <label id="performer-name-label" for="performer-name" class="gf-label">Your name</label>
+          <input type="text" id="performer-name" class="gf-input" autocomplete="name" placeholder="e.g. Maya Nair" aria-describedby="err-performer-name name-lookup-box" required>
+          <p id="err-performer-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+          <div id="name-lookup-box" class="gf-box" hidden>
+            <p id="name-lookup-text" class="m-0"></p>
+            <div id="name-lookup-actions" class="gf-box-actions"></div>
           </div>
         </div>
-      </div>
 
-      <!-- REGISTRATION ROLE SELECTOR -->
-      <div id="role-selector-section" class="bg-slate-900/90 border border-slate-800 p-5 rounded-3xl space-y-3">
-        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300">
-          I am registering as:
+        <div class="gf-field">
+          <label for="contact-info" class="gf-label">Phone <span class="gf-muted" style="text-transform:none;letter-spacing:0">For event coordination</span></label>
+          <input type="tel" id="contact-info" class="gf-input" autocomplete="tel" inputmode="tel" placeholder="(555) 123-4567" aria-describedby="err-contact-info phone-note" required>
+          <p id="err-contact-info" class="gf-error" role="alert" aria-live="polite" hidden></p>
+          <p id="phone-note" class="gf-note" hidden></p>
+        </div>
+
+        <fieldset id="age-group-wrap" class="gf-fieldset" aria-describedby="err-age-group">
+          <legend class="gf-label">Age group</legend>
+          <div id="age-group-options" class="gf-radio-row"></div>
+          <p id="err-age-group" class="gf-error" role="alert" aria-live="polite" hidden></p>
+        </fieldset>
+
+        <div id="guardian-container" class="gf-box" hidden>
+          <p class="m-0 font-bold">A parent or guardian is needed for this age group.</p>
+          <div class="gf-field" style="margin-top:.75rem">
+            <label for="guardian-name" class="gf-label">Parent or guardian name</label>
+            <input type="text" id="guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-guardian-name">
+            <p id="err-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+          </div>
+          <div class="gf-field" style="margin-bottom:0">
+            <label for="guardian-phone" class="gf-label">Guardian phone</label>
+            <input type="tel" id="guardian-phone" class="gf-input" autocomplete="off" inputmode="tel" aria-describedby="err-guardian-phone">
+            <p id="err-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- STEP: YOUR ACT -->
+      <section id="step-act" data-step="act" class="gf-card" aria-labelledby="step-act-title" hidden>
+        <h3 id="step-act-title" class="gf-title">Your song</h3>
+
+        <div class="gf-field">
+          <label for="song-title" class="gf-label">Song title</label>
+          <input type="text" id="song-title" class="gf-input" placeholder="Optional now, you can add it later" aria-describedby="song-dup-box">
+          <div id="song-dup-box" class="gf-box" role="status" hidden></div>
+        </div>
+        <div class="gf-field">
+          <label for="movie-name" class="gf-label">Movie or album</label>
+          <input type="text" id="movie-name" class="gf-input" placeholder="Optional">
+        </div>
+
+        <fieldset id="perf-type-wrap" class="gf-fieldset">
+          <legend class="gf-label">Type</legend>
+          <div id="perf-type" class="gf-radio-row"></div>
+        </fieldset>
+
+        <div id="partner-box" class="gf-field" hidden>
+          <label id="partner-label" for="partner-name" class="gf-label">Partner name</label>
+          <input type="text" id="partner-name" class="gf-input" list="partner-names" autocomplete="off" aria-describedby="err-partner-name partner-match-box">
+          <datalist id="partner-names"></datalist>
+          <p id="err-partner-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+
+          <div id="partner-match-box" class="gf-box" role="group" aria-label="Same person?" hidden>
+            <p id="partner-match-text" class="m-0"></p>
+            <div class="gf-box-actions">
+              <button type="button" id="partner-same-yes" class="gf-btn gf-btn-small">Yes, same person</button>
+              <button type="button" id="partner-same-no" class="gf-btn gf-btn-small">No, someone else</button>
+            </div>
+          </div>
+
+          <div id="partner-new-box" hidden>
+            <p id="partner-new-note" class="gf-note"></p>
+            <div class="gf-field" style="margin-top:.75rem">
+              <label for="partner-phone" class="gf-label">Partner phone <span class="gf-muted" style="text-transform:none;letter-spacing:0">For event coordination</span></label>
+              <input type="tel" id="partner-phone" class="gf-input" inputmode="tel" autocomplete="off" aria-describedby="err-partner-phone">
+              <p id="err-partner-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+            </div>
+            <fieldset class="gf-fieldset">
+              <legend class="gf-label">Partner age group</legend>
+              <div id="partner-age-options" class="gf-radio-row"></div>
+              <p class="gf-muted" style="margin:.375rem 0 0">If your partner is a junior, the organizers will ask for a guardian name and phone.</p>
+            </fieldset>
+          </div>
+        </div>
+
+        <div class="gf-field">
+          <label for="stage-notes" class="gf-label">Note for the sound team</label>
+          <input type="text" id="stage-notes" class="gf-input" placeholder="e.g. Needs 2 wireless mics (only the sound team sees this)">
+        </div>
+
+        <label class="gf-check">
+          <input type="checkbox" id="acoustic">
+          <span>Acoustic or no track needed (I will sing or play live)
+            <small>Tick this and you will not be asked for a track.</small></span>
         </label>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <label id="role-performer-card" class="relative flex items-start gap-3 p-4 rounded-2xl border-2 border-orange-500 bg-orange-500/10 cursor-pointer transition">
-            <input type="radio" name="registration_role" id="role-performer" value="performer" checked class="mt-1 text-orange-500 focus:ring-orange-500">
-            <div>
-              <div class="text-sm font-bold text-white flex items-center gap-1.5">
-                <i data-lucide="mic" class="w-4 h-4 text-orange-400"></i>
-                <span>Stage Performer</span>
-              </div>
-              <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-                Singing or playing an instrument on stage. Includes optional potluck dish sign-up.
-              </p>
-            </div>
-          </label>
+        <p id="upload-hint" class="gf-muted" style="margin:.75rem 0 0">You can upload a track after you submit.</p>
+      </section>
 
-          <label id="role-attendee-card" class="relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition">
-            <input type="radio" name="registration_role" id="role-attendee" value="food_only" class="mt-1 text-emerald-500 focus:ring-emerald-500">
-            <div>
-              <div class="text-sm font-bold text-white flex items-center gap-1.5">
-                <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
-                <span>Attendee / Family (Potluck Only)</span>
-              </div>
-              <p class="text-xs text-slate-400 mt-1 leading-relaxed">
-                Attending without performing on stage. Only one sign-up is needed per family/household to bring a dish.
-              </p>
-            </div>
-          </label>
+      <!-- STEP: DISH -->
+      <section id="step-dish" data-step="dish" class="gf-card" aria-labelledby="step-dish-title" hidden>
+        <h3 id="step-dish-title" class="gf-title">Choose a dish</h3>
+        <p class="gf-muted" style="margin:0 0 .5rem"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
+        <fieldset class="gf-fieldset" aria-describedby="err-food">
+          <legend class="gf-label">Open dish slots</legend>
+          <div id="food-groups-container"></div>
+          <p id="err-food" class="gf-error" role="alert" aria-live="polite" hidden></p>
+        </fieldset>
+        <div id="selected-food-box" class="gf-field" style="margin-top:1rem" hidden>
+          <label for="dish-description" class="gf-label">Note for organizers (optional)</label>
+          <input type="text" id="dish-description" class="gf-input" placeholder="e.g. Mild spice. Contains cashews.">
         </div>
+      </section>
+
+      <p id="form-error" class="gf-form-error" role="alert" aria-live="polite" hidden></p>
+
+      <div class="gf-actions">
+        <button type="button" id="back-btn" class="gf-btn" hidden>Back</button>
+        <button type="submit" id="submit-btn" class="gf-btn gf-btn-primary"><span id="submit-btn-text">Continue</span></button>
       </div>
-
-      <!-- STEP 1: PARTICIPANT INFO -->
-      <div class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span id="step-1-num" class="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
-            <span id="step-1-title">Participant Information</span>
-          </h3>
-          <span class="text-xs text-slate-500">* Required fields</span>
-        </div>
-
-        <!-- Family / Household Notice for Attendees -->
-        <div id="family-signup-note" class="hidden p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-start gap-2.5">
-          <i data-lucide="users" class="w-4 h-4 text-emerald-400 shrink-0 mt-0.5"></i>
-          <div>
-            <strong class="font-bold text-emerald-300">Only one sign-up needed per family:</strong>
-            <span class="text-slate-300"> If you are coming with family, you just need this single sign-up to coordinate your potluck contribution. Individual attendees from the same family do not need separate registrations.</span>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="sm:col-span-2">
-            <label id="performer-name-label" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Full Name *
-            </label>
-            <input type="text" id="performer-name" required placeholder="e.g. Maya Suresh" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-            
-            <!-- Live Duplicate Sign-up Warning Alert -->
-            <div id="duplicate-warning-box" class="hidden mt-2.5 p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs transition">
-              <div class="flex items-start gap-2.5">
-                <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
-                <div class="flex-1 space-y-2">
-                  <div class="font-bold text-amber-300 flex items-center justify-between">
-                    <span>Already registered? Matching performers found:</span>
-                    <button type="button" id="dismiss-dup-warning-btn" class="text-amber-400/80 hover:text-white text-[11px] p-0.5">
-                      <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                    </button>
-                  </div>
-                  <p class="text-slate-300 text-xs leading-relaxed">
-                    If you are one of the participants below, you don't need to register again. Tap your name to open the <strong>Performer Hub</strong> to edit songs, upload backing tracks, or choose potluck items:
-                  </p>
-                  <div id="matched-performers-list" class="flex flex-wrap gap-2 pt-1">
-                    <!-- Populated dynamically with direct links -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div id="contact-info-wrap" class="sm:col-span-1">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Phone Number *
-            </label>
-            <input type="tel" id="contact-info" required placeholder="e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent">
-          </div>
-
-          <div id="age-group-wrap" class="sm:col-span-1">
-            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-              Age Group *
-            </label>
-            <div id="age-group-options" class="flex gap-2.5 pt-1">
-              <!-- Dynamically populated -->
-            </div>
-          </div>
-        </div>
-
-        <!-- Guardian Fields (Conditional on Age Group) -->
-        <div id="guardian-container" class="hidden p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-3">
-          <p class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-            <i data-lucide="shield-alert" class="w-4 h-4"></i>
-            <span>Guardian details required for Junior participants</span>
-          </p>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Parent / Guardian Name *</label>
-              <input type="text" id="guardian-name" placeholder="Guardian's Name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1">Guardian Phone *</label>
-              <input type="tel" id="guardian-phone" placeholder="Guardian's Mobile" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- STEP 2: PERFORMANCES -->
-      <div id="perf-section" class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span class="w-6 h-6 rounded-full bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">2</span>
-            <span>Performance Details</span>
-          </h3>
-          <span id="perf-count-label" class="text-xs text-orange-400 font-medium">Max 2 performances (1 solo)</span>
-        </div>
-
-        <!-- Performance 1 Card -->
-        <div id="perf-card-1" class="p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4">
-          <div class="flex items-center justify-between">
-            <h4 class="text-sm font-bold text-white flex items-center gap-2">
-              <span class="w-5 h-5 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center justify-center font-bold">#1</span>
-              <span>Performance 1</span>
-            </h4>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Type *</label>
-              <div id="perf-type-1" class="flex gap-2">
-                <!-- Dynamically populated -->
-              </div>
-            </div>
-
-            <div id="partner-box-1" class="hidden sm:col-span-2 space-y-2">
-              <div class="flex items-center justify-between">
-                <label class="block text-xs font-semibold text-slate-400">Duet Partner Name *</label>
-                <button type="button" id="toggle-custom-partner-1" class="text-[11px] text-orange-400 hover:text-orange-300 font-semibold transition">
-                  + Add other participant
-                </button>
-              </div>
-              <div id="partner-select-wrap-1">
-                <select id="partner-select-1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
-                  <option value="">-- Choose from registered performers --</option>
-                </select>
-              </div>
-              <div id="partner-custom-wrap-1" class="hidden space-y-3">
-                <div>
-                  <input type="text" id="partner-custom-name-1" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                  
-                  <!-- Live Duplicate Check Alert for Partner 1 -->
-                  <div id="partner-dup-box-1" class="hidden mt-2 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs transition">
-                    <div class="flex items-start gap-2">
-                      <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
-                      <div class="flex-1 space-y-1.5">
-                        <div class="font-bold text-amber-300 flex items-center justify-between">
-                          <span>Already registered? Matching performers found:</span>
-                          <button type="button" id="dismiss-partner-dup-1" class="text-amber-400/80 hover:text-white text-[11px] p-0.5">
-                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                          </button>
-                        </div>
-                        <p class="text-slate-300 text-xs leading-relaxed">
-                          If your duet partner is already registered, tap their name to select them:
-                        </p>
-                        <div id="partner-matched-list-1" class="flex flex-wrap gap-1.5 pt-0.5">
-                          <!-- Populated dynamically -->
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Partner Phone Number -->
-                <div id="partner-phone-wrap-1">
-                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Phone Number *</label>
-                  <input type="tel" id="partner-custom-phone-1" placeholder="Partner's mobile (xxx) xxx-xxxx" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                </div>
-
-                <!-- Partner Age Category Selection -->
-                <div id="partner-age-wrap-1" class="pt-0.5">
-                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Age Category *</label>
-                  <div id="partner-age-options-1" class="flex gap-2">
-                    <!-- Populated dynamically -->
-                  </div>
-                </div>
-              </div>
-              <input type="hidden" id="partner-name-1" value="">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Song Name</label>
-              <input type="text" id="song-title-1" placeholder="e.g. Puthumazha (Optional now, can edit later)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-              <div id="song-dup-box-1" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Movie / Album Name</label>
-              <input type="text" id="movie-name-1" placeholder="e.g. Sarvam Maya" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Stage / Technical Notes (Optional)</label>
-              <input type="text" id="stage-notes-1" placeholder="e.g. Needs 2 wireless mics, acoustic guitar DI" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-
-            <div class="sm:col-span-2 pt-1">
-              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-                <input type="checkbox" id="acoustic-1" class="rounded bg-slate-950 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
-                <div>
-                  <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <i data-lucide="guitar" class="w-3.5 h-3.5 text-orange-400"></i>
-                    <span>Acoustic / Live Instrument (No backing track upload needed)</span>
-                  </span>
-                  <span class="text-[11px] text-slate-400 block mt-0.5">Check this if performing with live acoustic instruments, karaoke track won't be required.</span>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Performance 2 Card (Initially Hidden) -->
-        <div id="perf-card-2" class="hidden p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-4 relative">
-          <div class="flex items-center justify-between">
-            <h4 class="text-sm font-bold text-white flex items-center gap-2">
-              <span class="w-5 h-5 rounded-full bg-slate-800 text-slate-300 text-xs flex items-center justify-center font-bold">#2</span>
-              <span>Performance 2</span>
-            </h4>
-            <button type="button" id="remove-perf-2-btn" class="text-xs text-rose-400 hover:text-rose-300 flex items-center gap-1 font-semibold">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>Remove</span>
-            </button>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Type *</label>
-              <div id="perf-type-2" class="flex gap-2">
-                <!-- Dynamically populated -->
-              </div>
-              <p id="perf-2-solo-warn" class="hidden text-xs text-amber-400 mt-1">Solo is disabled because you already have a solo performance.</p>
-            </div>
-
-            <div id="partner-box-2" class="hidden sm:col-span-2 space-y-2">
-              <div class="flex items-center justify-between">
-                <label class="block text-xs font-semibold text-slate-400">Duet Partner Name *</label>
-                <button type="button" id="toggle-custom-partner-2" class="text-[11px] text-orange-400 hover:text-orange-300 font-semibold transition">
-                  + Add other participant
-                </button>
-              </div>
-              <div id="partner-select-wrap-2">
-                <select id="partner-select-2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500">
-                  <option value="">-- Choose from registered performers --</option>
-                </select>
-              </div>
-              <div id="partner-custom-wrap-2" class="hidden space-y-3">
-                <div>
-                  <input type="text" id="partner-custom-name-2" placeholder="Enter participant's full name" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                  
-                  <!-- Live Duplicate Check Alert for Partner 2 -->
-                  <div id="partner-dup-box-2" class="hidden mt-2 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs transition">
-                    <div class="flex items-start gap-2">
-                      <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
-                      <div class="flex-1 space-y-1.5">
-                        <div class="font-bold text-amber-300 flex items-center justify-between">
-                          <span>Already registered? Matching performers found:</span>
-                          <button type="button" id="dismiss-partner-dup-2" class="text-amber-400/80 hover:text-white text-[11px] p-0.5">
-                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
-                          </button>
-                        </div>
-                        <p class="text-slate-300 text-xs leading-relaxed">
-                          If your duet partner is already registered, tap their name to select them:
-                        </p>
-                        <div id="partner-matched-list-2" class="flex flex-wrap gap-1.5 pt-0.5">
-                          <!-- Populated dynamically -->
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Partner Phone Number -->
-                <div id="partner-phone-wrap-2">
-                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Phone Number *</label>
-                  <input type="tel" id="partner-custom-phone-2" placeholder="Partner's mobile (xxx) xxx-xxxx" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-                </div>
-
-                <!-- Partner Age Category Selection -->
-                <div id="partner-age-wrap-2" class="pt-0.5">
-                  <label class="block text-xs font-semibold text-slate-400 mb-1.5">Partner Age Category *</label>
-                  <div id="partner-age-options-2" class="flex gap-2">
-                    <!-- Populated dynamically -->
-                  </div>
-                </div>
-              </div>
-              <input type="hidden" id="partner-name-2" value="">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Song Name</label>
-              <input type="text" id="song-title-2" placeholder="Song title" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-              <div id="song-dup-box-2" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Movie / Album Name</label>
-              <input type="text" id="movie-name-2" placeholder="Movie / album" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-slate-400 mb-1.5">Stage / Technical Notes (Optional)</label>
-              <input type="text" id="stage-notes-2" placeholder="Special requirements" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-            </div>
-
-            <div class="sm:col-span-2 pt-1">
-              <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-                <input type="checkbox" id="acoustic-2" class="rounded bg-slate-950 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
-                <div>
-                  <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                    <i data-lucide="guitar" class="w-3.5 h-3.5 text-orange-400"></i>
-                    <span>Acoustic / Live Instrument (No backing track upload needed)</span>
-                  </span>
-                  <span class="text-[11px] text-slate-400 block mt-0.5">Check this if performing with live acoustic instruments, karaoke track won't be required.</span>
-                </div>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Add 2nd Performance Button -->
-        <button type="button" id="add-perf-btn" class="w-full py-2.5 rounded-2xl border border-dashed border-slate-700 hover:border-orange-500/50 hover:bg-orange-500/5 text-slate-300 hover:text-orange-400 text-xs font-bold flex items-center justify-center gap-2 transition">
-          <i data-lucide="plus-circle" class="w-4 h-4"></i>
-          <span>Add Second Performance (Duet or Group)</span>
-        </button>
-      </div>
-
-      <!-- STEP 3: FOOD POTLUCK SIGN-UP -->
-      <div id="food-section" class="bg-slate-900/90 border border-slate-800 p-6 rounded-3xl space-y-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-3 gap-2">
-          <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span id="step-3-num" class="w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center font-bold">3</span>
-            <span id="step-3-title">Potluck Food Sign-Up</span>
-          </h3>
-          <span id="food-serving-note-text" class="text-xs text-amber-400 font-medium">Half-Tray or Above (15+ servings)</span>
-        </div>
-
-        <p class="text-xs text-slate-400 leading-relaxed">
-          Please choose an available food slot from the menu below to contribute to our community dinner. Each dish has only 1 available slot.
-        </p>
-
-        <!-- Attendee Notice -->
-        <div id="attendee-food-notice" class="hidden p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-200 text-xs flex items-center gap-2.5">
-          <i data-lucide="utensils" class="w-4 h-4 text-emerald-400 shrink-0"></i>
-          <span>As an attendee, please select an available dish slot below to complete your potluck registration.</span>
-        </div>
-
-        <!-- Skip food checkbox -->
-        <div id="skip-food-wrap">
-          <label class="inline-flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-            <input type="checkbox" id="skip-food-checkbox" class="w-4 h-4 rounded bg-slate-950 border-slate-700 text-orange-500 focus:ring-orange-500">
-            <span>I will sign up for food later / Unable to bring food</span>
-          </label>
-        </div>
-
-        <!-- Food Groups Container -->
-        <div id="food-groups-container" class="space-y-4 pt-1">
-          <!-- Dynamically populated -->
-        </div>
-
-        <!-- Selected Food Details Box -->
-        <div id="selected-food-box" class="hidden p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-bold text-emerald-300 flex items-center gap-1.5">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-              <span>Selected Dish Slot:</span>
-              <strong id="selected-food-item-name" class="text-white ml-1"></strong>
-            </span>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">What specific dish will you prepare / bring? <span class="text-slate-500 font-normal">(Optional)</span></label>
-            <input type="text" id="dish-description" placeholder="e.g. Chicken 65, Vegetable Biryani, Gulab Jamun" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500">
-          </div>
-        </div>
-      </div>
-
-      <!-- SUBMIT BUTTON -->
-      <div class="space-y-3 pt-2">
-        <button type="submit" id="submit-btn" class="w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-black text-sm shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 transition active:scale-[0.99]">
-          <i data-lucide="check" class="w-5 h-5"></i>
-          <span id="submit-btn-text">Complete Registration</span>
-        </button>
-        <p id="form-error" class="hidden text-center text-xs font-semibold text-rose-400"></p>
-      </div>
-
     </form>
 
-    <!-- SUCCESS CONFIRMATION MODAL -->
-    <div id="success-modal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur z-50 flex items-center justify-center p-4">
-      <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-lg w-full shadow-2xl space-y-5 text-center">
-        <div class="w-16 h-16 mx-auto rounded-2xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shadow-lg">
-          <i data-lucide="party-popper" class="w-8 h-8"></i>
-        </div>
+    <!-- POST SIGN-UP CARD -->
+    <section id="signup-done" class="gf-card gf-done" aria-labelledby="done-title" tabindex="-1" hidden>
+      <h2 id="done-title">You are signed up</h2>
+      <div id="done-entry-ids"></div>
+      <p id="done-message" class="gf-muted"></p>
 
-        <div class="space-y-1.5">
-          <h3 class="text-2xl font-black text-white">Registration Complete!</h3>
-          <p id="success-message-text" class="text-sm text-slate-300"></p>
-        </div>
-
-        <div id="success-details-box" class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-left text-xs space-y-2 text-slate-300">
-          <!-- Populated -->
-        </div>
-
-        <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
-          <a id="success-performer-link" href="/performer" class="flex-1 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition flex items-center justify-center gap-1.5">
-            <i data-lucide="upload-cloud" class="w-4 h-4"></i>
-            <span>Upload Track Now</span>
-          </a>
-          <a href="/dashboard" class="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-1.5">
-            <i data-lucide="layout-grid" class="w-4 h-4"></i>
-            <span>View Dashboard</span>
-          </a>
-        </div>
+      <p class="gf-eyebrow">WHAT NEXT</p>
+      <div class="gf-next">
+        <a id="done-upload" href="/my-entry" class="gf-btn gf-btn-primary">Upload track now<small id="done-upload-hint">Choose a file or paste a YouTube or SoundCloud link.</small></a>
+        <button type="button" id="done-add-act" class="gf-btn">Add another act<small>Same name and phone, new song</small></button>
+        <button type="button" id="done-add-dish" class="gf-btn">Add a dish<small>Pick an open slot on the food board</small></button>
       </div>
-    </div>
+
+      <div id="done-payment" hidden>
+        <p class="gf-eyebrow">SIGN-UP FEE</p>
+        <p class="gf-muted">Paid on the organizer's own payment page. We never see your card. The organizer marks you as paid.</p>
+        <a id="done-payment-link" class="gf-btn" href="#" target="_blank" rel="noopener noreferrer">Pay the sign-up fee (opens the organizer's payment page)</a>
+      </div>
+    </section>
 
   </main>
-
-  <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
-    <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
-      </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>
-        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
-        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
-        <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Console</a>
-        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
-      </div>
-    </div>
-  </footer>
 
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/signup.js"></script>

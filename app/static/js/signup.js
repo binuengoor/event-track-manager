@@ -1,1165 +1,846 @@
-let signupConfig = null;
-let selectedAgeGroup = null;
-let hasPerf2 = false;
+// Guest sign-up: one progressive form (About you -> Your act -> Dish), then a "what next" card.
+// Choices: Perform / Bring a dish / Both. Backend: POST /api/signup (registration_type performer | food_only | both).
+const NAME_KEY = "etm_guest_name";
+const STEP_LABELS = { about: "About you", act: "Your song", dish: "Dish" };
+const STEP_SEQUENCE = { perform: ["about", "act"], dish: ["about", "dish"], both: ["about", "act", "dish"] };
+
+const state = {
+  config: null,
+  choice: "perform",
+  step: 0,
+  ageGroup: null,
+  entries: [],            // normalised registered entries: {name, ids[], titles[]}
+  nameDecision: "",       // lower-case name for which the user chose "No, new act"
+  profileChecked: "",     // lower-case name already looked up for phone pre-fill
+  partnerSame: null,      // true / false / null (not answered or no match)
+  lastResult: null,
+};
+
+const $ = (id) => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
-  setupEventListeners();
+  bindEvents();
   await loadSignupConfig();
+  renderStepper();
 });
 
+// ---------------------------------------------------------------------------------------------- config
 async function loadSignupConfig() {
   try {
     const res = await fetch("/api/signup/config");
     if (!res.ok) throw new Error("Failed to load registration configuration");
-    signupConfig = await res.json();
+    state.config = await res.json();
     window.auroraEffect?.setActive(true, 1200);
+    const c = state.config;
 
-    if (signupConfig.header_brand_title) {
-      const titleEl = document.getElementById("nav-event-title");
-      if (titleEl) titleEl.textContent = signupConfig.header_brand_title;
-      document.title = `Event Registration - ${signupConfig.header_brand_title}`;
+    const brand = c.header_brand_title || c.event_name;
+    if (brand) {
+      const titleEl = $("nav-event-title");
+      if (titleEl) titleEl.textContent = c.header_brand_title || brand;
+      document.title = `Sign up - ${brand}`;
     }
-    if (signupConfig.header_brand_subtitle) {
-      const subEl = document.getElementById("nav-event-subtitle");
-      if (subEl) subEl.textContent = signupConfig.header_brand_subtitle;
+    if (c.header_brand_subtitle) {
+      const subEl = $("nav-event-subtitle");
+      if (subEl) subEl.textContent = c.header_brand_subtitle;
     }
+    if (c.food_serving_note) $("food-serving-note-text").textContent = c.food_serving_note;
 
-    if (signupConfig.food_serving_note) {
-      const noteEl = document.getElementById("food-serving-note-text");
-      if (noteEl) noteEl.textContent = signupConfig.food_serving_note;
-    }
-
-    let availablePerfTypes = signupConfig.performance_types || ["Solo", "Duet", "Group"];
-    if (signupConfig.allow_duets === false) {
-      availablePerfTypes = ["Solo"];
-    }
-
-    renderAgeGroups(signupConfig.age_groups || []);
-    renderPerformanceTypes(availablePerfTypes);
-    renderPartnerOptions(signupConfig.registered_performers || []);
-    renderFoodGroups(signupConfig.food_groups || [], signupConfig.food_items || []);
-
-    applyRegistrationModules(signupConfig);
-
-    if (window.adaptNavigationForEventConfig) {
-      window.adaptNavigationForEventConfig(signupConfig);
-    }
-
+    state.entries = normalizeEntries(c);
+    renderAgeGroups(c.age_groups || []);
+    renderPerformanceTypes(performanceTypes());
+    renderPartnerAgeGroups(c.age_groups || []);
+    renderPartnerDatalist();
+    renderFoodGroups();
+    applyAvailability();
+    window.adaptNavigationForEventConfig?.(c);
     if (window.lucide) lucide.createIcons();
   } catch (err) {
     console.error("Config load error:", err);
-    showError("Could not load registration settings. Please refresh the page.");
+    showFormError("Could not load sign-up settings. Please refresh the page.");
   }
 }
 
-function renderAgeGroups(ageGroups) {
-  const container = document.getElementById("age-group-options");
-  if (!container) return;
-  container.innerHTML = "";
+function performanceTypes() {
+  const c = state.config || {};
+  if (c.allow_duets === false) return ["Solo"];
+  return c.performance_types || ["Solo", "Duet", "Group"];
+}
 
-  ageGroups.forEach((ag, idx) => {
-    const label = document.createElement("label");
-    label.className = "flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-950/80 hover:border-orange-500/50 cursor-pointer transition text-xs font-bold text-slate-300";
-    
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = "age_group";
-    input.value = ag.name;
-    input.className = "text-orange-500 focus:ring-orange-500";
-    if (idx === 0) {
-      input.checked = true;
-      selectedAgeGroup = ag;
-    }
+function performEnabled() {
+  const c = state.config || {};
+  return c.signup_enabled !== false && c.stage_performances_enabled !== false;
+}
+function dishEnabled() {
+  return (state.config || {}).food_signup_enabled !== false;
+}
 
-    input.addEventListener("change", () => {
-      selectedAgeGroup = ag;
-      toggleGuardianRequirement(ag.requires_guardian);
+// registered_entries is the preferred source ({name, entry_id | entry_ids, song_title}); fall back to names only.
+function normalizeEntries(c) {
+  const byName = new Map();
+  const add = (name, ids, titles) => {
+    name = String(name || "").trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    const rec = byName.get(key) || { name, ids: [], titles: [] };
+    ids.filter(Boolean).forEach((id) => { if (!rec.ids.includes(id)) rec.ids.push(id); });
+    titles.filter(Boolean).forEach((t) => rec.titles.push(t));
+    byName.set(key, rec);
+  };
+  if (Array.isArray(c.registered_entries)) {
+    c.registered_entries.forEach((e) => {
+      if (typeof e === "string") return add(e, [], []);
+      const ids = Array.isArray(e.entry_ids) ? e.entry_ids : [e.entry_id];
+      const titles = Array.isArray(e.song_titles) ? e.song_titles : [e.song_title];
+      add(e.performer_name || e.name, ids, titles);
     });
+  }
+  (c.registered_performers || []).forEach((n) => add(n, [], []));
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
 
-    label.appendChild(input);
-    label.appendChild(document.createTextNode(ag.name));
-    container.appendChild(label);
+function findEntry(name) {
+  const key = String(name || "").trim().toLowerCase();
+  return key ? state.entries.find((e) => e.name.toLowerCase() === key) : null;
+}
+
+// ---------------------------------------------------------------------------------------------- availability and steps
+function applyAvailability() {
+  const perform = performEnabled();
+  const dish = dishEnabled();
+  const closed = !perform && !dish;
+  $("signup-closed-banner").hidden = !closed;
+  $("signup-form").hidden = closed;
+
+  const choices = { perform: perform, dish: dish, both: perform && dish };
+  Object.entries(choices).forEach(([k, on]) => {
+    $(`choice-${k}-label`).hidden = !on;
+    const input = document.querySelector(`input[name="signup_choice"][value="${k}"]`);
+    if (input) input.disabled = !on;
   });
+  // Only one possible choice: no chooser, just the matching heading.
+  const available = Object.keys(choices).filter((k) => choices[k]);
+  $("choice-section").hidden = available.length <= 1;
+  if (!choices[state.choice] && available.length) setChoice(available[0]);
 
-  if (selectedAgeGroup) {
-    toggleGuardianRequirement(selectedAgeGroup.requires_guardian);
+  const title = $("signup-banner-title");
+  const desc = $("signup-banner-desc");
+  if (closed) {
+    title.textContent = "Sign up";
+    desc.textContent = "Sign-ups are closed.";
+  } else if (perform && !dish) {
+    title.textContent = "Sign up to perform";
+    desc.textContent = "Register your song for the stage lineup.";
+  } else if (dish && !perform) {
+    title.textContent = "Bring a dish";
+    desc.textContent = "Choose a dish to share at the potluck. One sign-up per family is enough.";
+  } else {
+    title.textContent = "Sign up";
+    desc.textContent = "Perform on stage, bring a dish, or both. It takes about a minute.";
+  }
+  syncChoiceUI();
+}
+
+function steps() { return STEP_SEQUENCE[state.choice] || STEP_SEQUENCE.perform; }
+
+function setChoice(value) {
+  state.choice = value;
+  const input = document.querySelector(`input[name="signup_choice"][value="${value}"]`);
+  if (input) input.checked = true;
+  syncChoiceUI();
+}
+
+function syncChoiceUI() {
+  const wantsAct = state.choice !== "dish";
+  $("age-group-wrap").hidden = !wantsAct;
+  updateGuardian();
+  $("performer-name-label").textContent = state.choice === "dish" ? "Your name or family name" : "Your name";
+  if (state.step >= steps().length) state.step = 0;
+  showStep();
+}
+
+function showStep() {
+  const seq = steps();
+  document.querySelectorAll("[data-step]").forEach((el) => { el.hidden = el.dataset.step !== seq[state.step]; });
+  const last = state.step === seq.length - 1;
+  $("back-btn").hidden = state.step === 0;
+  const nextKey = seq[state.step + 1];
+  $("submit-btn-text").textContent = last
+    ? (seq.length === 1 ? "Sign up" : "Complete sign-up")
+    : (nextKey === "act" ? "Continue to your song" : "Continue to dish");
+  $("step-status").textContent = `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[seq[state.step]]}`;
+  if (seq[state.step] === "dish") renderFoodGroups();
+  renderStepper();
+  hideFormError();
+}
+
+function renderStepper() {
+  const ol = $("stepper");
+  const n = steps().length;
+  ol.innerHTML = "";
+  for (let i = 0; i < n; i++) {
+    const li = document.createElement("li");
+    li.dataset.state = i < state.step ? "done" : i === state.step ? "current" : "todo";
+    ol.appendChild(li);
   }
 }
 
-function toggleGuardianRequirement(requires) {
-  const container = document.getElementById("guardian-container");
-  const nameInput = document.getElementById("guardian-name");
-  const phoneInput = document.getElementById("guardian-phone");
-  if (!container) return;
+function goToStep(key) {
+  const idx = steps().indexOf(key);
+  if (idx >= 0) { state.step = idx; showStep(); }
+}
 
-  const activeRole = document.querySelector('input[name="registration_role"]:checked')?.value;
-  if (activeRole === "food_only") {
-    container.classList.add("hidden");
-    if (nameInput) {
-      nameInput.required = false;
-      nameInput.value = "";
-    }
-    if (phoneInput) {
-      phoneInput.required = false;
-      phoneInput.value = "";
-    }
-    return;
+// ---------------------------------------------------------------------------------------------- rendering helpers
+function makeRadio(name, value, label, desc, checked) {
+  const l = document.createElement("label");
+  l.className = "gf-radio";
+  const input = document.createElement("input");
+  input.type = "radio";
+  input.name = name;
+  input.value = value;
+  input.checked = Boolean(checked);
+  const span = document.createElement("span");
+  span.textContent = label;
+  l.append(input, span);
+  if (desc) {
+    const small = document.createElement("small");
+    small.textContent = desc;
+    l.appendChild(small);
   }
+  return { label: l, input };
+}
 
-  if (requires) {
-    container.classList.remove("hidden");
-    if (nameInput) nameInput.required = true;
-    if (phoneInput) phoneInput.required = true;
-  } else {
-    container.classList.add("hidden");
-    if (nameInput) {
-      nameInput.required = false;
-      nameInput.value = "";
-    }
-    if (phoneInput) {
-      phoneInput.required = false;
-      phoneInput.value = "";
-    }
+function renderAgeGroups(groups) {
+  const box = $("age-group-options");
+  box.innerHTML = "";
+  state.ageGroup = null;
+  // Start on the first group that needs no guardian (an adult), so the guardian block stays closed until chosen.
+  const defIdx = Math.max(0, groups.findIndex((g) => !g.requires_guardian));
+  groups.forEach((ag, idx) => {
+    const { label, input } = makeRadio("age_group", ag.name, ag.name, ag.description || ag.hint || "", idx === defIdx);
+    if (idx === defIdx) state.ageGroup = ag;
+    input.addEventListener("change", () => {
+      state.ageGroup = ag;
+      updateGuardian();
+      setErr("age-group", "");
+    });
+    box.appendChild(label);
+  });
+  updateGuardian();
+}
+
+function isJunior() {
+  return state.choice !== "dish" && Boolean(state.ageGroup && state.ageGroup.requires_guardian);
+}
+
+function updateGuardian() {
+  const box = $("guardian-container");
+  const show = isJunior();
+  box.hidden = !show;
+  if (!show) {
+    $("guardian-name").value = "";
+    $("guardian-phone").value = "";
+    setErr("guardian-name", "");
+    setErr("guardian-phone", "");
   }
 }
 
 function renderPerformanceTypes(types) {
-  ["perf-type-1", "perf-type-2"].forEach((containerId, idx) => {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = "";
-    const cardNum = idx + 1;
+  const box = $("perf-type");
+  box.innerHTML = "";
+  types.forEach((t, i) => {
+    const { label, input } = makeRadio("perf_type", t, t, "", i === 0);
+    input.addEventListener("change", syncPartnerUI);
+    box.appendChild(label);
+  });
+  $("perf-type-wrap").hidden = types.length <= 1;
+  syncPartnerUI();
+}
 
-    types.forEach((t, tIdx) => {
-      const label = document.createElement("label");
-      label.className = `flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:border-orange-500/50 cursor-pointer transition text-xs font-semibold text-slate-300 perf-type-opt-${cardNum}`;
-      
-      const input = document.createElement("input");
-      input.type = "radio";
-      input.name = `perf_type_${cardNum}`;
-      input.value = t;
-      input.className = "text-orange-500 focus:ring-orange-500";
-      if (cardNum === 1 && tIdx === 0) input.checked = true;
-      if (cardNum === 2 && tIdx === 1) input.checked = true;
-
-      input.addEventListener("change", () => {
-        handleTypeChange(cardNum, t);
-        checkSoloLimit();
-      });
-
-      label.appendChild(input);
-      label.appendChild(document.createTextNode(t));
-      container.appendChild(label);
-    });
+function renderPartnerAgeGroups(groups) {
+  const box = $("partner-age-options");
+  box.innerHTML = "";
+  const list = groups && groups.length ? groups : [{ name: "Adult" }, { name: "Junior" }];
+  // Default to the group that does not need a guardian (an adult) when we can tell.
+  const def = list.findIndex((g) => !g.requires_guardian);
+  list.forEach((ag, idx) => {
+    const { label } = makeRadio("partner_age_group", ag.name, ag.name, ag.description || "", idx === (def < 0 ? 0 : def));
+    box.appendChild(label);
   });
 }
 
-function renderPartnerAgeGroups(cardNum, ageGroups) {
-  const container = document.getElementById(`partner-age-options-${cardNum}`);
-  if (!container) return;
-  container.innerHTML = "";
-
-  const groups = (ageGroups && ageGroups.length > 0) ? ageGroups : [{ name: "Senior" }, { name: "Junior" }];
-  groups.forEach((ag, idx) => {
-    const label = document.createElement("label");
-    label.className = `flex-1 flex items-center justify-center gap-2 p-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:border-orange-500/50 cursor-pointer transition text-xs font-semibold text-slate-300 partner-age-opt-${cardNum}`;
-
-    const input = document.createElement("input");
-    input.type = "radio";
-    input.name = `partner_age_group_${cardNum}`;
-    input.value = ag.name;
-    input.className = "text-orange-500 focus:ring-orange-500";
-    if (idx === 0) input.checked = true;
-
-    label.appendChild(input);
-    label.appendChild(document.createTextNode(ag.name));
-    container.appendChild(label);
+function renderPartnerDatalist() {
+  const dl = $("partner-names");
+  dl.innerHTML = "";
+  state.entries.forEach((e) => {
+    const o = document.createElement("option");
+    o.value = e.name;
+    dl.appendChild(o);
   });
 }
 
-function renderPartnerOptions(registeredNames) {
-  [1, 2].forEach(cardNum => {
-    const select = document.getElementById(`partner-select-${cardNum}`);
-    if (!select) return;
-
-    select.innerHTML = '<option value="">-- Choose from registered performers --</option>';
-    registeredNames.forEach(name => {
-      const opt = document.createElement("option");
-      opt.value = name;
-      opt.textContent = name;
-      select.appendChild(opt);
-    });
-
-    renderPartnerAgeGroups(cardNum, signupConfig?.age_groups || []);
-
-    const toggleBtn = document.getElementById(`toggle-custom-partner-${cardNum}`);
-    const selectWrap = document.getElementById(`partner-select-wrap-${cardNum}`);
-    const customWrap = document.getElementById(`partner-custom-wrap-${cardNum}`);
-    const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
-    const hiddenPartner = document.getElementById(`partner-name-${cardNum}`);
-    const dupBox = document.getElementById(`partner-dup-box-${cardNum}`);
-    const matchedListEl = document.getElementById(`partner-matched-list-${cardNum}`);
-    const dismissBtn = document.getElementById(`dismiss-partner-dup-${cardNum}`);
-
-    if (toggleBtn && !toggleBtn._configured) {
-      toggleBtn._configured = true;
-      toggleBtn.addEventListener("click", () => {
-        const isCustomHidden = customWrap.classList.contains("hidden");
-        const customPhoneInput = document.getElementById(`partner-custom-phone-${cardNum}`);
-        if (isCustomHidden) {
-          // Switch to custom text input
-          customWrap.classList.remove("hidden");
-          selectWrap.classList.add("hidden");
-          toggleBtn.textContent = "← Choose from registered list";
-          select.value = "";
-          hiddenPartner.value = customInput.value.trim();
-          customInput.focus();
-        } else {
-          // Switch back to select dropdown
-          customWrap.classList.add("hidden");
-          selectWrap.classList.remove("hidden");
-          toggleBtn.textContent = "+ Add other participant";
-          customInput.value = "";
-          if (customPhoneInput) customPhoneInput.value = "";
-          hiddenPartner.value = select.value.trim();
-          if (dupBox) dupBox.classList.add("hidden");
-        }
-      });
-    }
-
-    if (select && !select._configured) {
-      select._configured = true;
-      select.addEventListener("change", () => {
-        hiddenPartner.value = select.value.trim();
-      });
-    }
-
-    if (customInput && !customInput._configured) {
-      customInput._configured = true;
-      customInput.addEventListener("input", () => {
-        const rawVal = customInput.value;
-        hiddenPartner.value = rawVal.trim();
-
-        const currentType = document.querySelector(`input[name="perf_type_${cardNum}"]:checked`)?.value?.toLowerCase() || "duet";
-        const isGroup = currentType === "group";
-
-        let activePart = "";
-        let parts = [];
-        let excluded = [];
-
-        if (isGroup) {
-          parts = rawVal.split(',');
-          activePart = parts[parts.length - 1].trim().toLowerCase();
-          excluded = parts.slice(0, -1).map(p => p.trim().toLowerCase());
-        } else {
-          activePart = rawVal.trim().toLowerCase();
-        }
-
-        // Check if >= 3 characters entered
-        if (activePart.length < 3 || !signupConfig || !signupConfig.registered_performers) {
-          if (dupBox) dupBox.classList.add("hidden");
-          return;
-        }
-
-        const registered = signupConfig.registered_performers;
-        const matches = registered
-          .filter(p => !excluded.includes(p.trim().toLowerCase()))
-          .filter(p => {
-            const norm = p.trim().toLowerCase();
-            return norm === activePart || norm.startsWith(activePart) || norm.includes(activePart);
-          });
-
-        if (matches.length > 0 && dupBox && matchedListEl) {
-          matchedListEl.innerHTML = "";
-          matches.forEach(m => {
-            const pill = document.createElement("button");
-            pill.type = "button";
-            pill.className = "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition";
-
-            const nameSpan = document.createElement("span");
-            nameSpan.textContent = m;
-            pill.appendChild(nameSpan);
-
-            const icon = document.createElement("i");
-            icon.setAttribute("data-lucide", isGroup ? "plus" : "check");
-            icon.className = "w-3 h-3";
-            pill.appendChild(icon);
-
-            pill.addEventListener("click", () => {
-              if (isGroup) {
-                parts[parts.length - 1] = " " + m;
-                customInput.value = parts.map(p => p.trim()).filter(Boolean).join(", ") + ", ";
-                hiddenPartner.value = customInput.value.trim();
-                dupBox.classList.add("hidden");
-                customInput.focus();
-              } else {
-                // Ensure option exists in select
-                let opt = Array.from(select.options).find(o => o.value.toLowerCase() === m.toLowerCase());
-                if (!opt) {
-                  opt = document.createElement("option");
-                  opt.value = m;
-                  opt.textContent = m;
-                  select.appendChild(opt);
-                }
-                select.value = opt.value;
-                hiddenPartner.value = opt.value;
-
-                // Switch back to select mode
-                customWrap.classList.add("hidden");
-                selectWrap.classList.remove("hidden");
-                toggleBtn.textContent = "+ Add other participant";
-                customInput.value = "";
-                const customPhoneInput = document.getElementById(`partner-custom-phone-${cardNum}`);
-                if (customPhoneInput) customPhoneInput.value = "";
-                dupBox.classList.add("hidden");
-              }
-            });
-
-            matchedListEl.appendChild(pill);
-          });
-          dupBox.classList.remove("hidden");
-          if (window.lucide) lucide.createIcons();
-        } else {
-          if (dupBox) dupBox.classList.add("hidden");
-        }
-      });
-    }
-
-    if (dismissBtn && !dismissBtn._configured) {
-      dismissBtn._configured = true;
-      dismissBtn.addEventListener("click", () => {
-        if (dupBox) dupBox.classList.add("hidden");
-      });
-    }
-  });
+function currentType() {
+  return document.querySelector('input[name="perf_type"]:checked')?.value || "Solo";
 }
 
-function handleTypeChange(cardNum, type) {
-  const partnerBox = document.getElementById(`partner-box-1`);
-  const partnerBox2 = document.getElementById(`partner-box-2`);
-  const hiddenPartner = document.getElementById(`partner-name-${cardNum}`);
-  const selectWrap = document.getElementById(`partner-select-wrap-${cardNum}`);
-  const customWrap = document.getElementById(`partner-custom-wrap-${cardNum}`);
-  const toggleBtn = document.getElementById(`toggle-custom-partner-${cardNum}`);
-
-  const targetBox = cardNum === 1 ? partnerBox : partnerBox2;
-  const label = targetBox ? targetBox.querySelector('label') : null;
-  const t = type.toLowerCase();
-
-  if (targetBox) {
-    if (t === "duet" || t === "group") {
-      targetBox.classList.remove("hidden");
-      if (t === "group") {
-        if (label) label.textContent = "Group Members *";
-        if (customWrap && selectWrap) {
-          customWrap.classList.remove("hidden");
-          selectWrap.classList.add("hidden");
-        }
-        if (toggleBtn) toggleBtn.classList.add("hidden");
-        const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
-        if (customInput) customInput.placeholder = "Comma-separated names (e.g. Alice, Bob, Charlie)";
-      } else {
-        if (label) label.textContent = "Duet Partner Name *";
-        if (toggleBtn) {
-          toggleBtn.classList.remove("hidden");
-          toggleBtn.textContent = customWrap && !customWrap.classList.contains("hidden") 
-            ? "← Choose from registered list" 
-            : "+ Add other participant";
-        }
-        const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
-        if (customInput) customInput.placeholder = "Enter participant's full name";
-      }
-    } else {
-      targetBox.classList.add("hidden");
-      if (hiddenPartner) hiddenPartner.value = "";
-      const select = document.getElementById(`partner-select-${cardNum}`);
-      if (select) select.value = "";
-      const customInput = document.getElementById(`partner-custom-name-${cardNum}`);
-      if (customInput) customInput.value = "";
-      const dupBox = document.getElementById(`partner-dup-box-${cardNum}`);
-      if (dupBox) dupBox.classList.add("hidden");
-    }
+function syncPartnerUI() {
+  const t = currentType().toLowerCase();
+  const box = $("partner-box");
+  const hasPartner = t === "duet" || t === "group";
+  box.hidden = !hasPartner;
+  $("partner-label").textContent = t === "group" ? "Group members (separate names with commas)" : "Partner name";
+  $("partner-name").placeholder = t === "group" ? "e.g. Alice, Bob, Charlie" : "Partner's full name";
+  if (!hasPartner) {
+    $("partner-name").value = "";
+    $("partner-phone").value = "";
+    state.partnerSame = null;
   }
+  updatePartnerMatch();
 }
 
-function checkSoloLimit() {
-  const type1 = document.querySelector('input[name="perf_type_1"]:checked')?.value || "Solo";
-  const soloRadio2 = document.querySelector('input[name="perf_type_2"][value="Solo"]');
-  const warnEl = document.getElementById("perf-2-solo-warn");
+// Duet partner: exact match with someone already signed up asks "Same person?"
+function updatePartnerMatch() {
+  const duet = currentType().toLowerCase() === "duet";
+  const name = $("partner-name").value.trim();
+  const match = duet ? findEntry(name) : null;
+  const matchBox = $("partner-match-box");
+  const newBox = $("partner-new-box");
 
-  if (type1.toLowerCase() === "solo") {
-    if (soloRadio2) {
-      soloRadio2.disabled = true;
-      soloRadio2.parentElement.classList.add("opacity-50", "cursor-not-allowed");
-      if (soloRadio2.checked) {
-        const duetRadio2 = document.querySelector('input[name="perf_type_2"][value="Duet"]');
-        if (duetRadio2) {
-          duetRadio2.checked = true;
-          handleTypeChange(2, "Duet");
-        }
-      }
+  if (!duet || !name) {
+    matchBox.hidden = true;
+    newBox.hidden = true;
+    state.partnerSame = null;
+    return;
+  }
+  if (match) {
+    const ids = match.ids.length ? ` (${match.ids.join(", ")})` : "";
+    $("partner-match-text").textContent = `${match.name} is already signed up${ids}. Same person?`;
+    matchBox.hidden = false;
+    if (state.partnerSame === false) {
+      $("partner-new-note").textContent = `Got it. This is a different ${match.name}, so we need their phone.`;
     }
-    if (warnEl) warnEl.classList.remove("hidden");
+    newBox.hidden = state.partnerSame !== false;
   } else {
-    if (soloRadio2) {
-      soloRadio2.disabled = false;
-      soloRadio2.parentElement.classList.remove("opacity-50", "cursor-not-allowed");
-    }
-    if (warnEl) warnEl.classList.add("hidden");
+    matchBox.hidden = true;
+    state.partnerSame = null;
+    $("partner-new-note").textContent = "We need your partner's phone so the organizers can reach them.";
+    newBox.hidden = false;
   }
 }
 
-function renderFoodGroups(groups, allItems) {
-  const container = document.getElementById("food-groups-container");
-  if (!container) return;
+function renderFoodGroups() {
+  const container = $("food-groups-container");
+  const c = state.config;
+  if (!container || !c) return;
+  const selected = document.querySelector('input[name="food_item_id"]:checked')?.value || "";
+  const me = $("performer-name").value.trim().toLowerCase();
+  const groups = c.food_groups || [];
+  const items = c.food_items || [];
   container.innerHTML = "";
+  let open = 0;
 
-  groups.forEach(group => {
-    const groupItems = allItems.filter(i => i.group_id === group.group_id);
-    if (groupItems.length === 0) return;
+  groups.forEach((group) => {
+    const groupItems = items.filter((i) => i.group_id === group.group_id);
+    if (!groupItems.length) return;
+    const wrap = document.createElement("div");
+    wrap.className = "gf-dish-group";
+    const h = document.createElement("h4");
+    const gName = document.createElement("span");
+    gName.textContent = group.name;
+    const gCount = document.createElement("span");
+    gCount.textContent = `${groupItems.filter((i) => !i.is_taken).length} open`;
+    h.append(gName, gCount);
+    wrap.appendChild(h);
+    const grid = document.createElement("div");
+    grid.className = "gf-dish-grid";
 
-    const groupWrapper = document.createElement("div");
-    groupWrapper.className = "p-4 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-3";
-
-    const header = document.createElement("div");
-    header.className = "flex items-center justify-between";
-    header.innerHTML = `
-      <h4 class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-        <i data-lucide="utensils" class="w-3.5 h-3.5"></i>
-        <span>${escapeHtml(group.name)}</span>
-      </h4>
-      <span class="text-[11px] font-semibold text-slate-400">
-        ${group.taken_count || 0}/${groupItems.length} taken
-      </span>
-    `;
-    groupWrapper.appendChild(header);
-
-    const itemsGrid = document.createElement("div");
-    itemsGrid.className = "grid grid-cols-1 sm:grid-cols-2 gap-2";
-
-    groupItems.forEach(item => {
-      const itemRow = document.createElement("label");
-      if (item.is_taken) {
-        itemRow.className = "flex items-center justify-between p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/80 opacity-60 text-xs text-slate-400 cursor-not-allowed";
-        itemRow.innerHTML = `
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-            <span class="font-medium">${escapeHtml(item.name)}</span>
-          </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20">
-            Taken (${escapeHtml(item.signer_name || "Signed Up")})
-          </span>
-        `;
-      } else {
-        itemRow.className = "flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-emerald-500/60 cursor-pointer transition text-xs text-slate-200";
-        itemRow.innerHTML = `
-          <div class="flex items-center gap-2">
-            <input type="radio" name="food_item_id" value="${escapeQuotes(item.item_id)}" data-name="${escapeQuotes(item.name)}" class="text-emerald-500 focus:ring-emerald-500">
-            <span class="font-medium text-white">${escapeHtml(item.name)}</span>
-          </div>
-          <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-            OPEN
-          </span>
-        `;
+    groupItems.forEach((item) => {
+      const taken = Boolean(item.is_taken);
+      const mine = taken && me && String(item.signer_name || "").trim().toLowerCase() === me;
+      const row = document.createElement(taken ? "div" : "label");
+      row.className = "gf-dish" + (taken ? " is-taken" : "");
+      const name = document.createElement("span");
+      name.className = "gf-dish-name";
+      const tag = document.createElement("span");
+      tag.className = "gf-dish-tag " + (mine ? "yours" : taken ? "taken" : "open");
+      tag.textContent = mine ? "Yours" : taken ? "Taken" : "Open";
+      if (!taken) {
+        open += 1;
+        const input = document.createElement("input");
+        input.type = "radio";
+        input.name = "food_item_id";
+        input.value = item.item_id;
+        input.dataset.name = item.name;
+        input.checked = item.item_id === selected;
+        name.appendChild(input);
       }
-      itemsGrid.appendChild(itemRow);
+      const text = document.createElement("span");
+      text.textContent = item.name;
+      name.appendChild(text);
+      if (taken && !mine && item.signer_name) {
+        const who = document.createElement("span");
+        who.className = "gf-dish-who";
+        who.textContent = item.signer_name;
+        text.appendChild(who);
+      }
+      row.append(name, tag);
+      grid.appendChild(row);
     });
-
-    groupWrapper.appendChild(itemsGrid);
-    container.appendChild(groupWrapper);
+    wrap.appendChild(grid);
+    container.appendChild(wrap);
   });
+
+  $("food-open-count").textContent = `${open} slot${open === 1 ? "" : "s"} still open.`;
+  if (!groups.length) {
+    const p = document.createElement("p");
+    p.className = "gf-muted";
+    p.textContent = "No dishes are listed yet. Check back soon.";
+    container.appendChild(p);
+  }
+  $("selected-food-box").hidden = !document.querySelector('input[name="food_item_id"]:checked');
 }
 
-function isPlaceholderSong(title) {
-  if (!title) return true;
-  const t = title.trim().toLowerCase();
-  if (!t) return true;
-  const placeholders = [
-    'tbd', 'tba', 'to be decided', 'to be announced',
-    'test', 'testing', 'n/a', 'na', 'none', 'unknown',
-    'song title missing', 'missing', 'pending', 'null', 'untitled'
-  ];
-  if (placeholders.includes(t)) return true;
-  if (t.includes('song title missing')) return true;
-  if (t.includes('(song') && t.includes('missing)')) return true;
-  if (/^performance\s*(?:#?\d+)?$/i.test(t)) return true;
-  if (/^song\s*(?:#?\d+)?$/i.test(t)) return true;
-  return false;
-}
+// ---------------------------------------------------------------------------------------------- name lookup
+function updateNameLookup() {
+  const raw = $("performer-name").value.trim();
+  const box = $("name-lookup-box");
+  const text = $("name-lookup-text");
+  const actions = $("name-lookup-actions");
+  actions.innerHTML = "";
+  const key = raw.toLowerCase();
 
-function findDuplicateSongSignup(title) {
-  if (!title || isPlaceholderSong(title) || !signupConfig || !signupConfig.existing_songs) return null;
-  const cleanTitle = title.trim().toLowerCase();
-  if (cleanTitle.length < 3) return null;
+  if (raw.length < 3) { box.hidden = true; return; }
+  const exact = findEntry(raw);
 
-  for (const s of signupConfig.existing_songs) {
-    const existingTitle = (s.song_title || '').trim();
-    if (isPlaceholderSong(existingTitle)) continue;
+  if (exact && state.nameDecision !== key) {
+    const ids = exact.ids;
+    const n = ids.length;
+    const detail = n === 0 ? "" : n === 1
+      ? ` with one act (${ids[0]}${exact.titles[0] ? ", " + exact.titles[0] : ""})`
+      : ` with ${n} acts (${ids.join(", ")})`;
+    text.textContent = `${exact.name} is already signed up${detail}.`;
+    const targets = ids.length ? ids : [""];
+    targets.forEach((id) => {
+      const a = document.createElement("a");
+      a.className = "gf-btn gf-btn-small gf-btn-primary";
+      a.href = `/my-entry?name=${encodeURIComponent(exact.name)}`;
+      a.textContent = id ? `Edit ${id}` : "Edit my entry";
+      actions.appendChild(a);
+    });
+    const no = document.createElement("button");
+    no.type = "button";
+    no.className = "gf-btn gf-btn-small";
+    no.textContent = "No, new act";
+    no.addEventListener("click", () => {
+      state.nameDecision = key;
+      box.hidden = true;
+      prefillFromProfile(exact.name);
+      $("contact-info").focus();
+    });
+    actions.appendChild(no);
+    box.hidden = false;
+    prefillFromProfile(exact.name);
+    return;
+  }
 
-    const existingLower = existingTitle.toLowerCase();
-    if (existingLower === cleanTitle || 
-        (cleanTitle.length >= 4 && (existingLower.includes(cleanTitle) || cleanTitle.includes(existingLower)))) {
-      return s;
+  if (!exact) {
+    // Partial matches: offer to fill the full registered name.
+    const partial = state.entries.filter((e) => e.name.toLowerCase().includes(key)).slice(0, 4);
+    if (partial.length) {
+      text.textContent = "Already signed up? Tap your name:";
+      partial.forEach((e) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "gf-btn gf-btn-small";
+        b.textContent = e.name;
+        b.addEventListener("click", () => {
+          $("performer-name").value = e.name;
+          setErr("performer-name", "");
+          updateNameLookup();
+          $("performer-name").focus();
+        });
+        actions.appendChild(b);
+      });
+      box.hidden = false;
+      return;
     }
+  }
+  box.hidden = true;
+}
+
+// Phone (and age group) pre-fill goes through the existing exact-name profile API only.
+async function prefillFromProfile(name) {
+  const key = name.trim().toLowerCase();
+  if (state.profileChecked === key) return;
+  state.profileChecked = key;
+  try {
+    const res = await fetch(`/api/performer/profile?name=${encodeURIComponent(name)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const perf = (data.performances || []).find((p) => (p.performer_name || "").trim().toLowerCase() === key) || (data.performances || [])[0] || {};
+    const phone = data.contact_info || data.phone || perf.contact_info || "";
+    const input = $("contact-info");
+    if (phone && !input.value.trim()) {
+      input.value = phone;
+      const note = $("phone-note");
+      note.textContent = "Filled in from your earlier sign-up. Change it if it is different.";
+      note.hidden = false;
+    }
+    const ag = perf.age_group;
+    if (ag) {
+      const radio = Array.from(document.querySelectorAll('input[name="age_group"]')).find((r) => r.value === ag);
+      if (radio && !radio.checked) { radio.checked = true; radio.dispatchEvent(new Event("change")); }
+    }
+  } catch (e) {
+    console.warn("Profile lookup failed:", e);
+  }
+}
+
+// ---------------------------------------------------------------------------------------------- song duplicate hint
+function isPlaceholderSong(title) {
+  const t = String(title || "").trim().toLowerCase();
+  if (!t) return true;
+  if (["tbd", "tba", "to be decided", "to be announced", "test", "testing", "n/a", "na", "none", "unknown", "missing", "pending", "null", "untitled"].includes(t)) return true;
+  if (t.includes("song title missing")) return true;
+  return /^(performance|song)\s*(?:#?\d+)?$/i.test(t);
+}
+
+function findDuplicateSong(title) {
+  const clean = String(title || "").trim().toLowerCase();
+  if (clean.length < 3 || isPlaceholderSong(clean)) return null;
+  for (const s of (state.config?.existing_songs || [])) {
+    const existing = String(s.song_title || "").trim().toLowerCase();
+    if (!existing || isPlaceholderSong(existing)) continue;
+    if (existing === clean || (clean.length >= 4 && (existing.includes(clean) || clean.includes(existing)))) return s;
   }
   return null;
 }
 
-function updateRoleUI(role) {
-  const rolePerformerCard = document.getElementById("role-performer-card");
-  const roleAttendeeCard = document.getElementById("role-attendee-card");
-  const perfSection = document.getElementById("perf-section");
-  const step3Num = document.getElementById("step-3-num");
-  const step1Title = document.getElementById("step-1-title");
-  const skipFoodWrap = document.getElementById("skip-food-wrap");
-  const skipFoodCheckbox = document.getElementById("skip-food-checkbox");
-  const attendeeFoodNotice = document.getElementById("attendee-food-notice");
-  const submitBtnText = document.getElementById("submit-btn-text");
-  const ageGroupWrap = document.getElementById("age-group-wrap");
-  const contactInfoWrap = document.getElementById("contact-info-wrap");
-  const familyNote = document.getElementById("family-signup-note");
-  const nameLabel = document.getElementById("performer-name-label");
-  const nameInput = document.getElementById("performer-name");
-  const guardianContainer = document.getElementById("guardian-container");
-
-  if (role === "food_only") {
-    if (roleAttendeeCard) {
-      roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-emerald-500 bg-emerald-500/10 cursor-pointer transition";
-    }
-    if (rolePerformerCard) {
-      rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
-    }
-    if (perfSection) perfSection.classList.add("hidden");
-    if (ageGroupWrap) ageGroupWrap.classList.add("hidden");
-    if (contactInfoWrap) {
-      contactInfoWrap.classList.remove("sm:col-span-1");
-      contactInfoWrap.classList.add("sm:col-span-2");
-    }
-    if (familyNote) familyNote.classList.remove("hidden");
-    toggleGuardianRequirement(false);
-    if (guardianContainer) guardianContainer.classList.add("hidden");
-    if (nameLabel) nameLabel.textContent = "Contact / Family Name *";
-    if (nameInput) nameInput.placeholder = "e.g. Maya Suresh or Suresh Family";
-    if (step3Num) step3Num.textContent = "2";
-    if (step1Title) step1Title.textContent = "Family & Contact Information";
-    if (skipFoodWrap) skipFoodWrap.classList.add("hidden");
-    if (attendeeFoodNotice) attendeeFoodNotice.classList.remove("hidden");
-    if (skipFoodCheckbox) skipFoodCheckbox.checked = false;
-    if (submitBtnText) submitBtnText.textContent = "Complete Potluck Sign-Up";
-  } else {
-    if (rolePerformerCard) {
-      rolePerformerCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-orange-500 bg-orange-500/10 cursor-pointer transition";
-    }
-    if (roleAttendeeCard) {
-      roleAttendeeCard.className = "relative flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-700 bg-slate-950/60 hover:border-slate-600 cursor-pointer transition";
-    }
-    if (perfSection) perfSection.classList.remove("hidden");
-    if (ageGroupWrap) ageGroupWrap.classList.remove("hidden");
-    if (contactInfoWrap) {
-      contactInfoWrap.classList.remove("sm:col-span-2");
-      contactInfoWrap.classList.add("sm:col-span-1");
-    }
-    if (familyNote) familyNote.classList.add("hidden");
-    if (nameLabel) nameLabel.textContent = "Full Name *";
-    if (nameInput) nameInput.placeholder = "e.g. Maya Suresh";
-    if (step3Num) step3Num.textContent = "3";
-    if (step1Title) step1Title.textContent = "Participant Information";
-    if (skipFoodWrap) skipFoodWrap.classList.remove("hidden");
-    if (attendeeFoodNotice) attendeeFoodNotice.classList.add("hidden");
-    if (submitBtnText) submitBtnText.textContent = "Complete Registration";
-    if (selectedAgeGroup) {
-      toggleGuardianRequirement(selectedAgeGroup.requires_guardian);
-    }
-  }
+function updateSongWarning() {
+  const box = $("song-dup-box");
+  const dup = findDuplicateSong($("song-title").value);
+  box.innerHTML = "";
+  if (!dup) { box.hidden = true; return; }
+  const singer = dup.partner_name ? `${dup.performer_name} & ${dup.partner_name}` : dup.performer_name;
+  const strong1 = document.createElement("strong");
+  strong1.textContent = `"${dup.song_title}"`;
+  const strong2 = document.createElement("strong");
+  strong2.textContent = singer;
+  box.append("Song already chosen: ", strong1, " is taken by ", strong2, ` (${dup.performance_type || "Solo"}). You can still keep it.`);
+  box.hidden = false;
 }
 
-function applyRegistrationModules(config) {
-  if (!config) return;
-  const perfEnabled = Boolean(config.signup_enabled !== false);
-  const foodEnabled = Boolean(config.food_signup_enabled !== false);
-
-  const roleSelectorSection = document.getElementById("role-selector-section");
-  const rolePerformerCard = document.getElementById("role-performer-card");
-  const roleAttendeeCard = document.getElementById("role-attendee-card");
-  const rolePerformer = document.getElementById("role-performer");
-  const roleAttendee = document.getElementById("role-attendee");
-  const closedBanner = document.getElementById("signup-closed-banner");
-  const bannerTitle = document.getElementById("signup-banner-title");
-  const bannerDesc = document.getElementById("signup-banner-desc");
-  const submitBtn = document.getElementById("submit-btn");
-  const submitBtnText = document.getElementById("submit-btn-text");
-  const addPerfBtn = document.getElementById("add-perf-btn");
-
-  if (addPerfBtn) {
-    if (config.allow_duets === false) {
-      addPerfBtn.classList.add("hidden");
-    } else {
-      addPerfBtn.classList.remove("hidden");
-    }
+// ---------------------------------------------------------------------------------------------- errors
+function setErr(field, msg) {
+  const err = $(`err-${field}`);
+  const input = $(field);
+  if (err) {
+    err.textContent = msg || "";
+    err.hidden = !msg;
   }
-
-  // Case 1: Both disabled -> Entire registration closed (e.g. Event-Day Freeze)
-  if (!perfEnabled && !foodEnabled) {
-    if (closedBanner) closedBanner.classList.remove("hidden");
-    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
-    const perfSection = document.getElementById("perf-section");
-    if (perfSection) perfSection.classList.add("hidden");
-    const foodSection = document.getElementById("food-section");
-    if (foodSection) foodSection.classList.add("hidden");
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.className = "w-full py-4 rounded-2xl bg-slate-800 text-slate-500 font-bold text-sm shadow-none flex items-center justify-center gap-2 cursor-not-allowed";
-    }
-    if (submitBtnText) submitBtnText.textContent = "Sign-Ups Closed";
-    return;
-  }
-
-  // Active registration: ensure banner hidden and button enabled
-  if (closedBanner) closedBanner.classList.add("hidden");
-  if (submitBtn) {
-    submitBtn.disabled = false;
-    submitBtn.className = "w-full py-4 rounded-2xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition hover:scale-[1.01] active:scale-[0.99] cursor-pointer";
-  }
-
-  // Case 2: Potluck / Food ONLY (Performances disabled) -> e.g. Potluck Preset
-  if (!perfEnabled && foodEnabled) {
-    if (bannerTitle) bannerTitle.textContent = "Potluck Food Sign-Up";
-    if (bannerDesc) bannerDesc.textContent = "Choose a dish to bring for our community potluck dinner. One registration per family/household.";
-    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
-    if (roleAttendee) {
-      roleAttendee.checked = true;
-    }
-    updateRoleUI("food_only");
-    return;
-  }
-
-  // Case 3: Performance ONLY (Food disabled) -> e.g. Solo Competition
-  if (perfEnabled && !foodEnabled) {
-    if (bannerTitle) bannerTitle.textContent = "Stage Performer Sign-Up";
-    if (bannerDesc) bannerDesc.textContent = "Register your performance for the stage lineup.";
-    if (roleSelectorSection) roleSelectorSection.classList.add("hidden");
-    const foodSec = document.getElementById("food-section");
-    if (foodSec) foodSec.classList.add("hidden");
-    if (rolePerformer) {
-      rolePerformer.checked = true;
-    }
-    updateRoleUI("performer");
-    return;
-  }
-
-  // Case 4: Both enabled -> Full Event (e.g. Musical Night)
-  if (bannerTitle) bannerTitle.textContent = "Performer & Food Sign-Up";
-  if (bannerDesc) bannerDesc.textContent = "Register your performances for the stage lineup and choose a dish to bring for our community potluck dinner.";
-  if (roleSelectorSection) roleSelectorSection.classList.remove("hidden");
-  if (rolePerformerCard) rolePerformerCard.classList.remove("hidden");
-  if (roleAttendeeCard) roleAttendeeCard.classList.remove("hidden");
-  const activeRole = document.querySelector('input[name="registration_role"]:checked')?.value || "performer";
-  updateRoleUI(activeRole);
+  if (input && "ariaInvalid" in input) input.setAttribute("aria-invalid", msg ? "true" : "false");
+  return !msg;
 }
 
-function setupEventListeners() {
-  // Registration Role (Performer vs Food-Only Attendee)
-  const roleRadios = document.querySelectorAll('input[name="registration_role"]');
-  roleRadios.forEach(radio => {
-    radio.addEventListener("change", (e) => {
-      updateRoleUI(e.target.value);
-    });
+function showFormError(msg) {
+  const el = $("form-error");
+  el.textContent = msg;
+  el.hidden = !msg;
+}
+function hideFormError() { showFormError(""); }
+
+function isValidPhone(phone) {
+  return String(phone || "").replace(/\D/g, "").length >= 10;
+}
+
+// Each validator sets inline errors and returns true when the step is fine.
+const VALIDATORS = {
+  about() {
+    let ok = true;
+    const name = $("performer-name").value.trim();
+    const phone = $("contact-info").value.trim();
+    const wantsAct = state.choice !== "dish";
+    let firstBad = null;
+    const fail = (field, msg) => { setErr(field, msg); ok = false; firstBad = firstBad || $(field); };
+
+    setErr("performer-name", ""); setErr("contact-info", ""); setErr("guardian-name", ""); setErr("guardian-phone", ""); setErr("age-group", "");
+    if (!name) fail("performer-name", "Please enter your name.");
+    if (wantsAct && !state.ageGroup && (state.config?.age_groups || []).length) fail("age-group", "Choose an age group.");
+
+    if (isJunior()) {
+      if (!$("guardian-name").value.trim()) fail("guardian-name", "Enter a parent or guardian name.");
+      const gp = $("guardian-phone").value.trim();
+      if (!gp) fail("guardian-phone", "Enter a guardian phone number.");
+      else if (!isValidPhone(gp)) fail("guardian-phone", "Enter a 10-digit phone number for the guardian.");
+      if (phone && !isValidPhone(phone)) fail("contact-info", "Enter a 10-digit phone number, or leave it blank to use the guardian's.");
+    } else if (!phone) {
+      fail("contact-info", "Enter your phone number.");
+    } else if (!isValidPhone(phone)) {
+      fail("contact-info", "Enter a 10-digit phone number.");
+    }
+    firstBad?.focus();
+    return ok;
+  },
+
+  act() {
+    let ok = true;
+    setErr("partner-name", ""); setErr("partner-phone", "");
+    const t = currentType().toLowerCase();
+    const partner = $("partner-name").value.trim();
+    let firstBad = null;
+    const fail = (field, msg) => { setErr(field, msg); ok = false; firstBad = firstBad || $(field); };
+
+    if (t === "duet" || t === "group") {
+      if (!partner) {
+        fail("partner-name", t === "group" ? "Add the names of your group members." : "Enter your partner's name.");
+      } else if (t === "duet") {
+        const match = findEntry(partner);
+        if (match && state.partnerSame === null) {
+          fail("partner-name", "Choose Yes or No above to continue.");
+        } else if (!match || state.partnerSame === false) {
+          const pp = $("partner-phone").value.trim();
+          if (!pp) fail("partner-phone", "Enter your partner's phone number.");
+          else if (!isValidPhone(pp)) fail("partner-phone", "Enter a 10-digit phone number for your partner.");
+        }
+      }
+    }
+    firstBad?.focus();
+    return ok;
+  },
+
+  dish() {
+    setErr("food", "");
+    if (!document.querySelector('input[name="food_item_id"]:checked')) {
+      setErr("food", "Pick an open dish to continue.");
+      return false;
+    }
+    return true;
+  },
+};
+
+// ---------------------------------------------------------------------------------------------- events
+function bindEvents() {
+  document.querySelectorAll('input[name="signup_choice"]').forEach((r) => {
+    r.addEventListener("change", (e) => setChoice(e.target.value));
   });
 
-  // Add 2nd Performance
-  const addPerfBtn = document.getElementById("add-perf-btn");
-  const perfCard2 = document.getElementById("perf-card-2");
-  const removePerf2Btn = document.getElementById("remove-perf-2-btn");
+  const nameInput = $("performer-name");
+  nameInput.addEventListener("input", () => {
+    setErr("performer-name", "");
+    state.profileChecked = state.profileChecked === nameInput.value.trim().toLowerCase() ? state.profileChecked : "";
+    updateNameLookup();
+  });
+  $("contact-info").addEventListener("input", () => { setErr("contact-info", ""); $("phone-note").hidden = true; });
+  $("guardian-name").addEventListener("input", () => setErr("guardian-name", ""));
+  $("guardian-phone").addEventListener("input", () => setErr("guardian-phone", ""));
 
-  if (addPerfBtn) {
-    addPerfBtn.addEventListener("click", () => {
-      hasPerf2 = true;
-      perfCard2.classList.remove("hidden");
-      addPerfBtn.classList.add("hidden");
-      checkSoloLimit();
-      if (window.lucide) lucide.createIcons();
-    });
-  }
+  $("song-title").addEventListener("input", updateSongWarning);
+  $("acoustic").addEventListener("change", () => { $("upload-hint").hidden = $("acoustic").checked; });
 
-  if (removePerf2Btn) {
-    removePerf2Btn.addEventListener("click", () => {
-      hasPerf2 = false;
-      perfCard2.classList.add("hidden");
-      addPerfBtn.classList.remove("hidden");
-      document.getElementById("song-title-2").value = "";
-      document.getElementById("movie-name-2").value = "";
-      document.getElementById("stage-notes-2").value = "";
-      const partner2 = document.getElementById("partner-name-2");
-      if (partner2) partner2.value = "";
-    });
-  }
+  $("partner-name").addEventListener("input", () => {
+    setErr("partner-name", "");
+    state.partnerSame = null;
+    updatePartnerMatch();
+  });
+  $("partner-phone").addEventListener("input", () => setErr("partner-phone", ""));
+  $("partner-same-yes").addEventListener("click", () => {
+    state.partnerSame = true;
+    setErr("partner-name", "");
+    $("partner-match-text").textContent = `${$("partner-name").value.trim()} is linked as your partner.`;
+    $("partner-new-box").hidden = true;
+  });
+  $("partner-same-no").addEventListener("click", () => {
+    state.partnerSame = false;
+    setErr("partner-name", "");
+    updatePartnerMatch();
+    $("partner-phone").focus();
+  });
 
-  // Food selection listeners
-  const container = document.getElementById("food-groups-container");
-  const selectedFoodBox = document.getElementById("selected-food-box");
-  const selectedNameEl = document.getElementById("selected-food-item-name");
-  const skipCheckbox = document.getElementById("skip-food-checkbox");
-
-  if (container) {
-    container.addEventListener("change", (e) => {
-      if (e.target && e.target.name === "food_item_id") {
-        if (skipCheckbox) skipCheckbox.checked = false;
-        if (selectedFoodBox) selectedFoodBox.classList.remove("hidden");
-        if (selectedNameEl) selectedNameEl.textContent = e.target.dataset.name;
-      }
-    });
-  }
-
-  if (skipCheckbox) {
-    skipCheckbox.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        const checkedRadio = document.querySelector('input[name="food_item_id"]:checked');
-        if (checkedRadio) checkedRadio.checked = false;
-        if (selectedFoodBox) selectedFoodBox.classList.add("hidden");
-      }
-    });
-  }
-
-  // Live duplicate registration check on performer name
-  const nameInput = document.getElementById("performer-name");
-  const dupWarningBox = document.getElementById("duplicate-warning-box");
-  const matchedListEl = document.getElementById("matched-performers-list");
-  const dismissDupBtn = document.getElementById("dismiss-dup-warning-btn");
-
-  if (nameInput && dupWarningBox) {
-    nameInput.addEventListener("input", () => {
-      const val = nameInput.value.trim().toLowerCase();
-      // Only start looking up once at least 3 characters are entered
-      if (val.length < 3 || !signupConfig || !signupConfig.registered_performers) {
-        dupWarningBox.classList.add("hidden");
-        return;
-      }
-
-      // Find ALL matching registered performers
-      const registered = signupConfig.registered_performers;
-      const matches = registered.filter(p => {
-        const norm = p.trim().toLowerCase();
-        return norm === val || norm.startsWith(val) || norm.includes(val);
-      });
-
-      if (matches.length > 0) {
-        if (matchedListEl) {
-          matchedListEl.innerHTML = "";
-          matches.forEach(m => {
-            const btn = document.createElement("a");
-            btn.href = `/performer?name=${encodeURIComponent(m)}`;
-            btn.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition";
-            
-            const nameSpan = document.createElement("span");
-            nameSpan.textContent = m;
-            btn.appendChild(nameSpan);
-
-            const icon = document.createElement("i");
-            icon.setAttribute("data-lucide", "arrow-right");
-            icon.className = "w-3.5 h-3.5";
-            btn.appendChild(icon);
-
-            matchedListEl.appendChild(btn);
-          });
-        }
-        dupWarningBox.classList.remove("hidden");
-        if (window.lucide) lucide.createIcons();
-      } else {
-        dupWarningBox.classList.add("hidden");
-      }
-    });
-
-    if (dismissDupBtn) {
-      dismissDupBtn.addEventListener("click", () => {
-        dupWarningBox.classList.add("hidden");
-      });
-    }
-  }
-
-  // Live duplicate check on song titles
-  [1, 2].forEach(cardNum => {
-    const songInput = document.getElementById(`song-title-${cardNum}`);
-    const songDupBox = document.getElementById(`song-dup-box-${cardNum}`);
-    if (songInput && songDupBox) {
-      songInput.addEventListener("input", () => {
-        const val = songInput.value.trim();
-        const dup = findDuplicateSongSignup(val);
-        if (dup) {
-          const singer = dup.partner_name 
-            ? `${dup.performer_name} & ${dup.partner_name}` 
-            : dup.performer_name;
-          songDupBox.innerHTML = `
-            <div class="flex items-start gap-2">
-              <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
-              <div>
-                <span class="font-bold text-amber-300">Song already chosen:</span>
-                <span>"<strong>${escapeHtml(dup.song_title)}</strong>" has already been selected by <strong>${escapeHtml(singer)}</strong> (${escapeHtml(dup.performance_type || 'Solo')}).</span>
-              </div>
-            </div>
-          `;
-          songDupBox.classList.remove("hidden");
-          if (window.lucide) lucide.createIcons();
-        } else {
-          songDupBox.classList.add("hidden");
-          songDupBox.innerHTML = "";
-        }
-      });
+  $("food-groups-container").addEventListener("change", (e) => {
+    if (e.target && e.target.name === "food_item_id") {
+      setErr("food", "");
+      $("selected-food-box").hidden = false;
     }
   });
 
-  // Signup form submit
-  const form = document.getElementById("signup-form");
-  if (form) {
-    form.addEventListener("submit", handleSignupSubmit);
-  }
+  $("back-btn").addEventListener("click", () => {
+    if (state.step > 0) { state.step -= 1; showStep(); }
+  });
+  $("signup-form").addEventListener("submit", handleSubmit);
+
+  $("done-add-act").addEventListener("click", () => restartForm("perform"));
+  $("done-add-dish").addEventListener("click", () => restartForm("dish"));
 }
 
-async function handleSignupSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
-  hideError();
+  hideFormError();
+  const seq = steps();
+  const key = seq[state.step];
 
-  if (signupConfig && signupConfig.signup_enabled === false) {
-    showError("Thanks for your interest, but the sign-ups for this event are currently closed. Please reach out to the organizers for more information.");
+  if (!VALIDATORS[key]()) return;
+  if (state.step < seq.length - 1) {
+    state.step += 1;
+    showStep();
+    window.scrollTo({ top: 0 });
     return;
   }
-
-  const role = document.querySelector('input[name="registration_role"]:checked')?.value || "performer";
-  const name = document.getElementById("performer-name").value.trim();
-  const contact = document.getElementById("contact-info").value.trim();
-  const ageGroup = document.querySelector('input[name="age_group"]:checked')?.value || "";
-
-  if (!name) {
-    showError("Please enter your full name.");
-    return;
+  // Final step: re-check earlier steps so nothing slips through.
+  for (const k of seq.slice(0, -1)) {
+    if (!VALIDATORS[k]()) { goToStep(k); return; }
   }
+  await submitSignup();
+}
 
-  // Attendee Potluck-Only registration path
-  if (role === "food_only") {
-    if (!contact) {
-      showError("Phone number is required for registration.");
-      return;
-    }
-    if (!isValidPhone(contact)) {
-      showError("Please enter a valid 10-digit phone number.");
-      return;
-    }
-
-    const foodRadio = document.querySelector('input[name="food_item_id"]:checked');
-    if (!foodRadio) {
-      showError("Please select an available dish from the potluck menu below to complete your registration.");
-      return;
-    }
-    const dishDesc = document.getElementById("dish-description")?.value.trim() || "";
-
-    const payload = {
-      registration_type: "food_only",
-      performer_name: name,
-      contact_info: contact,
-      age_group: ageGroup,
-      performances: [],
-      food_signup: {
-        item_id: foodRadio.value,
-        dish_description: dishDesc
-      }
-    };
-
-    const submitBtn = document.getElementById("submit-btn");
-    const submitText = document.getElementById("submit-btn-text");
-    submitBtn.disabled = true;
-    submitText.textContent = "Registering...";
-
-    try {
-      const res = await fetch("/api/signup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.detail || "Registration failed. Please try again.");
-      }
-
-      showSuccessModal(data, payload);
-    } catch (err) {
-      showError(err.message);
-    } finally {
-      submitBtn.disabled = false;
-      submitText.textContent = "Complete Potluck Sign-Up";
-    }
-    return;
-  }
-
-  const guardianName = document.getElementById("guardian-name")?.value.trim() || "";
-  const guardianPhone = document.getElementById("guardian-phone")?.value.trim() || "";
-  const isJunior = Boolean(selectedAgeGroup && selectedAgeGroup.requires_guardian);
-
-  if (isJunior) {
-    if (!guardianName) {
-      showError("Parent/Guardian name is required for Junior registration.");
-      return;
-    }
-    if (!guardianPhone || !isValidPhone(guardianPhone)) {
-      showError("Please enter a valid 10-digit phone number for the Parent/Guardian.");
-      return;
-    }
-    if (contact && !isValidPhone(contact)) {
-      showError("Please enter a valid 10-digit phone number for the participant.");
-      return;
-    }
-  } else {
-    if (!contact) {
-      showError("Phone number is required for registration.");
-      return;
-    }
-    if (!isValidPhone(contact)) {
-      showError("Please enter a valid 10-digit phone number.");
-      return;
-    }
-  }
-
-  // Performance 1
-  const type1 = document.querySelector('input[name="perf_type_1"]:checked')?.value || "Solo";
-  const partner1 = document.getElementById("partner-name-1")?.value.trim() || null;
-  const song1 = document.getElementById("song-title-1")?.value.trim() || "";
-  const movie1 = document.getElementById("movie-name-1")?.value.trim() || "";
-  const notes1 = document.getElementById("stage-notes-1")?.value.trim() || "";
-  const acoustic1 = Boolean(document.getElementById("acoustic-1")?.checked);
-
-  const isCustomPartner1 = !document.getElementById("partner-custom-wrap-1")?.classList.contains("hidden");
-  const partnerPhone1 = isCustomPartner1 ? (document.getElementById("partner-custom-phone-1")?.value.trim() || "") : "";
-  const partnerAgeGroup1 = (type1.toLowerCase() === "duet" && isCustomPartner1)
-    ? (document.querySelector('input[name="partner_age_group_1"]:checked')?.value || "Senior")
-    : null;
-
-  if (type1.toLowerCase() === "duet") {
-    if (!partner1) {
-      showError("Please specify your duet partner's name for Performance 1.");
-      return;
-    }
-    if (isCustomPartner1) {
-      if (!partnerPhone1) {
-        showError("Please enter a phone number for your duet partner in Performance 1.");
-        return;
-      }
-      if (!isValidPhone(partnerPhone1)) {
-        showError("Please enter a valid 10-digit phone number for your duet partner in Performance 1.");
-        return;
-      }
-    }
-  }
-
-  const performances = [
-    {
-      performance_type: type1,
-      partner_name: partner1,
-      partner_age_group: partnerAgeGroup1,
-      partner_phone: partnerPhone1,
-      song_title: song1,
-      movie_name: movie1,
-      stage_notes: notes1,
-      is_acoustic: acoustic1
-    }
-  ];
-
-  // Performance 2
-  if (hasPerf2) {
-    const type2 = document.querySelector('input[name="perf_type_2"]:checked')?.value || "Duet";
-    const partner2 = document.getElementById("partner-name-2")?.value.trim() || null;
-    const song2 = document.getElementById("song-title-2")?.value.trim() || "";
-    const movie2 = document.getElementById("movie-name-2")?.value.trim() || "";
-    const notes2 = document.getElementById("stage-notes-2")?.value.trim() || "";
-    const acoustic2 = Boolean(document.getElementById("acoustic-2")?.checked);
-
-    const isCustomPartner2 = !document.getElementById("partner-custom-wrap-2")?.classList.contains("hidden");
-    const partnerPhone2 = isCustomPartner2 ? (document.getElementById("partner-custom-phone-2")?.value.trim() || "") : "";
-    const partnerAgeGroup2 = (type2.toLowerCase() === "duet" && isCustomPartner2)
-      ? (document.querySelector('input[name="partner_age_group_2"]:checked')?.value || "Senior")
-      : null;
-
-    if (type2.toLowerCase() === "duet") {
-      if (!partner2) {
-        showError("Please specify your duet partner's name for Performance 2.");
-        return;
-      }
-      if (isCustomPartner2) {
-        if (!partnerPhone2) {
-          showError("Please enter a phone number for your duet partner in Performance 2.");
-          return;
-        }
-        if (!isValidPhone(partnerPhone2)) {
-          showError("Please enter a valid 10-digit phone number for your duet partner in Performance 2.");
-          return;
-        }
-      }
-    }
-
-    performances.push({
-      performance_type: type2,
-      partner_name: partner2,
-      partner_age_group: partnerAgeGroup2,
-      partner_phone: partnerPhone2,
-      song_title: song2,
-      movie_name: movie2,
-      stage_notes: notes2,
-      is_acoustic: acoustic2
-    });
-  }
-
-  // Food sign-up
-  let foodSignup = null;
-  const skipFood = document.getElementById("skip-food-checkbox")?.checked;
-  const foodRadio = document.querySelector('input[name="food_item_id"]:checked');
-
-  if (!skipFood && foodRadio) {
-    const dishDesc = document.getElementById("dish-description")?.value.trim() || "";
-    foodSignup = {
-      item_id: foodRadio.value,
-      dish_description: dishDesc
-    };
-  }
-
+function buildPayload() {
+  const choice = state.choice;
+  const name = $("performer-name").value.trim();
+  const food = document.querySelector('input[name="food_item_id"]:checked');
   const payload = {
     performer_name: name,
-    contact_info: contact,
-    age_group: ageGroup,
-    guardian_name: guardianName,
-    guardian_phone: guardianPhone,
-    performances: performances,
-    food_signup: foodSignup
+    contact_info: $("contact-info").value.trim(),
+    age_group: choice === "dish" ? "" : (document.querySelector('input[name="age_group"]:checked')?.value || ""),
+    guardian_name: isJunior() ? $("guardian-name").value.trim() : "",
+    guardian_phone: isJunior() ? $("guardian-phone").value.trim() : "",
+    registration_type: choice === "dish" ? "food_only" : choice === "both" ? "both" : "performer",
+    performances: [],
+    food_signup: null,
   };
+  if (choice !== "dish") {
+    const t = currentType();
+    const partner = $("partner-name").value.trim();
+    const isDuet = t.toLowerCase() === "duet";
+    const needsPartnerPhone = isDuet && (!findEntry(partner) || state.partnerSame === false);
+    payload.performances.push({
+      performance_type: t,
+      partner_name: partner || null,
+      partner_age_group: needsPartnerPhone ? (document.querySelector('input[name="partner_age_group"]:checked')?.value || null) : null,
+      partner_phone: needsPartnerPhone ? $("partner-phone").value.trim() : "",
+      song_title: $("song-title").value.trim(),
+      movie_name: $("movie-name").value.trim(),
+      stage_notes: $("stage-notes").value.trim(),
+      is_acoustic: $("acoustic").checked,
+    });
+  }
+  if (choice !== "perform" && food) {
+    payload.food_signup = { item_id: food.value, dish_description: $("dish-description").value.trim() };
+  }
+  return payload;
+}
 
-  const submitBtn = document.getElementById("submit-btn");
-  const submitText = document.getElementById("submit-btn-text");
-  submitBtn.disabled = true;
-  submitText.textContent = "Registering...";
-
+async function submitSignup() {
+  const payload = buildPayload();
+  const btn = $("submit-btn");
+  const text = $("submit-btn-text");
+  const label = text.textContent;
+  btn.disabled = true;
+  text.textContent = "Signing you up...";
   try {
     const res = await fetch("/api/signup", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.detail || "Registration failed. Please try again.");
-    }
-
-    showSuccessModal(data, payload);
+    let data = {};
+    try { data = await res.json(); } catch (_) { /* non-JSON error body */ }
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Sign-up did not go through. Please try again.");
+    state.lastResult = { response: data, request: payload, dishName: document.querySelector('input[name="food_item_id"]:checked')?.dataset.name || "" };
+    try { localStorage.setItem(NAME_KEY, payload.performer_name); } catch (_) { /* private mode */ }
+    showDone(data, payload);
   } catch (err) {
-    showError(err.message);
+    showFormError(err.message || "Sign-up did not go through. Please try again.");
   } finally {
-    submitBtn.disabled = false;
-    submitText.textContent = "Complete Registration";
+    btn.disabled = false;
+    text.textContent = label;
   }
 }
 
-function showSuccessModal(response, request) {
-  const modal = document.getElementById("success-modal");
-  const msgEl = document.getElementById("success-message-text");
-  const detailsBox = document.getElementById("success-details-box");
-  const perfLink = document.getElementById("success-performer-link");
+// ---------------------------------------------------------------------------------------------- done card
+function eventLabel() {
+  const c = state.config || {};
+  return c.event_name || c.header_brand_title || "the event";
+}
 
-  if (!modal) return;
+function showDone(response, request) {
+  const c = state.config || {};
+  const name = response.performer_name || request.performer_name;
+  const ids = response.entry_ids || [];
+  const act = request.performances[0];
+  const hasDish = Boolean(response.food_signup_id || request.food_signup);
 
-  const isFoodOnly = request.registration_type === "food_only" || response.registration_type === "food_only";
+  $("signup-form").hidden = true;
+  const done = $("signup-done");
+  done.hidden = false;
 
-  if (isFoodOnly) {
-    msgEl.textContent = `Thank you, ${response.performer_name}! Your potluck contribution has been registered.`;
-    if (perfLink) {
-      perfLink.classList.add("hidden");
-    }
-
-    const itemName = document.getElementById("selected-food-item-name")?.textContent || "Selected Dish";
-    const itemDesc = request.food_signup?.dish_description || "";
-
-    let detailsHtml = `
-      <p class="font-bold text-white border-b border-slate-800 pb-1.5 mb-2 flex items-center gap-1.5">
-        <i data-lucide="utensils" class="w-4 h-4 text-emerald-400"></i>
-        <span>Potluck Contribution Summary</span>
-      </p>
-      <div class="space-y-1.5 text-xs">
-        <p><strong class="text-slate-400">Contributor:</strong> <span class="text-white">${escapeHtml(response.performer_name)}</span></p>
-        <p><strong class="text-slate-400">Contact Phone:</strong> <span class="text-white">${escapeHtml(request.contact_info)}</span></p>
-        <p><strong class="text-emerald-400">Dish Slot:</strong> <span class="text-white font-semibold">${escapeHtml(itemName)}</span></p>
-        ${itemDesc ? `<p><strong class="text-slate-400">Specific Dish:</strong> <span class="text-white">${escapeHtml(itemDesc)}</span></p>` : ''}
-        <p class="text-[11px] text-emerald-300/80 pt-1 border-t border-slate-800/80 mt-2">
-          Your dish is confirmed and transparently displayed on the public food board.
-        </p>
-      </div>
-    `;
-    detailsBox.innerHTML = detailsHtml;
-    modal.classList.remove("hidden");
-    if (window.lucide) lucide.createIcons();
-    return;
-  }
-
-  if (perfLink) {
-    perfLink.classList.remove("hidden");
-  }
-
-  msgEl.textContent = `Thank you, ${response.performer_name}! You are registered for Paattukoottam 2026.`;
-  perfLink.href = `/performer?name=${encodeURIComponent(response.performer_name)}`;
-
-  let detailsHtml = `
-    <p class="font-bold text-white border-b border-slate-800 pb-1.5 mb-2">Registration Summary</p>
-    <div class="space-y-1">
-      <p><strong class="text-orange-400">Entry ID(s):</strong> ${response.entry_ids.join(", ")}</p>
-      <p><strong class="text-slate-400">Performances:</strong> ${request.performances.length} act(s)</p>
-  `;
-
-  request.performances.forEach((p, idx) => {
-    detailsHtml += `
-      <p class="text-[11px] text-slate-400 pl-2">&bull; Act ${idx + 1}: ${escapeHtml(p.performance_type)} ${p.song_title ? `— "${escapeHtml(p.song_title)}"` : "(Song name TBD)"}</p>
-    `;
+  const idBox = $("done-entry-ids");
+  idBox.innerHTML = "";
+  ids.forEach((id) => {
+    const s = document.createElement("span");
+    s.className = "gf-entry-id";
+    s.textContent = id;
+    idBox.appendChild(s);
+    idBox.appendChild(document.createTextNode(" "));
   });
 
-  if (response.food_signup_id) {
-    detailsHtml += `
-      <p class="mt-2 pt-1.5 border-t border-slate-800/80"><strong class="text-emerald-400">🍽 Potluck Dish:</strong> Claimed item confirmed! Thanks for bringing food.</p>
-    `;
+  const parts = [];
+  if (act) parts.push(`${act.song_title ? act.song_title + ", " : ""}${act.performance_type.toLowerCase()}`);
+  if (hasDish) parts.push(state.lastResult?.dishName ? `dish: ${state.lastResult.dishName}` : "your dish is on the food board");
+  const tail = ids.length ? " Keep this entry id; you can edit from My entry." : "";
+  $("done-message").textContent = `Thank you, ${name}! You are signed up for ${eventLabel()}.${parts.length ? " " + parts.join("; ") + "." : ""}${tail}`;
+
+  const upload = $("done-upload");
+  const canUpload = Boolean(act) && !act.is_acoustic && c.track_upload_enabled !== false;
+  upload.hidden = !canUpload;
+  upload.href = `/my-entry?name=${encodeURIComponent(name)}`;
+
+  const canAddAct = performEnabled();
+  $("done-add-act").hidden = !canAddAct;
+  $("done-add-act").firstChild.textContent = act ? "Add another act" : "Add an act";
+  $("done-add-dish").hidden = !(dishEnabled() && !hasDish);
+
+  const pay = $("done-payment");
+  if (c.payment_url && c.payment_enabled !== false) {
+    $("done-payment-link").href = c.payment_url;
+    pay.hidden = false;
   } else {
-    detailsHtml += `
-      <p class="mt-2 pt-1.5 border-t border-slate-800/80 text-amber-300">🍽 You skipped food sign-up. You can pick an open dish anytime from the Transparency Dashboard.</p>
-    `;
+    pay.hidden = true;
   }
-
-  detailsHtml += `</div>`;
-  detailsBox.innerHTML = detailsHtml;
-
-  modal.classList.remove("hidden");
-  if (window.lucide) lucide.createIcons();
+  window.scrollTo({ top: 0 });
+  done.focus();
 }
 
-function showError(msg) {
-  const errEl = document.getElementById("form-error");
-  if (errEl) {
-    errEl.textContent = msg;
-    errEl.classList.remove("hidden");
+// Reset the form for another act or a dish. Name, phone, age group and guardian stay.
+async function restartForm(choice) {
+  ["song-title", "movie-name", "stage-notes", "partner-name", "partner-phone", "dish-description"].forEach((id) => { $(id).value = ""; });
+  $("acoustic").checked = false;
+  $("upload-hint").hidden = false;
+  $("song-dup-box").hidden = true;
+  document.querySelectorAll('input[name="food_item_id"]').forEach((r) => { r.checked = false; });
+  state.partnerSame = null;
+  state.nameDecision = $("performer-name").value.trim().toLowerCase();
+  $("name-lookup-box").hidden = true;
+  const firstType = document.querySelector('input[name="perf_type"]');
+  if (firstType) firstType.checked = true;
+  syncPartnerUI();
+
+  $("signup-done").hidden = true;
+  $("signup-form").hidden = false;
+  setChoice(choice);
+  await refreshConfig();
+  goToStep(choice === "dish" ? "dish" : "act");
+  window.scrollTo({ top: 0 });
+}
+
+// Refresh registered names and dish availability without wiping what the guest typed.
+async function refreshConfig() {
+  try {
+    const res = await fetch("/api/signup/config");
+    if (!res.ok) return;
+    state.config = await res.json();
+    state.entries = normalizeEntries(state.config);
+    renderPartnerDatalist();
+    renderFoodGroups();
+  } catch (e) {
+    console.warn("Could not refresh sign-up settings:", e);
   }
 }
-
-function hideError() {
-  const errEl = document.getElementById("form-error");
-  if (errEl) errEl.classList.add("hidden");
-}
-
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str).replace(/[&<>"']/g, (m) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  })[m]);
-}
-
-function isValidPhone(phone) {
-  if (!phone) return false;
-  const digits = String(phone).replace(/\D/g, "");
-  return digits.length >= 10;
-}
-

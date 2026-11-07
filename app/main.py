@@ -41,7 +41,7 @@ from app.schemas import (
     SequenceItem,
     ReorderRequest,
 )
-from app.routers.auth import verify_admin_pin
+from app.routers.auth import verify_admin_pin, register_auth_handlers
 from app.routers import (
     pages,
     auth,
@@ -108,7 +108,9 @@ class AppStaticFiles(StaticFiles):
 
     async def get_response(self, path, scope):
         if path in self.GUEST_ALIASES:
-            return RedirectResponse(self.GUEST_ALIASES[path], status_code=307)
+            query = scope.get("query_string", b"").decode("latin-1")
+            target = self.GUEST_ALIASES[path] + (f"?{query}" if query else "")
+            return RedirectResponse(target, status_code=307)
         return await super().get_response(path, scope)
 
 
@@ -156,6 +158,7 @@ async def revalidate_static_assets(request, call_next):
 
 
 # Register Modular Routers
+register_auth_handlers(app)
 app.include_router(pages.router)
 app.include_router(auth.router)
 app.include_router(event.router)

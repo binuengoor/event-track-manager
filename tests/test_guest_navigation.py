@@ -67,7 +67,10 @@ def test_active_link_has_visible_style():
     assert 'bg-orange-600' in active
 
 
-@pytest.mark.parametrize(('old', 'new'), [('/dashboard', '/schedule'), ('/performer', '/my-entry')])
+@pytest.mark.parametrize(('old', 'new'), [
+    ('/dashboard', '/schedule'), ('/performer', '/my-entry'),
+    ('/upload', '/my-entry'), ('/intake', '/my-entry'), ('/tracks', '/my-entry'),
+])
 def test_old_guest_routes_permanently_redirect(old, new):
     with TestClient(app) as client:
         response = client.get(old, follow_redirects=False)
@@ -91,3 +94,32 @@ def test_single_destination_has_no_navigation_bar():
         response = client.get('/')
     assert '<nav aria-label="Main"' not in response.text
     assert '<footer class="guest-admin-link"><a href="/admin">' in response.text
+
+
+@pytest.mark.parametrize(('old', 'new'), [
+    ('/performer', '/my-entry'), ('/dashboard', '/schedule'),
+    ('/tracks', '/my-entry'), ('/upload', '/my-entry'), ('/intake', '/my-entry'),
+    ('/static/index.html', '/my-entry'), ('/static/dashboard.html', '/schedule'),
+])
+def test_redirects_preserve_encoded_query_for_guest_links(old, new):
+    query = 'name=Arun%20%26%20Divya&food_item=rice%2Bbeans'
+    with TestClient(app) as client:
+        redirect = client.get(f'{old}?{query}', follow_redirects=False)
+        page = client.get(f'{old}?{query}')
+    assert redirect.headers['location'] == f'{new}?{query}'
+    assert page.status_code == 200
+    assert page.url.path == ('/schedule' if 'dashboard' in old else '/my-entry')
+    assert page.url.params['name'] == 'Arun & Divya'
+    assert page.url.params['food_item'] == 'rice+beans'
+
+
+@pytest.mark.parametrize('path', ['/', '/signup', '/my-entry', '/schedule'])
+def test_guest_pages_have_no_staff_links_except_the_footer_sign_in(path):
+    with TestClient(app) as client:
+        html = client.get(path).text
+    assert 'href="/console"' not in html
+    assert html.count('href="/admin"') == 1
+    assert '<footer class="guest-admin-link"><a href="/admin">Admin sign-in</a></footer>' in html
+    for legacy in ('Performer Hub', 'Transparency Dashboard', 'href="/dashboard"', 'href="/performer"',
+                   'href="/upload"', 'href="/intake"', 'Staff'):
+        assert legacy not in html, legacy

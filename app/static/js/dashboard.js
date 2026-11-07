@@ -1,343 +1,354 @@
+// Schedule: running order (Lineup) and food board (Food) as a segmented switch.
+// The public payload carries sequence_order and status (upcoming | now | done) only; no age group or track state.
+const NAME_KEY = "etm_guest_name";
+const CACHE_KEY = "etm_schedule_cache";
+
 let performancesData = [];
 let foodData = null;
 let activeTab = "songs";
+let eventInfo = {};
+let lineupFromCache = false;
+
+const $ = (id) => document.getElementById(id);
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
-  await loadEventInfo();
   setupTabs();
-  await Promise.all([loadPerformances(), loadFood()]);
   setupFilters();
+  window.addEventListener("offline", () => showOffline(true));
+  window.addEventListener("online", () => refreshAll());
+  await loadEventInfo();
+  await refreshAll();
+  applyDeepLink();
 });
 
+function myName() {
+  try { return (localStorage.getItem(NAME_KEY) || "").trim().toLowerCase(); } catch (_) { return ""; }
+}
+
+async function refreshAll() {
+  await Promise.all([loadPerformances(), loadFood()]);
+}
+
+// ---------------------------------------------------------------------------------------------- event info and tabs
 async function loadEventInfo() {
   try {
     const res = await fetch("/api/event-info");
-    if (res.ok) {
-      const data = await res.json();
-      window.eventInfo = data;
-      if (data.header_brand_title) {
-        const titleEl = document.getElementById("nav-event-title");
-        if (titleEl) titleEl.textContent = data.header_brand_title;
-        document.title = `Dashboard - ${data.header_brand_title}`;
-      }
-      if (data.header_brand_subtitle) {
-        const subEl = document.getElementById("nav-event-subtitle");
-        if (subEl) subEl.textContent = data.header_brand_subtitle;
-      }
-      const isStageEnabled = Boolean(data.stage_performances_enabled !== false);
-      const isFoodEnabled = Boolean(data.food_signup_enabled !== false);
-
-      const tabSongs = document.getElementById("tab-songs-btn");
-      const tabFood = document.getElementById("tab-food-btn");
-      const secSongs = document.getElementById("section-songs");
-      const secFood = document.getElementById("section-food");
-      const headerTitle = document.getElementById("dashboard-header-title");
-      const headerDesc = document.getElementById("dashboard-header-desc");
-      const tabsContainer = document.getElementById("dashboard-tabs-container");
-
-      // Case 1: Potluck-Only Event (Stage performances disabled, Food enabled)
-      if (!isStageEnabled && isFoodEnabled) {
-        if (headerTitle) headerTitle.textContent = "Community Potluck Board";
-        if (headerDesc) headerDesc.textContent = "Coordination board for community potluck dishes, commitments, and needed food items.";
-        if (tabsContainer) tabsContainer.classList.add("hidden");
-        if (tabSongs) tabSongs.classList.add("hidden");
-        if (secSongs) secSongs.classList.add("hidden");
-        if (secFood) secFood.classList.remove("hidden");
-        activeTab = "food";
-      }
-      // Case 2: Performance-Only Event (Food disabled, Stage performances enabled)
-      else if (isStageEnabled && !isFoodEnabled) {
-        if (headerTitle) headerTitle.textContent = "Performance Setlist Dashboard";
-        if (headerDesc) headerDesc.textContent = "Live view of all registered stage performances, acts, and audio track statuses.";
-        if (tabsContainer) tabsContainer.classList.add("hidden");
-        if (tabFood) tabFood.classList.add("hidden");
-        if (secFood) secFood.classList.add("hidden");
-        if (secSongs) secSongs.classList.remove("hidden");
-        activeTab = "songs";
-      }
-      // Case 3: Both enabled (Full Event)
-      else if (isStageEnabled && isFoodEnabled) {
-        if (tabsContainer) tabsContainer.classList.remove("hidden");
-        if (tabSongs) tabSongs.classList.remove("hidden");
-        if (tabFood) tabFood.classList.remove("hidden");
-        if (data.dashboard_enabled === false) {
-          // Private setlists mode (e.g. competition)
-          if (tabFood) tabFood.click();
-        }
-      }
-
-      if (window.adaptNavigationForEventConfig) {
-        window.adaptNavigationForEventConfig(data);
-      }
+    if (!res.ok) return;
+    eventInfo = await res.json();
+    if (eventInfo.header_brand_title) {
+      const titleEl = $("nav-event-title");
+      if (titleEl) titleEl.textContent = eventInfo.header_brand_title;
+      document.title = `${eventInfo.stage_performances_enabled === false ? "Food board" : "Schedule"} - ${eventInfo.header_brand_title}`;
     }
+    if (eventInfo.header_brand_subtitle) {
+      const subEl = $("nav-event-subtitle");
+      if (subEl) subEl.textContent = eventInfo.header_brand_subtitle;
+    }
+    const stage = eventInfo.stage_performances_enabled !== false;
+    const food = eventInfo.food_signup_enabled !== false;
+    const title = $("dashboard-header-title");
+    const desc = $("dashboard-header-desc");
+    const seg = $("dashboard-tabs-container");
+
+    if (!stage && food) {
+      title.textContent = "Food board";
+      desc.textContent = "Dishes people are bringing and the slots still open.";
+      seg.hidden = true;
+      selectTab("food");
+    } else if (stage && !food) {
+      title.textContent = "Schedule";
+      desc.textContent = "The running order for the show.";
+      seg.hidden = true;
+      selectTab("songs");
+    } else if (stage && food && eventInfo.dashboard_enabled === false) {
+      selectTab("food");
+    }
+    window.adaptNavigationForEventConfig?.(eventInfo);
   } catch (e) {
     console.warn("Could not load event info:", e);
   }
 }
 
+function selectTab(tab) {
+  activeTab = tab;
+  const songsBtn = $("tab-songs-btn");
+  const foodBtn = $("tab-food-btn");
+  songsBtn.setAttribute("aria-pressed", String(tab === "songs"));
+  foodBtn.setAttribute("aria-pressed", String(tab === "food"));
+  $("section-songs").hidden = tab !== "songs";
+  $("section-food").hidden = tab !== "food";
+}
+
 function setupTabs() {
-  const tabSongs = document.getElementById("tab-songs-btn");
-  const tabFood = document.getElementById("tab-food-btn");
-  const secSongs = document.getElementById("section-songs");
-  const secFood = document.getElementById("section-food");
+  $("tab-songs-btn").addEventListener("click", () => selectTab("songs"));
+  $("tab-food-btn").addEventListener("click", () => selectTab("food"));
+  $("refresh-dashboard-btn")?.addEventListener("click", refreshAll);
+}
 
-  tabSongs.addEventListener("click", () => {
-    activeTab = "songs";
-    tabSongs.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow";
-    tabFood.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white";
-    secSongs.classList.remove("hidden");
-    secFood.classList.add("hidden");
-  });
+function applyDeepLink() {
+  const view = new URLSearchParams(location.search).get("view");
+  if (view === "food" || view === "potluck") selectTab("food");
+}
 
-  tabFood.addEventListener("click", () => {
-    activeTab = "food";
-    tabFood.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-emerald-600 text-white shadow";
-    tabSongs.className = "px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white";
-    secFood.classList.remove("hidden");
-    secSongs.classList.add("hidden");
-  });
+function setupFilters() {
+  $("song-search-input")?.addEventListener("input", renderLineup);
+  $("type-filter-select")?.addEventListener("change", renderLineup);
+}
 
-  document.getElementById("refresh-dashboard-btn")?.addEventListener("click", async () => {
-    await Promise.all([loadPerformances(), loadFood()]);
+// ---------------------------------------------------------------------------------------------- offline banner and cache
+function formatClock(ts) {
+  return new Date(ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function showOffline(on, ts) {
+  const banner = $("offline-banner");
+  if (!banner) return;
+  if (on) {
+    let stamp = ts;
+    if (!stamp) {
+      try { stamp = (JSON.parse(localStorage.getItem(CACHE_KEY) || "null") || {}).savedAt; } catch (_) { stamp = null; }
+    }
+    $("offline-time").textContent = stamp ? formatClock(stamp) : "your last visit";
+  }
+  banner.hidden = !on;
+}
+
+function saveCache() {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), performances: performancesData, food: foodData }));
+  } catch (_) { /* storage full or private mode */ }
+}
+
+function loadCache() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY) || "null"); } catch (_) { return null; }
+}
+
+// ---------------------------------------------------------------------------------------------- lineup
+function sequenceOf(p) {
+  const n = Number(p.sequence_order);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+// Running order: scheduled acts by sequence_order, unscheduled last (by name). One row per act; partners stay together.
+function sortedActs(list) {
+  return list.slice().sort((a, b) => {
+    const sa = sequenceOf(a);
+    const sb = sequenceOf(b);
+    if (sa !== null && sb !== null) return sa - sb || String(a.entry_id).localeCompare(String(b.entry_id));
+    if (sa !== null) return -1;
+    if (sb !== null) return 1;
+    return String(a.performer_name || "").localeCompare(String(b.performer_name || ""));
   });
 }
 
 async function loadPerformances() {
-  if (window.eventInfo && window.eventInfo.stage_performances_enabled === false) {
-    return;
-  }
+  if (eventInfo.stage_performances_enabled === false) return;
   try {
     const res = await fetch("/api/dashboard/performances");
     if (!res.ok) throw new Error("Failed to fetch performances");
     performancesData = await res.json();
     window.auroraEffect?.setActive(true, 1200);
-    
-    if (window.eventInfo && window.eventInfo.dashboard_enabled === false) {
-      const badge = document.getElementById("songs-count-badge");
-      if (badge) badge.textContent = "Locked";
-      document.getElementById("songs-table-body").innerHTML = `
-        <tr>
-          <td colspan="6" class="px-5 py-12 text-center">
-            <div class="max-w-md mx-auto space-y-2">
-              <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
-                <i data-lucide="lock" class="w-5 h-5"></i>
-              </div>
-              <h4 class="text-sm font-bold text-white">Private Setlist Mode</h4>
-              <p class="text-xs text-slate-400 leading-relaxed">Performance setlist transparency is currently locked for this event (e.g. Solo Competition Mode). Songs remain private until stage time.</p>
-            </div>
-          </td>
-        </tr>
-      `;
-      if (window.lucide) lucide.createIcons();
-      return;
-    }
-
-    document.getElementById("songs-count-badge").textContent = performancesData.length;
-    renderSongsTable();
+    lineupFromCache = false;
+    showOffline(false);
+    saveCache();
   } catch (err) {
     console.error("Performances error:", err);
-    document.getElementById("songs-table-body").innerHTML = `
-      <tr><td colspan="6" class="px-5 py-6 text-center text-rose-400">Failed to load performances. Please refresh.</td></tr>
-    `;
+    const cached = loadCache();
+    if (cached && Array.isArray(cached.performances)) {
+      performancesData = cached.performances;
+      lineupFromCache = true;
+      showOffline(true, cached.savedAt);
+    } else {
+      $("lineup-list").innerHTML = '<li class="gf-muted" style="padding:1.5rem;text-align:center">Could not load the lineup. Check your connection and tap Refresh.</li>';
+      showOffline(!navigator.onLine);
+      return;
+    }
   }
+
+  if (eventInfo.dashboard_enabled === false) {
+    $("songs-count-badge").textContent = "Locked";
+    $("lineup-list").innerHTML = '<li class="gf-muted" style="padding:1.5rem;text-align:center">The lineup is private for this event and stays hidden until stage time.</li>';
+    return;
+  }
+  $("songs-count-badge").textContent = performancesData.length;
+  renderLineup();
 }
 
-function renderSongsTable() {
-  const tbody = document.getElementById("songs-table-body");
-  const query = document.getElementById("song-search-input")?.value.toLowerCase() || "";
-  const typeFilter = document.getElementById("type-filter-select")?.value.toLowerCase() || "";
+function hasRealTitle(t) {
+  const v = String(t || "").trim();
+  return Boolean(v) && !/song title missing|^(performance|song)\s*#?\d*$|^(tbd|tba)$/i.test(v);
+}
 
-  // Expand performances: if partner exists, create entries for both so both appear alphabetically
-  const expanded = [];
-  performancesData.forEach(p => {
-    // Primary performer
-    expanded.push({
-      ...p,
-      display_performer: p.performer_name,
-      display_partner: p.partner_name || "",
-      link_performer: p.performer_name
-    });
+function singers(p) {
+  const partner = (p.partner_name || "").trim();
+  const name = (p.performer_name || "").trim();
+  if (!partner || partner.toLowerCase() === name.toLowerCase()) return name;
+  return `${name} & ${partner}`;
+}
 
-    // If there is a distinct partner name, also create an entry under the partner
-    if (p.partner_name && p.partner_name.trim().toLowerCase() !== p.performer_name.trim().toLowerCase()) {
-      expanded.push({
-        ...p,
-        display_performer: p.partner_name.trim(),
-        display_partner: p.performer_name.trim(),
-        link_performer: p.partner_name.trim()
-      });
-    }
+function renderLineup() {
+  const list = $("lineup-list");
+  const query = ($("song-search-input")?.value || "").trim().toLowerCase();
+  const typeFilter = ($("type-filter-select")?.value || "").toLowerCase();
+  const me = myName();
+
+  const filtered = sortedActs(performancesData).filter((p) => {
+    const hay = [p.performer_name, p.partner_name, p.song_title, p.movie_name].join(" ").toLowerCase();
+    return (!query || hay.includes(query)) && (!typeFilter || String(p.performance_type || "").toLowerCase().includes(typeFilter));
   });
 
-  // Sort alphabetically by the displayed performer's name
-  expanded.sort((a, b) => a.display_performer.localeCompare(b.display_performer));
-
-  const filtered = expanded.filter(p => {
-    const matchQuery = (
-      p.display_performer.toLowerCase().includes(query) ||
-      p.display_partner.toLowerCase().includes(query) ||
-      (p.song_title || "").toLowerCase().includes(query) ||
-      (p.movie_name || "").toLowerCase().includes(query)
-    );
-    const matchType = !typeFilter || (p.performance_type || "").toLowerCase().includes(typeFilter);
-    return matchQuery && matchType;
-  });
-
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr><td colspan="6" class="px-5 py-8 text-center text-slate-500">No performances match the filter criteria.</td></tr>
-    `;
+  list.innerHTML = "";
+  if (!filtered.length) {
+    const li = document.createElement("li");
+    li.className = "gf-muted";
+    li.style.cssText = "padding:1.5rem;text-align:center";
+    li.textContent = performancesData.length ? "No acts match your search." : "No acts are scheduled yet.";
+    list.appendChild(li);
     return;
   }
 
-  tbody.innerHTML = filtered.map(p => {
-    const safeName = encodeURIComponent(p.link_performer);
-    const songName = p.song_title ? escapeHtml(p.song_title) : '<span class="text-amber-400 italic">Song name TBD</span>';
-    const movieName = p.movie_name ? `<span class="text-[11px] text-slate-500 block">${escapeHtml(p.movie_name)}</span>` : '';
-    const partner = p.display_partner ? `<span class="text-[11px] text-amber-400 block font-normal">w/ ${escapeHtml(p.display_partner)}</span>` : '';
+  let laterShown = false;
+  filtered.forEach((p) => {
+    const seq = sequenceOf(p);
+    const status = p.status === "now" || p.status === "done" ? p.status : "upcoming";
+    const li = document.createElement("li");
+    li.className = "gf-act" + (status === "now" ? " is-now" : status === "done" ? " is-done" : "");
 
-    let trackBadge = '';
-    if (p.track_status === "Acoustic") {
-      trackBadge = '<span class="inline-flex items-center gap-1 text-[11px] font-bold text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20"><i data-lucide="guitar" class="w-3 h-3"></i> Acoustic</span>';
-    } else if (p.has_track || p.track_status === "Uploaded") {
-      trackBadge = '<span class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20"><i data-lucide="check-circle" class="w-3 h-3"></i> Ready</span>';
-    } else {
-      trackBadge = '<span class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20"><i data-lucide="clock" class="w-3 h-3"></i> Pending</span>';
+    const num = document.createElement("span");
+    num.className = "gf-act-num";
+    num.textContent = seq !== null ? String(seq).padStart(2, "0") : "--";
+
+    const body = document.createElement("div");
+    const title = document.createElement("div");
+    title.className = "gf-act-title";
+    title.textContent = hasRealTitle(p.song_title) ? p.song_title : "Song to be announced";
+    const sub = document.createElement("div");
+    sub.className = "gf-act-sub";
+    sub.textContent = `${singers(p)} · ${p.performance_type || "Solo"}`;
+    if (p.movie_name) sub.textContent += ` · ${p.movie_name}`;
+    body.append(title, sub);
+    if (me && String(p.performer_name || "").trim().toLowerCase() === me) {
+      const a = document.createElement("a");
+      a.href = `/my-entry?name=${encodeURIComponent(p.performer_name)}`;
+      a.textContent = " Yours: open my entry";
+      a.className = "gf-act-sub";
+      sub.appendChild(document.createElement("br"));
+      sub.appendChild(a);
     }
 
-    const agePill = p.age_group ? `<span class="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 text-[11px] font-semibold">${escapeHtml(p.age_group)}</span>` : '—';
+    const tag = document.createElement("span");
+    if (status === "now") { tag.className = "gf-act-tag"; tag.textContent = "On stage"; }
+    else if (status === "done") { tag.className = "gf-act-tag done"; tag.textContent = "Done"; }
+    else if (!laterShown && status === "upcoming" && seq !== null) { tag.className = "gf-act-tag up"; tag.textContent = "Up next"; laterShown = true; }
 
-    return `
-      <tr class="hover:bg-slate-800/40 transition">
-        <td class="px-5 py-3.5" data-label="Performer">
-          <a href="/performer?name=${safeName}" class="text-orange-400 hover:text-orange-300 font-bold inline-flex items-center gap-1 group" title="Click to view performer hub & edit details">
-            <span>${escapeHtml(p.display_performer)}</span>
-            <i data-lucide="arrow-up-right" class="w-3 h-3 opacity-60 group-hover:opacity-100 transition"></i>
-          </a>
-          ${partner}
-        </td>
-        <td class="px-5 py-3.5" data-label="Song">
-          <span class="font-semibold text-white">${songName}</span>
-          ${movieName}
-        </td>
-        <td class="px-4 py-3.5" data-label="Type">
-          <span class="px-2 py-0.5 rounded-md bg-slate-800/90 text-slate-300 font-semibold text-[11px]">${escapeHtml(p.performance_type || 'Solo')}</span>
-        </td>
-        <td class="px-4 py-3.5" data-label="Category">${agePill}</td>
-        <td class="px-4 py-3.5" data-label="Track">${trackBadge}</td>
-        <td class="px-4 py-3.5 text-right">
-          <a href="/performer?name=${safeName}" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[11px] font-semibold transition">
-            Edit
-          </a>
-        </td>
-      </tr>
-    `;
-  }).join("");
-
-  if (window.lucide) lucide.createIcons();
+    li.append(num, body, tag);
+    list.appendChild(li);
+  });
 }
 
-function setupFilters() {
-  document.getElementById("song-search-input")?.addEventListener("input", renderSongsTable);
-  document.getElementById("type-filter-select")?.addEventListener("change", renderSongsTable);
-}
-
+// ---------------------------------------------------------------------------------------------- food board
 async function loadFood() {
   try {
     const res = await fetch("/api/dashboard/food");
-    if (!res.ok) throw new Error("Failed to fetch food dashboard");
+    if (!res.ok) throw new Error("Failed to fetch food board");
     foodData = await res.json();
-
-    const tabFoodBtn = document.getElementById("tab-food-btn");
-    if (foodData.enabled === false) {
-      if (tabFoodBtn) tabFoodBtn.classList.add("hidden");
-    } else {
-      if (tabFoodBtn) tabFoodBtn.classList.remove("hidden");
-    }
-
-    document.getElementById("dashboard-serving-note").textContent = foodData.serving_note || "Bring one dish to share";
-    document.getElementById("food-stats-pill").textContent = `${foodData.taken_items} / ${foodData.total_items} Taken`;
-    document.getElementById("food-count-badge").textContent = `${foodData.taken_items}/${foodData.total_items}`;
-
-    renderFoodGroups();
+    saveCache();
   } catch (err) {
     console.error("Food error:", err);
+    const cached = loadCache();
+    if (cached && cached.food) {
+      foodData = cached.food;
+      showOffline(true, cached.savedAt);
+    } else {
+      return;
+    }
   }
+
+  const foodBtn = $("tab-food-btn");
+  if (foodData.enabled === false) foodBtn.hidden = true;
+  else foodBtn.hidden = false;
+
+  $("dashboard-serving-note").textContent = foodData.serving_note ? `Open slots: ${foodData.open_items ?? 0} · ${foodData.serving_note}` : "";
+  $("food-stats-pill").textContent = `${foodData.taken_items} of ${foodData.total_items} taken`;
+  $("food-count-badge").textContent = `${foodData.taken_items}/${foodData.total_items}`;
+  renderFoodGroups();
 }
 
 function renderFoodGroups() {
-  const container = document.getElementById("dashboard-food-groups");
+  const container = $("dashboard-food-groups");
   if (!container || !foodData) return;
-
+  const me = myName();
   const groups = foodData.groups || [];
-  const allItems = foodData.items || [];
+  const items = foodData.items || [];
+  container.innerHTML = "";
 
-  if (groups.length === 0) {
-    container.innerHTML = `
-      <div class="p-8 text-center bg-slate-900 border border-slate-800 rounded-3xl text-slate-400">
-        No food categories currently defined.
-      </div>
-    `;
+  if (!groups.length) {
+    const p = document.createElement("p");
+    p.className = "gf-card gf-muted";
+    p.textContent = "No dishes are listed yet.";
+    container.appendChild(p);
     return;
   }
 
-  container.innerHTML = groups.map(group => {
-    const items = allItems.filter(i => i.group_id === group.group_id);
-    if (items.length === 0) return "";
+  groups.forEach((group) => {
+    const groupItems = items.filter((i) => i.group_id === group.group_id);
+    if (!groupItems.length) return;
+    const wrap = document.createElement("div");
+    wrap.className = "gf-card gf-dish-group";
+    wrap.style.marginTop = ".75rem";
+    const h = document.createElement("h4");
+    const gName = document.createElement("span");
+    gName.textContent = group.name;
+    const gCount = document.createElement("span");
+    gCount.textContent = `${groupItems.filter((i) => !i.is_taken).length} open`;
+    h.append(gName, gCount);
+    const grid = document.createElement("div");
+    grid.className = "gf-dish-grid";
 
-    const itemsHtml = items.map(item => {
-      if (item.is_taken) {
-        return `
-          <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-3">
-            <div class="min-w-0">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-rose-500 shrink-0"></span>
-                <span class="font-bold text-slate-200 text-xs truncate">${escapeHtml(item.name)}</span>
-              </div>
-              <p class="text-[11px] text-slate-400 mt-1 pl-4 truncate">
-                <span class="text-orange-400 font-semibold">${escapeHtml(item.signer_name)}</span>
-                ${item.dish_description ? ` &bull; <span class="text-slate-300 italic">"${escapeHtml(item.dish_description)}"</span>` : ''}
-              </p>
-            </div>
-            <span class="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[10px] font-bold uppercase shrink-0">
-              Taken
-            </span>
-          </div>
-        `;
-      } else {
-        return `
-          <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/80 hover:border-emerald-500/60 flex items-center justify-between gap-3 transition">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-              <span class="font-bold text-white text-xs truncate">${escapeHtml(item.name)}</span>
-            </div>
-            <a href="/performer?food_item=${encodeURIComponent(item.item_id)}" class="px-3 py-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center gap-1 transition shrink-0">
-              <span>Sign up</span>
-              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-            </a>
-          </div>
-        `;
+    groupItems.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "gf-dish" + (item.is_taken ? " is-taken" : "");
+      const name = document.createElement("span");
+      name.className = "gf-dish-name";
+      const text = document.createElement("span");
+      text.textContent = item.name;
+      name.appendChild(text);
+
+      const mine = item.is_taken && me && String(item.signer_name || "").trim().toLowerCase() === me;
+      if (item.is_taken && !mine) {
+        // Someone else's slot: show who, and the dish note if they left one.
+        const who = document.createElement("span");
+        who.className = "gf-dish-who";
+        who.textContent = [item.signer_name, item.dish_description].filter(Boolean).join(" · ");
+        text.appendChild(who);
+      } else if (mine && item.dish_description) {
+        const who = document.createElement("span");
+        who.className = "gf-dish-who";
+        who.textContent = item.dish_description;
+        text.appendChild(who);
       }
-    }).join("");
 
-    return `
-      <div class="bg-slate-900/80 border border-slate-800 p-5 rounded-3xl space-y-3">
-        <div class="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
-          <h3 class="text-sm font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
-            <i data-lucide="utensils" class="w-4 h-4"></i>
-            <span>${escapeHtml(group.name)}</span>
-          </h3>
-          <span class="text-xs font-semibold text-slate-400">
-            ${group.taken_count || 0} of ${items.length} slots claimed
-          </span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-          ${itemsHtml}
-        </div>
-      </div>
-    `;
-  }).join("");
-
-  if (window.lucide) lucide.createIcons();
+      let right;
+      if (mine) {
+        right = document.createElement("a");
+        right.href = `/my-entry?name=${encodeURIComponent(item.signer_name)}`;
+        right.className = "gf-dish-tag yours";
+        right.textContent = "Yours";
+      } else if (item.is_taken) {
+        right = document.createElement("span");
+        right.className = "gf-dish-tag taken";
+        right.textContent = "Taken";
+      } else {
+        right = document.createElement("a");
+        right.href = `/my-entry?food_item=${encodeURIComponent(item.item_id)}`;
+        right.className = "gf-btn gf-btn-small";
+        right.textContent = "I'll bring it";
+      }
+      row.append(name, right);
+      grid.appendChild(row);
+    });
+    wrap.append(h, grid);
+    container.appendChild(wrap);
+  });
 }

@@ -1,11 +1,20 @@
-// EMA Paattukoottam Performer Hub Logic
+// My entry (guest): edit acts, upload a track or paste a link, manage a dish.
+const NAME_KEY = 'etm_guest_name';
+const VIDEO_EXTS = ['mp4', 'webm', 'mov', 'mkv', 'm4v', 'avi'];
+const DEFAULT_ALLOWED_EXTS = ['mp3', 'wav', 'm4a', 'mp4', 'webm'];
+const LINK_HOSTS = ['soundcloud.com', 'on.soundcloud.com', 'youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be'];
+let maxAudioMb = 200;
+let maxVideoMb = 500;
+let allowedExts = DEFAULT_ALLOWED_EXTS.slice();
+let allowedMedia = null; // from /api/event-info allowed_media
+let activeXhr = null;
+let lastSubmitFailed = false;
 let performances = [];
 let selectedPerformer = null;
 let selectedEntry = null;
 let currentMethod = 'file'; // 'file' or 'youtube'
 let currentMediaType = 'audio'; // 'audio' or 'video'
 let sheetUrl = '';
-let maxUploadSizeMb = 100;
 let performerFoodSignup = null;
 let allFoodGroups = [];
 let allFoodItems = [];
@@ -67,8 +76,8 @@ async function initEventInfo() {
         const titleEl = document.getElementById('event-title');
         if (titleEl) titleEl.textContent = data.header_brand_title;
         document.title = data.stage_performances_enabled === false
-          ? `${data.header_brand_title} - Attendee Hub`
-          : `${data.header_brand_title} - Performer Hub`;
+          ? `${data.header_brand_title} - My dish`
+          : `${data.header_brand_title} - My entry`;
       }
       if (data.header_brand_subtitle) {
         const subEl = document.getElementById('event-subtitle');
@@ -77,11 +86,11 @@ async function initEventInfo() {
 
       if (data.stage_performances_enabled === false) {
         const hubTitle = document.getElementById('performer-hub-title');
-        if (hubTitle) hubTitle.textContent = "Attendee Portal & Food Sign-Up";
+        if (hubTitle) hubTitle.textContent = "My dish";
         const hubDesc = document.getElementById('performer-hub-desc');
-        if (hubDesc) hubDesc.textContent = "Select your name to manage and review your community potluck dish contribution.";
+        if (hubDesc) hubDesc.textContent = "Pick your name to see, change or release your dish.";
         const selectLabel = document.getElementById('performer-select-label-text');
-        if (selectLabel) selectLabel.textContent = "Select Attendee";
+        if (selectLabel) selectLabel.textContent = "Your name";
         const potluckNotice = document.getElementById('potluck-only-event-notice');
         if (potluckNotice) potluckNotice.classList.remove('hidden');
         const othersSection = document.getElementById('others-songs-section');
@@ -93,6 +102,7 @@ async function initEventInfo() {
       }
 
       // Only offer the track formats this event accepts (audio, video, or both)
+      if (Array.isArray(data.allowed_media)) allowedMedia = data.allowed_media;
       if (Array.isArray(data.allowed_media) && data.allowed_media.length === 1) {
         const only = data.allowed_media[0];
         const audioBtn = document.getElementById('type-audio-btn');
@@ -116,11 +126,17 @@ async function initEventInfo() {
           payPlaceholder.classList.add('hidden');
         }
       }
-      if (data.max_upload_size_mb) {
-        maxUploadSizeMb = data.max_upload_size_mb;
-        const hint = document.getElementById('max-size-hint');
-        if (hint) hint.textContent = `Supports MP3, M4A, WAV (Max ${maxUploadSizeMb}MB)`;
+      // Limits and accepted types come from the admin settings (fall back to the documented defaults).
+      const audioLimit = Number(data.max_audio_upload_mb);
+      const videoLimit = Number(data.max_video_upload_mb);
+      maxAudioMb = audioLimit > 0 ? audioLimit : 200;
+      maxVideoMb = videoLimit > 0 ? videoLimit : 500;
+      if (Array.isArray(data.allowed_extensions) && data.allowed_extensions.length) {
+        allowedExts = data.allowed_extensions.map(e => String(e).replace(/^\./, '').toLowerCase());
+      } else {
+        allowedExts = DEFAULT_ALLOWED_EXTS.slice();
       }
+      setMediaType(currentMediaType);
 
       // Fetch last sync timestamp
       try {
@@ -362,6 +378,13 @@ function setupEventListeners() {
     if (fileInput.files && fileInput.files[0]) {
       handleFileSelected(fileInput.files[0]);
     }
+  });
+
+  document.getElementById('retry-upload-btn')?.addEventListener('click', () => {
+    handleFormSubmit({ preventDefault() {} });
+  });
+  document.getElementById('cancel-upload-btn')?.addEventListener('click', () => {
+    if (activeXhr) activeXhr.abort();
   });
 
   const alertAddTitleBtn = document.getElementById('alert-add-title-btn');
@@ -943,6 +966,7 @@ function formatTimeAgo(isoString) {
 }
 
 async function handlePerformerSelected(name) {
+  if (name) { try { localStorage.setItem(NAME_KEY, name); } catch (_) { /* private mode */ } }
   const songSection = document.getElementById('song-selection-section');
   const uploadSection = document.getElementById('upload-methods-section');
   const songContainer = document.getElementById('song-options-container');
@@ -1143,7 +1167,7 @@ async function checkPerformerFoodStatus(name) {
               <div>
                 <div class="flex items-center gap-2">
                   <h4 class="text-sm font-bold text-white">${escapeHtml(performerFoodSignup.item_name)}</h4>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">CONFIRMED DISH</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-bold border border-amber-500/40">YOURS</span>
                 </div>
                 <p class="text-xs text-slate-300 mt-0.5">${performerFoodSignup.dish_description ? escapeHtml(performerFoodSignup.dish_description) : 'No description provided'}</p>
                 <p class="text-[11px] text-emerald-400/80 mt-0.5">Group: ${escapeHtml(performerFoodSignup.group_name)} &bull; ${escapeHtml(foodServingNote)}</p>
@@ -1167,15 +1191,15 @@ async function checkPerformerFoodStatus(name) {
         });
 
         document.getElementById('release-food-btn').addEventListener('click', async () => {
-          if (!confirm(`Are you sure you want to release "${performerFoodSignup.item_name}"?`)) return;
+          if (!confirm(`Release "${performerFoodSignup.item_name}"?\n\nThis frees the slot for someone else. You can pick another dish any time.`)) return;
           try {
             const delRes = await fetch(`/api/signup/food/${performerFoodSignup.signup_id}`, { method: 'DELETE' });
-            if (delRes.ok) {
-              await loadFoodCatalog();
-              await checkPerformerFoodStatus(selectedPerformer);
-            }
+            if (!delRes.ok) throw new Error('release failed');
+            await loadFoodCatalog();
+            await checkPerformerFoodStatus(selectedPerformer);
+            showToast('Dish released.', 'success');
           } catch (e) {
-            alert('Failed to release food item.');
+            alert('We could not release your dish. Please try again.');
           }
         });
 
@@ -1188,8 +1212,8 @@ async function checkPerformerFoodStatus(name) {
                 <i data-lucide="utensils" class="w-4 h-4"></i>
               </div>
               <div>
-                <h4 class="text-sm font-bold text-white">You haven't picked a potluck dish yet!</h4>
-                <p class="text-xs text-amber-300/90 mt-0.5">Help feed the gathering &mdash; claim an open item from the potluck menu.</p>
+                <h4 class="text-sm font-bold text-white">You have not picked a dish yet</h4>
+                <p class="text-xs text-amber-300/90 mt-0.5">You do not have to perform to bring a dish. Pick an open slot from the food board.</p>
                 <p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(foodServingNote)}</p>
               </div>
             </div>
@@ -1243,13 +1267,14 @@ function openFoodSelector(preselectItemId = null, prefillDesc = '') {
 
     items.forEach(item => {
       const isClaimedByOther = item.is_taken && (!performerFoodSignup || performerFoodSignup.item_id !== item.item_id);
+      const isOwn = Boolean(performerFoodSignup && performerFoodSignup.item_id === item.item_id);
       const isSelected = preselectItemId ? item.item_id === preselectItemId : (performerFoodSignup && performerFoodSignup.item_id === item.item_id);
 
       if (isClaimedByOther) {
         html += `
           <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 opacity-60 flex items-center justify-between text-xs">
             <span class="text-slate-400 line-through">${escapeHtml(item.name)}</span>
-            <span class="text-[10px] text-rose-400 font-mono">${escapeHtml(item.signer_name || 'Taken')}</span>
+            <span class="text-[10px] text-rose-400 font-mono">Taken${item.signer_name ? ' \u00b7 ' + escapeHtml(item.signer_name) : ''}</span>
           </div>
         `;
       } else {
@@ -1261,7 +1286,7 @@ function openFoodSelector(preselectItemId = null, prefillDesc = '') {
               <input type="radio" name="food_item_radio" value="${item.item_id}" ${isSelected ? 'checked' : ''} class="text-amber-500 accent-amber-500 focus:ring-amber-500">
               <span class="font-medium">${escapeHtml(item.name)}</span>
             </div>
-            <span class="text-[10px] text-emerald-400 font-semibold uppercase">Open</span>
+            <span class="text-[10px] font-semibold uppercase ${isOwn ? 'text-amber-300' : 'text-emerald-400'}">${isOwn ? 'Yours' : 'Open'}</span>
           </label>
         `;
       }
@@ -1319,6 +1344,16 @@ function updateSelectedSong(song) {
   updateActiveTrackPreview(song);
 }
 
+function audioExts() { return (allowedMedia && !allowedMedia.includes('audio')) ? [] : allowedExts.filter(e => !VIDEO_EXTS.includes(e)); }
+function videoExts() { return (allowedMedia && !allowedMedia.includes('video')) ? [] : allowedExts.filter(e => VIDEO_EXTS.includes(e)); }
+function extList(list) { return list.map(e => e.toUpperCase()).join(', ').replace(/, ([^,]*)$/, ' or $1'); }
+function limitHintText() {
+  const parts = [];
+  if (audioExts().length) parts.push(`${extList(audioExts())} up to ${maxAudioMb} MB`);
+  if (videoExts().length) parts.push(`${extList(videoExts())} video up to ${maxVideoMb} MB`);
+  return parts.join('. ') + '. Or paste a YouTube or SoundCloud link.';
+}
+
 function setMediaType(type) {
   currentMediaType = type;
   const audioBtn = document.getElementById('type-audio-btn');
@@ -1328,54 +1363,32 @@ function setMediaType(type) {
   const fileInput = document.getElementById('audio-file-input');
   const label = document.getElementById('file-select-label');
   const sizeHint = document.getElementById('max-size-hint');
+  const exts = type === 'video' ? videoExts() : audioExts();
+
+  if (audioBtn) audioBtn.classList.toggle('hidden', audioExts().length === 0);
+  if (videoBtn) videoBtn.classList.toggle('hidden', videoExts().length === 0);
 
   if (type === 'video') {
-    if (audioBtn) {
-      audioBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition';
-    }
-    if (videoBtn) {
-      videoBtn.className = 'py-2.5 px-3 rounded-lg bg-purple-600 text-white flex items-center justify-center gap-1.5 transition shadow';
-    }
+    if (audioBtn) audioBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition' + (audioExts().length ? '' : ' hidden');
+    if (videoBtn) videoBtn.className = 'py-2.5 px-3 rounded-lg bg-purple-600 text-white flex items-center justify-center gap-1.5 transition shadow';
     if (badge) {
-      badge.textContent = '🎬 Video with Lyrics (MP4)';
+      badge.textContent = `Video (${extList(exts)})`;
       badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-500/40 font-medium';
     }
-    if (hint) {
-      hint.textContent = 'Video plays on stage confidence monitor (720p H.264). Pristine audio quality preserved untouched.';
-    }
-    if (fileInput) {
-      fileInput.accept = 'video/*,.mp4,.mov,.mkv,.webm,audio/*';
-    }
-    if (label && label.textContent.includes('audio')) {
-      label.textContent = 'Tap to select or drag video file here';
-    }
-    if (sizeHint) {
-      sizeHint.textContent = 'Supports MP4, MOV, MKV (Max 500MB)';
-    }
+    if (hint) hint.textContent = 'Video plays on the stage monitor (720p). The sound team checks length and sound before it goes live.';
+    if (label && label.textContent.includes('audio')) label.textContent = 'Tap to select or drag a video file here';
   } else {
-    if (audioBtn) {
-      audioBtn.className = 'py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow';
-    }
-    if (videoBtn) {
-      videoBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition';
-    }
+    if (audioBtn) audioBtn.className = 'py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow';
+    if (videoBtn) videoBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition' + (videoExts().length ? '' : ' hidden');
     if (badge) {
-      badge.textContent = '🎵 Audio Track (MP3)';
+      badge.textContent = `Audio (${extList(exts)})`;
       badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium';
     }
-    if (hint) {
-      hint.textContent = 'Standard studio-grade audio backing track for venue PA sound.';
-    }
-    if (fileInput) {
-      fileInput.accept = 'audio/*,.mp3,.m4a,.wav,.aac';
-    }
-    if (label && label.textContent.includes('video')) {
-      label.textContent = 'Tap to select or drag audio file here';
-    }
-    if (sizeHint) {
-      sizeHint.textContent = `Supports MP3, M4A, WAV (Max ${maxUploadSizeMb}MB)`;
-    }
+    if (hint) hint.textContent = 'A normal audio backing track for the venue sound system.';
+    if (label && label.textContent.includes('video')) label.textContent = 'Tap to select or drag an audio file here';
   }
+  if (fileInput) fileInput.accept = exts.map(e => '.' + e).join(',');
+  if (sizeHint) sizeHint.textContent = limitHintText();
   updateSubmitButtonText();
   if (window.lucide) lucide.createIcons();
 }
@@ -1557,31 +1570,92 @@ function updateActiveTrackBadge() {
   if (window.lucide) lucide.createIcons();
 }
 
+function fileExt(name) {
+  const m = /\.([A-Za-z0-9]+)$/.exec(name || '');
+  return m ? m[1].toLowerCase() : '';
+}
+
+// Returns an error {title, text} or null.
+function checkFile(file) {
+  const ext = fileExt(file.name);
+  if (!allowedExts.includes(ext)) {
+    const kinds = [];
+    if (audioExts().length) kinds.push(`${extList(audioExts())} audio`);
+    if (videoExts().length) kinds.push(`${extList(videoExts())} video`);
+    return {
+      title: 'That file type is not allowed',
+      text: `${file.name} is ${ext ? 'a .' + ext : 'an unknown'} file. Use ${kinds.join(', or ')}.`,
+    };
+  }
+  const isVideo = VIDEO_EXTS.includes(ext);
+  const limit = isVideo ? maxVideoMb : maxAudioMb;
+  if (file.size > limit * 1024 * 1024) {
+    return {
+      title: 'File is too big',
+      text: `This ${isVideo ? 'video' : 'audio'} file is ${formatBytes(file.size)}. The limit is ${maxAudioMb} MB for audio (${maxVideoMb} MB for video). Export a smaller file or paste a link instead.`,
+    };
+  }
+  return null;
+}
+
 function handleFileSelected(file) {
   const infoBar = document.getElementById('file-info-bar');
   const nameDisplay = document.getElementById('file-name-display');
   const sizeDisplay = document.getElementById('file-size-display');
   const label = document.getElementById('file-select-label');
   const fileInput = document.getElementById('audio-file-input');
+  if (!file) return;
 
-  if (file) {
-    const isVideo = currentMediaType === 'video';
-    const effectiveMaxMb = isVideo ? 500 : maxUploadSizeMb;
-    const maxBytes = effectiveMaxMb * 1024 * 1024;
-    if (file.size > maxBytes) {
-      if (fileInput) fileInput.value = '';
-      if (infoBar) infoBar.classList.add('hidden');
-      if (label) label.textContent = isVideo ? 'Tap to select or drag video file here' : 'Tap to select or drag audio file here';
-      showError(`File size (${formatBytes(file.size)}) exceeds the maximum upload limit of ${effectiveMaxMb}MB.`);
-      return;
-    }
-
-    hideError();
-    nameDisplay.textContent = file.name;
-    sizeDisplay.textContent = formatBytes(file.size);
-    label.textContent = 'File chosen! Tap to change';
-    infoBar.classList.remove('hidden');
+  const problem = checkFile(file);
+  if (problem) {
+    if (fileInput) fileInput.value = '';
+    if (infoBar) infoBar.classList.add('hidden');
+    if (label) label.textContent = currentMediaType === 'video' ? 'Tap to select or drag a video file here' : 'Tap to select or drag an audio file here';
+    lastSubmitFailed = false;
+    showError(`${problem.title}. ${problem.text}`);
+    return;
   }
+
+  // Match the format switch to the chosen file (a .mp4 picked while "Audio" is shown, and so on).
+  const wantVideo = VIDEO_EXTS.includes(fileExt(file.name));
+  if (wantVideo !== (currentMediaType === 'video')) setMediaType(wantVideo ? 'video' : 'audio');
+
+  hideError();
+  nameDisplay.textContent = file.name;
+  sizeDisplay.textContent = formatBytes(file.size);
+  label.textContent = 'File chosen! Tap to change';
+  infoBar.classList.remove('hidden');
+}
+
+// Allowed link hosts: SoundCloud and YouTube (including m., music. and youtu.be). Returns the cleaned URL or null.
+function validLink(raw) {
+  let u;
+  try { u = new URL(raw); } catch (_) { return null; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  const host = u.hostname.toLowerCase().replace(/^www\./, '');
+  return LINK_HOSTS.includes(host) ? u.toString() : null;
+}
+
+function sendUpload(formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    activeXhr = xhr;
+    xhr.open('POST', '/api/upload');
+    xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) onProgress(ev.loaded, ev.total); };
+    xhr.upload.onload = () => onProgress(null, null);
+    xhr.onload = () => {
+      activeXhr = null;
+      let body = null;
+      if ((xhr.getResponseHeader('content-type') || '').includes('application/json')) {
+        try { body = JSON.parse(xhr.responseText); } catch (_) { body = null; }
+      }
+      resolve({ status: xhr.status, ok: xhr.status >= 200 && xhr.status < 300, body });
+    };
+    xhr.onerror = () => { activeXhr = null; reject(new Error('We could not reach the server. Check your connection and try again.')); };
+    xhr.onabort = () => { activeXhr = null; const e = new Error('Upload cancelled.'); e.cancelled = true; reject(e); };
+    xhr.ontimeout = () => { activeXhr = null; reject(new Error('The upload timed out. Try again, or paste a link instead.')); };
+    xhr.send(formData);
+  });
 }
 
 async function handleFormSubmit(e) {
@@ -1589,6 +1663,7 @@ async function handleFormSubmit(e) {
   hideError();
 
   if (!selectedEntry) {
+    lastSubmitFailed = false;
     showError('Please select a song from the list first.');
     return;
   }
@@ -1600,8 +1675,6 @@ async function handleFormSubmit(e) {
   }
 
   const isVideo = currentMediaType === 'video';
-  const effectiveMaxMb = isVideo ? 500 : maxUploadSizeMb;
-
   const formData = new FormData();
   formData.append('entry_id', selectedEntry.entry_id);
   formData.append('submission_type', currentMethod);
@@ -1610,115 +1683,107 @@ async function handleFormSubmit(e) {
   if (currentMethod === 'file') {
     const fileInput = document.getElementById('audio-file-input');
     if (!fileInput.files || fileInput.files.length === 0) {
-      showError(`Please select a ${isVideo ? 'video' : 'audio'} file to upload.`);
+      lastSubmitFailed = false;
+      showError(`Please choose ${isVideo ? 'a video' : 'an audio'} file first.`);
       return;
     }
     const file = fileInput.files[0];
-    const maxBytes = effectiveMaxMb * 1024 * 1024;
-    if (file.size > maxBytes) {
-      showError(`File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of ${effectiveMaxMb}MB.`);
+    const problem = checkFile(file);
+    if (problem) {
+      lastSubmitFailed = false;
+      showError(`${problem.title}. ${problem.text}`);
       return;
     }
     formData.append('file', file);
   } else if (currentMethod === 'youtube') {
-    const ytUrl = document.getElementById('youtube-url-input').value.trim();
-    if (!ytUrl) {
-      showError('Please enter a valid YouTube link.');
+    const raw = document.getElementById('youtube-url-input').value.trim();
+    if (!raw) {
+      lastSubmitFailed = false;
+      showError('Paste a public YouTube or SoundCloud link to one song.');
       return;
     }
-    if (!ytUrl.includes('youtube.com') && !ytUrl.includes('youtu.be')) {
-      showError('The URL must be a valid YouTube link (youtube.com or youtu.be).');
+    const link = validLink(raw);
+    if (!link) {
+      lastSubmitFailed = false;
+      showError('We could not use that link. Paste a public YouTube or SoundCloud link to one song. Private videos and playlists do not work.');
       return;
     }
-    formData.append('youtube_url', ytUrl);
+    formData.append('youtube_url', link);
   }
 
-  // UI state during upload
   const submitBtn = document.getElementById('submit-btn');
   const progressContainer = document.getElementById('progress-container');
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
+  const isLink = currentMethod === 'youtube';
 
   submitBtn.disabled = true;
   progressContainer.classList.remove('hidden');
-  progressBar.style.width = '35%';
-  progressText.textContent = currentMethod === 'youtube'
-    ? (isVideo ? 'Extracting 720p video from YouTube with yt-dlp...' : 'Extracting audio from YouTube with yt-dlp...')
-    : (isVideo ? 'Uploading & optimizing video for stage monitor...' : 'Uploading audio to server...');
+  progressBar.style.width = isLink ? '35%' : '0%';
+  progressText.textContent = isLink
+    ? 'Checking the link, then downloading and processing. This can take a minute.'
+    : 'Starting upload...';
 
   try {
-    const res = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData
-    });
-
-    progressBar.style.width = '80%';
-    progressText.textContent = 'Saving version and updating database...';
-
-    let result = null;
-    const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      try {
-        result = await res.json();
-      } catch (_) {
-        result = null;
+    const res = await sendUpload(formData, (loaded, total) => {
+      if (loaded === null) {
+        // All bytes are on the server: it now checks length and sound.
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Upload finished. Checking length and sound...';
+        return;
       }
-    }
+      const pct = Math.max(1, Math.min(99, Math.round((loaded / total) * 100)));
+      progressBar.style.width = pct + '%';
+      progressText.textContent = `${pct}%  ·  ${formatBytes(loaded)} of ${formatBytes(total)}`;
+    });
 
     if (!res.ok) {
       if (res.status === 413) {
-        throw new Error(`File is too large for upload (HTTP 413). WAV audio files can be very large—please upload an audio file under ${maxUploadSizeMb}MB or convert it to MP3 (320kbps).`);
+        throw new Error(`The server says this file is too big. The limit is ${maxAudioMb} MB for audio (${maxVideoMb} MB for video). Export a smaller file or paste a link instead.`);
       }
       if (res.status === 502 || res.status === 504) {
-        throw new Error(`Upload timed out (HTTP ${res.status}). If uploading a large WAV file, please convert it to MP3 (320kbps) and try again.`);
+        throw new Error(`The upload timed out (HTTP ${res.status}). Try again, or export a smaller file.`);
       }
-      throw new Error(result?.detail || `Upload failed (HTTP ${res.status}). Please try again.`);
+      const detail = res.body && typeof res.body.detail === 'string' ? res.body.detail : '';
+      throw new Error(detail || `Upload failed (HTTP ${res.status}). Please try again.`);
     }
+    const result = res.body;
+    if (!result) throw new Error('The upload reached the server, but its reply was unexpected. Check My entry to see if the track is there.');
 
-    if (!result) {
-      try {
-        result = await res.json();
-      } catch (_) {
-        throw new Error('Upload succeeded on the server, but received an unexpected response format.');
-      }
-    }
-
+    lastSubmitFailed = false;
     progressBar.style.width = '100%';
-    progressText.textContent = 'Complete!';
+    progressText.textContent = 'Done!';
 
     setTimeout(() => {
       submitBtn.disabled = false;
       progressContainer.classList.add('hidden');
       document.getElementById('intake-form').classList.add('hidden');
-      
+
       const successCard = document.getElementById('success-card');
       const detailsBox = document.getElementById('success-details');
       detailsBox.innerHTML = `
         <p><strong>Performer:</strong> ${escapeHtml(result.performer_name)}</p>
         <p><strong>Song:</strong> ${escapeHtml(result.song_title)}</p>
-        <p><strong>Active Track File:</strong> <code class="text-orange-300">${escapeHtml(result.filename)}</code></p>
+        <p><strong>Track file:</strong> <code class="text-orange-300">${escapeHtml(result.filename)}</code></p>
       `;
       successCard.classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
-
-      // Refresh performances
       loadPerformances();
     }, 400);
 
   } catch (err) {
     submitBtn.disabled = false;
     progressContainer.classList.add('hidden');
-    let msg = err?.message || 'An unexpected error occurred during submission.';
-    if (msg.includes('expected pattern') || msg.includes('SyntaxError') || msg.includes('token <')) {
-      msg = `Upload failed or was blocked by network limits (HTTP 413 / Gateway). If you are uploading a large uncompressed WAV file, please convert it to MP3 (320kbps) and try again.`;
-    }
-    showError(msg);
+    if (err && err.cancelled) { lastSubmitFailed = false; hideError(); return; }
+    lastSubmitFailed = true;
+    showError(err?.message || 'Something went wrong while uploading.');
   }
 }
 
 function showError(msg) {
   const errCard = document.getElementById('error-card');
   document.getElementById('error-message').textContent = msg;
+  document.getElementById('retry-upload-btn')?.classList.toggle('hidden', !lastSubmitFailed);
   errCard.classList.remove('hidden');
   errCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
   if (window.lucide) lucide.createIcons();

@@ -46,25 +46,22 @@ def test_landing_and_tracks_pages():
     # Landing page at root /
     res_root = client.get("/")
     assert res_root.status_code == 200
-    assert "Sing & Serenade" in res_root.text
-    assert "Sign Up" in res_root.text
-    assert "Performer Hub" in res_root.text
-    assert "Live Program" in res_root.text
-    assert "Console" in res_root.text
+    assert "Sign up" in res_root.text or "Sign Up" in res_root.text
+    assert "My entry" in res_root.text
+    assert "Live" in res_root.text
+    # Guest pages carry no staff destinations; the only admin link is the footer sign-in.
+    assert 'href="/console"' not in res_root.text
+    assert res_root.text.count('href="/admin"') == 1
 
-    # Tracks page at /tracks (redirects to /performer or serves performer hub)
+    # /tracks, /upload and /intake all permanently redirect to /my-entry
     res_tracks = client.get("/tracks")
     assert res_tracks.status_code == 200
-    assert "Performer Hub" in res_tracks.text
+    assert "My entry" in res_tracks.text
 
-    # Redirects for /upload and /intake
-    res_up = client.get("/upload", follow_redirects=False)
-    assert res_up.status_code in (302, 307)
-    assert res_up.headers["location"] == "/tracks"
-
-    res_in = client.get("/intake", follow_redirects=False)
-    assert res_in.status_code in (302, 307)
-    assert res_in.headers["location"] == "/tracks"
+    for old in ("/upload", "/intake"):
+        res = client.get(old, follow_redirects=False)
+        assert res.status_code == 301
+        assert res.headers["location"] == "/my-entry"
 
 def test_data_static_serving():
     import os

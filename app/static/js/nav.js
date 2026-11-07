@@ -2,7 +2,7 @@
  * Shared site navigation.
  * Replaces each page's <header><nav> with one consistent component:
  *  - desktop/tablet: inline pills with an accent-coloured active page
- *  - phones: a single menu button opening a compact grid sheet (public links first, staff links separated)
+ *  - phones: a single menu button opening a compact grid sheet (public links first, admin links separated)
  * Non-link children of the old <nav> (e.g. the admin "PIN Authorized" badge) are preserved.
  */
 (function () {
@@ -10,12 +10,12 @@
 
   const PUBLIC_LINKS = [
     { href: '/', label: 'Home', icon: 'home', accent: 'orange' },
-    { href: '/signup', label: 'Sign Up', icon: 'user-plus', accent: 'emerald' },
-    { href: '/performer', label: 'Performer Hub', short: 'Performer', icon: 'mic-2', accent: 'orange' },
-    { href: '/dashboard', label: 'Dashboard', icon: 'layout-dashboard', accent: 'indigo' },
-    { href: '/live', label: 'Live Program', icon: 'radio', accent: 'rose' },
+    { href: '/schedule', label: 'Schedule', icon: 'layout-dashboard', accent: 'indigo' },
+    { href: '/signup', label: 'Sign up', icon: 'user-plus', accent: 'emerald' },
+    { href: '/my-entry', label: 'My entry', icon: 'mic-2', accent: 'orange' },
+    { href: '/live', label: 'Live', icon: 'radio', accent: 'rose' },
   ];
-  const STAFF_LINKS = [
+  const ADMIN_LINKS = [
     { href: '/console', label: 'Console', icon: 'shield', accent: 'amber' },
     { href: '/admin', label: 'Admin', icon: 'settings', accent: 'purple' },
   ];
@@ -70,7 +70,7 @@
       <nav class="hidden xl:flex items-center gap-1.5 flex-nowrap justify-end" aria-label="Main">
         ${PUBLIC_LINKS.map(pill).join('')}
         <span class="w-px h-5 bg-slate-700 mx-1" aria-hidden="true"></span>
-        ${STAFF_LINKS.map(pill).join('')}
+        ${ADMIN_LINKS.map(pill).join('')}
       </nav>
       <button type="button" id="site-menu-btn" class="xl:hidden p-2.5 rounded-xl bg-slate-800/70 border border-slate-700/80 text-slate-100 transition active:scale-95" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu-sheet">
         <i data-lucide="menu" class="w-5 h-5"></i>
@@ -83,8 +83,8 @@
     sheet.style.background = 'rgba(2, 6, 23, 0.97)'; // inline: Tailwind CDN has no /97 opacity step
     sheet.innerHTML = `
       <div class="grid grid-cols-2 gap-2">${PUBLIC_LINKS.map(tile).join('')}</div>
-      <p class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-3 mb-1.5 px-1">Staff</p>
-      <div class="grid grid-cols-2 gap-2">${STAFF_LINKS.map(tile).join('')}</div>`;
+      <p class="text-[10px] uppercase tracking-widest text-slate-500 font-bold mt-3 mb-1.5 px-1">Admin</p>
+      <div class="grid grid-cols-2 gap-2">${ADMIN_LINKS.map(tile).join('')}</div>`;
     header.style.position = header.style.position || 'sticky';
     header.appendChild(sheet);
 

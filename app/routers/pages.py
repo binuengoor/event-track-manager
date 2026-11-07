@@ -1,7 +1,8 @@
 import os
 import re
+from html import escape
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.config import settings, get_setting
@@ -20,7 +21,7 @@ async def serve_landing_page():
         landing_path = os.path.join(STATIC_DIR, "index.html")
     with open(landing_path, "r", encoding="utf-8") as f:
         html = f.read()
-    html = render_guest_navigation(html, "/")
+    html = render_guest_navigation(_brand(html), "/")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -37,7 +38,7 @@ async def serve_signup_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/signup.js', f'/static/js/signup.js?v={version}')
 
-    html = render_guest_navigation(html, "/signup")
+    html = render_guest_navigation(_brand(html), "/signup")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -52,36 +53,49 @@ async def serve_performer_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
 
-    html = render_guest_navigation(html, "/my-entry")
+    html = render_guest_navigation(_brand(html), "/my-entry")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
+def _brand(html: str) -> str:
+    """Replace the template placeholder brand with the event's own (escaped) header text."""
+    title = escape(str(get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "") or "Event"))
+    subtitle = escape(str(get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "") or ""))
+    html = html.replace("EMA Paattukoottam", title)
+    return html.replace(">Musical Night<", f">{subtitle}<")
+
+
+def _redirect_with_query(path: str, request: Request, status_code: int = 301):
+    query = request.url.query
+    return RedirectResponse(path + (f"?{query}" if query else ""), status_code=status_code)
+
+
 @router.get("/performer")
-async def redirect_performer():
-    return RedirectResponse(url="/my-entry", status_code=301)
+async def redirect_performer(request: Request):
+    return _redirect_with_query("/my-entry", request)
 
 
 @router.get("/dashboard")
-async def redirect_dashboard():
-    return RedirectResponse(url="/schedule", status_code=301)
+async def redirect_dashboard(request: Request):
+    return _redirect_with_query("/schedule", request)
 
 
 @router.get("/tracks")
-async def redirect_tracks_to_performer():
+async def redirect_tracks_to_performer(request: Request):
     """301 permanent redirect from old /tracks to /performer"""
-    return RedirectResponse(url="/performer", status_code=301)
+    return _redirect_with_query("/my-entry", request)
 
 
 @router.get("/upload")
-async def redirect_upload_to_performer():
-    return RedirectResponse(url="/tracks")
+async def redirect_upload_to_performer(request: Request):
+    return _redirect_with_query("/my-entry", request)
 
 
 @router.get("/intake")
-async def redirect_intake_to_performer():
-    return RedirectResponse(url="/tracks")
+async def redirect_intake_to_performer(request: Request):
+    return _redirect_with_query("/my-entry", request)
 
 
 @router.get("/schedule", response_class=HTMLResponse)
@@ -89,7 +103,7 @@ async def serve_dashboard_page():
     dash_path = os.path.join(STATIC_DIR, "dashboard.html")
     with open(dash_path, "r", encoding="utf-8") as f:
         html = f.read()
-    html = render_guest_navigation(html, "/schedule")
+    html = render_guest_navigation(_brand(html), "/schedule")
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response

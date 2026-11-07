@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
   <meta name="view-transition" content="same-origin">
-  <title>Dashboard - EMA Paattukoottam</title>
+  <title>Schedule - EMA Paattukoottam</title>
   <style>
     :root, html, body {
       background-color: #000000 !important;
@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
+<link rel="stylesheet" href="/static/css/guest-forms.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
 
@@ -38,157 +39,60 @@
       </a>
 
       <!-- Quick Nav Links -->
-      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <a href="/" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Home">
-          <i data-lucide="home" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Home</span>
-        </a>
-        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>Sign Up</span>
-        </a>
-        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
-          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Performer</span>
-        </a>
-        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-indigo-600 text-white shadow-md shadow-indigo-600/30 transition" title="Transparency Dashboard">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-white"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span>Live Program</span>
-        </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Console</span>
-        </a>
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Admin</span>
-        </a>
-      </nav>
+      <nav aria-label="Main"></nav>
     </div>
   </header>
   <script src="/static/js/nav.js"></script>
 
   <!-- Main Content -->
-  <main class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 sm:py-8 space-y-6">
+  <main class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-8 space-y-4">
 
-    <!-- Header Section -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/90 border border-slate-800 p-6 rounded-3xl shadow-xl">
+    <div id="offline-banner" class="gf-offline" role="status" aria-live="polite" hidden>
+      You are offline. Showing the schedule as of <span id="offline-time"></span>.
+    </div>
+
+    <div class="gf-card" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem">
       <div>
-        <h2 id="dashboard-header-title" class="text-xl sm:text-2xl font-black text-white">Event Dashboard</h2>
-        <p id="dashboard-header-desc" class="text-xs sm:text-sm text-slate-400 mt-0.5">Live view of all registered performances, track readiness, and potluck food contributions.</p>
+        <h2 id="dashboard-header-title" class="text-xl sm:text-2xl font-black text-white m-0">Schedule</h2>
+        <p id="dashboard-header-desc" class="gf-muted" style="margin:.25rem 0 0">The running order and the food board.</p>
       </div>
-
-      <!-- Tab Switcher -->
-      <div id="dashboard-tabs-container" class="flex items-center bg-slate-950 p-1.5 rounded-2xl border border-slate-800 self-start md:self-auto shrink-0">
-        <button id="tab-songs-btn" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 bg-orange-500 text-white shadow">
-          <i data-lucide="mic" class="w-4 h-4"></i>
-          <span>Songs & Acts</span>
-          <span id="songs-count-badge" class="px-1.5 py-0.2 rounded-full bg-white/20 text-[10px]">0</span>
-        </button>
-        <button id="tab-food-btn" class="px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 text-slate-400 hover:text-white">
-          <i data-lucide="utensils" class="w-4 h-4"></i>
-          <span>Food & Potluck</span>
-          <span id="food-count-badge" class="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px]">0</span>
-        </button>
+      <div id="dashboard-tabs-container" class="gf-segment" role="group" aria-label="Schedule view">
+        <button type="button" id="tab-songs-btn" aria-pressed="true">Lineup <span id="songs-count-badge">0</span></button>
+        <button type="button" id="tab-food-btn" aria-pressed="false">Food <span id="food-count-badge">0</span></button>
       </div>
     </div>
 
-    <!-- TAB 1: SONGS & ACTS BOARD -->
-    <section id="section-songs" class="space-y-4">
-      <!-- Search & Filters -->
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/60 border border-slate-800 p-3.5 rounded-2xl">
-        <div class="relative w-full sm:w-80">
-          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
-          <input type="text" id="song-search-input" placeholder="Search performer, song title..." class="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-        </div>
-
-        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-          <select id="type-filter-select" class="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-2 text-xs text-white focus:outline-none">
-            <option value="">All Types</option>
-            <option value="solo">Solo</option>
-            <option value="duet">Duet</option>
-            <option value="group">Group</option>
-          </select>
-          <button id="refresh-dashboard-btn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="Refresh">
-            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
-          </button>
-        </div>
+    <!-- LINEUP -->
+    <section id="section-songs" class="space-y-3" aria-label="Lineup">
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+        <label for="song-search-input" class="gf-label" style="position:absolute;left:-9999px">Search the lineup</label>
+        <input type="search" id="song-search-input" class="gf-input" style="flex:1 1 12rem" placeholder="Search performer or song">
+        <label for="type-filter-select" class="gf-label" style="position:absolute;left:-9999px">Filter by type</label>
+        <select id="type-filter-select" class="gf-select" style="flex:0 0 auto;width:auto">
+          <option value="">All types</option>
+          <option value="solo">Solo</option>
+          <option value="duet">Duet</option>
+          <option value="group">Group</option>
+        </select>
+        <button type="button" id="refresh-dashboard-btn" class="gf-btn" aria-label="Refresh">Refresh</button>
       </div>
-
-      <!-- Songs Table Container -->
-      <div class="bg-slate-900/90 border border-slate-800 rounded-3xl overflow-hidden shadow-xl">
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs stack-table">
-            <thead class="bg-slate-950/80 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800 text-[11px]">
-              <tr>
-                <th class="px-5 py-3.5">Performer</th>
-                <th class="px-5 py-3.5">Song Details</th>
-                <th class="px-4 py-3.5">Type</th>
-                <th class="px-4 py-3.5">Category</th>
-                <th class="px-4 py-3.5">Track</th>
-                <th class="px-4 py-3.5 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody id="songs-table-body" class="divide-y divide-slate-800/80 text-slate-300 font-medium">
-              <tr>
-                <td colspan="6" class="px-5 py-10 text-center text-slate-500">Loading performances...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ol id="lineup-list" class="gf-lineup" aria-live="polite">
+        <li class="gf-muted" style="padding:1.5rem;text-align:center">Loading the lineup...</li>
+      </ol>
     </section>
 
-    <!-- TAB 2: FOOD & POTLUCK BOARD -->
-    <section id="section-food" class="hidden space-y-4">
-      <!-- Serving Note Callout -->
-      <div class="bg-gradient-to-r from-emerald-950/40 to-slate-900 border border-emerald-500/30 p-4 sm:p-5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-start gap-3">
-          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-            <i data-lucide="chef-hat" class="w-5 h-5"></i>
-          </div>
-          <div>
-            <h3 class="text-sm font-bold text-white">Potluck Serving Guideline</h3>
-            <p id="dashboard-serving-note" class="text-xs text-emerald-300 font-semibold mt-0.5">Half-Tray or Above (15+ servings)</p>
-          </div>
-        </div>
-        <div class="flex items-center gap-3">
-          <span id="food-stats-pill" class="px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold">
-            0 / 0 Taken
-          </span>
-        </div>
+    <!-- FOOD BOARD -->
+    <section id="section-food" class="space-y-3" aria-label="Food board" hidden>
+      <div class="gf-card">
+        <p class="m-0 font-bold text-white"><span id="food-stats-pill">0 of 0 taken</span></p>
+        <p id="dashboard-serving-note" class="gf-muted" style="margin:.25rem 0 0"></p>
+        <p class="gf-muted" style="margin:.25rem 0 0">You do not have to perform to bring a dish.</p>
+        <p style="margin:.75rem 0 0"><a id="bring-dish-link" class="gf-btn gf-btn-primary" href="/signup">Bring a dish</a></p>
       </div>
-
-      <!-- Food Groups Container -->
-      <div id="dashboard-food-groups" class="space-y-6">
-        <!-- Dynamically rendered groups and items -->
-      </div>
+      <div id="dashboard-food-groups"></div>
     </section>
 
   </main>
-
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
-    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
-      </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>
-        <a href="/signup" class="hover:text-slate-300 transition">Sign Up</a>
-        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
-        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
-        <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Console</a>
-        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
-      </div>
-    </div>
-  </footer>
 
   <script src="/static/js/utils.js"></script>
   <script src="/static/js/dashboard.js"></script>

@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
   <meta name="view-transition" content="same-origin">
-  <title>EMA Paattukoottam - Sing & Serenade</title>
+  <title>Event</title>
   <style>
     :root, html, body {
       background-color: #000000 !important;
@@ -153,36 +153,7 @@
       </a>
 
       <!-- Quick Nav Links -->
-      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <a href="/" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-orange-600 text-white shadow-md shadow-orange-600/30 transition" title="Home">
-          <i data-lucide="home" class="w-3.5 h-3.5 text-white"></i>
-          <span>Home</span>
-        </a>
-        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="New Participant Registration">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>Sign Up</span>
-        </a>
-        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Performer Hub & Track Submission">
-          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Performer</span>
-        </a>
-        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Transparency Dashboard">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span>Dashboard</span>
-        </a>
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span>Live Program</span>
-        </a>
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Console</span>
-        </a>
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition" title="Admin Settings">
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Admin</span>
-        </a>
-      </nav>
+      <nav aria-label="Main"></nav>
     </div>
   </header>
   <script src="/static/js/nav.js"></script>
@@ -193,14 +164,13 @@
     <!-- Event Banner / Animated Poster -->
     <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 poster-glow transition-all">
       <div id="poster-container" class="w-full flex items-center justify-center bg-slate-950/80 overflow-hidden">
-        <img id="event-poster-img" 
-             src="/data/paattukoottam_animated.gif" 
-             alt="Paattukoottam Sing & Serenade Poster" 
+        <img id="event-poster-img" style="display:none"
+             alt="Event poster" 
              class="w-full max-h-[460px] object-contain mx-auto"
              onerror="this.style.display='none'; document.getElementById('poster-fallback').classList.remove('hidden');" />
         
         <!-- Fallback Graphic if poster image is loading or missing -->
-        <div id="poster-fallback" class="hidden py-12 px-6 text-center">
+        <div id="poster-fallback" class="py-12 px-6 text-center">
           <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-xl shadow-orange-500/30">
             <i data-lucide="music-2" class="w-8 h-8"></i>
           </div>
@@ -212,10 +182,10 @@
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 id="event-title-display" class="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Paattukoottam Sing & Serenade
+              Event
             </h2>
             <p id="event-subtitle-display" class="text-xs sm:text-sm text-amber-400 font-medium mt-0.5">
-              Musical Night • September 19, 2026
+              
             </p>
           </div>
 
@@ -333,7 +303,7 @@
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p id="card-signup-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                New participant registration. Sign up for Solo, Duet, or Group performances, and choose a potluck dish to share.
+                Perform, bring a dish, or both. It takes about a minute.
               </p>
             </div>
           </div>
@@ -343,8 +313,8 @@
           </div>
         </a>
 
-        <!-- 2. Performer Hub Card -->
-        <a id="card-performer" href="/performer" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/50 shadow-lg hover:shadow-orange-500/10 transition-all duration-200">
+        <!-- 2. My entry card -->
+        <a id="card-performer" href="/my-entry" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/50 shadow-lg hover:shadow-orange-500/10 transition-all duration-200">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500/20 to-amber-500/20 border border-orange-500/30 text-orange-400 flex items-center justify-center group-hover:scale-110 transition">
@@ -356,22 +326,22 @@
             </div>
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-orange-400 transition flex items-center gap-1.5">
-                <span id="card-performer-title">Performer Hub</span>
+                <span id="card-performer-title">My entry</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p id="card-performer-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Edit song details, upload backing tracks (<span class="text-slate-300 font-medium">MP3, M4A, WAV</span>), paste YouTube links, and update food sign-up.
+                Edit your song, upload your track (<span class="text-slate-300 font-medium">MP3, WAV, M4A, MP4, WebM</span>) or paste a YouTube or SoundCloud link, and manage your dish.
               </p>
             </div>
           </div>
           <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-orange-400">
-            <span id="card-performer-cta">Manage Songs & Tracks</span>
+            <span id="card-performer-cta">Open my entry</span>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </div>
         </a>
 
-        <!-- 3. Transparency Dashboard Card -->
-        <a id="card-dashboard" href="/dashboard" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/10 transition-all duration-200">
+        <!-- 3. Schedule card -->
+        <a id="card-dashboard" href="/schedule" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/10 transition-all duration-200">
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition">
@@ -383,16 +353,16 @@
             </div>
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-indigo-400 transition flex items-center gap-1.5">
-                <span id="card-dashboard-title">Dashboard</span>
+                <span id="card-dashboard-title">Schedule</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p id="card-dashboard-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Public transparency board. Browse registered songs to avoid duplicates, and check open potluck items on the food board.
+                The running order and the food board. See who sings when and which dishes are still open.
               </p>
             </div>
           </div>
           <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
-            <span id="card-dashboard-cta">View Community Board</span>
+            <span id="card-dashboard-cta">See the schedule</span>
             <i data-lucide="chevron-right" class="w-4 h-4"></i>
           </div>
         </a>
@@ -410,7 +380,7 @@
             </div>
             <div>
               <h4 class="text-base font-bold text-white group-hover:text-rose-400 transition flex items-center gap-1.5">
-                <span>Live Program</span>
+                <span>Live</span>
                 <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
               </h4>
               <p id="card-live-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
@@ -424,83 +394,10 @@
           </div>
         </a>
 
-        <!-- 5. Sound Console Card -->
-        <a id="card-console" href="/console" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-amber-500/50 shadow-lg hover:shadow-amber-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-yellow-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="disc-3" class="w-6 h-6"></i>
-              </div>
-              <span id="card-console-badge" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
-                Sound Desk
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-amber-400 transition flex items-center gap-1.5">
-                <span id="card-console-title">Sound Console</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p id="card-console-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Sound engineer console with live audio playback, waveform scrubbing, queue drag-and-drop, and offline ZIP export.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-400">
-            <span>Playback Console (PIN)</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
-        <!-- 6. Admin Settings Card -->
-        <a href="/admin" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-purple-500/50 shadow-lg hover:shadow-purple-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-500/20 to-violet-500/20 border border-purple-500/30 text-purple-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="settings" class="w-6 h-6"></i>
-              </div>
-              <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase tracking-wider">
-                Admin
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-purple-400 transition flex items-center gap-1.5">
-                <span>Admin Settings</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p class="text-xs text-slate-400 leading-relaxed mt-1">
-                Event details, sign-up rules, food groups & items management, live statistics, and local backup snapshots.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-400">
-            <span>Manage Settings (PIN)</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
       </div>
     </div>
 
   </main>
-
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
-    <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
-      </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>
-        <a href="/signup" class="hover:text-slate-300 transition">Sign Up</a>
-        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
-        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
-        <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Console</a>
-        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
-      </div>
-    </div>
-  </footer>
 
   <script src="/static/js/utils.js"></script>
   <script>
@@ -517,6 +414,10 @@
 
         if (info.poster_url) {
           const img = document.getElementById("event-poster-img");
+          img.onload = () => {
+            img.style.display = "";
+            document.getElementById("poster-fallback").classList.add("hidden");
+          };
           img.src = info.poster_url;
         }
 
@@ -530,7 +431,7 @@
         if (info.header_brand_title) {
           const navTitle = document.getElementById("nav-event-title");
           if (navTitle) navTitle.textContent = info.header_brand_title;
-          document.title = `${info.header_brand_title} - Sing & Serenade`;
+          document.title = info.event_name || info.header_brand_title;
         }
         if (info.header_brand_subtitle) {
           const navSub = document.getElementById("nav-event-subtitle");
@@ -579,8 +480,6 @@
         const dashboardCta = document.getElementById("card-dashboard-cta");
         const liveBadge = document.getElementById("card-live-badge");
         const liveDesc = document.getElementById("card-live-desc");
-        const consoleBadge = document.getElementById("card-console-badge");
-        const consoleDesc = document.getElementById("card-console-desc");
 
         // Master switch: Stage performances disabled (e.g. Potluck Social / Dinner Only)
         if (info.stage_performances_enabled === false) {
@@ -592,7 +491,7 @@
             performerBadge.textContent = "Attendees";
             performerBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider";
           }
-          if (performerTitle) performerTitle.textContent = "Attendee Hub";
+          if (performerTitle) performerTitle.textContent = "My dish";
           if (performerDesc) performerDesc.textContent = "Check your registration and coordinate your community potluck dish contribution.";
           if (performerCta) performerCta.textContent = "Manage Potluck Dish";
 
@@ -600,7 +499,7 @@
             dashboardBadge.textContent = "Food Board";
             dashboardBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider";
           }
-          if (dashboardTitle) dashboardTitle.textContent = "Community Food Board";
+          if (dashboardTitle) dashboardTitle.textContent = "Food board";
           if (dashboardDesc) dashboardDesc.textContent = "Public community board showing all potluck dishes, commitments, and needed items.";
           if (dashboardCta) dashboardCta.textContent = "View Food Board";
 
@@ -609,12 +508,6 @@
             liveBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
           }
           if (liveDesc) liveDesc.textContent = "Live stage display inactive (no stage performance program for this event).";
-
-          if (consoleBadge) {
-            consoleBadge.textContent = "Inactive";
-            consoleBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-          }
-          if (consoleDesc) consoleDesc.textContent = "Sound playback and engineer desk console inactive for this event.";
         } else {
           // Standard / Musical event logic
           if (info.signup_enabled === false && info.food_signup_enabled === false) {
@@ -657,14 +550,6 @@
               liveBadge.textContent = "Inactive";
               liveBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
             }
-          }
-
-          if (info.console_enabled === false) {
-            if (consoleBadge) {
-              consoleBadge.textContent = "Inactive";
-              consoleBadge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-            }
-            if (consoleDesc) consoleDesc.textContent = "Sound playback and engineer desk console inactive for this event.";
           }
         }
 
@@ -725,7 +610,7 @@
         // Event is over
         document.getElementById("countdown-heading-badge").textContent = "EVENT ENDED";
         document.getElementById("countdown-status-title").textContent = "Thank you for being part of the night!";
-        document.getElementById("countdown-status-sub").textContent = "The program has wrapped up. Browse the final setlist on the Dashboard, and see you at the next one.";
+        document.getElementById("countdown-status-sub").textContent = "The program has wrapped up. Browse the final running order on the Schedule, and see you at the next one.";
         const tiles = document.getElementById("countdown-tiles");
         if (tiles) tiles.classList.add("hidden");
         const pill = document.getElementById("status-pill");
@@ -738,7 +623,7 @@
         // Event has started!
         document.getElementById("countdown-heading-badge").textContent = "LIVE NOW";
         document.getElementById("countdown-status-title").textContent = "The Program is Live on Stage!";
-        document.getElementById("countdown-status-sub").textContent = "Performances are now underway. Head to the Live Program to see who is on stage.";
+        document.getElementById("countdown-status-sub").textContent = "Performances are now underway. Open Live to see who is on stage.";
         document.getElementById("cd-days").textContent = "00";
         document.getElementById("cd-hours").textContent = "00";
         document.getElementById("cd-mins").textContent = "00";
