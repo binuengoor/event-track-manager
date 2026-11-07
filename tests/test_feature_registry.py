@@ -60,3 +60,27 @@ def test_presets_use_registered_flags_and_freeze_is_a_partial_patch():
         "performer_edits_enabled": False,
         "console_enabled": True,
     }
+
+
+def test_readiness_acts_follow_registered_stage_and_track_flags(monkeypatch):
+    from app.services.readiness_service import readiness_service
+
+    monkeypatch.setattr(
+        features,
+        "get_setting",
+        lambda key, fallback: {"stage_performances_enabled": False}.get(key, True),
+    )
+    assert readiness_service._acts()[0]["detail"] == "Stage performances are off for this event type."
+
+    monkeypatch.setattr(features, "get_setting", lambda key, fallback: key != "track_upload_enabled")
+    monkeypatch.setattr(
+        "app.services.readiness_service.db_service.get_all_performances",
+        lambda: [{"performer_name": "A singer", "is_song_name_missing": False, "track_status": "Pending"}],
+    )
+    checks = readiness_service._acts()
+    assert [check["id"] for check in checks] == ["songs"]
+
+    monkeypatch.setattr(features, "get_setting", lambda key, fallback: True)
+    checks = readiness_service._acts()
+    assert [check["id"] for check in checks] == ["songs", "tracks"]
+    assert checks[1]["status"] == "warn"

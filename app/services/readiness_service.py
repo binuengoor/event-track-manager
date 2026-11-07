@@ -5,6 +5,7 @@ import logging
 from typing import Dict, Any, List
 
 from app.config import settings, get_setting
+from app.features import feature_enabled
 from app.services.db_service import db_service
 from app.services.track_store import track_store
 from app.services.downloader_client import downloader_client
@@ -114,7 +115,7 @@ class ReadinessService:
     def _acts(self):
         perfs = db_service.get_all_performances()
         out = []
-        stage_on = bool(get_setting("stage_performances_enabled", True))
+        stage_on = feature_enabled("stage_performances_enabled")
         if not stage_on:
             return [_check("acts", "Performances", INFO, "Stage performances are off for this event type.")]
         if not perfs:
@@ -124,7 +125,7 @@ class ReadinessService:
                           f"{len(no_song)} act(s) have no song title yet: " + ", ".join(p["performer_name"] for p in no_song[:5]) + ("..." if len(no_song) > 5 else "")
                           if no_song else "Every act has a song title.",
                           "Ask them to fill it in on the Performer Hub." if no_song else ""))
-        if bool(get_setting("track_upload_enabled", True)):
+        if feature_enabled("track_upload_enabled"):
             needs = [p for p in perfs if p.get("track_status") not in ("Uploaded", "Acoustic") and not p.get("drive_file_id")]
             out.append(_check("tracks", "Backing tracks", WARN if needs else OK,
                               f"{len(needs)} of {len(perfs)} act(s) still need a track: " + ", ".join(p["performer_name"] for p in needs[:5]) + ("..." if len(needs) > 5 else "")
