@@ -22,6 +22,7 @@ from app.services.track_store import track_store
 from app.services.downloader_client import downloader_client
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
+from app.services.loudness_service import loudness_service
 
 logger = logging.getLogger("audio-workflow-service")
 
@@ -176,6 +177,8 @@ class AudioWorkflowService:
         except Exception as e:
             logger.error("Failed to store track for %s: %s", entry_id, e)
             raise ExternalServiceError("Failed to save the track in the event folder")
+
+        loudness_service.schedule(entry_id, stored_path)
 
         event_service.update_track_metadata(
             entry_id,

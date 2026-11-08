@@ -51,10 +51,14 @@ export function createGainStage(mediaElement, AudioContextCtor = globalThis.Audi
     const gain = ctx.createGain();
     source.connect(gain);
     gain.connect(ctx.destination);
+    let base = 1;   // per-track loudness gain (can boost above 1)
+    let level = 1;  // fade level, 0..1
+    const apply = () => { gain.gain.value = base * level; };
     return {
       ctx,
       gain,
-      setGain(v) { gain.gain.value = Math.max(0, Math.min(1, v)); },
+      setGain(v) { level = Math.max(0, Math.min(1, v)); apply(); },
+      setBase(v) { base = Number.isFinite(v) && v > 0 ? v : 1; apply(); },
       resume() { return ctx.state === 'suspended' ? ctx.resume() : Promise.resolve(); },
     };
   } catch (e) {

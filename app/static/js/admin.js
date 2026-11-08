@@ -10,6 +10,7 @@ import { describeLoginFailure } from "./console/login.js";
 import { createScreens } from "./console/screens.js";
 import { createWakeLock } from "./console/wake-lock.js";
 import { sinkSupported, applySink, listOutputs, rememberedSink, rememberSink } from "./console/output-device.js";
+import { createGainStore } from "./console/loudness.js";
 import { pillText, fetchManifest, runVaultSync, planVaultSync } from "./console/vault-sync.js";
 
 // EMA Paattukoottam Stage Playback Console
@@ -30,6 +31,8 @@ const transport = createTransport();
 let onDeckId = null;
 let gainStage = null;
 let vaultManifest = null;
+const trackGains = createGainStore();
+let trackBaseGain = 1;
 let vaultSyncRunning = false;
 let vaultSyncStarted = false;
 let vaultFailures = new Map();
@@ -243,6 +246,7 @@ async function renderVaultSheet() {
 async function autoVaultSync(onlyId = null) {
   if (vaultSyncRunning || !userAdminPin || !navigator.onLine) return;
   vaultManifest = await fetchManifest(fetch, getAuthHeaders) || vaultManifest;
+  if (vaultManifest) trackGains.update(vaultManifest.tracks);
   if (!vaultManifest) { await updateVaultStatusDisplay(); return; }
   vaultSyncRunning = true;
   const pill = document.getElementById('vault-status-indicator');
@@ -1828,6 +1832,7 @@ function cueTrack(item, autoPlay = false, isRestoration = false) {
 
       if (wavesurfer && (isVaultCached || navigator.onLine)) {
         try {
+          applyTrackGain(item.entry_id);
           wavesurfer.load(audioSourceUrl);
           if (autoPlay) {
             wavesurfer.once('ready', () => {
@@ -1930,7 +1935,13 @@ function handleCueNext() {
 let fadeAfterDone = null;
 function setOutputLevel(v) {
   if (gainStage) gainStage.setGain(v);
-  else if (wavesurfer && typeof wavesurfer.setVolume === 'function') { try { wavesurfer.setVolume(v); } catch (e) {} }
+  else if (wavesurfer && typeof wavesurfer.setVolume === 'function') { try { wavesurfer.setVolume(Math.min(1, trackBaseGain) * v); } catch (e) {} }
+}
+// Loudness gain for the cued act; boosts need the gain stage, cuts also work through plain volume.
+function applyTrackGain(entryId) {
+  trackBaseGain = trackGains.linear(entryId);
+  if (gainStage) gainStage.setBase(trackBaseGain);
+  else setOutputLevel(1);
 }
 const fader = createFader({
   duration: FADE_MS,
@@ -1959,6 +1970,7 @@ function fadeOut(afterDone = null) {
 function ensureGainStage() {
   if (gainStage || !wavesurfer || typeof wavesurfer.getMediaElement !== 'function') return;
   gainStage = createGainStage(wavesurfer.getMediaElement());
+  if (gainStage) gainStage.setBase(trackBaseGain);
   setupOutputDevice();
 }
 

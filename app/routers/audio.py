@@ -13,6 +13,7 @@ from app.services.event_service import event_service
 from app.services.audio_service import audio_service
 from app.services.track_store import mime_type_for, media_type_for
 from app.services.audio_workflow_service import audio_workflow_service
+from app.services.loudness_service import loudness_service
 from app.services.db_service import db_service
 from app.routers.auth import verify_operator_pin, verify_admin_pin, is_admin
 from app.privacy import NamePrivacy
@@ -193,6 +194,9 @@ def vault_manifest(_authorized: bool = Depends(verify_admin_pin)):
         path = audio_service.get_track_path(entry_id) if entry_id else None
         if not path or not os.path.isfile(path):
             continue
+        gain_db = loudness_service.gain_db(entry_id, path)
+        if gain_db is None:
+            loudness_service.schedule(entry_id, path)  # measured in the background; shows up on the next manifest fetch
         tracks.append({
             "entry_id": entry_id,
             "file": os.path.basename(path),
@@ -200,6 +204,7 @@ def vault_manifest(_authorized: bool = Depends(verify_admin_pin)):
             "sha256": _sha256_cached(path),
             "size": os.path.getsize(path),
             "duration": _duration_seconds(perf.get("duration")),
+            "gain_db": gain_db,
             "url": f"/api/stream/{entry_id}",
         })
     return {"event_id": get_setting("event_id") or settings.event.id, "tracks": tracks}
