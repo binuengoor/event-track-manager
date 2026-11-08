@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
@@ -133,6 +134,7 @@ class AdminService:
         "max_audio_upload_mb": (1, 2000), "max_video_upload_mb": (1, 5000),
     }
     LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns", "allowed_media"}
+    GALLERY_ORDER_LIMIT = 50
     STR_SETTINGS = {
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
@@ -147,7 +149,12 @@ class AdminService:
         cleaned: Dict[str, Any] = {}
         items = {("external_link_url" if k == "signup_sheet_url" else k): v for k, v in items.items()}  # pre-rename alias
         for k, v in items.items():
-            if k in self.BOOL_SETTINGS:
+            if k == "gallery_order":
+                if (not isinstance(v, list) or len(v) > self.GALLERY_ORDER_LIMIT
+                        or not all(isinstance(name, str) and name and name == os.path.basename(name)
+                                   for name in v)):
+                    raise ValueError(f"Setting 'gallery_order' must be a list of up to {self.GALLERY_ORDER_LIMIT} filenames.")
+            elif k in self.BOOL_SETTINGS:
                 if isinstance(v, str) and v.strip().lower() in ("true", "false"):
                     v = v.strip().lower() == "true"
                 if not isinstance(v, bool):

@@ -97,7 +97,7 @@ body[data-mode="off"] #live-badge, body[data-mode="off"] .lv-subtitle { display:
 .lv-aside { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
 .lv-gallery { flex: 0 0 auto; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; background: rgb(19 22 27 / .72); border: 1px solid rgb(255 255 255 / .14); }
 .lv-gallery-frame { height: clamp(150px, 26vh, 300px); margin: 12px 12px 0; border-radius: 12px; background: #000; display: flex; align-items: center; justify-content: center; }
-#carousel-img { max-width: 94%; max-height: 94%; object-fit: contain; border-radius: 8px; transition: opacity .5s; opacity: 0; }
+#carousel-img, #carousel-video { max-width: 94%; max-height: 94%; object-fit: contain; border-radius: 8px; transition: opacity .5s; opacity: 0; }
 .lv-gallery-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; color: var(--lv-soft); }
 .lv-dots { display: flex; gap: 8px; }
 .lv-dots span { width: 12px; height: 12px; border-radius: var(--radius-full); background: #4B5563; }

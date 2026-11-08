@@ -640,6 +640,8 @@ empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the 
 
 Admin Lineup also supports adding and deleting acts, replacing tracks, matching incoming files to acts, and saving the running order. Deletion archives the track; entry IDs are not reused. These actions require Admin authentication.
 
+Admin Event Details supports poster and sponsor uploads with content-signature checks. Images are limited to 20 MiB and videos to 100 MiB. Gallery order is event-specific; the gallery supports images and MP4/WebM videos, and posters support images and MP4. When a shared GALLERY_DIR is configured for a switchable installation, gallery changes are disabled to prevent cross-event edits.
+
 ### 6.9 Console and live upgrades
 
 | Upgrade | Detail | Provenance |

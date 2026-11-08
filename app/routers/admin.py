@@ -9,6 +9,10 @@ from app.services.readiness_service import readiness_service
 from app.services.db_service import db_service
 from app.services.export_service import export_service, SnapshotError
 from app.services import lineup_service
+from app.services.media_asset_service import (
+    MediaAssetError, MediaAssetEventChangedError, MediaAssetSharedGalleryError,
+    MediaAssetTooLargeError, media_asset_service,
+)
 from app.exceptions import InvalidAudioError, FileTooLargeError, PerformanceNotFoundError
 from app.routers.auth import verify_admin_pin
 from app.schemas import AdminParticipantUpdateRequest
@@ -16,6 +20,63 @@ from app.schemas import AdminParticipantUpdateRequest
 logger = logging.getLogger("admin-router")
 
 router = APIRouter(tags=["admin"])
+
+
+@router.post("/api/admin/poster")
+async def upload_admin_poster(file: UploadFile = File(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        stored = await media_asset_service.upload_poster(file)
+    except MediaAssetEventChangedError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except MediaAssetTooLargeError as ex:
+        raise HTTPException(status_code=413, detail=str(ex))
+    except MediaAssetError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    return {"status": "success", **stored}
+
+
+@router.get("/api/admin/gallery")
+def get_admin_gallery(_authorized: bool = Depends(verify_admin_pin)):
+    return {"files": media_asset_service.gallery_items()}
+
+
+@router.post("/api/admin/gallery")
+async def upload_admin_gallery_file(file: UploadFile = File(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        stored = await media_asset_service.upload_gallery(file)
+    except MediaAssetEventChangedError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except MediaAssetSharedGalleryError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except MediaAssetTooLargeError as ex:
+        raise HTTPException(status_code=413, detail=str(ex))
+    except MediaAssetError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    return {"status": "success", **stored}
+
+
+@router.delete("/api/admin/gallery")
+def delete_admin_gallery_file(payload: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        media_asset_service.delete_gallery_file(payload.get("filename"))
+    except FileNotFoundError as ex:
+        raise HTTPException(status_code=404, detail="Gallery file not found.") from ex
+    except MediaAssetSharedGalleryError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except MediaAssetError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    return {"status": "success"}
+
+
+@router.put("/api/admin/gallery/order")
+def order_admin_gallery(payload: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        media_asset_service.set_gallery_order(payload.get("filenames"))
+    except MediaAssetSharedGalleryError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except MediaAssetError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    return {"status": "success", "files": media_asset_service.gallery_items()}
 
 
 @router.get("/api/admin/settings")

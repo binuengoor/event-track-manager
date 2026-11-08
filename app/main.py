@@ -14,6 +14,7 @@ from app.services.downloader_client import downloader_client
 from app.events import register_default_listeners
 from app.services.event_manager import event_manager
 from app.services.event_service import event_service
+from app.services.media_asset_service import GALLERY_PUBLIC_MIMES, POSTER_MIMES
 
 from app.routers.auth import verify_admin_pin, register_auth_handlers
 from app.routers import (
@@ -104,6 +105,46 @@ async def serve_public_data(file_path: str):
     if not full.startswith(root + os.sep) or not os.path.isfile(full):
         raise HTTPException(status_code=404)
     return FileResponse(full)
+
+
+@app.api_route("/event-media/{file_path:path}", methods=["GET", "HEAD"], include_in_schema=False)
+async def serve_event_media(file_path: str):
+    """Serve only poster/gallery media from the currently active event's configured folders."""
+    normalized = file_path.replace("\\", "/")
+    parts = normalized.split("/")
+    if (not normalized or any(part in ("", ".", "..") for part in parts)
+            or any("\x00" in part for part in parts)):
+        raise HTTPException(status_code=404)
+
+    if parts[0] == "gallery":
+        if len(parts) != 2:
+            raise HTTPException(status_code=404)
+        root = settings.storage.gallery_dir
+        allowed = GALLERY_PUBLIC_MIMES
+        name = parts[1]
+    else:
+        if len(parts) != 1:
+            raise HTTPException(status_code=404)
+        root = settings.storage.event_dir
+        allowed = POSTER_MIMES
+        name = parts[0]
+
+    extension = os.path.splitext(name)[1].lower()
+    if name.startswith(".") or extension not in allowed:
+        raise HTTPException(status_code=404)
+    root = os.path.realpath(root)
+    candidate = os.path.join(root, name)
+    full = os.path.realpath(candidate)
+    try:
+        contained = os.path.commonpath((root, full)) == root
+    except ValueError:
+        contained = False
+    if not contained or os.path.islink(candidate) or not os.path.isfile(full):
+        raise HTTPException(status_code=404)
+    return FileResponse(full, media_type=allowed[extension], headers={
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+    })
 
 
 ROBOTS_TAG = "noindex, nofollow, noarchive"

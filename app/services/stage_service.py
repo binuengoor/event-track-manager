@@ -1,11 +1,11 @@
 import os
 import logging
-import urllib.parse
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from app.config import settings, get_setting
 from app.services.db_service import db_service
+from app.services.media_asset_service import media_asset_service
 
 logger = logging.getLogger("stage-service")
 
@@ -13,24 +13,8 @@ logger = logging.getLogger("stage-service")
 class StageService:
     @staticmethod
     def get_gallery_images() -> List[str]:
-        """Scans the configured gallery directory and returns web-accessible URLs."""
-        gallery_dir = settings.storage.gallery_dir
-        if not gallery_dir or not os.path.isdir(gallery_dir):
-            return []
-
-        valid_exts = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"}
-        images = []
-        try:
-            for fname in sorted(os.listdir(gallery_dir)):
-                if fname.startswith("."):
-                    continue
-                ext = os.path.splitext(fname)[1].lower()
-                if ext in valid_exts:
-                    safe_name = urllib.parse.quote(fname)
-                    images.append(f"/data/gallery/{safe_name}")
-        except Exception as ex:
-            logger.warning("Error scanning gallery directory %s: %s", gallery_dir, ex)
-        return images
+        """Returns gallery URLs in the order saved by the admin."""
+        return [item["url"] for item in media_asset_service.gallery_items()]
 
     @staticmethod
     def is_eligible_for_stage(p) -> bool:

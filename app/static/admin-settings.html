@@ -316,9 +316,30 @@
               <input type="text" id="setting-event-poster-url" class="as-input">
             </div>
             <div class="as-field">
+              <label for="poster-upload-input" class="as-label">Upload a poster image or video</label>
+              <div class="media-upload-row">
+                <input type="file" id="poster-upload-input" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4">
+                <button type="button" id="poster-upload-btn" class="as-btn as-btn-secondary media-upload-btn">Upload poster</button>
+              </div>
+              <p id="poster-upload-status" class="as-help" role="status" aria-live="polite"></p>
+            </div>
+            <div class="as-field">
               <label for="setting-entry-id-prefix" class="as-label">Entry ID prefix (e.g. PK)</label>
               <input type="text" id="setting-entry-id-prefix" class="as-input as-mono as-upper">
             </div>
+          </section>
+
+          <section class="as-card" aria-labelledby="as-ev-gallery-h">
+            <div class="as-card-head"><h2 id="as-ev-gallery-h" class="as-card-title">Sponsor gallery</h2><span class="as-card-note">Images and videos shown on Home and Live</span></div>
+            <div class="as-field">
+              <label for="gallery-upload-input" class="as-label">Add gallery media</label>
+              <div class="media-upload-row">
+                <input type="file" id="gallery-upload-input" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm" multiple>
+                <button type="button" id="gallery-upload-btn" class="as-btn as-btn-secondary media-upload-btn">Upload media</button>
+              </div>
+              <p id="gallery-upload-status" class="as-help" role="status" aria-live="polite"></p>
+            </div>
+            <ul id="gallery-assets-list" class="media-assets-list" aria-label="Sponsor gallery files"></ul>
           </section>
 
           <section class="as-card" aria-labelledby="as-ev-links-h">
@@ -1087,6 +1108,7 @@
   <script src="/static/js/settings/features.js?v=3.1"></script>
   <script src="/static/js/settings/food-catalog.js?v=3.1"></script>
   <script src="/static/js/settings/summary-backup.js?v=3.1"></script>
+  <script src="/static/js/settings/media-assets.js?v=1"></script>
   <script src="/static/js/settings/activity-log.js?v=3.1"></script>
   <script src="/static/js/settings/action-handlers.js?v=3.1"></script>
   <script src="/static/js/settings/participants.js?v=3.1"></script>

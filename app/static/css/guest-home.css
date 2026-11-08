@@ -83,6 +83,8 @@ html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
   min-height: 150px; border-radius: 20px;
 }
 .gh-poster-img { display: block; width: 100%; max-height: min(52vh, 460px); object-fit: contain; }
+.gh-poster-img[hidden] { display: none; }
+.gh-poster video.gh-poster-img { background: #000; }
 .gh-poster-fallback { color: rgb(255 255 255 / .2); line-height: 0; }
 .gh-hero[data-poster="img"] .gh-poster-fallback { display: none; }
 .gh-hero[data-poster="img"] .gh-poster { background: #fff; border: 1px solid var(--border-subtle); box-shadow: var(--gh-shadow); }
@@ -228,7 +230,7 @@ html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
   flex: 0 0 150px; height: 60px; display: flex; align-items: center; justify-content: center;
   border-radius: 14px; background: #fff; border: 1px solid var(--border-subtle);
 }
-.gh-reel-track img { max-width: 88%; max-height: 44px; object-fit: contain; }
+.gh-reel-track img, .gh-reel-track video { max-width: 88%; max-height: 44px; object-fit: contain; }
 .gh-reel.is-marquee .gh-reel-track { animation: gh-reel var(--reel-time, 30s) linear infinite; }
 .gh-reel.is-marquee:hover .gh-reel-track, .gh-reel.is-paused .gh-reel-track { animation-play-state: paused; }
 @keyframes gh-reel { to { transform: translateX(var(--reel-shift, -50%)); } }

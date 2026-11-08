@@ -1,5 +1,5 @@
 // Venue /live screen view: SSE + poll + etm-live BroadcastChannel feed one render path.
-// Public screen: no navigation, no admin calls, no ages, no stage notes, no contact numbers.
+// Public screen: small-screen guest navigation, no admin calls, no ages, stage notes or contact numbers.
 (function () {
   'use strict';
   const L = window.EtmLive;
@@ -241,13 +241,29 @@
     }
   }
 
+  function createMediaElement(url) {
+    const isVideo = /\.(mp4|webm)(?:[?#].*)?$/i.test(String(url));
+    const media = $(isVideo ? 'carousel-video' : 'carousel-img');
+    const other = $(isVideo ? 'carousel-img' : 'carousel-video');
+    if (other) { if (other.pause) other.pause(); other.hidden = true; other.style.opacity = '0'; other.removeAttribute('src'); }
+    media.hidden = false;
+    media.style.opacity = '0';
+    if (isVideo) {
+      media.onloadeddata = () => {
+        media.style.opacity = '1';
+        const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (!reduced && media.play) { const playback = media.play(); if (playback && playback.catch) playback.catch(() => {}); }
+      };
+    } else media.onload = () => { media.style.opacity = '1'; };
+    media.onerror = () => { media.style.opacity = '0'; };
+    media.src = url;
+  }
+
   function showSlide(i) {
-    const img = $('carousel-img');
     if (!galleryImages.length) return;
     const dots = $('gallery-dots');
     if (dots) dots.innerHTML = galleryImages.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('');
-    img.style.opacity = '0';
-    setTimeout(() => { img.onload = () => { img.style.opacity = '1'; }; img.src = galleryImages[i]; }, 300);
+    setTimeout(() => createMediaElement(galleryImages[i]), 300);
   }
 
   // TV: when the lineup is longer than its panel, drift it upward slowly and loop. Off for reduced motion,
