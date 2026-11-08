@@ -10,11 +10,24 @@ const sw = read('sw.js');
 const shell = [...sw.match(/SHELL_URLS = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
 
 function consoleImports(src) {
-  return [...src.matchAll(/from\s+["']\.\/(console\/[\w.-]+\.js)["']/g)].map(m => `/static/js/${m[1]}`);
+  return [...src.matchAll(/from\s+["']\.\/(?:console\/)?([\w.-]+\.js)["']/g)].map(m => `/static/js/console/${m[1]}`);
 }
 
-test('every console module imported by admin.js is in the SW shell', () => {
-  const imported = consoleImports(read('js/admin.js'));
+// admin.js is a thin entry point; walk every console module reachable from it.
+function reachableFromAdmin() {
+  const seen = new Set();
+  const todo = [...[...read('js/admin.js').matchAll(/from\s+["']\.\/console\/([\w.-]+\.js)["']/g)].map(m => `/static/js/console/${m[1]}`)];
+  while (todo.length) {
+    const url = todo.pop();
+    if (seen.has(url)) continue;
+    seen.add(url);
+    for (const dep of consoleImports(read(url.replace('/static/', '')))) todo.push(dep);
+  }
+  return [...seen];
+}
+
+test('every console module reachable from admin.js is in the SW shell', () => {
+  const imported = reachableFromAdmin();
   assert.ok(imported.length >= 13, 'expected the console imports to be found');
   for (const url of imported) assert.ok(shell.includes(url), `${url} missing from SHELL_URLS`);
 });

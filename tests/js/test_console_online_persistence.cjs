@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {plainScript} = require('./_module_source.cjs');
 
 function consoleContext() {
-  const source = fs.readFileSync(path.join(__dirname, '../../app/static/js/admin.js'),'utf8');
-  const block = source.slice(source.indexOf('let offlineSaveFailure = false;'), source.indexOf("document.addEventListener('DOMContentLoaded'"));
-  const updates = source.slice(source.indexOf('async function updateStatus('),source.indexOf('function updatePlayerBarNotes('));
+  const block = plainScript('offline-sync.js');
+  const updates = plainScript('act-actions.js');
   const nodes = {'network-dot':{}, 'network-status-text':{}, 'network-status-indicator':{}};
   const calls = [], messages = [];
   let failStorage = true, failFetch = false, failAppend = false;
@@ -18,8 +18,9 @@ function consoleContext() {
     fetch:async(url,opts)=>{calls.push({url,opts}); if (failFetch) throw Error('network'); return {ok:true,json:async()=>({stage_notes:'Hello'})}},
     localStorage:{setItem(){if (failStorage) throw Error('storage full')}},
     showToast:(message,type)=>messages.push({message,type}), getAuthHeaders:()=>({}),
-    queue:[{entry_id:'PK-001',performance_status:'Upcoming',stage_notes:''}], currentCuedItem:null,
-    updateQueueStatsSummary(){}, applyFilter(){}, renderQueueList(){}, updatePlayerBarState(){}, updatePlayerBarNotes(){},
+    S:{queue:[{entry_id:'PK-001',performance_status:'Upcoming',stage_notes:''}], currentCuedItem:null},
+    hooks:{updateQueueStatsSummary(){}, applyFilter(){}, renderQueueList(){}, loadQueue:async()=>{}},
+    updatePlayerBarState(){}, updatePlayerBarNotes(){},
   };
   vm.createContext(context);vm.runInContext(block+'\n'+updates,context);
   return {context, nodes, calls, messages, setStorage:value=>{failStorage=value}, setFetch:value=>{failFetch=value}, setAppend:value=>{failAppend=value}};
@@ -93,7 +94,6 @@ test('a successfully replayed matching queued intent clears its own unsaved warn
     acknowledged(queued.shift());
     return 1;
   };
-  context.loadQueue = async()=>{};
   await context.enqueueOfflineAction('uncue',null,{},context.beginAction({}));
   await context.syncOfflineActions();
   assert.equal(nodes['network-status-text'].textContent,'Online');

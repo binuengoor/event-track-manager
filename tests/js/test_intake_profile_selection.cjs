@@ -20,7 +20,11 @@ function setup(fetch) {
     localStorage: { setItem() {} }, console: { warn() {} }, fetch, URLSearchParams,
     encodeURIComponent,
   });
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '../../app/static/js/intake.js'), 'utf8'), context);
+  // intake.js is split into ordered classic scripts; load them in index.html order.
+  const html = fs.readFileSync(path.join(__dirname, '../../app/static/index.html'), 'utf8');
+  for (const [, src] of html.matchAll(/<script src="\/static\/js\/(intake(?:\/[\w-]+)?\.js)"/g)) {
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../../app/static/js', src), 'utf8'), context, { filename: src });
+  }
   vm.runInContext('showToast = (message) => { window.lastError = message; }', context);
   return { context, node };
 }

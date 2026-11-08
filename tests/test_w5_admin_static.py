@@ -4,7 +4,7 @@ from pathlib import Path
 
 STATIC = Path(__file__).resolve().parent.parent / "app" / "static"
 HTML = (STATIC / "admin-settings.html").read_text()
-JS = (STATIC / "js" / "admin-settings.js").read_text()
+JS = "\n".join(f.read_text() for f in [STATIC / "js" / "admin-settings.js", *sorted((STATIC / "js" / "settings").glob("*.js"))])
 SETUP_JS = (STATIC / "js" / "admin-setup.js").read_text()
 DASH_JS = (STATIC / "js" / "admin-dashboard.js").read_text()
 CSS = (STATIC / "css" / "admin-shell.css").read_text()

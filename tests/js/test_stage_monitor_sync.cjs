@@ -42,6 +42,6 @@ test('stage monitor degrades without channel and opens the expected window',asyn
 
 test('console imports monitor module and offline shell precaches it',()=>{
   const root = path.join(__dirname,'../../app/static');
-  assert.match(fs.readFileSync(path.join(root,'js/admin.js'),'utf8'),/from ["']\.\/console\/stage-monitor-sync\.js["']/);
+  assert.match(fs.readFileSync(path.join(root,'js/console/stage-sync.js'),'utf8'),/from ["']\.\/stage-monitor-sync\.js["']/);
   assert.match(fs.readFileSync(path.join(root,'sw.js'),'utf8'),/["']\/static\/js\/console\/stage-monitor-sync\.js["']/);
 });

@@ -175,7 +175,8 @@ def test_dashboard_and_signup_scripts_escape_user_content():
     js = open(os.path.join(here, "app", "static", "js", "dashboard.js"), encoding="utf-8").read()
     for raw in ("${item.signer_name}", "${item.dish_description}", "${p.display_performer}", "${group.name}", "${item.name}"):
         assert raw not in js, f"unescaped {raw} in dashboard.js"
-    signup = open(os.path.join(here, "app", "static", "js", "signup.js"), encoding="utf-8").read()
+    signup_dir = os.path.join(here, "app", "static", "js")
+    signup = "".join(open(os.path.join(signup_dir, name), encoding="utf-8").read() for name in ["signup.js"] + [os.path.join("signup", f) for f in sorted(os.listdir(os.path.join(signup_dir, "signup")))])
     assert "${item.signer_name" not in signup.replace("escapeHtml(item.signer_name", "")
 
 

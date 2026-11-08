@@ -18,7 +18,12 @@ JS = STATIC / 'js'
 
 
 def read(path):
-    return path.read_text(encoding='utf-8')
+    text = path.read_text(encoding='utf-8')
+    # intake.js / signup.js are split into ordered classic scripts under js/intake/ and js/signup/.
+    split_dir = path.parent / path.stem
+    if path.parent == JS and split_dir.is_dir():
+        text += ''.join(p.read_text(encoding='utf-8') for p in sorted(split_dir.glob('*.js')))
+    return text
 
 
 GUEST_HTML = ['landing.html', 'signup.html', 'index.html', 'dashboard.html']
@@ -46,7 +51,9 @@ def test_guest_scripts_use_new_routes_and_copy(name):
 @pytest.mark.skipif(shutil.which('node') is None, reason='node not installed')
 @pytest.mark.parametrize('name', GUEST_JS + ['nav.js'])
 def test_guest_scripts_parse(name):
-    subprocess.run(['node', '--check', str(JS / name)], check=True)
+    files = [JS / name] + sorted((JS / Path(name).stem).glob('*.js'))
+    for f in files:
+        subprocess.run(['node', '--check', str(f)], check=True)
 
 
 def test_nav_js_says_admin_not_staff():

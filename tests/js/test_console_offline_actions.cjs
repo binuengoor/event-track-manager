@@ -45,9 +45,10 @@ test('replay preserves order and keeps failed or unknown actions for retry', asy
 
 test('console imports the replay module and service worker precaches it', () => {
   const root = path.join(__dirname, '../../app/static');
-  const consoleScript = fs.readFileSync(path.join(root, 'js/admin.js'), 'utf8');
+  // admin.js is a thin entry; offline-sync.js is the console module that drains the queue through replayOfflineActions.
+  const consoleScript = fs.readFileSync(path.join(root, 'js/console/offline-sync.js'), 'utf8');
   const worker = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
-  assert.match(consoleScript, /import\s*\{[^}]*replayOfflineActions[^}]*\}\s*from\s*["']\.\/console\/offline-actions\.js["']/);
+  assert.match(consoleScript, /import\s*\{[^}]*drainOfflineQueue[^}]*\}\s*from\s*["']\.\/offline-actions\.js["']/);
   assert.match(worker, /['"]\/static\/js\/console\/offline-actions\.js['"]/);
 });
 

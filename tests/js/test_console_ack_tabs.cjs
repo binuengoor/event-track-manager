@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {plainScript} = require('./_module_source.cjs');
 
 function makeTabs() {
-  const source = fs.readFileSync(path.join(__dirname, '../../app/static/js/admin.js'),'utf8');
-  const script = source.slice(source.indexOf('let offlineSaveFailure = false;'),source.indexOf("document.addEventListener('DOMContentLoaded'"));
+  const script = plainScript('offline-sync.js');
   const channels = [];
   const pending = [];
   class Channel {
@@ -20,8 +20,8 @@ function makeTabs() {
       document:{getElementById:id=>nodes[id]}, getOfflineActions:()=>pending,
       appendOfflineAction:async action=>{if (fail) throw Error('storage full'); pending.push(action);},
       drainOfflineQueue:async(headers,fetch,timeout,ack)=>{const action=pending.shift(); ack(action); return 1;},
-      localStorage:{setItem(){}}, queue:[], coordinatedOfflineQueueAvailable:()=>true,
-      showToast(){}, getAuthHeaders:()=>({}), fetch(){}, loadQueue:async()=>{}};
+      localStorage:{setItem(){}}, S:{queue:[]}, hooks:{loadQueue:async()=>{}}, coordinatedOfflineQueueAvailable:()=>true,
+      showToast(){}, getAuthHeaders:()=>({}), fetch(){}};
     vm.createContext(context); vm.runInContext(script,context);
     return {context,nodes,setFail:value=>{fail=value}};
   };

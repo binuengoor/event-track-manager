@@ -1,7 +1,7 @@
 // Service Worker for EMA Paattukoottam Stage Console
 // Enables offline loading of the console UI shell and assets.
 
-const CACHE_NAME = 'paattukoottam-console-v17';
+const CACHE_NAME = 'paattukoottam-console-v18';
 
 const SHELL_URLS = [
   '/console',
@@ -19,6 +19,22 @@ const SHELL_URLS = [
   '/static/js/console/hold-confirm.js',
   '/static/js/console/fade.js',
   '/static/js/console/loudness.js',
+  '/static/js/console/state.js',
+  '/static/js/console/util.js',
+  '/static/js/console/stage-sync.js',
+  '/static/js/console/audio-engine.js',
+  '/static/js/console/disruption.js',
+  '/static/js/console/vault-ui.js',
+  '/static/js/console/offline-sync.js',
+  '/static/js/console/player-bar.js',
+  '/static/js/console/deck.js',
+  '/static/js/console/act-actions.js',
+  '/static/js/console/sync-order.js',
+  '/static/js/console/queue-render.js',
+  '/static/js/console/queue-load.js',
+  '/static/js/console/action-buttons.js',
+  '/static/js/console/hotkeys.js',
+  '/static/js/console/console-upgrades.js',
   '/static/js/console/reorder.js',
   '/static/js/console/vault-sync.js',
   '/static/js/console/screens.js',
