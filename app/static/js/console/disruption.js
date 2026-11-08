@@ -23,7 +23,7 @@ export function confirmIfPlaying(actionDescription, onProceed) {
   const modal = document.getElementById('disruption-modal');
   const msgEl = document.getElementById('disruption-modal-msg');
   if (msgEl) {
-    msgEl.innerHTML = `A track is currently playing live on stage.<br><span class="text-amber-300 font-semibold">${escapeHtml(actionDescription)}</span> will stop or silence the music.`;
+    msgEl.innerHTML = `A track is currently playing live on stage.<br><strong class="c-warn-text">${escapeHtml(actionDescription)}</strong> will stop or silence the music.`;
   }
 
   disruptionPendingCallback = onProceed;

@@ -129,9 +129,9 @@ export function setupActionButtons() {
   const zipBtn = document.getElementById('download-zip-btn');
   if (zipBtn) {
     zipBtn.addEventListener('click', async () => {
-      zipBtn.classList.add('opacity-50', 'pointer-events-none');
+      zipBtn.classList.add('is-busy');
       const originalText = zipBtn.innerHTML;
-      zipBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Bundling...</span>`;
+      zipBtn.innerHTML = `<i data-lucide="loader-2"></i><span>Bundling...</span>`;
       if (window.lucide) lucide.createIcons();
 
       try {
@@ -161,7 +161,7 @@ export function setupActionButtons() {
         showToast(`Could not export offline tracks: ${err.message}`, 'error');
       } finally {
         zipBtn.innerHTML = originalText;
-        zipBtn.classList.remove('opacity-50', 'pointer-events-none');
+        zipBtn.classList.remove('is-busy');
         if (window.lucide) lucide.createIcons();
       }
     });

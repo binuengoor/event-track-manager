@@ -15,17 +15,17 @@ export function showToast(message, type = 'success') {
 
   msgEl.textContent = message;
   if (type === 'error') {
-    iconEl.innerHTML = '<i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>';
-    toast.className = 'fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-0 opacity-100 bg-rose-950/90 border border-rose-500/40 text-rose-200 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs';
+    iconEl.innerHTML = '<i data-lucide="alert-triangle"></i>';
+    toast.className = 'c-toast is-show is-error';
   } else {
-    iconEl.innerHTML = '<i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>';
-    toast.className = 'fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-0 opacity-100 bg-slate-900 border border-slate-700 text-slate-100 px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs';
+    iconEl.innerHTML = '<i data-lucide="check-circle"></i>';
+    toast.className = 'c-toast is-show';
   }
 
   if (window.lucide) lucide.createIcons();
 
   setTimeout(() => {
-    toast.className = 'fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs pointer-events-none';
+    toast.className = 'c-toast';
   }, 3500);
 }
 

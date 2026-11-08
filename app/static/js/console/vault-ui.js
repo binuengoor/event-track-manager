@@ -27,13 +27,13 @@ export function updateRowCachePills() {
     const cacheBtn = row.querySelector('.btn-cache-single');
     if (cacheBtn) {
       if (isCached) {
-        cacheBtn.className = 'btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border-slate-800 hover:border-emerald-500/40';
+        cacheBtn.className = 'btn-cache-single c-act';
         cacheBtn.title = 'Track stored in browser Vault (Offline Safe). Click to re-cache fresh copy.';
-        cacheBtn.innerHTML = '<i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-slate-400"></i><span>Re-cache</span>';
+        cacheBtn.innerHTML = '<i data-lucide="refresh-cw"></i><span>Re-cache</span>';
       } else {
-        cacheBtn.className = 'btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border-slate-800 hover:border-cyan-500/40 shadow-sm';
+        cacheBtn.className = 'btn-cache-single c-act c-act--info';
         cacheBtn.title = 'Pre-cache this audio track into local browser Vault without cueing';
-        cacheBtn.innerHTML = '<i data-lucide="hard-drive-download" class="w-3.5 h-3.5 text-cyan-400"></i><span>Cache</span>';
+        cacheBtn.innerHTML = '<i data-lucide="hard-drive-download"></i><span>Cache</span>';
       }
     }
   });
@@ -44,8 +44,8 @@ export async function handleSingleTrackCache(entryId, btn) {
   const item = S.queue.find(q => q.entry_id === entryId);
   if (!item) return;
 
-  btn.classList.add('opacity-60', 'pointer-events-none');
-  btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Caching...</span>`;
+  btn.classList.add('is-busy');
+  btn.innerHTML = `<i data-lucide="loader-2"></i><span>Caching...</span>`;
   if (window.lucide) lucide.createIcons();
 
   try {
@@ -65,7 +65,7 @@ export async function handleSingleTrackCache(entryId, btn) {
   } catch (err) {
     showToast(`Could not cache track: ${err.message}`, 'error');
   } finally {
-    btn.classList.remove('opacity-60', 'pointer-events-none');
+    btn.classList.remove('is-busy');
     updateRowCachePills();
   }
 }
@@ -113,6 +113,8 @@ export async function updateVaultStatusDisplay() {
       bytes = meta.reduce((n, r) => n + (r.size_bytes || 0), 0);
     }
     vaultText.textContent = pillText({ ready, total, bytes });
+    const pill = document.getElementById('vault-status-indicator');
+    if (pill && pill.setAttribute) pill.setAttribute('data-state', total > 0 && ready >= total ? 'ok' : 'warn');
   }
   updateRowCachePills();
   renderVaultSheet();
@@ -137,20 +139,24 @@ export async function renderVaultSheet() {
   const readyCount = rows.filter(r => r.state === 'ready').length;
   const bytes = [...meta.values()].reduce((n, r) => n + (r.size_bytes || 0), 0);
   if (summary) summary.textContent = `${readyCount} of ${rows.length} acts ready, ${Math.round(bytes / (1024 * 1024))} MB`;
-  list.innerHTML = rows.length === 0 ? '<p class="p-4 text-slate-500">No ready acts yet.</p>' : rows.map(r => `
-    <div class="flex items-center justify-between gap-3 px-4 py-2.5" data-vault-row="${escapeHtml(r.e.entry_id)}">
-      <div class="min-w-0">
-        <p class="font-semibold text-white truncate">${escapeHtml(r.item.song_title || r.e.file || r.e.entry_id)}</p>
-        <p class="text-slate-400 truncate">${escapeHtml(r.item.performer_name || '')} &middot; ${escapeHtml(r.e.entry_id)}${r.e.kind === 'video' ? ' &middot; video' : ''}</p>
-        ${r.failed ? `<p class="text-rose-300">${escapeHtml(r.failed)}</p>` : ''}
+  const meter = document.getElementById('vault-meter-fill');
+  if (meter) meter.style.width = `${rows.length ? Math.round((readyCount / rows.length) * 100) : 0}%`;
+  list.innerHTML = rows.length === 0 ? '<p class="c-vault__empty">No ready acts yet.</p>' : rows.map(r => {
+    const seq = r.item.sequence_order != null ? String(r.item.sequence_order).padStart(2, '0') : '';
+    const sub = `${escapeHtml(r.item.performer_name || '')} &middot; ${escapeHtml(r.e.entry_id)}${r.e.kind === 'video' ? ' &middot; video' : ''}`;
+    const statusLabel = r.state === 'ready' ? 'Cached' : (r.state === 'failed' ? 'Not cached' : 'Needs cache');
+    return `
+    <div class="c-vrow c-vrow--${r.state}" data-vault-row="${escapeHtml(r.e.entry_id)}">
+      <span class="c-vrow__num">${seq}</span>
+      <div class="c-vrow__text">
+        <p class="c-vrow__song" title="${escapeHtml(r.item.song_title || r.e.file || r.e.entry_id)}">${escapeHtml(r.item.song_title || r.e.file || r.e.entry_id)}</p>
+        <p class="c-vrow__sub">${r.failed ? escapeHtml(r.failed) : sub}</p>
       </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <span class="text-slate-400 font-mono">${r.rec ? (r.rec.size_bytes / (1024 * 1024)).toFixed(1) + ' MB' : ''}</span>
-        ${r.state === 'ready'
-          ? '<span class="px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Ready</span>'
-          : `<button type="button" class="vault-retry-btn px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700" data-entry-id="${escapeHtml(r.e.entry_id)}">${r.state === 'failed' ? 'Retry' : 'Cache'}</button>`}
-      </div>
-    </div>`).join('');
+      <span class="c-vrow__size">${r.rec ? (r.rec.size_bytes / (1024 * 1024)).toFixed(1) + ' MB' : ''}</span>
+      ${r.state === 'ready' ? '' : `<button type="button" class="vault-retry-btn c-act" data-entry-id="${escapeHtml(r.e.entry_id)}">${r.state === 'failed' ? 'Retry' : 'Cache'}</button>`}
+      <span class="c-vrow__state">${statusLabel}</span>
+    </div>`;
+  }).join('');
   list.querySelectorAll('.vault-retry-btn').forEach(btn => btn.addEventListener('click', () => autoVaultSync(btn.dataset.entryId)));
 }
 
@@ -219,7 +225,7 @@ export async function cacheAllTracksOffline() {
   }
 
   if (btn) btn.disabled = true;
-  if (icon) icon.classList.add('animate-spin');
+  if (icon) icon.classList.add('c-spin');
   if (text) text.textContent = `Caching 0/${readyTracks.length}...`;
   showToast(`Starting offline caching for ${readyTracks.length} tracks...`);
 
@@ -252,7 +258,7 @@ export async function cacheAllTracksOffline() {
 
   await updateVaultStatusDisplay();
   if (btn) btn.disabled = false;
-  if (icon) icon.classList.remove('animate-spin');
+  if (icon) icon.classList.remove('c-spin');
   if (text) text.textContent = 'Cache all';
 
   if (failedCount === 0) {
@@ -265,8 +271,8 @@ export async function cacheAllTracksOffline() {
     const cached = await getCachedTrack(S.currentCuedItem.entry_id);
     const cuedVaultStatus = document.getElementById('cued-vault-status');
     if (cached && cuedVaultStatus) {
-      cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
-      cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+      cuedVaultStatus.className = 'c-vstat c-vstat--ok';
+      cuedVaultStatus.innerHTML = '<i data-lucide="shield-check"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
       if (window.lucide) lucide.createIcons();
     }
   }
@@ -298,8 +304,8 @@ export async function clearVaultStorage() {
     if (S.currentCuedItem) {
       const cuedVaultStatus = document.getElementById('cued-vault-status');
       if (cuedVaultStatus) {
-        cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-slate-400';
-        cuedVaultStatus.innerHTML = '<i data-lucide="info" class="w-3 h-3 text-slate-400"></i><span>Streaming from Server (Not Cached)</span>';
+        cuedVaultStatus.className = 'c-vstat';
+        cuedVaultStatus.innerHTML = '<i data-lucide="info"></i><span>Streaming from Server (Not Cached)</span>';
         if (window.lucide) lucide.createIcons();
       }
     }

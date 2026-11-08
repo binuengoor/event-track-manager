@@ -19,43 +19,80 @@
     return L.selectState(state.status, Date.now(), targetStartTime.getTime());
   }
 
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function plural(n, one, many) { return `${n} ${n === 1 ? one : many}`; }
+
   function setBadge(mode) {
     const badge = $('live-badge'), text = $('live-badge-text');
     if (!badge) return;
+    const data = state.status || {};
+    const done = (data.performed || []).length;
+    const total = Number(data.total_count) || 0;
+    const live = total >= done && total > 0 ? `Live \u00b7 ${done} of ${total} performed` : 'Live';
     const map = {
-      prestart: ['chip wait', 'COUNTDOWN'],
-      live: ['chip live', 'LIVE PROGRAM'],
-      ended: ['chip ended', 'SHOW ENDED'],
-      off: ['chip wait', 'OFF'],
+      prestart: ['chip wait', 'Starting soon'],
+      live: ['chip live', live],
+      ended: ['chip ended', 'Show ended'],
+      off: ['chip wait', 'Off'],
     };
     const [cls, label] = map[mode] || map.live;
     badge.className = cls;
     text.textContent = label;
   }
 
+  // "Show starts at 5:00 PM", or with the day when it is not today.
+  function startLabel() {
+    const t = targetStartTime;
+    const time = t.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const sameDay = t.toDateString() === new Date().toDateString();
+    return sameDay ? `Show starts at ${time}` : `Show starts ${t.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} \u00b7 ${time}`;
+  }
+
+  function setInfoStrip(mode, data) {
+    const strip = $('live-info-strip');
+    let label = '', text = '';
+    if (mode === 'prestart') {
+      const n = Number(data.total_count) || 0;
+      if (n) { label = 'Lineup'; text = `${plural(n, 'act', 'acts')} on the program.`; }
+    } else if (mode === 'ended') {
+      label = 'See you next year'; text = 'Thank you to our performers, sponsors and volunteers.';
+    }
+    $('live-info-label').textContent = label;
+    $('live-info-text').textContent = text;
+    strip.classList.toggle('hidden', !text);
+  }
+
   function applyMode() {
     const mode = currentMode();
     const data = state.status || {};
     const show = (id, on) => { const el = $(id); if (el) el.classList.toggle('hidden', !on); };
+    document.body.dataset.mode = mode;
     show('live-inactive-card', mode === 'off');
     show('ended-card', mode === 'ended');
-    show('live-active-content', mode !== 'off' && mode !== 'ended');
+    show('live-active-content', mode !== 'off');
+    show('up-next-section', mode === 'live' && (data.up_next || []).length > 0);
     show('countdown-card', mode === 'prestart');
     show('now-performing-card', mode === 'live');
     const label = $('section-status-text');
     if (label) label.textContent = mode === 'prestart' ? 'Stage Countdown' : 'Now on Stage';
     setBadge(mode);
+    setInfoStrip(mode, data);
+    const clock = $('live-clock');
+    if (clock) clock.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
     if (mode === 'prestart') {
       const p = L.countdownParts(targetStartTime.getTime() - Date.now());
-      $('cd-days').textContent = String(p.days).padStart(2, '0');
-      $('cd-hours').textContent = String(p.hours).padStart(2, '0');
-      $('cd-mins').textContent = String(p.mins).padStart(2, '0');
-      $('cd-secs').textContent = String(p.secs).padStart(2, '0');
+      $('cd-days').textContent = pad2(p.days);
+      $('cd-hours').textContent = pad2(p.hours);
+      $('cd-mins').textContent = pad2(p.mins);
+      $('cd-secs').textContent = pad2(p.secs);
+      show('cd-days-tile', p.days > 0);
+      show('cd-days-sep', p.days > 0);
+      $('countdown-datetime-display').textContent = startLabel();
     }
     if (mode === 'ended') {
       const n = (data.performed || []).length;
-      $('ended-count').textContent = n ? `${n} ${n === 1 ? 'act' : 'acts'}, one great night.` : 'One great night.';
+      $('ended-count').textContent = n ? `${plural(n, 'act', 'acts')}, one great night.` : 'One great night.';
     }
   }
 
@@ -73,8 +110,17 @@
     el.textContent = viaConsole ? 'Following the console' : '';
   }
 
-  function nameHtml(item, clamp) {
-    return `<span class="${L.nameClasses(clamp)}">${esc(L.actName(item))}</span>`;
+  // Song first (board order); an act without a song title leads with the performer.
+  function actTitle(item) { return item.song_title || L.actName(item); }
+  function actSub(item) {
+    const who = item.song_title ? L.actName(item) : '';
+    return [who, item.performance_type].filter(Boolean).join(' \u00b7 ');
+  }
+  function actMeta(item) {
+    return [item.performance_type, item.movie_name ? `from the film ${item.movie_name}` : ''].filter(Boolean).join(' \u00b7 ');
+  }
+  function titleHtml(item) {
+    return `<span class="${L.nameClasses(true)}">${esc(actTitle(item))}</span>`;
   }
 
   function renderLiveStatus(data) {
@@ -93,52 +139,63 @@
     $('live-event-title').textContent = title;
     document.title = `Live Stage Program - ${title}`;
     $('live-event-subtitle').textContent = data.header_brand_subtitle || data.event_subtitle || 'Musical Night';
+    $('ended-event').textContent = title;
+    $('prestart-event-name').textContent = data.event_name || '';
+    $('prestart-event-sub').textContent = data.event_subtitle || '';
     if (data.event_start_time_iso) {
       const parsed = new Date(data.event_start_time_iso);
       if (!isNaN(parsed.getTime())) targetStartTime = parsed;
-      if (data.event_start_time) $('countdown-datetime-display').textContent = `Scheduled start: ${data.event_start_time}`;
     }
     $('ended-title').textContent = 'Thank you for coming';
     $('live-sync-timestamp').textContent = lastServerOk ? `Synced ${timeAgo(lastServerOk)}` : 'Following the console';
 
-    // Now performing (no age badges, no stage notes)
+    // Now performing: the song leads, then who sings it, then type and film. No age badges, no stage notes.
     const np = data.now_performing;
+    const nowCard = $('now-performing-card');
+    const songEl = $('now-song-title');
     if (np) {
       const acoustic = np.track_status === 'Acoustic' || /acoustic/i.test(np.performance_type || '');
+      const song = np.song_title || '';
       $('now-acoustic-badge').classList.toggle('hidden', !acoustic);
-      $('now-seq-badge').textContent = L.seqLabel(np);
-      $('now-performer-name').innerHTML = esc(L.actName(np));
-      $('now-song-title').textContent = np.song_title ? `"${np.song_title}"` : '';
+      $('now-seq-badge').textContent = pad2(np.sequence_order || 0);
+      $('now-seq-wrap').classList.remove('hidden');
+      songEl.textContent = song;
+      nowCard.classList.toggle('is-long', song.length > 22 || L.actName(np).length > 30);
+      nowCard.classList.toggle('no-song', !song);
+      $('now-performer-name').textContent = L.actName(np);
+      $('now-meta').textContent = actMeta(np);
     } else {
       $('now-acoustic-badge').classList.add('hidden');
-      $('now-seq-badge').textContent = '#--';
-      $('now-performer-name').innerHTML = '<span class="muted" style="font-weight:400;font-style:italic">Waiting for the next performance...</span>';
-      $('now-song-title').textContent = 'Stage in preparation';
+      $('now-seq-badge').textContent = '--';
+      $('now-seq-wrap').classList.add('hidden');
+      songEl.textContent = '';
+      nowCard.classList.remove('is-long');
+      nowCard.classList.add('no-song');
+      $('now-performer-name').innerHTML = '<span class="lv-waiting">Waiting for the next performance...</span>';
+      $('now-meta').textContent = 'Stage in preparation';
     }
 
-    // Up next
-    const upNext = data.up_next || [];
-    const nextSection = $('up-next-section');
-    nextSection.classList.toggle('hidden', upNext.length === 0);
+    // Up next (the server sends at most two ready acts)
+    const upNext = (data.up_next || []).slice(0, 2);
     $('up-next-container').innerHTML = upNext.map((item, idx) => `
-      <div class="next-card">
-        <div class="tag">${esc(L.seqLabel(item))} &middot; ${idx === 0 ? 'Next' : 'After that'}</div>
-        <div class="nm">${nameHtml(item, true)}</div>
-        <p class="sg"><span class="${L.nameClasses(true)}">${item.song_title ? `"${esc(item.song_title)}"` : ''}</span></p>
+      <div class="next-card${idx === 0 ? ' is-first' : ''}">
+        <div class="tag">${idx === 0 ? 'Up next' : 'Then'} &middot; ${esc(pad2(item.sequence_order || 0))}</div>
+        <div class="nm">${titleHtml(item)}</div>
+        <p class="sg"><span class="${L.nameClasses(true)}">${esc(actSub(item))}</span></p>
       </div>`).join('');
 
     // Upcoming queue
     const upcoming = data.upcoming || [];
+    $('upcoming-section').classList.toggle('hidden', upcoming.length === 0);
     $('upcoming-count').textContent = `${upcoming.length} scheduled`;
-    $('upcoming-list').innerHTML = upcoming.length ? upcoming.map(item => `
+    $('upcoming-list').innerHTML = upcoming.map(item => `
       <div class="qrow">
-        <span class="n">${esc(L.seqLabel(item))}</span>
+        <span class="n">${esc(pad2(item.sequence_order || 0))}</span>
         <div class="body">
-          <div class="nm">${nameHtml(item, true)}</div>
-          <div class="sg"><span class="${L.nameClasses(true)}">${item.song_title ? `"${esc(item.song_title)}"` : ''}</span></div>
+          <div class="nm">${titleHtml(item)}</div>
+          <div class="sg"><span class="${L.nameClasses(true)}">${esc(actSub(item))}</span></div>
         </div>
-        ${item.performance_type ? `<span class="ty">${esc(item.performance_type)}</span>` : ''}
-      </div>`).join('') : '<div class="qrow muted">No further performances scheduled</div>';
+      </div>`).join('');
 
     // Completed
     const performed = data.performed || [];
@@ -146,8 +203,8 @@
     $('completed-header-text').textContent = `Completed Performances (${performed.length})`;
     $('completed-list-container').innerHTML = performed.map(item => `
       <div class="qrow">
-        <span class="n">${esc(L.seqLabel(item))}</span>
-        <div class="body"><div class="nm">${nameHtml(item, true)}${item.song_title ? ` - "${esc(item.song_title)}"` : ''}</div></div>
+        <span class="n">${esc(pad2(item.sequence_order || 0))}</span>
+        <div class="body"><div class="nm">${titleHtml(item)}</div><div class="sg"><span class="${L.nameClasses(true)}">${esc(actSub(item))}</span></div></div>
       </div>`).join('');
 
     updateGallery(data.gallery_images || []);
@@ -164,7 +221,7 @@
   }
 
   function updateGallery(images) {
-    const grid = $('hero-section-grid'), box = $('hero-gallery');
+    const grid = $('live-active-content'), box = $('hero-gallery');
     if (!images.length) {
       grid.classList.remove('with-gallery');
       box.classList.add('hidden');
@@ -187,8 +244,30 @@
   function showSlide(i) {
     const img = $('carousel-img');
     if (!galleryImages.length) return;
+    const dots = $('gallery-dots');
+    if (dots) dots.innerHTML = galleryImages.map((_, k) => `<span class="${k === i ? 'on' : ''}"></span>`).join('');
     img.style.opacity = '0';
     setTimeout(() => { img.onload = () => { img.style.opacity = '1'; }; img.src = galleryImages[i]; }, 300);
+  }
+
+  // TV: when the lineup is longer than its panel, drift it upward slowly and loop. Off for reduced motion,
+  // on small screens (they scroll by hand) and while a pointer or focus is inside the panel.
+  function startUpcomingScroll() {
+    const box = $('upcoming-scroll');
+    const still = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    const wide = window.matchMedia ? window.matchMedia('(min-width: 1000px)') : { matches: true };
+    let hold = 0, paused = false;
+    box.addEventListener('mouseenter', () => { paused = true; });
+    box.addEventListener('mouseleave', () => { paused = false; });
+    box.addEventListener('focusin', () => { paused = true; });
+    box.addEventListener('focusout', () => { paused = false; });
+    setInterval(() => {
+      if (paused || still.matches || !wide.matches || box.scrollHeight <= box.clientHeight + 2) return;
+      if (hold > 0) { hold--; return; }
+      if (box.scrollTop + box.clientHeight >= box.scrollHeight - 1) { box.scrollTop = 0; hold = 60; return; }
+      box.scrollTop += 1;
+      if (box.scrollTop <= 0) hold = 60;
+    }, 50);
   }
 
   async function fetchLiveStatus() {
@@ -221,9 +300,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    if (window.lucide) window.lucide.createIcons();
-
-    // Footer QR for the sign-up link (>= 56 px; 120 px here).
+    // Footer QR for the sign-up link (>= 56 px; the size follows the screen state in live.css).
     const url = `${location.origin}/signup`;
     const qrBox = $('signup-qr');
     try {
@@ -262,6 +339,7 @@
       setTimeout(() => { refreshBtn.disabled = false; }, 500);
     });
 
+    startUpcomingScroll();
     if (window.EtmWakeLock) window.EtmWakeLock.start();
   });
 })();

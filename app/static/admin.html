@@ -1,471 +1,307 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en" data-theme="dark" style="color-scheme: dark;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0B0D10">
   <meta name="view-transition" content="same-origin">
-  <title>Stage Playback Console - Event Track Manager</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
+  <title>Sound console</title>
   <script src="/static/js/icons.js"></script>
   <script src="/static/vendor/wavesurfer.min.js"></script>
-  <link rel="stylesheet" href="/static/css/style.css">
-  <style>
-    .drag-ghost {
-      opacity: 0.35;
-      background: #1e293b !important;
-    }
-    .drag-over {
-      border-top: 2px solid #f97316 !important;
-    }
-    /* Touch targets: at least 40px for header controls, vault chips, player and row buttons. */
-    #console-subheader button, #console-subheader a, #console-subheader select, #console-subheader .tt40,
-    header nav a, #player-bar button, #queue-container button, .sheet button, .tt40 {
-      min-height: 40px;
-      min-width: 40px;
-    }
-    /* Hold-to-confirm progress fill driven by --hold (0..1). */
-    .hold-fill {
-      background-image: linear-gradient(to right, rgba(52,211,153,0.55) calc(var(--hold, 0) * 100%), transparent calc(var(--hold, 0) * 100%));
-      touch-action: none;
-      user-select: none;
-    }
-    .ondeck-row { border-left-color: #fbbf24 !important; }
-    .sheet-backdrop { background: rgba(2,6,23,0.8); }
-  </style>
-<link rel="stylesheet" href="/static/css/app.css?v=1">
+  <link rel="stylesheet" href="/static/css/app.css?v=1">
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/console.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-52">
+<body class="console">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <!-- Floating Toast Notification -->
-  <div id="toast" class="fixed top-4 right-4 z-50 transform transition-all duration-300 translate-y-[-150%] opacity-0 bg-slate-900 border border-slate-700 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs pointer-events-none">
-    <div id="toast-icon"></div>
+  <!-- Toast -->
+  <div id="toast" class="c-toast" role="status" aria-live="polite">
+    <div id="toast-icon" class="c-toast__icon"></div>
     <span id="toast-message"></span>
   </div>
 
-  <!-- PIN Entry Modal (shown if unauthorized) -->
-  <div id="auth-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
-    <div class="bg-slate-900 border border-slate-800 p-6 sm:p-8 rounded-3xl max-w-sm w-full shadow-2xl space-y-6 text-center">
-      <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-500/10 text-orange-400 flex items-center justify-center">
-        <i data-lucide="lock" class="w-7 h-7"></i>
+  <!-- Admin sign-in (shown if unauthorized) -->
+  <div id="auth-modal" class="c-login" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <div class="c-login__card">
+      <div class="c-login__head">
+        <h2 id="auth-modal-title" class="c-login__title">Admin sign-in</h2>
+        <p class="c-login__sub">Enter the Admin PIN to open the sound console.</p>
       </div>
-      <div>
-        <h2 class="text-xl font-bold text-white">Stage Sound Console</h2>
-        <p class="text-xs text-slate-400 mt-1">Enter the Admin PIN to open the sound console</p>
-      </div>
-      <form id="pin-form" class="space-y-4">
-        <input type="password" id="pin-input" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" class="w-full text-center text-2xl tracking-widest font-mono py-3 rounded-xl bg-slate-950 border border-slate-700 text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-        <p id="pin-error" role="alert" class="hidden text-xs text-rose-400"></p>
-        <button type="submit" class="w-full py-3 rounded-xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm shadow-lg shadow-orange-500/20 transition">
-          Unlock Console
-        </button>
+      <form id="pin-form" class="c-login__form">
+        <label for="pin-input" class="sr-only">Admin PIN</label>
+        <input type="password" id="pin-input" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="Admin PIN" class="c-login__input">
+        <p id="pin-error" role="alert" class="c-login__error hidden"></p>
+        <button type="submit" class="c-btn c-btn--primary c-btn--lg">Sign in</button>
       </form>
     </div>
   </div>
 
-  <!-- Audio Disruption Warning Modal -->
-  <div id="disruption-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-    <div class="bg-slate-900 border border-slate-700 p-6 sm:p-7 rounded-3xl max-w-md w-full shadow-2xl space-y-5 text-center">
-      <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-        <i data-lucide="alert-triangle" class="w-7 h-7 animate-pulse"></i>
+  <!-- Audio disruption confirm -->
+  <div id="disruption-modal" class="c-modal hidden">
+    <div class="c-modal__card" role="alertdialog" aria-modal="true" aria-labelledby="disruption-modal-title" aria-describedby="disruption-modal-msg">
+      <div class="c-modal__head">
+        <span class="c-modal__icon" aria-hidden="true"><i data-lucide="alert-triangle"></i></span>
+        <div class="c-modal__text">
+          <h3 id="disruption-modal-title" class="c-modal__title">Audio Currently Playing</h3>
+          <p id="disruption-modal-msg" class="c-modal__msg">A track is currently playing live on stage. Proceeding will interrupt the audio.</p>
+        </div>
       </div>
-      <div class="space-y-1.5">
-        <h3 class="text-lg font-bold text-white tracking-tight">Audio Currently Playing</h3>
-        <p id="disruption-modal-msg" class="text-xs text-slate-300 leading-relaxed">
-          A track is currently playing live on stage. Proceeding will interrupt the audio.
-        </p>
-      </div>
-      <div class="flex items-center gap-3 pt-2">
-        <button id="disruption-cancel-btn" class="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
-          Keep Playing
-        </button>
-        <button id="disruption-fade-btn" class="flex-1 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg shadow-amber-600/20 transition">
-          Fade out first
-        </button>
-        <button id="disruption-confirm-btn" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg shadow-rose-600/20 transition">
-          Stop & Proceed
-        </button>
+      <div class="c-modal__actions">
+        <button id="disruption-fade-btn" type="button" class="c-btn c-btn--primary c-btn--lg">Fade out first</button>
+        <div class="c-modal__row">
+          <button id="disruption-confirm-btn" type="button" class="c-btn c-btn--danger c-btn--lg">Stop &amp; Proceed</button>
+          <button id="disruption-cancel-btn" type="button" class="c-btn c-btn--lg">Keep Playing</button>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Main Stage Console Header -->
-  <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-30">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-      <a href="/" class="flex items-center gap-3 group">
-        <div class="w-9 h-9 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow group-hover:scale-105 transition">
-          <i data-lucide="disc-3" class="w-5 h-5 animate-spin" style="animation-duration: 6s;"></i>
-        </div>
-        <div>
-          <h1 id="admin-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</h1>
-          <p id="admin-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
-        </div>
-      </a>
-
-      <!-- Clean Uniform Navigation Links -->
-      <nav class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-        <a href="/" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Home">
-          <i data-lucide="home" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Home</span>
-        </a>
-
-        <a href="/signup" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="New Participant Registration">
-          <i data-lucide="user-plus" class="w-3.5 h-3.5 text-emerald-400"></i>
-          <span>Sign Up</span>
-        </a>
-
-        <a href="/performer" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Performer Hub & Track Submission">
-          <i data-lucide="mic-2" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Performer</span>
-        </a>
-
-        <a href="/dashboard" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Transparency Dashboard">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
-          <span>Dashboard</span>
-        </a>
-
-        <a href="/live" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Live Stage Program & Lineup">
-          <i data-lucide="radio" class="w-3.5 h-3.5 text-rose-400"></i>
-          <span>Live Program</span>
-        </a>
-
-        <a href="/console" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-amber-600 text-white shadow-md shadow-amber-600/30 transition" title="Stage Sound & Playback Console">
-          <i data-lucide="shield" class="w-3.5 h-3.5 text-white"></i>
-          <span>Console</span>
-        </a>
-
-        <a href="/admin" class="px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition" title="Admin Settings">
-          <i data-lucide="settings" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Admin</span>
-        </a>
-      </nav>
+  <!-- Header -->
+  <header class="c-header">
+    <div class="c-header__id">
+      <h1 class="c-header__title">Sound console</h1>
+      <span class="c-header__event"><span id="admin-event-title"></span><span id="admin-event-subtitle"></span></span>
     </div>
-  </header>
-  <script src="/static/js/nav.js"></script>
-
-  <!-- Sound Console Inactive State Card -->
-  <div id="console-inactive-card" class="hidden flex-1 max-w-lg mx-auto my-16 px-4">
-    <div class="p-8 sm:p-10 text-center bg-slate-900/90 border border-slate-800 rounded-3xl space-y-4 shadow-2xl">
-      <div class="w-14 h-14 rounded-3xl bg-slate-800 text-slate-400 mx-auto flex items-center justify-center">
-        <i data-lucide="sliders" class="w-7 h-7 text-amber-400"></i>
+    <div class="c-header__tools" id="console-subheader">
+      <!-- Vault chip: opens the vault sheet -->
+      <button id="vault-status-indicator" type="button" class="c-chip" data-state="idle" title="Open the vault: audio and video stored in this browser for offline playback">
+        <span class="c-dot" aria-hidden="true"></span>
+        <span id="vault-status-text">Vault 0/0 ready, 0 MB</span>
+      </button>
+      <!-- Stage monitor: shown only when a monitor opened from this console has been closed -->
+      <span id="monitor-status-indicator" class="c-chip c-chip--bad hidden" role="status">
+        <span class="c-dot" aria-hidden="true"></span>Stage monitor not connected
+      </span>
+      <!-- Connection status (Online / Offline mode) -->
+      <div id="network-status-indicator" class="c-status c-status--ok" title="Internet connectivity status">
+        <span class="c-dot" id="network-dot"></span>
+        <span id="network-status-text">Online</span>
       </div>
-      <div>
-        <h3 class="text-lg font-bold text-white">Sound Console Inactive</h3>
-        <p class="text-xs text-slate-400 mt-1.5 leading-relaxed">
-          The sound desk and playback console are disabled for this event (e.g. Potluck Social / Community Dinner). No audio playback or stage cueing operations are active.
-        </p>
-      </div>
-      <div class="pt-2 flex items-center justify-center gap-3">
-        <a href="/" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
-          <i data-lucide="home" class="w-3.5 h-3.5"></i>
-          <span>Return Home</span>
-        </a>
-        <a href="/admin" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-semibold transition shadow-md shadow-orange-500/20">
-          <i data-lucide="settings" class="w-3.5 h-3.5"></i>
-          <span>Admin Settings</span>
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <div id="console-active-content" class="flex-1 flex flex-col">
-  <!-- Dedicated Sub-Header: vault, connection, screens and sync controls -->
-  <div id="console-subheader" class="border-b border-slate-800 bg-slate-950/80 backdrop-blur">
-    <div class="max-w-6xl mx-auto px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-2.5 text-xs flex-wrap">
-        <!-- Connection Status Indicator (Online / Offline Mode) -->
-        <div id="network-status-indicator" class="flex items-center gap-1.5 text-xs text-emerald-400 font-medium px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20" title="Internet connectivity status">
-          <span class="w-2 h-2 rounded-full bg-emerald-500" id="network-dot"></span>
-          <span id="network-status-text">Online</span>
-        </div>
-
-        <!-- Vault chip: opens the vault sheet -->
-        <button id="vault-status-indicator" type="button" class="flex items-center gap-1.5 text-xs text-cyan-400 font-medium px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 hover:bg-cyan-500/20 transition" title="Open the vault: audio and video stored in this browser for offline playback">
-          <i data-lucide="hard-drive" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span id="vault-status-text">Vault 0/0 ready, 0 MB</span>
-        </button>
-
-        <span id="stats-summary" class="text-xs text-slate-400 ml-1">Loading stage queue...</span>
-      </div>
-
-      <div class="flex items-center gap-2 flex-wrap">
-        <label id="output-device-wrap" class="hidden items-center gap-1.5 text-xs text-slate-400" title="Send playback to this output (for example the audio interface)">
-          <i data-lucide="speaker" class="w-3.5 h-3.5 text-slate-400"></i>
-          <select id="output-device-select" aria-label="Audio output device" class="bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 px-2"></select>
-        </label>
-
-        <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
-          <i data-lucide="archive" class="w-3.5 h-3.5"></i>
-          <span>Offline ZIP</span>
-        </button>
-
-        <button id="open-screens-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-300 border border-purple-500/40 transition active:scale-95 shadow-sm" title="Announcement, fade to black, lyrics and the stage monitor">
-          <i data-lucide="tv" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>Screens</span>
-        </button>
-
-        <button id="refresh-queue-btn" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 flex items-center gap-1.5 transition active:scale-95 border border-orange-400/40" title="Refresh latest data from Event Database">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="refresh-icon"></i>
-          <span>Refresh Data</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Stage Queue Section -->
-  <main id="main-content" class="flex-1 max-w-6xl w-full mx-auto px-4 py-6 space-y-4">
-
-    <!-- Search & Reorder Bar -->
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-      <!-- Fuzzy Search Input -->
-      <div class="relative flex-1">
-        <input type="text" id="queue-search-input" placeholder="Search singer, partner, song title, movie, sequence #..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 transition pr-10">
-        <button id="search-clear-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1">
-          <i data-lucide="x" class="w-4 h-4"></i>
-        </button>
-      </div>
-
-      <!-- Reorder lock -->
-      <div class="flex items-center gap-2 text-xs text-slate-400 shrink-0">
-        <button id="reorder-lock-btn" type="button" aria-pressed="false" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 flex items-center gap-1.5 hover:bg-slate-800 transition" title="Unlock to drag rows into a new running order">
-          <i data-lucide="lock" class="w-3.5 h-3.5 text-orange-400" id="reorder-lock-icon"></i>
-          <span id="reorder-lock-text">Order locked &middot; Unlock</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Announcement: event-wide, shown on every public screen until cleared -->
-    <div class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800 space-y-2">
-      <label for="announcement-input" class="block text-xs font-bold tracking-wide text-slate-400">ANNOUNCEMENT &middot; ALL SCREENS, ALL ACTS</label>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <input id="announcement-input" type="text" maxlength="140" placeholder="For example: Dinner starts after act 12." class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500">
-        <button id="announcement-send-btn" type="button" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition">Send to screen</button>
-        <button id="announcement-clear-btn" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">Clear</button>
-      </div>
-      <p class="text-xs text-slate-500">Shows on the live screen and stage monitor across all acts until you clear it. <span id="announcement-state" class="text-amber-300"></span></p>
-    </div>
-
-    <!-- Unsynced Staged Changes Banner (Shows when the new order has not been saved to track file names and exports yet) -->
-    <div id="unsynced-sequence-banner" class="hidden p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-2 shadow-lg animate-pulse">
-      <div class="flex items-center gap-2">
-        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0"></i>
-        <span><strong>Stage Sequence Updated Locally:</strong> Your new order is live, but track file names and the signup export still show the old order.</span>
-      </div>
-      <button id="banner-sync-btn" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs shadow transition active:scale-95 flex items-center gap-1">
-        <i data-lucide="cloud-upload" class="w-3.5 h-3.5"></i>
-        <span>Save Order &amp; Rename Tracks</span>
+      <a href="/admin" class="c-link" aria-label="Admin menu">Admin <i data-lucide="chevron-down"></i></a>
+      <button id="open-screens-btn" type="button" class="c-btn c-btn--sm" title="Announcement, fade to black, lyrics and the stage monitor">
+        <i data-lucide="tv"></i><span>Screens</span>
+      </button>
+      <button id="open-stage-monitor-btn" type="button" class="c-btn c-btn--sm" aria-label="Open stage monitor">
+        <span>Open stage monitor</span><i data-lucide="external-link"></i>
       </button>
     </div>
+  </header>
 
-    <!-- Queue Table / Cards -->
-    <div class="bg-slate-900/60 border border-slate-800/80 rounded-2xl overflow-hidden shadow-xl">
-      <div class="p-4 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/90">
-        <h2 class="text-sm font-bold text-slate-200 flex items-center gap-2">
-          <i data-lucide="list-ordered" class="w-4 h-4 text-orange-400"></i>
-          <span>Live Chronological Queue</span>
-        </h2>
-        <div class="flex items-center gap-2">
-          <span id="search-match-count" class="hidden text-xs text-orange-400 font-mono"></span>
-          <span class="text-xs text-slate-400 font-mono" id="queue-count-pill">0 items</span>
-        </div>
+  <!-- Console inactive card -->
+  <div id="console-inactive-card" class="c-inactive hidden">
+    <div class="c-inactive__card">
+      <i data-lucide="sliders" class="c-inactive__icon"></i>
+      <h3 class="c-inactive__title">Sound Console Inactive</h3>
+      <p class="c-inactive__text">The sound desk and playback console are disabled for this event (e.g. Potluck Social / Community Dinner). No audio playback or stage cueing operations are active.</p>
+      <div class="c-inactive__actions">
+        <a href="/" class="c-btn"><i data-lucide="home"></i><span>Return Home</span></a>
+        <a href="/admin" class="c-btn c-btn--primary"><i data-lucide="settings"></i><span>Admin Settings</span></a>
       </div>
-
-      <!-- Queue List Container (Draggable) -->
-      <div id="queue-container" class="divide-y divide-slate-800/60">
-        <div class="p-8 text-center text-slate-500 text-sm">
-          Loading performances...
-        </div>
-      </div>
-    </div>
-
-  </main>
-
-  <!-- Persistent Live Audio Playback Controller -->
-  <div id="player-bar" class="fixed bottom-0 inset-x-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-800 z-40 shadow-2xl p-3 sm:p-4">
-    <div class="max-w-6xl mx-auto flex flex-col gap-2.5">
-
-      <!-- On deck: the next act. Picking a row while playing only sets this. -->
-      <div id="on-deck-strip" class="hidden flex items-center justify-between gap-3 px-3 py-1.5 rounded-xl bg-amber-950/30 border border-amber-500/30">
-        <div class="min-w-0 text-xs">
-          <span class="font-bold text-amber-300 tracking-wide">ON DECK</span>
-          <span id="on-deck-text" class="text-slate-200 truncate"></span>
-          <span id="on-deck-note" class="text-amber-300/80 truncate"></span>
-        </div>
-        <button id="btn-ondeck-cue" type="button" class="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition shrink-0" title="Cue the on-deck act [Down]">Cue next &darr;</button>
-      </div>
-
-      <!-- Top Row: Track details, controls, quick actions -->
-      <div class="flex flex-col md:flex-row items-center justify-between gap-3">
-        
-        <!-- Current Track Info -->
-        <div class="flex items-center gap-3 w-full md:w-1/3 overflow-hidden">
-          <div id="player-badge" class="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700">
-            <i data-lucide="music-2" class="w-5 h-5" id="player-badge-icon"></i>
-          </div>
-          <!-- Mini Video Preview Tile (shown when cued track is video) -->
-          <div id="player-video-preview" class="hidden relative w-16 h-10 rounded-lg overflow-hidden bg-black shrink-0 border border-purple-500/50 cursor-pointer shadow group" title="Video act preview (the stage monitor opens from Screens)">
-            <video id="console-preview-video" class="w-full h-full object-contain" muted playsinline></video>
-            <div class="absolute bottom-0 inset-x-0 bg-purple-950/80 text-xs text-center text-purple-300 font-mono">STAGE</div>
-          </div>
-          <div class="overflow-hidden flex-1">
-            <h4 id="player-title" class="font-bold text-sm text-white truncate">No Track Cued</h4>
-            <p id="player-performer" class="text-xs text-orange-400 truncate">Tap "Cue Track" on any song to inspect & play</p>
-            <div id="cued-vault-status" class="hidden mt-0.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
-              <i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i>
-              <span id="cued-vault-text">Cached locally in Vault</span>
-            </div>
-            <div id="player-notes-bar" class="hidden mt-1 flex items-center gap-1.5 text-xs text-amber-300">
-              <i data-lucide="file-text" class="w-3 h-3 text-amber-400 shrink-0"></i>
-              <span id="player-notes-text" class="truncate font-medium cursor-pointer hover:underline" title="Click to edit live stage notes">No stage notes</span>
-              <button id="player-notes-edit-btn" class="text-xs text-slate-400 hover:text-amber-300 ml-1 p-0.5" title="Edit Note">
-                <i data-lucide="pencil" class="w-2.5 h-2.5"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Central Playback Controls -->
-        <div class="flex items-center gap-2 sm:gap-3">
-          <button id="btn-seek-back" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Back 5s [←]">
-            <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-          </button>
-          <button id="btn-play-pause" class="w-12 h-12 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shadow-lg shadow-orange-500/30 transition transform active:scale-95 disabled:opacity-40 disabled:pointer-events-none" disabled title="Play / Pause [Space]">
-            <i data-lucide="play" class="w-6 h-6 ml-0.5" id="play-icon"></i>
-          </button>
-          <button id="btn-seek-fwd" class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition" title="Seek Forward 5s [→]">
-            <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-          </button>
-          <button id="btn-mute" class="p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition" title="Mute / Unmute Audio [M]">
-            <i data-lucide="volume-2" id="mute-icon" class="w-4 h-4"></i>
-          </button>
-          <button id="btn-fade" class="px-2.5 py-2 text-amber-300 hover:text-amber-200 rounded-lg hover:bg-slate-800 transition text-xs font-semibold flex items-center gap-1 disabled:opacity-40 disabled:pointer-events-none" disabled title="Fade out over 3 seconds, then stop [F]">
-            <i data-lucide="trending-down" class="w-4 h-4"></i><span>Fade out <kbd class="text-xs text-slate-500">F</kbd></span>
-          </button>
-          <button id="btn-cue-next" class="p-2 text-slate-400 hover:text-orange-400 rounded-lg hover:bg-slate-800 transition ml-1" title="Cue Next Sequenced Track [↓]">
-            <i data-lucide="skip-forward" class="w-4 h-4"></i>
-          </button>
-        </div>
-
-        <!-- Stage Actions: Download MP3, Mark Done, Skip/Hold -->
-        <div class="flex items-center justify-end gap-2 w-full md:w-1/3 flex-wrap">
-          <!-- 1-Click Track Download for Local Playback -->
-          <a id="btn-download-cued" href="#" download class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition opacity-40 pointer-events-none" title="Download track file locally for emergency VLC/QuickTime playback">
-            <i data-lucide="download" class="w-4 h-4 text-orange-400"></i>
-            <span class="hidden sm:inline">Download</span>
-          </a>
-          <button id="btn-mark-done" class="hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Hold to mark as performed (hold Enter)">
-            <i data-lucide="check-check" class="w-4 h-4"></i>
-            <span>Done</span>
-          </button>
-          <button id="btn-hold-skip" class="px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="No-Show / Put On Hold">
-            <i data-lucide="pause-circle" class="w-4 h-4"></i>
-            <span>Hold</span>
-          </button>
-          <button id="btn-uncue" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 hover:text-rose-200 font-semibold text-xs border border-slate-700 hover:border-rose-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none" disabled title="Uncue Track & Return to Queue">
-            <i data-lucide="x-circle" class="w-4 h-4 text-rose-400"></i>
-            <span>Uncue</span>
-          </button>
-        </div>
-
-      </div>
-
-      <!-- Waveform Visualizer & Scrubber -->
-      <div class="w-full flex items-center gap-3">
-        <span id="player-current-time" class="text-xs font-mono text-slate-400 w-10 text-right shrink-0">0:00</span>
-        <div id="player-waveform-container" class="flex-1 h-11 bg-slate-950/80 rounded-lg overflow-hidden border border-slate-800 relative cursor-pointer flex items-center">
-          <div id="player-waveform" class="w-full h-full"></div>
-          <div id="waveform-placeholder" class="absolute inset-0 flex items-center justify-center text-xs text-slate-600 font-mono pointer-events-none">
-            Waveform visualizer ready
-          </div>
-        </div>
-        <span id="player-duration" class="text-xs font-mono text-slate-400 w-10 shrink-0">0:00</span>
-      </div>
-
     </div>
   </div>
+
+  <div id="console-active-content" class="c-app">
+    <main id="main-content" class="c-main" tabindex="-1">
+
+      <!-- Running order -->
+      <section class="c-queue" aria-label="Running order">
+        <div class="c-queue__head">
+          <h2 class="c-eyebrow c-queue__label">Running order <span aria-hidden="true">&middot;</span> <span id="queue-total-count">0</span></h2>
+          <button id="reorder-lock-btn" type="button" aria-pressed="false" class="c-lock" title="Unlock to drag rows into a new running order">
+            <i data-lucide="lock" id="reorder-lock-icon"></i>
+            <span id="reorder-lock-text">Order locked &middot; Unlock</span>
+          </button>
+        </div>
+
+        <div class="c-queue__tools">
+          <div class="c-search">
+            <label for="queue-search-input" class="sr-only">Search the running order</label>
+            <input type="text" id="queue-search-input" placeholder="Search singer, partner, song, sequence #" class="c-input">
+            <button id="search-clear-btn" type="button" class="c-search__clear hidden" aria-label="Clear search"><i data-lucide="x"></i></button>
+          </div>
+          <button id="refresh-queue-btn" type="button" class="c-btn c-btn--icon-text" title="Refresh the latest data and tracks">
+            <i data-lucide="refresh-cw" id="refresh-icon"></i>
+            <span>Refresh Data</span>
+          </button>
+        </div>
+
+        <p class="c-queue__meta">
+          <span id="stats-summary">Loading stage queue...</span>
+          <span id="search-match-count" class="hidden"></span>
+          <span id="queue-count-pill">0 items</span>
+        </p>
+
+        <!-- Order changed but track file names not saved yet -->
+        <div id="unsynced-sequence-banner" class="c-banner hidden">
+          <span class="c-banner__text"><strong>Stage sequence updated locally.</strong> Your new order is live, but track file names and the signup export still show the old order.</span>
+          <button id="banner-sync-btn" type="button" class="c-btn c-btn--warn c-btn--sm">
+            <i data-lucide="cloud-upload"></i><span>Save Order &amp; Rename Tracks</span>
+          </button>
+        </div>
+
+        <div id="queue-container" class="c-list">
+          <div class="c-list__empty">Loading performances...</div>
+        </div>
+
+        <!-- Offline: changes waiting to send -->
+        <div id="offline-queue-banner" class="c-offline hidden" role="status"></div>
+      </section>
+
+      <!-- Now playing -->
+      <section id="player-bar" class="c-now" data-transport="idle" aria-label="Now playing">
+        <div class="c-now__head">
+          <span id="player-eyebrow" class="c-eyebrow c-now__eyebrow">No act cued</span>
+          <div id="player-badge" class="c-now__badge" aria-hidden="true"></div>
+          <h2 id="player-title" class="c-now__title">No Track Cued</h2>
+          <p id="player-performer" class="c-now__who">Pick an act in the running order to cue it</p>
+          <div id="cued-vault-status" class="c-vstat hidden">
+            <i data-lucide="shield-check"></i>
+            <span id="cued-vault-text">Cached locally in Vault</span>
+          </div>
+        </div>
+
+        <!-- Waveform / video preview -->
+        <div class="c-wave">
+          <div id="player-video-preview" class="c-video hidden" title="Video act preview (the stage monitor opens from Screens)">
+            <video id="console-preview-video" muted playsinline></video>
+            <span class="c-video__tag">Stage</span>
+          </div>
+          <div class="c-wave__main">
+            <div id="player-waveform-container" class="c-wave__box">
+              <div id="player-waveform" class="c-wave__canvas"></div>
+              <div id="waveform-placeholder" class="c-wave__ph">Waveform visualizer ready</div>
+            </div>
+            <div class="c-wave__times">
+              <span id="player-current-time">0:00</span>
+              <span id="player-duration">0:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Transport -->
+        <div class="c-transport">
+          <button id="btn-play-pause" type="button" class="c-tbtn c-tbtn--primary" disabled title="Play / Pause [Space]">
+            <i data-lucide="play" id="play-icon"></i><span id="play-label">Play</span><kbd>Space</kbd>
+          </button>
+          <button id="btn-fade" type="button" class="c-tbtn" disabled title="Fade out over 3 seconds, then stop [F]">
+            <span>Fade out <kbd>F</kbd></span>
+          </button>
+          <button id="btn-mute" type="button" class="c-tbtn" title="Mute / Unmute Audio [M]" aria-pressed="false">
+            <i data-lucide="volume-2" id="mute-icon"></i><span id="mute-label">Mute</span><kbd>M</kbd>
+          </button>
+          <button id="btn-mark-done" type="button" class="c-tbtn c-tbtn--done hold-fill" disabled title="Hold to mark as performed (hold Enter)">
+            <span class="c-ring" aria-hidden="true"></span><span class="c-done__text"><span>Done</span><kbd>Hold Enter</kbd></span>
+          </button>
+        </div>
+
+        <div class="c-secondary">
+          <button id="btn-seek-back" type="button" class="c-sbtn" title="Seek Back 5s [Left]"><i data-lucide="rotate-ccw"></i><span>5s</span></button>
+          <button id="btn-seek-fwd" type="button" class="c-sbtn" title="Seek Forward 5s [Right]"><i data-lucide="rotate-cw"></i><span>5s</span></button>
+          <button id="btn-cue-next" type="button" class="c-sbtn" title="Cue Next Sequenced Track [Down]"><i data-lucide="skip-forward"></i><span>Next</span></button>
+          <button id="btn-hold-skip" type="button" class="c-sbtn c-sbtn--warn" disabled title="No-Show / Put On Hold"><i data-lucide="pause-circle"></i><span>Hold</span></button>
+          <button id="btn-uncue" type="button" class="c-sbtn c-sbtn--bad" disabled title="Uncue Track & Return to Queue"><i data-lucide="x-circle"></i><span>Uncue</span></button>
+          <a id="btn-download-cued" href="#" download class="c-sbtn is-disabled" title="Download track file locally for emergency VLC/QuickTime playback"><i data-lucide="download"></i><span>Download</span></a>
+        </div>
+
+        <!-- On deck and act note -->
+        <div class="c-deck">
+          <div id="on-deck-strip" class="c-deck__row hidden">
+            <div class="c-deck__info">
+              <span id="on-deck-label" class="c-eyebrow c-eyebrow--cued">On deck</span>
+              <span id="on-deck-text" class="c-deck__song"></span>
+              <span class="c-deck__sub"><span id="on-deck-who"></span><span id="on-deck-note"></span></span>
+            </div>
+            <button id="btn-ondeck-cue" type="button" class="c-btn c-btn--cued c-btn--lg" title="Cue the on-deck act [Down]">Cue next <kbd>&darr;</kbd></button>
+          </div>
+          <div id="player-notes-bar" class="c-note hidden">
+            <div class="c-note__info">
+              <span class="c-eyebrow">Act note <span aria-hidden="true">&middot;</span> shown on the stage screen</span>
+              <span id="player-notes-text" class="c-note__text" title="Click to edit live stage notes">No stage notes</span>
+            </div>
+            <button id="player-notes-edit-btn" type="button" class="c-btn" title="Edit Note">Edit note</button>
+          </div>
+        </div>
+
+        <!-- Announcement -->
+        <div class="c-ann">
+          <label for="announcement-input" class="c-eyebrow">Announcement <span aria-hidden="true">&middot;</span> all screens, all acts</label>
+          <div class="c-ann__row">
+            <input id="announcement-input" type="text" maxlength="140" placeholder="For example: Dinner starts after act 12." class="c-input">
+            <button id="announcement-send-btn" type="button" class="c-btn c-btn--ok">Send to screen</button>
+            <button id="announcement-clear-btn" type="button" class="c-btn">Clear</button>
+          </div>
+          <p class="c-ann__hint">Shows on the live screen and stage monitor across all acts until you clear it. <span id="announcement-state"></span></p>
+        </div>
+      </section>
+    </main>
   </div><!-- /#console-active-content -->
 
   <!-- Vault sheet -->
-  <div id="vault-sheet" class="sheet hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sheet-backdrop p-4" role="dialog" aria-modal="true" aria-labelledby="vault-sheet-title">
-    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-      <div class="p-5 border-b border-slate-800 flex items-center justify-between gap-3">
-        <div>
-          <h3 id="vault-sheet-title" class="text-base font-bold text-white">Vault</h3>
-          <p id="vault-sheet-summary" class="text-xs text-slate-400"></p>
+  <div id="vault-sheet" class="sheet c-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="vault-sheet-title">
+    <div class="c-sheet__scrim"></div>
+    <aside class="c-sheet__panel">
+      <div class="c-sheet__head">
+        <h3 id="vault-sheet-title" class="c-sheet__title">Vault</h3>
+        <button id="vault-sheet-close" type="button" class="c-iconbtn" aria-label="Close Vault"><i data-lucide="x"></i></button>
+      </div>
+      <div class="c-vault__summary">
+        <p id="vault-sheet-summary" class="c-vault__text"></p>
+        <span class="c-meter" aria-hidden="true"><span id="vault-meter-fill" class="c-meter__fill"></span></span>
+        <div class="c-vault__actions">
+          <button id="cache-all-btn" type="button" class="c-btn c-btn--primary" title="Download every ready act into this browser for offline playback">
+            <i data-lucide="zap" id="cache-all-icon"></i><span id="cache-all-text">Cache all</span>
+          </button>
+          <button id="clear-vault-btn" type="button" class="c-btn c-btn--danger" title="Remove every cached file from this browser">
+            <i data-lucide="trash-2"></i><span>Clear cache</span>
+          </button>
         </div>
-        <button id="vault-sheet-close" type="button" class="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 border border-slate-700">Close</button>
       </div>
-      <div class="p-3 flex items-center gap-2 flex-wrap border-b border-slate-800">
-        <button id="cache-all-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 hover:border-cyan-500/40 transition active:scale-95" title="Download every ready act into this browser for offline playback">
-          <i data-lucide="zap" class="w-3.5 h-3.5 text-cyan-400" id="cache-all-icon"></i>
-          <span id="cache-all-text">Cache all</span>
+      <div class="c-sheet__sub"><span class="c-eyebrow">Per act <span aria-hidden="true">&middot;</span> needs attention first</span></div>
+      <div id="vault-sheet-list" class="c-vault__list"></div>
+      <div class="c-sheet__foot">
+        <button id="download-zip-btn" type="button" class="c-btn c-btn--sm" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
+          <i data-lucide="archive"></i><span>Offline ZIP</span>
         </button>
-        <button id="clear-vault-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition active:scale-95" title="Remove every cached file from this browser">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-          <span>Clear cache</span>
-        </button>
+        <p>Cached files live in this browser only. Renumbering the order does not invalidate them.</p>
       </div>
-      <div id="vault-sheet-list" class="overflow-y-auto divide-y divide-slate-800/60 text-xs"></div>
-      <p class="p-3 text-xs text-slate-500">Cached files live in this browser only. Renumbering the order does not invalidate them.</p>
-    </div>
+    </aside>
   </div>
 
   <!-- Screens sheet -->
-  <div id="screens-sheet" class="sheet hidden fixed inset-0 z-50 flex items-end sm:items-center justify-center sheet-backdrop p-4" role="dialog" aria-modal="true" aria-labelledby="screens-sheet-title">
-    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-lg w-full max-h-[85vh] overflow-y-auto shadow-2xl p-5 space-y-5">
-      <div class="flex items-center justify-between gap-3">
-        <h3 id="screens-sheet-title" class="text-base font-bold text-white">Screens</h3>
-        <button id="screens-sheet-close" type="button" class="rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3 border border-slate-700">Close</button>
+  <div id="screens-sheet" class="sheet c-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="screens-sheet-title">
+    <div class="c-sheet__scrim"></div>
+    <aside class="c-sheet__panel">
+      <div class="c-sheet__head">
+        <h3 id="screens-sheet-title" class="c-sheet__title">Screens</h3>
+        <button id="screens-sheet-close" type="button" class="c-iconbtn" aria-label="Close Screens"><i data-lucide="x"></i></button>
       </div>
-      <button id="open-stage-monitor-btn" type="button" class="w-full flex items-center justify-center gap-2 text-sm font-semibold px-3 py-2 rounded-xl bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 border border-purple-500/40 transition">
-        <i data-lucide="tv" class="w-4 h-4 text-purple-400"></i><span>Open stage monitor</span>
-      </button>
-      <div class="flex items-center justify-between gap-3 p-3 rounded-xl bg-slate-950 border border-slate-800">
-        <div>
-          <p class="text-sm font-semibold text-white">Fade stage monitor to black</p>
-          <p class="text-xs text-slate-500">Blacks out the confidence monitor until you turn it off.</p>
+      <div class="c-screens">
+        <div class="c-field c-field--row">
+          <div>
+            <p class="c-field__title">Fade stage monitor to black</p>
+            <p class="c-field__hint">Blacks out the confidence monitor until you turn it off.</p>
+          </div>
+          <button id="fade-black-toggle" type="button" role="switch" aria-checked="false" class="c-btn c-switch">Off</button>
         </div>
-        <button id="fade-black-toggle" type="button" role="switch" aria-checked="false" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition">Off</button>
-      </div>
-      <div class="space-y-2">
-        <label for="lyrics-input" class="block text-xs font-bold tracking-wide text-slate-400">LYRICS &middot; STAGE MONITOR</label>
-        <textarea id="lyrics-input" rows="4" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Paste lyrics to show on the stage monitor"></textarea>
-        <div class="flex gap-2">
-          <button id="lyrics-send-btn" type="button" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold transition">Send lyrics</button>
-          <button id="lyrics-clear-btn" type="button" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">Clear</button>
+        <div class="c-field">
+          <label for="lyrics-input" class="c-eyebrow">Lyrics <span aria-hidden="true">&middot;</span> stage monitor</label>
+          <textarea id="lyrics-input" rows="4" class="c-input c-input--area" placeholder="Paste lyrics to show on the stage monitor"></textarea>
+          <div class="c-field__actions">
+            <button id="lyrics-send-btn" type="button" class="c-btn c-btn--primary">Send lyrics</button>
+            <button id="lyrics-clear-btn" type="button" class="c-btn">Clear</button>
+          </div>
         </div>
+        <label id="output-device-wrap" class="c-field hidden" title="Send playback to this output (for example the audio interface)">
+          <span class="c-eyebrow">Audio output</span>
+          <select id="output-device-select" aria-label="Audio output device" class="c-input"></select>
+        </label>
       </div>
-    </div>
+    </aside>
   </div>
-
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 bg-slate-900/40 mt-auto py-6">
-    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-      <div class="flex items-center gap-2">
-        <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span><span data-brand>Event Track Manager</span> &bull; All Rights Reserved</span>
-      </div>
-      <div class="flex items-center gap-4 flex-wrap">
-        <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>
-        <a href="/signup" class="hover:text-slate-300 transition">Sign Up</a>
-        <a href="/performer" class="hover:text-slate-300 transition">Performer Hub</a>
-        <a href="/dashboard" class="hover:text-slate-300 transition">Dashboard</a>
-        <a href="/live" class="hover:text-slate-300 transition">Live Program</a>
-        <a href="/console" class="hover:text-slate-300 transition">Console</a>
-        <a href="/admin" class="hover:text-slate-300 transition">Admin</a>
-      </div>
-    </div>
-  </footer>
 
   <script src="/static/js/utils.js"></script>
   <script type="module" src="/static/js/admin.js"></script>

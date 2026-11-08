@@ -26,7 +26,7 @@ test('live: uses etm-live channel, wake lock, refresh without POST, signup QR wi
   assert.doesNotMatch(read('js/live/live-view.js'), /method:\s*'POST'/);
   assert.match(read('live.html'), /id="signup-qr"[^>]*>/);
   assert.match(read('js/live/live-view.js'), /aria-label/);
-  assert.match(read('live.html'), /#signup-qr \{ width: 120px/);
+  assert.match(read('css/live.css'), /#signup-qr \{ width: 56px/);  // >= 56 px (88 px before the show)
 });
 test('live: header keeps a nav element (page shell rewrites it) and ended state exists', () => {
   const html = read('live.html');
@@ -34,7 +34,7 @@ test('live: header keeps a nav element (page shell rewrites it) and ended state 
   assert.match(html, /id="ended-card"/);
 });
 test('live and monitor: no font size below 24px', () => {
-  for (const f of ['live.html', 'stage-monitor.html']) {
+  for (const f of ['live.html', 'css/live.css', 'stage-monitor.html']) {
     const css = read(f);
     for (const m of css.matchAll(/font-size:\s*([^;}]+)[;}]/g)) {
       const v = m[1].trim();

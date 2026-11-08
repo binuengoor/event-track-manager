@@ -1,4 +1,5 @@
-import { S, hooks, reorderLock } from "./state.js";
+import { S, hooks, isAudioPlaying, reorderLock } from "./state.js";
+import { getOfflineActions } from "./offline-actions.js";
 import { updateStageNotes, updateStatus } from "./act-actions.js";
 import { cueNextTrack, cueTrack, onDeckTarget, renderOnDeck, selectRow } from "./deck.js";
 import { confirmIfPlaying } from "./disruption.js";
@@ -14,16 +15,7 @@ let draggedItemIndex = null;
 
 export function renderTypePill(perfType) {
   const raw = (perfType || 'Solo').trim();
-  const lower = raw.toLowerCase();
-  let colorClasses = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
-  if (lower.includes('duet')) {
-    colorClasses = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-  } else if (lower.includes('group')) {
-    colorClasses = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-  } else if (lower.includes('acoustic') || lower.includes('live')) {
-    colorClasses = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-  }
-  return `<span class="inline-flex items-center text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
+  return `<span class="c-type">${escapeHtml(raw)}</span>`;
 }
 
 export function updateQueueStatsSummary() {
@@ -37,6 +29,8 @@ export function updateQueueStatsSummary() {
   const uploaded = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && (q.track_status === 'Uploaded' || Boolean(q.track_version))).length;
   const pending = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && q.track_status !== 'Uploaded' && !q.track_version && q.track_status !== 'Acoustic' && (q.performance_type || '').toLowerCase() !== 'acoustic').length;
 
+  const totalEl = document.getElementById('queue-total-count');
+  if (totalEl) totalEl.textContent = String(total);
   statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
   countPill.textContent = `${performed}/${total} completed`;
 }
@@ -98,161 +92,106 @@ export function applyFilter() {
 export function renderQueueList() {
   const container = document.getElementById('queue-container');
   if (S.filteredQueue.length === 0) {
-    container.innerHTML = `<div class="p-8 text-center text-slate-500 text-sm">No performances match "${escapeHtml(S.searchQuery)}"</div>`;
+    container.innerHTML = `<div class="c-list__empty">No performances match "${escapeHtml(S.searchQuery)}"</div>`;
     renderOnDeck();
     return;
   }
 
   container.innerHTML = '';
+  const queuedIds = new Set(getOfflineActions().map(a => a && a.entryId).filter(Boolean));
   S.filteredQueue.forEach((item, index) => {
     const isCued = S.currentCuedItem && S.currentCuedItem.entry_id === item.entry_id;
     const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
     const isSkipped = !isDone && (item.performance_status === 'On Hold' || item.track_status === 'Skipped');
     const isAcoustic = !isDone && !isSkipped && (item.track_status === 'Acoustic' || (item.performance_type || '').toLowerCase().includes('acoustic'));
     const isUploaded = !isDone && !isSkipped && (item.track_status === 'Uploaded' || Boolean(item.track_version));
+    const deckTarget = onDeckTarget();
+    const isDeck = !isCued && deckTarget && deckTarget.entry_id === item.entry_id;
+    const isVideo = (item.media_type === 'video') || Boolean(item.track_file && item.track_file.endsWith('.mp4'));
+    const live = isCued && isAudioPlaying();
+    const playable = isUploaded || Boolean(item.track_version) || isAcoustic;
 
     const row = document.createElement('div');
     row.id = `queue-row-${item.entry_id}`;
     row.dataset.entryId = item.entry_id;
     row.dataset.index = index;
     row.draggable = reorderLock.canDrag(S.searchQuery); // drag only when unlocked and not searching
-    row.className = `p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition border-l-4 ${
-      isCued
-        ? 'cued-active bg-orange-500/10 border-orange-500'
-        : (onDeckTarget() && onDeckTarget().entry_id === item.entry_id)
-        ? 'ondeck-row bg-amber-500/5 border-amber-400'
-        : isDone
-        ? 'opacity-60 bg-slate-950/40 border-slate-700'
-        : isSkipped
-        ? 'bg-amber-950/20 border-amber-500/60'
-        : 'bg-slate-900/30 border-transparent hover:bg-slate-800/40'
-    }`;
+    const state = isCued ? (live ? 'is-cued is-playing' : 'is-cued')
+      : isDeck ? 'is-deck ondeck-row'
+      : isDone ? 'is-done'
+      : isSkipped ? 'is-hold'
+      : playable ? 'is-ready' : 'is-need';
+    row.className = `c-row ${state}`;
 
     const seqNum = item.sequence_order !== null ? String(item.sequence_order).padStart(2, '0') : '??';
-    
-    // Performer display & duet formatting
-    let performerDisplay = escapeHtml(item.performer_name);
-    if (item.partner_name) {
-      performerDisplay = `Duet: <span class="text-white font-bold">${escapeHtml(item.performer_name)}</span> & <span class="text-orange-300 font-bold">${escapeHtml(item.partner_name)}</span>`;
-    }
 
-    let statusPill = '';
-    if (isDone) {
-      statusPill = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700 flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Performed</span>`;
-    } else if (isSkipped) {
-      statusPill = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/20 text-amber-300 border border-amber-500/50 flex items-center gap-1"><i data-lucide="pause-circle" class="w-3 h-3"></i> On Hold</span>`;
-    } else if (isUploaded) {
-      statusPill = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1"><i data-lucide="music" class="w-3 h-3"></i> Ready</span>`;
-    } else if (isAcoustic) {
-      statusPill = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-sky-500/20 text-sky-300 border border-sky-500/40 flex items-center gap-1"><i data-lucide="guitar" class="w-3 h-3"></i> Acoustic</span>`;
-    } else {
-      statusPill = `<span class="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-amber-300 border border-amber-500/30 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Pending</span>`;
-    }
+    // Performer display: duets read "A & B"; the full text is in the tooltip for long names.
+    const performerText = item.partner_name ? `${item.performer_name} & ${item.partner_name}` : (item.performer_name || '');
 
-    const durationInfo = item.duration ? `<span class="text-[11px] font-mono text-slate-400 ml-1">(${item.duration})</span>` : '';
+    let tagText;
+    if (isCued) tagText = live ? 'Playing' : 'Cued';
+    else if (isDeck) tagText = 'On deck';
+    else if (isDone) tagText = 'Done';
+    else if (isSkipped) tagText = 'On hold';
+    else if (isUploaded) tagText = 'Ready';
+    else if (isAcoustic) tagText = 'Live';
+    else tagText = 'Needs track';
 
-    const extraTagsPills = (item.extra_tags || []).map(tag => {
-      return `<span class="inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full border border-sky-500/30 bg-sky-500/10 text-sky-300 tracking-wide shrink-0">${escapeHtml(tag)}</span>`;
-    }).join(' ');
+    const durationInfo = item.duration ? `<span class="c-row__dur">${escapeHtml(item.duration)}</span>` : '';
+
+    const extraTagsPills = (item.extra_tags || []).map(tag => `<span class="c-chipmini">${escapeHtml(tag)}</span>`).join('');
 
     const isCached = S.cachedVaultEntryIds.has(item.entry_id);
     const cachedBadgeHtml = (isUploaded || item.track_version)
-      ? `<span class="vault-cached-tag ${isCached ? '' : 'hidden'} inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 tracking-wide shrink-0" title="Audio cached in local Vault for offline playback"><i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>Cached</span></span>`
+      ? `<span class="vault-cached-tag c-cached ${isCached ? '' : 'hidden'}" title="Audio cached in local Vault for offline playback" role="img" aria-label="Cached in the vault"><i data-lucide="shield-check"></i></span>`
+      : '';
+    const queuedHtml = queuedIds.has(item.entry_id)
+      ? '<span class="c-queued" title="Change waiting to sync"><i data-lucide="refresh-cw"></i>Queued</span>'
       : '';
 
     let cacheBtnHtml = '';
     if (isUploaded || item.track_version) {
       cacheBtnHtml = `
-        <button class="btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 ${
-          isCached
-            ? 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-300 border-slate-800 hover:border-emerald-500/40'
-            : 'bg-slate-900 hover:bg-slate-800 text-cyan-300 hover:text-cyan-200 border-slate-800 hover:border-cyan-500/40 shadow-sm'
-        }" data-entry-id="${item.entry_id}" title="${isCached ? 'Track already in browser Vault. Click to re-download fresh copy.' : 'Pre-cache this audio track into local browser Vault without cueing'}">
-          <i data-lucide="${isCached ? 'refresh-cw' : 'hard-drive-download'}" class="w-3.5 h-3.5 ${isCached ? 'text-slate-400' : 'text-cyan-400'}"></i>
+        <button type="button" class="btn-cache-single c-act ${isCached ? '' : 'c-act--info'}" data-entry-id="${item.entry_id}" title="${isCached ? 'Track already in browser Vault. Click to re-download fresh copy.' : 'Pre-cache this audio track into local browser Vault without cueing'}">
+          <i data-lucide="${isCached ? 'refresh-cw' : 'hard-drive-download'}"></i>
           <span>${isCached ? 'Re-cache' : 'Cache'}</span>
-        </button>
-      `;
+        </button>`;
     }
 
+    const hasNote = Boolean(item.stage_notes && item.stage_notes.trim());
+    const noteHtml = hasNote
+      ? `<button type="button" class="btn-edit-note c-act c-act--note" title="Edit stage note: ${escapeHtml(item.stage_notes.trim())}"><i data-lucide="file-text"></i><span class="note-val">${escapeHtml(item.stage_notes.trim())}</span></button>`
+      : `<button type="button" class="btn-edit-note c-act" title="Add stage note for live program view"><i data-lucide="plus"></i><span>Note</span></button>`;
+
     row.innerHTML = `
-      <div class="flex items-center gap-3">
-        <!-- Drag Handle (hidden during search) -->
+      <div class="c-row__main">
         ${reorderLock.canDrag(S.searchQuery) ? `
-        <div class="drag-handle cursor-grab active:cursor-grabbing p-1 text-slate-600 hover:text-slate-300 transition shrink-0" title="Drag to re-order sequence">
-          <i data-lucide="grip-vertical" class="w-4 h-4"></i>
+        <span class="drag-handle c-row__grip" title="Drag to re-order sequence" aria-hidden="true">
+          <svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><circle cx="4" cy="3" r="1.5"/><circle cx="10" cy="3" r="1.5"/><circle cx="4" cy="9" r="1.5"/><circle cx="10" cy="9" r="1.5"/><circle cx="4" cy="15" r="1.5"/><circle cx="10" cy="15" r="1.5"/></svg>
+        </span>` : ''}
+        <span class="c-row__num">${seqNum}</span>
+        <div class="c-row__text">
+          <span class="c-row__song" title="${escapeHtml(item.song_title)}">${escapeHtml(item.song_title)}${durationInfo}</span>
+          <span class="c-row__who" title="${escapeHtml(performerText)}">${escapeHtml(performerText)}</span>
         </div>
-        ` : ''}
-
-        <!-- Sequence Badge -->
-        <div class="w-9 h-9 rounded-xl ${isCued ? 'bg-orange-500 text-white' : 'bg-slate-800 text-slate-300'} flex items-center justify-center font-mono font-bold text-xs shrink-0 border border-slate-700 shadow">
-          #${seqNum}
-        </div>
-
-        <!-- Performer & Song Info -->
-        <div class="overflow-hidden">
-          <div class="flex items-center gap-2 flex-wrap">
-            <h3 class="font-bold text-sm text-white ${isDone ? 'line-through text-slate-400' : ''}">
-              ${performerDisplay}
-            </h3>
-            ${renderTypePill(item.performance_type)}
-            ${extraTagsPills}
-            ${cachedBadgeHtml}
-          </div>
-          <p class="text-xs text-orange-400 font-medium mt-0.5 ${isDone ? 'line-through text-slate-500' : ''}">
-            "${escapeHtml(item.song_title)}" ${durationInfo}
-          </p>
-          <div class="row-notes-container mt-1.5 flex items-center gap-1.5 flex-wrap">
-            ${item.stage_notes && item.stage_notes.trim() ? `
-              <span class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium cursor-pointer hover:bg-amber-500/25 transition btn-edit-note" title="Click to edit stage note">
-                <i data-lucide="file-text" class="w-3 h-3 text-amber-400"></i>
-                <span class="note-val">${escapeHtml(item.stage_notes.trim())}</span>
-              </span>
-            ` : `
-              <button class="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md text-slate-400 hover:text-amber-300 hover:bg-slate-800/60 transition border border-dashed border-slate-700 hover:border-amber-500/40 btn-edit-note" title="Add stage note for live program view">
-                <i data-lucide="plus" class="w-2.5 h-2.5"></i>
-                <span>Note</span>
-              </button>
-            `}
-          </div>
-        </div>
+        ${isVideo ? renderTypePill('Video') : ''}
+        ${cachedBadgeHtml}
+        ${queuedHtml}
+        <span class="c-row__tag">${tagText}</span>
       </div>
-
-
-      <!-- Action Buttons -->
-      <div class="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap justify-end">
-        ${statusPill}
+      <div class="c-row__actions">
+        ${extraTagsPills}
+        ${noteHtml}
         ${cacheBtnHtml}
-
-        <!-- Cue Track -->
-        <button class="btn-cue-row px-2.5 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1 ${
-          isUploaded || item.track_version || isAcoustic
-            ? (isCued ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700')
-            : 'bg-slate-800/50 text-slate-600 cursor-not-allowed border border-slate-800'
-        }" ${isUploaded || item.track_version || isAcoustic ? '' : 'disabled'} title="Load act into player view & stage display">
-          <i data-lucide="${isCued ? (isAcoustic ? 'guitar' : 'disc') : (isAcoustic ? 'guitar' : 'disc-3')}" class="w-3.5 h-3.5 ${isCued && S.isPlaying ? 'animate-spin' : ''}"></i>
-          <span>${isCued ? 'Cued' : 'Cue'}</span>
+        <button type="button" class="btn-cue-row c-act ${isCued ? 'c-act--on' : ''}" ${playable ? '' : 'disabled'} title="Load act into player view & stage display">
+          <i data-lucide="${isAcoustic ? 'guitar' : 'disc-3'}"></i><span>${isCued ? 'Cued' : 'Cue'}</span>
         </button>
-
-        <!-- Skip / Hold -->
         ${!isDone ? `
-        <button class="btn-hold-row px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1 ${
-          isSkipped
-            ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
-            : 'bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-300 border-slate-800'
-        }" title="${isSkipped ? 'Return performer to queue' : 'Put performer on hold / skip'}">
-          <i data-lucide="${isSkipped ? 'play' : 'pause-circle'}" class="w-3.5 h-3.5"></i>
-          <span>${isSkipped ? 'Re-Queue' : 'Hold'}</span>
-        </button>
-        ` : ''}
-
-        <!-- Done / Undo Toggle -->
-        <button class="btn-done-row px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1 ${
-          isDone
-            ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-            : 'bg-slate-900 hover:bg-emerald-950/60 text-emerald-400 hover:text-emerald-300 border-slate-800 hover:border-emerald-500/40'
-        }" title="${isDone ? 'Undo completed status' : 'Mark as completed'}">
-          <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}" class="w-3.5 h-3.5"></i>
-          <span>${isDone ? 'Undo' : 'Done'}</span>
+        <button type="button" class="btn-hold-row c-act c-act--warn ${isSkipped ? 'c-act--on' : ''}" title="${isSkipped ? 'Return performer to queue' : 'Put performer on hold / skip'}">
+          <i data-lucide="${isSkipped ? 'play' : 'pause-circle'}"></i><span>${isSkipped ? 'Re-Queue' : 'Hold'}</span>
+        </button>` : ''}
+        <button type="button" class="btn-done-row c-act c-act--ok" title="${isDone ? 'Undo completed status' : 'Mark as completed'}">
+          <i data-lucide="${isDone ? 'rotate-ccw' : 'check'}"></i><span>${isDone ? 'Undo' : 'Done'}</span>
         </button>
       </div>
     `;

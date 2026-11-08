@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Render the mutually exclusive layers from the pure mode selector.
   function renderMode() {
     const mode = L.monitorMode(view);
+    document.body.dataset.mode = mode;
+    standbyCard.dataset.state = view.entryId ? 'name' : 'standby';
     blackOverlay.classList.toggle('hidden', mode !== 'black');
     blackCorner.textContent = view.performer ? `On stage: ${view.performer}` : '';
     lyricsPanel.classList.toggle('hidden', mode !== 'lyrics');

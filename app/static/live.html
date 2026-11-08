@@ -1,189 +1,123 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en" data-theme="dark" style="background-color: #0B0D10; color-scheme: dark;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0B0D10">
   <title>Live Stage Program - Event Track Manager</title>
   <script src="/static/js/icons.js"></script>
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
   <link rel="stylesheet" href="/static/css/app.css?v=1">
-  <style>
-    :root, html, body { background-color: #000; color-scheme: dark; }
-    * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; display: flex; flex-direction: column; color: #f1f5f9; font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 24px; line-height: 1.3; }
-    .hidden { display: none !important; }
-    :focus-visible { outline: 3px solid #f06449; outline-offset: 2px; }
-    /* Every visible string on this screen is at least 24px; long names wrap, never truncate. */
-    .tv-wrap { overflow-wrap: anywhere; word-break: break-word; min-width: 0; }
-    .tv-clamp2 { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .muted { color: #94a3b8; }
-    .orange { color: #fb923c; }
-    .amber { color: #fbbf24; }
-
-    #announcement { position: relative; z-index: 20; width: 100%; padding: 14px 32px; background: #f59e0b; color: #1a1205; font-size: 32px; font-weight: 800; text-align: center; }
-    header.top { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 32px; border-bottom: 1px solid #1e293b; background: rgba(15, 23, 42, .6); }
-    header.top h1 { margin: 0; font-size: 32px; font-weight: 800; }
-    header.top .sub { margin: 0; color: #fb923c; font-weight: 600; font-size: 24px; }
-    .chip { display: inline-flex; align-items: center; gap: 10px; padding: 6px 18px; border-radius: 999px; font-weight: 700; font-size: 24px; border: 1px solid #334155; }
-    .chip .dot { width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
-    .chip.live { color: #fb7185; border-color: rgba(244, 63, 94, .4); background: rgba(244, 63, 94, .1); }
-    .chip.wait { color: #fbbf24; border-color: rgba(245, 158, 11, .4); background: rgba(245, 158, 11, .1); }
-    .chip.ended { color: #34d399; border-color: rgba(52, 211, 153, .4); background: rgba(52, 211, 153, .1); }
-
-    main { position: relative; z-index: 5; flex: 1; width: 100%; max-width: 1400px; margin: 0 auto; padding: 24px 32px; display: flex; flex-direction: column; gap: 24px; }
-    .label { font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #fb923c; margin: 0 0 8px; font-size: 24px; }
-    .card { border-radius: 28px; padding: 28px 32px; background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(124, 45, 18, .35)); border: 3px solid rgba(249, 115, 22, .55); }
-    .card.wait { border-color: rgba(245, 158, 11, .55); background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(120, 53, 15, .4)); text-align: center; }
-    .card.end { border-color: rgba(52, 211, 153, .5); background: linear-gradient(135deg, #0f172a, #0f172a 60%, rgba(6, 78, 59, .4)); text-align: center; padding: 48px 32px; }
-    .seq { display: inline-block; padding: 4px 16px; border-radius: 14px; background: #F06449; color: #1A0B07; font-family: ui-monospace, monospace; font-weight: 800; font-size: 28px; }
-    .pill { display: inline-block; margin-left: 12px; padding: 4px 16px; border-radius: 999px; font-weight: 700; font-size: 24px; background: rgba(14, 165, 233, .2); color: #7dd3fc; border: 1px solid rgba(14, 165, 233, .4); }
-    .now-name { margin: 12px 0 4px; font-size: 64px; font-weight: 900; line-height: 1.1; }
-    .now-song { margin: 0; font-size: 36px; font-weight: 600; color: #fb923c; }
-    .cd-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; max-width: 760px; margin: 24px auto 0; }
-    .cd-tile { padding: 14px 8px; border-radius: 20px; background: rgba(2, 6, 23, .85); border: 1px solid rgba(245, 158, 11, .3); }
-    .cd-num { display: block; font-family: ui-monospace, monospace; font-weight: 900; font-size: 56px; }
-    .cd-lbl { display: block; color: #94a3b8; font-weight: 600; text-transform: uppercase; font-size: 24px; }
-    h2.big { margin: 0 0 8px; font-size: 48px; font-weight: 900; }
-    p.lead { margin: 8px 0 0; font-size: 28px; }
-
-    .next-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
-    @media (min-width: 1000px) { .next-grid { grid-template-columns: 1fr 1fr; } }
-    .next-card { padding: 18px 24px; border-radius: 22px; background: rgba(15, 23, 42, .9); border: 2px solid rgba(245, 158, 11, .35); min-width: 0; }
-    .next-card .tag { color: #fbbf24; font-weight: 800; text-transform: uppercase; font-size: 24px; }
-    .next-card .nm { margin: 4px 0; font-size: 36px; font-weight: 800; }
-    .next-card .sg { margin: 0; color: #fb923c; font-size: 28px; }
-    .qrow { display: flex; gap: 18px; align-items: flex-start; padding: 14px 24px; border-top: 1px solid rgba(30, 41, 59, .8); min-width: 0; }
-    .qrow:first-child { border-top: 0; }
-    .qrow .n { flex: 0 0 auto; min-width: 72px; text-align: center; padding: 2px 8px; border-radius: 12px; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; font-family: ui-monospace, monospace; font-weight: 800; font-size: 24px; }
-    .qrow .body { flex: 1; min-width: 0; }
-    .qrow .nm { font-weight: 800; font-size: 28px; }
-    .qrow .sg { color: #fb923c; font-size: 24px; }
-    .qrow .ty { flex: 0 0 auto; color: #94a3b8; font-size: 24px; font-weight: 700; }
-    .panel { border: 1px solid #1e293b; border-radius: 22px; background: rgba(15, 23, 42, .6); overflow: hidden; }
-    .row-between { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-    .done-btn { width: 100%; text-align: left; padding: 14px 24px; border-radius: 18px; background: rgba(15, 23, 42, .5); border: 1px solid #1e293b; color: #cbd5e1; font: inherit; font-weight: 700; cursor: pointer; }
-    .done-list .qrow { opacity: .65; }
-    .done-list .nm { text-decoration: line-through; }
-
-    #hero-gallery { border-radius: 28px; background: rgba(15, 23, 42, .9); border: 3px solid #1e293b; padding: 16px; height: 340px; display: flex; align-items: center; justify-content: center; position: relative; }
-    #carousel-img { max-width: 94%; max-height: 94%; object-fit: contain; border-radius: 16px; transition: opacity .5s; opacity: 0; }
-    .hero-grid { display: grid; grid-template-columns: 1fr; gap: 16px; align-items: stretch; }
-    .hero-grid.with-gallery { grid-template-columns: 2fr 1fr; }
-    @media (max-width: 1000px) { .hero-grid.with-gallery { grid-template-columns: 1fr; } }
-
-    footer.bottom { position: relative; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding: 16px 32px; border-top: 1px solid #1e293b; background: rgba(15, 23, 42, .6); }
-    #signup-qr { width: 120px; height: 120px; border-radius: 10px; overflow: hidden; background: #fff; flex: 0 0 auto; }
-    #signup-qr svg { display: block; width: 100%; height: 100%; }
-    .qr-wrap { display: flex; align-items: center; gap: 18px; }
-    #refresh-data-btn { padding: 10px 22px; border-radius: 14px; background: #1e293b; color: #e2e8f0; border: 1px solid #334155; font: inherit; font-weight: 700; cursor: pointer; }
-    #refresh-data-btn[disabled] { opacity: .6; }
-  </style>
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/live.css">
 </head>
-<body>
+<body data-mode="live">
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <aurora-background></aurora-background>
+  <div class="lv-scrim" aria-hidden="true"></div>
 
-  <!-- Full-width announcement strip (event-wide; empty means hidden) -->
-  <div id="announcement" class="hidden" role="status" aria-live="polite"></div>
-
-  <header class="top">
-    <div>
-      <h1 id="live-event-title">Event Track Manager</h1>
-      <p id="live-event-subtitle" class="sub">Musical Night</p>
+  <header class="top lv-top">
+    <div class="lv-brand">
+      <h1 id="live-event-title" class="lv-title">Event Track Manager</h1>
+      <p id="live-event-subtitle" class="lv-subtitle">Musical Night</p>
     </div>
     <!-- Required by the page shell; the venue screen has no navigation, so it stays empty. -->
     <nav aria-label="Main" class="hidden"></nav>
-    <span id="live-badge" class="chip wait"><span class="dot"></span><span id="live-badge-text">COUNTDOWN</span></span>
+    <span id="live-badge" class="chip wait"><span class="dot" aria-hidden="true"></span><span id="live-badge-text">Starting soon</span></span>
   </header>
 
-  <main id="main-content">
+  <main id="main-content" class="lv-main">
     <!-- OFF -->
-    <div id="live-inactive-card" class="hidden card wait" style="max-width: 900px; margin: 48px auto;">
-      <h2 class="big">Live stage display is off</h2>
-      <p class="lead muted">The live program is not switched on for this event. Please check with the organizers.</p>
+    <div id="live-inactive-card" class="hidden lv-off">
+      <span class="lv-off-icon" aria-hidden="true"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 1.6 5.4M7.8 16.2a6 6 0 0 1-1.6-5.4"/></svg></span>
+      <h2 class="lv-off-title">Live screen is off for this event</h2>
+      <p class="lv-off-text">This event does not use the venue screen. Ask an organizer if you expected to see the lineup here.</p>
     </div>
 
-    <!-- ENDED -->
-    <div id="ended-card" class="hidden card end">
-      <p class="label" style="color:#34d399">The show has ended</p>
-      <h2 class="big" id="ended-title">Thank you for coming</h2>
-      <p class="lead" id="ended-count">One great night.</p>
-      <p class="lead muted">Thank you to our performers, sponsors and volunteers. See you next year.</p>
-    </div>
-
-    <div id="live-active-content" style="display:flex; flex-direction:column; gap:24px;">
-      <section>
-        <div class="row-between">
-          <p class="label"><span id="section-status-text">Now on Stage</span></p>
-          <span id="live-sync-timestamp" class="muted">Syncing live...</span>
-        </div>
-        <div id="hero-section-grid" class="hero-grid">
-          <div id="hero-main-column">
+    <div id="live-active-content" class="lv-grid">
+      <div class="lv-primary">
+        <section id="hero-section-grid" class="lv-hero" aria-labelledby="section-status-text">
+          <div id="hero-main-column" class="lv-hero-col">
             <!-- PRESTART -->
-            <div id="countdown-card" class="hidden card wait">
-              <h2 class="big">The Program Begins Soon</h2>
-              <p id="countdown-datetime-display" class="lead amber">Starting soon</p>
-              <div class="cd-grid">
-                <div class="cd-tile"><span id="cd-days" class="cd-num">00</span><span class="cd-lbl">Days</span></div>
+            <div id="countdown-card" class="hidden lv-card lv-prestart">
+              <p id="countdown-datetime-display" class="lv-eyebrow lv-eyebrow-accent">Starting soon</p>
+              <div class="cd-grid" role="timer" aria-label="Time until the show starts">
+                <div class="cd-tile" id="cd-days-tile"><span id="cd-days" class="cd-num">00</span><span class="cd-lbl">Days</span></div>
+                <span class="cd-sep" id="cd-days-sep" aria-hidden="true">:</span>
                 <div class="cd-tile"><span id="cd-hours" class="cd-num">00</span><span class="cd-lbl">Hours</span></div>
+                <span class="cd-sep" aria-hidden="true">:</span>
                 <div class="cd-tile"><span id="cd-mins" class="cd-num">00</span><span class="cd-lbl">Minutes</span></div>
-                <div class="cd-tile"><span id="cd-secs" class="cd-num amber">00</span><span class="cd-lbl">Seconds</span></div>
+                <span class="cd-sep" aria-hidden="true">:</span>
+                <div class="cd-tile"><span id="cd-secs" class="cd-num">00</span><span class="cd-lbl">Seconds</span></div>
               </div>
+              <p id="prestart-event-name" class="lv-prestart-name tv-wrap"></p>
+              <p id="prestart-event-sub" class="lv-prestart-sub tv-wrap"></p>
             </div>
             <!-- LIVE -->
-            <div id="now-performing-card" class="card">
-              <div>
-                <span id="now-seq-badge" class="seq">#--</span>
-                <span id="now-acoustic-badge" class="pill hidden">LIVE ACOUSTIC</span>
-              </div>
-              <h2 id="now-performer-name" class="now-name tv-wrap">Loading program...</h2>
-              <p id="now-song-title" class="now-song tv-wrap">Please wait...</p>
+            <div id="now-performing-card" class="hidden lv-card lv-now">
+              <p class="lv-eyebrow"><span id="section-status-text">Now on Stage</span><span id="now-seq-wrap"> &middot; <span id="now-seq-badge">--</span></span></p>
+              <h2 id="now-song-title" class="lv-now-title tv-wrap tv-clamp2">Loading program...</h2>
+              <p id="now-performer-name" class="lv-now-name tv-wrap tv-clamp2"></p>
+              <p class="lv-now-meta"><span id="now-meta" class="tv-wrap"></span><span id="now-acoustic-badge" class="pill hidden">Live acoustic</span></p>
+            </div>
+            <!-- ENDED -->
+            <div id="ended-card" class="hidden lv-card lv-ended">
+              <p id="ended-event" class="lv-eyebrow lv-eyebrow-accent tv-wrap"></p>
+              <h2 class="lv-ended-title" id="ended-title">Thank you for coming</h2>
+              <p class="lv-ended-count" id="ended-count">One great night.</p>
             </div>
           </div>
-          <div id="hero-gallery" class="hidden">
-            <img id="carousel-img" src="" alt="Event highlight">
+        </section>
+
+        <section id="up-next-section" class="lv-next" aria-labelledby="up-next-heading">
+          <h2 id="up-next-heading" class="sr-only">Up next</h2>
+          <div id="up-next-container" class="next-grid"></div>
+        </section>
+      </div>
+
+      <aside class="lv-aside" aria-label="Sponsors and lineup">
+        <div id="hero-gallery" class="hidden lv-gallery">
+          <div class="lv-gallery-frame"><img id="carousel-img" src="" alt="Event highlight"></div>
+          <div class="lv-gallery-foot"><span>Our sponsors</span><span id="gallery-dots" class="lv-dots" aria-hidden="true"></span></div>
+        </div>
+
+        <section id="upcoming-section" class="lv-upcoming" aria-labelledby="upcoming-heading">
+          <div class="lv-upcoming-head">
+            <h2 id="upcoming-heading" class="lv-label">Coming up</h2>
+            <span id="upcoming-count" class="lv-count">0 scheduled</span>
           </div>
-        </div>
-      </section>
+          <div id="upcoming-scroll" class="lv-upcoming-scroll" tabindex="0" role="region" aria-label="Upcoming acts"><div id="upcoming-list"></div></div>
+        </section>
 
-      <section id="up-next-section">
-        <p class="label">Up Next (Please Be Ready)</p>
-        <div id="up-next-container" class="next-grid"></div>
-      </section>
-
-      <section>
-        <div class="row-between">
-          <p class="label" style="color:#cbd5e1">Upcoming Performances</p>
-          <span id="upcoming-count" class="muted">0 scheduled</span>
-        </div>
-        <div class="panel"><div id="upcoming-list"></div></div>
-      </section>
-
-      <section id="completed-section" class="hidden">
-        <button id="toggle-completed-btn" class="done-btn" aria-expanded="false" aria-controls="completed-list-container">
-          <span id="completed-header-text">Completed Performances (0)</span>
-        </button>
-        <div id="completed-list-container" class="hidden panel done-list" style="margin-top:12px;"></div>
-      </section>
+        <section id="completed-section" class="hidden lv-completed">
+          <button id="toggle-completed-btn" class="done-btn" type="button" aria-expanded="false" aria-controls="completed-list-container">
+            <span id="completed-header-text">Completed Performances (0)</span>
+          </button>
+          <div id="completed-list-container" class="hidden lv-done-list" tabindex="0" role="region" aria-label="Completed performances"></div>
+        </section>
+      </aside>
     </div>
   </main>
 
-  <footer class="bottom">
+  <div id="announcement" class="hidden" role="status" aria-live="polite"></div>
+  <div id="live-info-strip" class="hidden lv-strip" role="status"><span id="live-info-label" class="lv-strip-label">Tonight</span><span id="live-info-text" class="lv-strip-text"></span></div>
+
+  <footer class="bottom lv-foot">
     <div class="qr-wrap">
       <div id="signup-qr"></div>
-      <div>
-        <div style="font-weight:800">Want to sing next time?</div>
-        <div id="signup-url" class="muted tv-wrap">Scan to sign up</div>
+      <div class="lv-qr-text">
+        <span class="lv-cta">Scan to sign up</span>
+        <span id="signup-url" class="tv-wrap">Scan to sign up</span>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:18px;">
-      <span id="source-note" class="muted"></span>
+    <div class="lv-foot-right">
+      <span id="source-note"></span>
+      <span id="live-sync-timestamp">Syncing live...</span>
+      <span id="live-clock" class="lv-clock" aria-hidden="true"></span>
       <button id="refresh-data-btn" type="button" aria-label="Refresh the live program">Refresh</button>
     </div>
   </footer>

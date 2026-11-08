@@ -21,6 +21,11 @@ export function syncConsolePreviewVideo(play) {
   }
 }
 
+// Read a design token for the canvas waveform (CSS variables cannot reach a canvas).
+function token(name, fallback) {
+  try { return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback; } catch (e) { return fallback; }
+}
+
 export function initWaveSurfer() {
   const container = document.getElementById('player-waveform');
   if (!container || typeof WaveSurfer === 'undefined') return;
@@ -28,14 +33,14 @@ export function initWaveSurfer() {
   try {
     S.wavesurfer = WaveSurfer.create({
       container: container,
-      waveColor: '#475569',
-      progressColor: '#f97316',
-      cursorColor: '#fb923c',
+      waveColor: token('--border-strong', '#3D4554'),
+      progressColor: token('--status-playing-fg', '#34D399'),
+      cursorColor: token('--text-primary', '#F3F4F6'),
       cursorWidth: 2,
-      barWidth: 2,
-      barGap: 1,
+      barWidth: 3,
+      barGap: 3,
       barRadius: 2,
-      height: 44,
+      height: 80,
       normalize: true
     });
 
@@ -117,14 +122,19 @@ export function toggleMute() {
 export function updateMuteButton() {
   const icon = document.getElementById('mute-icon');
   const btn = document.getElementById('btn-mute');
+  const label = document.getElementById('mute-label');
   if (!icon || !btn) return;
   if (S.isMuted) {
     icon.setAttribute('data-lucide', 'volume-x');
-    btn.className = 'p-2 text-rose-400 bg-rose-500/20 rounded-lg transition border border-rose-500/40';
+    btn.className = 'c-tbtn is-muted';
+    btn.setAttribute('aria-pressed', 'true');
+    if (label) label.textContent = 'Unmute';
     btn.title = 'Unmute Audio [M]';
   } else {
     icon.setAttribute('data-lucide', 'volume-2');
-    btn.className = 'p-2 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-slate-800 transition';
+    btn.className = 'c-tbtn';
+    btn.setAttribute('aria-pressed', 'false');
+    if (label) label.textContent = 'Mute';
     btn.title = 'Mute Audio [M]';
   }
   if (window.lucide) lucide.createIcons();
@@ -138,7 +148,10 @@ export function updatePlayPauseButton() {
   } else {
     playIcon.setAttribute('data-lucide', 'play');
   }
+  const playLabel = document.getElementById('play-label');
+  if (playLabel) playLabel.textContent = S.isPlaying ? 'Pause' : 'Play';
   if (window.lucide) lucide.createIcons();
+  updateTransportUi(); // keeps Fade out enabled while sound is live (it was left disabled after Play)
 }
 
 export function togglePlayPause() {
@@ -204,7 +217,6 @@ export async function setupOutputDevice() {
     applySink(saved, element, S.gainStage).catch(() => {});
   }
   wrap.classList.remove('hidden');
-  wrap.classList.add('flex');
   select.addEventListener('change', async () => {
     try {
       await applySink(select.value, element, S.gainStage);
@@ -225,5 +237,6 @@ export function updateTransportUi() {
   }
   const playBtn = document.getElementById('btn-play-pause');
   if (playBtn && S.currentCuedItem && S.currentCuedItem.track_status !== 'Acoustic') playBtn.disabled = transport.state === 'FADING';
+  if (hooks.updateNowState) hooks.updateNowState();
 }
 

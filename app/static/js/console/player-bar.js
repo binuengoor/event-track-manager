@@ -12,13 +12,13 @@ export function updatePlayerBarState() {
   if (markDoneBtn) {
     markDoneBtn.disabled = false;
     if (isCuedDone) {
-      markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs border border-slate-700 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.className = 'c-tbtn c-tbtn--done hold-fill is-undo';
       markDoneBtn.title = 'Undo completed status';
-      markDoneBtn.innerHTML = '<i data-lucide="rotate-ccw" class="w-4 h-4"></i><span>Undo</span>';
+      markDoneBtn.innerHTML = '<i data-lucide="rotate-ccw"></i><span class="c-done__text"><span>Undo</span></span>';
     } else {
-      markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      markDoneBtn.className = 'c-tbtn c-tbtn--done hold-fill';
       markDoneBtn.title = 'Hold to mark as performed (hold Enter)';
-      markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
+      markDoneBtn.innerHTML = '<span class="c-ring" aria-hidden="true"></span><span class="c-done__text"><span>Done</span><kbd>Hold Enter</kbd></span>';
     }
     markDoneBtn.style.setProperty('--hold', 0);
   }
@@ -26,18 +26,39 @@ export function updatePlayerBarState() {
   if (holdBtn) {
     holdBtn.disabled = false;
     if (isCuedSkipped) {
-      holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold text-xs border border-amber-500/50 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      holdBtn.className = 'c-sbtn c-sbtn--warn is-on';
       holdBtn.title = 'Return performer to queue';
-      holdBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i><span>Re-Queue</span>';
+      holdBtn.innerHTML = '<i data-lucide="play"></i><span>Re-Queue</span>';
     } else {
-      holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+      holdBtn.className = 'c-sbtn c-sbtn--warn';
       holdBtn.title = 'No-Show / Put On Hold';
-      holdBtn.innerHTML = '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Hold</span>';
+      holdBtn.innerHTML = '<i data-lucide="pause-circle"></i><span>Hold</span>';
     }
   }
 
   if (window.lucide) lucide.createIcons();
 }
+
+const EYEBROW = { IDLE: 'No act cued', CUED: 'Cued', PLAYING: 'Playing', PAUSED: 'Paused', FADING: 'Fading out', ENDED: 'Ended' };
+
+// Mirror the transport state onto the panel: eyebrow, theme hooks and the current row's tag.
+export function updateNowState() {
+  const panel = document.getElementById('player-bar');
+  const eyebrow = document.getElementById('player-eyebrow');
+  const state = transport.state || 'IDLE';
+  if (panel && panel.dataset) panel.dataset.transport = state.toLowerCase();
+  const item = S.currentCuedItem;
+  const num = item && item.sequence_order != null ? ` \u00b7 ${String(item.sequence_order).padStart(2, '0')}` : '';
+  if (eyebrow) eyebrow.textContent = `${EYEBROW[state] || ''}${item ? num : ''}`;
+  const live = state === 'PLAYING' || state === 'FADING';
+  const row = document.querySelector('.c-row.is-cued');
+  if (row) {
+    row.classList.toggle('is-playing', live);
+    const tag = row.querySelector('.c-row__tag');
+    if (tag) tag.textContent = live ? 'Playing' : 'Cued';
+  }
+}
+hooks.updateNowState = updateNowState;
 
 export function resetPlayerBar() {
   S.currentCuedItem = null;
@@ -65,8 +86,8 @@ export function resetPlayerBar() {
   const placeholder = document.getElementById('waveform-placeholder');
 
   if (playerTitle) playerTitle.textContent = 'No Track Cued';
-  if (playerPerformer) playerPerformer.textContent = 'Tap "Cue Track" on any song to inspect & play';
-  if (playerBadge) playerBadge.className = 'w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 shrink-0 border border-slate-700';
+  if (playerPerformer) playerPerformer.textContent = 'Pick an act in the running order to cue it';
+  if (playerBadge) playerBadge.className = 'c-now__badge';
 
   const notesBar = document.getElementById('player-notes-bar');
   if (notesBar) notesBar.classList.add('hidden');
@@ -74,20 +95,20 @@ export function resetPlayerBar() {
   if (playBtn) playBtn.disabled = true;
   if (markDoneBtn) {
     markDoneBtn.disabled = true;
-    markDoneBtn.className = 'hold-fill px-3.5 py-2 rounded-xl bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-400 font-semibold text-xs border border-emerald-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+    markDoneBtn.className = 'c-tbtn c-tbtn--done hold-fill';
     markDoneBtn.title = 'Hold to mark as performed (hold Enter)';
-    markDoneBtn.innerHTML = '<i data-lucide="check-check" class="w-4 h-4"></i><span>Done</span>';
+    markDoneBtn.innerHTML = '<span class="c-ring" aria-hidden="true"></span><span class="c-done__text"><span>Done</span><kbd>Hold Enter</kbd></span>';
   }
   if (holdBtn) {
     holdBtn.disabled = true;
-    holdBtn.className = 'px-3 py-2 rounded-xl bg-amber-950/60 hover:bg-amber-900/80 text-amber-400 font-semibold text-xs border border-amber-500/40 flex items-center gap-1.5 transition disabled:opacity-40 disabled:pointer-events-none';
+    holdBtn.className = 'c-sbtn c-sbtn--warn';
     holdBtn.title = 'No-Show / Put On Hold';
-    holdBtn.innerHTML = '<i data-lucide="pause-circle" class="w-4 h-4"></i><span>Hold</span>';
+    holdBtn.innerHTML = '<i data-lucide="pause-circle"></i><span>Hold</span>';
   }
   if (uncueBtn) uncueBtn.disabled = true;
   if (window.lucide) lucide.createIcons();
   if (downloadBtn) {
-    downloadBtn.classList.add('opacity-40', 'pointer-events-none');
+    downloadBtn.classList.add('is-busy');
     downloadBtn.onclick = null;
   }
 
@@ -118,6 +139,7 @@ export function resetPlayerBar() {
 
   broadcastStageMonitor('UNCUE');
   updateTransportUi();
+  updateNowState();
   relayLiveSoon();
 
   hooks.renderQueueList();
@@ -133,11 +155,12 @@ export function updatePlayerBarNotes(notes) {
   }
   bar.classList.remove('hidden');
   if (notes && notes.trim()) {
-    text.textContent = `Note: ${notes.trim()}`;
-    text.className = 'truncate font-medium text-amber-300 cursor-pointer hover:underline';
+    text.textContent = notes.trim();
+    text.title = notes.trim();
+    text.className = 'c-note__text';
   } else {
-    text.textContent = '+ Add stage note...';
-    text.className = 'truncate italic text-slate-400 cursor-pointer hover:text-amber-300 hover:underline';
+    text.textContent = 'No note yet';
+    text.className = 'c-note__text is-empty';
   }
 }
 

@@ -75,8 +75,8 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
 
     if (playerTitle) playerTitle.textContent = item.song_title;
     let singerText = item.performer_name;
-    if (item.partner_name) singerText = `Duet: ${item.performer_name} & ${item.partner_name}`;
-    if (playerPerformer) playerPerformer.textContent = `#${String(item.sequence_order || 0).padStart(2, '0')} • ${singerText}`;
+    if (item.partner_name) singerText = `${item.performer_name} & ${item.partner_name}`;
+    if (playerPerformer) playerPerformer.textContent = [singerText, item.performance_type, item.entry_id].filter(Boolean).join(' \u00b7 ');
 
     updatePlayerBarNotes(item.stage_notes || '');
 
@@ -103,11 +103,11 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
       if (playerBadge) {
         playerBadge.classList.remove('hidden');
         if (isAcoustic) {
-          playerBadge.className = 'w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/40';
-          playerBadge.innerHTML = '<i data-lucide="guitar" class="w-5 h-5"></i>';
+          playerBadge.className = 'c-now__badge is-acoustic';
+          playerBadge.innerHTML = '<i data-lucide="guitar"></i>';
         } else {
-          playerBadge.className = 'w-10 h-10 rounded-xl bg-orange-500/20 text-orange-400 flex items-center justify-center shrink-0 border border-orange-500/40';
-          playerBadge.innerHTML = '<i data-lucide="music-2" class="w-5 h-5"></i>';
+          playerBadge.className = 'c-now__badge';
+          playerBadge.innerHTML = '<i data-lucide="music-2"></i>';
         }
       }
     }
@@ -119,7 +119,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
     // Configure 1-Click Track Download for Local Playback
     if (downloadBtn) {
       if (isAcoustic) {
-        downloadBtn.classList.add('opacity-40', 'pointer-events-none');
+        downloadBtn.classList.add('is-disabled');
         downloadBtn.onclick = null;
       } else {
         downloadBtn.onclick = async (e) => {
@@ -141,7 +141,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
             return;
           }
 
-          downloadBtn.classList.add('opacity-50', 'pointer-events-none');
+          downloadBtn.classList.add('is-busy');
           showToast('Downloading track...');
           try {
             const res = await fetch(`/api/download-track/${S.currentCuedItem.entry_id}`, {
@@ -166,10 +166,10 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
           } catch (err) {
             showToast(`Download error: ${err.message}`, 'error');
           } finally {
-            downloadBtn.classList.remove('opacity-50', 'pointer-events-none');
+            downloadBtn.classList.remove('is-busy');
           }
         };
-        downloadBtn.classList.remove('opacity-40', 'pointer-events-none');
+        downloadBtn.classList.remove('is-disabled');
       }
     }
 
@@ -195,8 +195,8 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
       }
 
       if (cuedVaultStatus) {
-        cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400';
-        cuedVaultStatus.innerHTML = '<span class="animate-spin text-xs">⚡</span><span>Checking Vault...</span>';
+        cuedVaultStatus.className = 'c-vstat c-vstat--warn';
+        cuedVaultStatus.innerHTML = '<i data-lucide="zap" class="c-spin"></i><span>Checking Vault...</span>';
         cuedVaultStatus.classList.remove('hidden');
       }
 
@@ -220,17 +220,17 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
         audioSourceUrl = S.currentCuedObjectUrl;
 
         if (cuedVaultStatus) {
-          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
-          cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+          cuedVaultStatus.className = 'c-vstat c-vstat--ok';
+          cuedVaultStatus.innerHTML = '<i data-lucide="shield-check"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
           if (window.lucide) lucide.createIcons();
         }
       } else if (navigator.onLine) {
         // 2. Online & not yet cached or stale: Fetch fresh and store in Vault!
         if (cuedVaultStatus) {
-          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-cyan-400 animate-pulse';
+          cuedVaultStatus.className = 'c-vstat c-vstat--info c-pulse';
           cuedVaultStatus.innerHTML = isStale
-            ? '<i data-lucide="refresh-cw" class="w-3 h-3 text-cyan-400 animate-spin"></i><span>Updating stale Vault cache...</span>'
-            : '<i data-lucide="hard-drive-download" class="w-3 h-3 text-cyan-400"></i><span>Caching track to Vault...</span>';
+            ? '<i data-lucide="refresh-cw"></i><span>Updating stale Vault cache...</span>'
+            : '<i data-lucide="hard-drive-download"></i><span>Caching track to Vault...</span>';
           if (window.lucide) lucide.createIcons();
         }
 
@@ -253,8 +253,8 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
             updateVaultStatusDisplay();
 
             if (cuedVaultStatus) {
-              cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400';
-              cuedVaultStatus.innerHTML = '<i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
+              cuedVaultStatus.className = 'c-vstat c-vstat--ok';
+              cuedVaultStatus.innerHTML = '<i data-lucide="shield-check"></i><span>⚡ Cached in Vault (Offline Safe)</span>';
               if (window.lucide) lucide.createIcons();
             }
           }
@@ -264,8 +264,8 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
       } else {
         // 3. Offline and not cached
         if (cuedVaultStatus) {
-          cuedVaultStatus.className = 'mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold text-rose-400';
-          cuedVaultStatus.innerHTML = '<i data-lucide="alert-triangle" class="w-3 h-3 text-rose-400"></i><span>⚠️ Not cached in Vault. Connect to Wi-Fi.</span>';
+          cuedVaultStatus.className = 'c-vstat c-vstat--bad';
+          cuedVaultStatus.innerHTML = '<i data-lucide="alert-triangle"></i><span>⚠️ Not cached in Vault. Connect to Wi-Fi.</span>';
           if (window.lucide) lucide.createIcons();
         }
         showToast('⚠️ Track was not cached locally and console is offline. Connect to Wi-Fi to load.', 'error');
@@ -346,7 +346,13 @@ export function renderOnDeck() {
   if (!target) { strip.classList.add('hidden'); return; }
   strip.classList.remove('hidden');
   const who = target.partner_name ? `${target.performer_name} & ${target.partner_name}` : target.performer_name;
-  document.getElementById('on-deck-text').textContent = ` ${String(target.sequence_order || 0).padStart(2, '0')} \u00b7 ${target.song_title} \u00b7 ${who}`;
+  const label = document.getElementById('on-deck-label');
+  if (label) label.textContent = `On deck \u00b7 ${String(target.sequence_order || 0).padStart(2, '0')}`;
+  const deckText = document.getElementById('on-deck-text');
+  deckText.textContent = target.song_title;
+  deckText.title = target.song_title;
+  const whoEl = document.getElementById('on-deck-who');
+  if (whoEl) whoEl.textContent = [who, target.performance_type, target.entry_id].filter(Boolean).join(' \u00b7 ');
   const note = (target.stage_notes || '').trim();
   document.getElementById('on-deck-note').textContent = note ? ` \u00b7 Note: ${note}` : '';
 }

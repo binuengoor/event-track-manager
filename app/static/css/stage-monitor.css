@@ -1,0 +1,59 @@
+/* Stage monitor: always dark, read from a distance. Boards: StageMonitor, StageLyrics,
+   CMonitorVideo, CMonitorStandby, CMonitorFaded. No animation, no aurora. */
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; width: 100vw; overflow: hidden; user-select: none; background: #000; color: var(--text-primary); font-family: var(--font-sans); font-size: 24px; line-height: 1.25; }
+.hidden { display: none !important; }
+:focus-visible { outline: 3px solid var(--accent-primary); outline-offset: 2px; }
+.wrap { overflow-wrap: anywhere; word-break: break-word; }
+.layer { position: absolute; inset: 0; }
+
+#video-container { z-index: 10; display: flex; align-items: center; justify-content: center; background: #000; }
+#stage-video { width: 100%; height: 100%; object-fit: contain; }
+
+/* Name card (audio act) and standby (dim Next card) */
+#standby-card { z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px; gap: 14px; }
+.badge { display: inline-flex; align-items: center; padding: 0; background: none; border: 0; color: var(--status-playing-fg); font-weight: 700; text-transform: uppercase; letter-spacing: .14em; font-size: 28px; }
+#stage-performer-name { margin: 0; font-size: clamp(48px, 9.4vw, 120px); font-weight: 700; letter-spacing: -.03em; line-height: 1; max-width: 92vw; color: var(--text-primary); }
+#stage-song-title { margin: 0; font-size: clamp(32px, 4.1vw, 52px); font-weight: 400; color: #D1D5DB; max-width: 92vw; }
+#stage-act-type { display: inline-block; margin-top: 10px; padding: 0; background: none; border: 0; color: var(--text-secondary); font-weight: 400; font-size: 28px; }
+#standby-card[data-state="standby"] .badge { color: var(--text-muted); letter-spacing: .16em; }
+#standby-card[data-state="standby"] #stage-performer-name { font-size: clamp(48px, 7.2vw, 92px); color: var(--text-secondary); }
+#standby-card[data-state="standby"] #stage-song-title { font-size: clamp(32px, 3.1vw, 40px); color: var(--text-muted); }
+#standby-card[data-state="standby"] #stage-act-type { color: var(--text-muted); }
+
+/* Lyrics */
+#lyrics-panel { z-index: 25; display: flex; align-items: center; justify-content: center; padding: 72px 80px; background: #000; text-align: center; }
+#lyrics-text { margin: 0; max-width: 1500px; width: 100%; font-family: inherit; font-size: clamp(36px, 5vw, 64px); font-weight: 700; line-height: 1.3; color: #fff; white-space: pre-wrap; max-height: 100%; overflow: hidden; }
+
+/* Announcement: amber band along the bottom */
+#announcement { z-index: 35; inset: auto 0 0 0; min-height: 104px; padding: 16px 60px; display: flex; align-items: center; justify-content: center; background: var(--status-cued-bg); border-top: 2px solid var(--status-cued-fg); color: #FDE68A; font-size: 32px; font-weight: 600; text-align: center; }
+#announcement:not(.hidden) ~ #progress-overlay { bottom: 104px; }
+
+/* Quiet chrome (fades after inactivity) */
+#control-overlay { z-index: 30; inset: 0 0 auto 0; padding: 28px 40px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+#progress-overlay { z-index: 30; inset: auto 0 0 0; padding: 28px 40px; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.idle-fade { opacity: 0; pointer-events: none; }
+#sync-status-indicator { display: inline-flex; align-items: center; gap: 10px; padding: 6px 20px; border-radius: var(--radius-full); font-weight: 700; font-size: 24px; border: 1px solid; }
+#sync-status-indicator::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: currentColor; }
+#sync-status-indicator .dot { display: none; }
+#sync-status-indicator.ok { color: var(--status-playing-fg); background: var(--status-playing-bg); border-color: var(--status-playing-fg); }
+#sync-status-indicator.bad { color: var(--status-cued-fg); background: var(--status-cued-bg); border-color: var(--status-cued-fg); }
+#fullscreen-btn { min-height: 44px; padding: 8px 24px; border-radius: var(--radius-md); background: var(--bg-surface-2); color: var(--text-primary); border: 1px solid var(--border-strong); font: inherit; font-weight: 600; cursor: pointer; }
+#cued-track-summary { font-weight: 400; color: var(--text-secondary); min-width: 0; }
+#time-display { font-family: var(--font-mono); font-weight: 600; color: var(--text-secondary); flex: 0 0 auto; }
+/* Video act: small name line stays visible over the picture */
+body[data-mode="video"] #progress-overlay.idle-fade { opacity: 1; background: linear-gradient(transparent, rgba(0, 0, 0, .75)); }
+body[data-mode="video"] #cued-track-summary { color: #E5E7EB; }
+
+/* Disconnected: large, never auto-hides, above everything except the black fade */
+#disconnected { z-index: 40; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 20px; padding: 48px; background: #000; }
+#disconnected h2 { margin: 0; font-size: clamp(48px, 7vw, 96px); font-weight: 700; color: var(--status-cued-fg); }
+#disconnected p { margin: 0; font-size: 32px; color: var(--text-primary); max-width: 1100px; }
+
+/* Fade to black: faint corner line only */
+#black-overlay { z-index: 50; background: #030304; }
+#black-corner { position: absolute; left: 40px; bottom: 32px; color: var(--text-secondary); font-size: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

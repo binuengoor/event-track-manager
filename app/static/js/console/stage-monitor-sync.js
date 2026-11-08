@@ -35,6 +35,26 @@ export function createStageMonitorSync(getState) {
   return {broadcast};
 }
 
+// A monitor window opened from this console is watched until it is closed; the header shows
+// "Stage monitor not connected" once it has been. A monitor opened some other way is not tracked.
+let monitorWindow = null;
+let monitorWatch = null;
+function showMonitorStatus(disconnected) {
+  const el = typeof document !== 'undefined' ? document.getElementById('monitor-status-indicator') : null;
+  if (el && el.classList) el.classList.toggle('hidden', !disconnected);
+}
 export function openStageMonitor() {
-  window.open('/console/stage-monitor', 'StageMonitor', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+  monitorWindow = window.open('/console/stage-monitor', 'StageMonitor', 'width=1280,height=720,menubar=no,toolbar=no,location=no');
+  showMonitorStatus(false);
+  if (monitorWatch) clearInterval(monitorWatch);
+  if (!monitorWindow) return monitorWindow;
+  monitorWatch = setInterval(() => {
+    if (!monitorWindow || monitorWindow.closed) {
+      clearInterval(monitorWatch);
+      monitorWatch = null;
+      monitorWindow = null;
+      showMonitorStatus(true);
+    }
+  }, 2000);
+  return monitorWindow;
 }

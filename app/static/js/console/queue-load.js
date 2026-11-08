@@ -146,7 +146,7 @@ export async function loadQueue(silent = false) {
 
   if (!silent) {
     if (syncText) syncText.textContent = 'Syncing...';
-    if (refreshIcon) refreshIcon.classList.add('animate-spin');
+    if (refreshIcon) refreshIcon.classList.add('c-spin');
   }
 
   try {
@@ -220,7 +220,7 @@ export async function loadQueue(silent = false) {
       showToast(navigator.onLine ? `Sync failed: ${err.message}` : 'Running in Offline Mode using local cache', navigator.onLine ? 'error' : 'warning');
     }
   } finally {
-    if (refreshIcon) refreshIcon.classList.remove('animate-spin');
+    if (refreshIcon) refreshIcon.classList.remove('c-spin');
   }
 }
 
