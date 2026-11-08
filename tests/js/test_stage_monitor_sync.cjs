@@ -45,3 +45,13 @@ test('console imports monitor module and offline shell precaches it',()=>{
   assert.match(fs.readFileSync(path.join(root,'js/console/stage-sync.js'),'utf8'),/from ["']\.\/stage-monitor-sync\.js["']/);
   assert.match(fs.readFileSync(path.join(root,'sw.js'),'utf8'),/["']\/static\/js\/console\/stage-monitor-sync\.js["']/);
 });
+
+test('uncue carries the next act when the console knows one', async () => {
+  const {createStageMonitorSync} = await load();
+  const posted = [];
+  global.BroadcastChannel = class { postMessage(m) { posted.push(m); } };
+  const sync = createStageMonitorSync(() => ({item: null, next: {performer_name: 'Maya Nair', song_title: 'Kannalane'}}));
+  sync.broadcast('UNCUE');
+  delete global.BroadcastChannel;
+  assert.deepEqual(posted, [{type: 'UNCUE', nextPerformer: 'Maya Nair', nextSong: 'Kannalane'}]);
+});

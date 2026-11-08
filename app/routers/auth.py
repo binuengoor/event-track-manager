@@ -168,6 +168,14 @@ def verify_admin_pin(request: Request) -> bool:
 verify_operator_pin = verify_admin_pin
 
 
+@router.post("/api/auth/logout")
+async def admin_logout():
+    """Clears the admin session cookie. Safe to call when not signed in."""
+    response = JSONResponse(content={"status": "success", "message": "Signed out"})
+    response.delete_cookie("admin_session", samesite="strict")
+    return response
+
+
 @router.post("/api/auth/login")
 async def admin_login(login: LoginRequest, request: Request):
     key = client_key(request)

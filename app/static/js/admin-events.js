@@ -67,6 +67,12 @@
   }
 
   function askClear(id) {
+    // One clear-media confirmation: use the board-style dialog when the System data is loaded.
+    if (typeof window.adOpenClearDialog === 'function') {
+      window.adOpenClearDialog(id, document.activeElement);
+      const dlg = document.getElementById('clear-media-dialog');
+      if (dlg && !dlg.classList.contains('hidden')) return;
+    }
     const ev = state.events.find((e) => e.id === id);
     const box = document.getElementById('clear-media-box');
     box.classList.remove('hidden');

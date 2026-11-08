@@ -84,3 +84,13 @@ def test_cloudflare_header_ignored_unless_trusted(monkeypatch):
     assert auth_module.client_key(req) == "3.3.3.3"
     monkeypatch.setenv("TRUST_CLOUDFLARE", "1")
     assert auth_module.client_key(req) == "1.1.1.1"
+
+
+def test_logout_clears_admin_session():
+    from app.config import settings
+    client = TestClient(app)
+    assert client.post("/api/auth/login", json={"pin": settings.admin_pin}).status_code == 200
+    assert client.get("/api/admin/settings").status_code == 200       # cookie session works
+    assert client.post("/api/auth/logout").status_code == 200
+    assert client.get("/api/admin/settings").status_code == 401       # cookie is gone
+    assert client.post("/api/auth/logout").status_code == 200          # safe when already signed out

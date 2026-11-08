@@ -195,3 +195,7 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
   .gad-chooser .gad-close { margin-top: 0; }
 }
 @media (prefers-reduced-motion: reduce) { .gad-dots.shake { animation: none; } }
+
+/* Chooser: Sign out and Close sit side by side */
+.gad-actions { display: flex; gap: .75rem; }
+.gad-actions .gad-btn { flex: 1; }

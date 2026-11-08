@@ -224,10 +224,18 @@
       var a = el('a', 'gad-mini'); a.href = x[0]; a.append(icon(x[1], 18), document.createTextNode(x[2])); row.appendChild(a);
     });
     var done = el('button', 'gad-btn gad-close', 'Close'); done.type = 'button'; done.addEventListener('click', close);
+    var out = el('button', 'gad-btn gad-signout', 'Sign out'); out.type = 'button';
+    out.addEventListener('click', function () {
+      fetch('/api/auth/logout', { method: 'POST' }).catch(function () {}).then(function () {
+        try { localStorage.removeItem('paattukoottam_pin'); } catch (e) {}
+        close();
+      });
+    });
+    var actions = el('div', 'gad-actions'); actions.append(out, done);
     page.append(head,
       choice('/console', 'console', 'Open Console', 'Run the show: cue tracks and play them from the sound desk.', true),
       choice('/admin', 'admin', 'Open Admin', 'Overview, lineup, people and potluck, setup and rules.', false),
-      row, done);
+      row, actions);
     document.body.appendChild(page);
     document.body.style.overflow = 'hidden';
     layer = page;

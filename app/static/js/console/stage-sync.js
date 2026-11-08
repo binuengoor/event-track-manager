@@ -2,6 +2,7 @@ import { S, hooks, isAudioPlaying, screensState } from "./state.js";
 import { createScreens } from "./screens.js";
 import { createStageMonitorSync } from "./stage-monitor-sync.js";
 import { getAuthHeaders } from "./util.js";
+import { findNextEligible } from "./deck-policy.js";
 
 // =============================================================================
 // POP-OUT STAGE CONFIDENCE MONITOR (BroadcastChannel Sync)
@@ -9,7 +10,8 @@ import { getAuthHeaders } from "./util.js";
 export const stageMonitor = createStageMonitorSync(() => ({
   item: S.currentCuedItem,
   wavesurfer: S.wavesurfer,
-  isPlaying: isAudioPlaying()
+  isPlaying: isAudioPlaying(),
+  next: findNextEligible(S.queue, S.currentCuedItem ? S.currentCuedItem.entry_id : null)
 }));
 export const broadcastStageMonitor = stageMonitor.broadcast;
 

@@ -99,6 +99,7 @@ let currentAdminTab = "overview";
 
 // Inline icon paths (same drawing set as the design boards); no runtime icon library needed.
 const AD_ICONS = {
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   overview: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/>',
   lineup: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   people: '<circle cx="9" cy="8" r="3.5"/><path d="M2 21c0-4 3-6 7-6s7 2 7 6M17 5a3.5 3.5 0 0 1 0 7M22 21c0-3-2-5-5-5.7"/>',
@@ -180,7 +181,13 @@ function moreItems() {
     { icon: "swap", title: "Switch event", subId: "ad-more-event-sub", sub: "Switch or create an event", run: click("manage-events-btn") },
     { icon: "console", title: "Open Console", sub: "Sound booth view", href: "/console" },
     { icon: "screen", title: "Open Live screen", sub: "Venue screen", href: "/live" },
-    { icon: "screen", title: "Open Stage monitor", sub: "Performers' screen", href: "/console/stage-monitor" }
+    { icon: "screen", title: "Open Stage monitor", sub: "Performers' screen", href: "/console/stage-monitor" },
+    { icon: "lock", title: "Admin sign out", sub: "Sign out on this device", run: () => {
+      fetch("/api/auth/logout", { method: "POST" }).catch(() => {}).then(() => {
+        try { localStorage.removeItem("paattukoottam_pin"); } catch (e) {}
+        location.reload();
+      });
+    } }
   ];
 }
 

@@ -553,5 +553,6 @@
   }
 
   if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', bind);
+  window.adOpenClearDialog = openClearDialog;  // also used by the Manage events modal
   window.AdminDash = { fmtBytes, trackBadge, sortLineup, confirmMatches, totalsFrom, typeBreakdown, daysUntil, fmtDuration };
 })();

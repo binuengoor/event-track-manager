@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'PLAY': handlePlay(data); break;
       case 'PAUSE': handlePause(data); break;
       case 'SEEK': handleSeek(data); break;
-      case 'UNCUE': handleUncue(); break;
+      case 'UNCUE': handleUncue(data); break;
       case 'SYNC': handleSync(data); break;
       case 'ANNOUNCEMENT': setAnnouncement(data.text); break;
       case 'FADE_BLACK': view.fadeBlack = Boolean(data.on); renderMode(); break;
@@ -174,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function handleUncue() {
+  function handleUncue(data) {
     view.entryId = null;
     view.mediaType = null;
     view.streamUrl = null;
@@ -184,7 +184,9 @@ document.addEventListener('DOMContentLoaded', () => {
     stageVideo.load();
     standbyBadge.textContent = 'Standby';
     stagePerformer.textContent = document.title.split(' - ').pop() || 'Event';
-    stageSong.textContent = 'Waiting for the next act';
+    stageSong.textContent = (data && data.nextPerformer)
+      ? `Next: ${data.nextPerformer}${data.nextSong ? ' \u00b7 ' + data.nextSong : ''}`
+      : 'Waiting for the next act';
     stageActType.textContent = 'Standing by';
     cuedSummary.textContent = 'Standing by...';
     timeDisplay.textContent = '0:00';

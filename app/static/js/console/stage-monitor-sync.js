@@ -4,9 +4,9 @@ export function createStageMonitorSync(getState) {
 
   function broadcast(eventType = 'SYNC') {
     if (!channel) return;
-    const {item, wavesurfer, isPlaying} = getState();
+    const {item, wavesurfer, isPlaying, next} = getState();
     if (!item) {
-      channel.postMessage({type: 'UNCUE'});
+      channel.postMessage(next ? {type: 'UNCUE', nextPerformer: next.performer_name, nextSong: next.song_title} : {type: 'UNCUE'});
       return;
     }
     const isAcoustic = item.track_status === 'Acoustic';
