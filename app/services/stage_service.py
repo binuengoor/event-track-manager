@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from app.config import settings, get_setting
+from app.config import settings, get_setting, parse_event_datetime
 from app.services.db_service import db_service
 from app.services.media_asset_service import media_asset_service
 
@@ -107,11 +107,18 @@ class StageService:
 
         upcoming.sort(key=get_sort_key)
 
+        event_start_time = get_setting("event_start_time") or get_setting("event_date_time") or settings.event.start_time
+        if not isinstance(event_start_time, str):
+            event_start_time = ""
+        event_start_time_iso = parse_event_datetime(event_start_time, tz_name=settings.event.timezone)
+
         return {
             "event_name": settings.event.name,
             "event_subtitle": settings.event.subtitle,
-            "event_start_time": settings.event.start_time,
-            "event_start_time_iso": settings.event.start_time_iso,
+            "event_start_time": event_start_time,
+            "event_start_time_iso": event_start_time_iso,
+            "doors_open_time": get_setting("doors_open_time", settings.event.doors_open_time or "") or "",
+            "post_event_link_url": get_setting("post_event_link_url", settings.event.post_event_link_url or "") or "",
             "now_performing": now_performing,
             "up_next": up_next,
             "upcoming": upcoming,

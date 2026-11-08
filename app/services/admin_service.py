@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+from urllib.parse import urlsplit
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
@@ -40,6 +41,8 @@ class AdminService:
             "hero_tag_primary": getattr(settings.event, "hero_tag_primary", "Musical Evening"),
             "hero_tag_status": getattr(settings.event, "hero_tag_status", "Stage Ready"),
             "event_poster_url": settings.event.poster_url,
+            "doors_open_time": settings.event.doors_open_time or "",
+            "post_event_link_url": settings.event.post_event_link_url or "",
             "payment_url": settings.event.payment_url or "",
             "external_link_url": settings.event.external_link_url or "",
             "signup_enabled": getattr(settings.signup, "signup_enabled", True),
@@ -143,6 +146,7 @@ class AdminService:
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
         "hero_tag_status", "event_poster_url", "payment_url", "external_link_url", "food_serving_note",
+        "doors_open_time", "post_event_link_url",
         "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset", "announcement",
     }
 
@@ -219,6 +223,26 @@ class AdminService:
                     v = v.strip()
                     if len(v) > 140:
                         raise ValueError("Announcement cannot exceed 140 characters.")
+                if k == "doors_open_time":
+                    v = v.strip()
+                    if len(v) > 100:
+                        raise ValueError("Doors open time cannot exceed 100 characters.")
+                if k == "post_event_link_url":
+                    v = v.strip()
+                    if len(v) > 2048:
+                        raise ValueError("Post-event link URL cannot exceed 2048 characters.")
+                    if v:
+                        if any(char.isspace() or ord(char) < 32 for char in v):
+                            raise ValueError("Post-event link must be a valid HTTP or HTTPS URL.")
+                        try:
+                            parts = urlsplit(v)
+                            valid = (parts.scheme.lower() in ("http", "https") and bool(parts.hostname)
+                                     and parts.username is None and parts.password is None)
+                            _ = parts.port
+                        except ValueError:
+                            valid = False
+                        if not valid:
+                            raise ValueError("Post-event link must be a valid HTTP or HTTPS URL.")
                 if len(v) > 5000:
                     raise ValueError(f"Setting '{k}' is too long.")
             else:

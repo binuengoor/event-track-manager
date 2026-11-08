@@ -76,6 +76,11 @@ body[data-mode="off"] #live-badge, body[data-mode="off"] .lv-subtitle { display:
 .lv-ended { align-items: flex-start; gap: 16px; background: rgb(19 22 27 / .72); border: 1px solid var(--border-subtle); padding: 32px 40px; }
 .lv-ended-title { font-size: clamp(56px, 6.875vw, 132px); font-weight: 700; letter-spacing: -.03em; line-height: 1; }
 .lv-ended-count { font-size: 40px; font-weight: 500; color: var(--lv-soft); }
+.lv-doors-pill { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; width: fit-content; min-height: 44px; margin-top: 8px; padding: 8px 16px; border: 1px solid var(--border-strong); border-radius: var(--radius-full); background: var(--bg-surface-2); color: var(--text-primary); font-size: 24px; }
+.lv-doors-pill strong { color: var(--accent-text); }
+.lv-event-qr { display: flex; align-items: center; gap: 16px; margin-top: 8px; font-size: 24px; font-weight: 600; color: var(--lv-soft); }
+.lv-event-qr-code { display: flex; align-items: center; justify-content: center; width: 96px; height: 96px; flex: none; padding: 4px; border-radius: 12px; background: #fff; }
+.lv-event-qr-code svg { display: block; width: 100%; height: 100%; }
 
 /* Off for this event */
 .lv-off { margin: auto; width: min(900px, 100%); display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center;
@@ -195,6 +200,9 @@ body[data-mode="off"] .lv-foot-right { display: none; }
   .lv-prestart-name { font-size: 1.5rem; }
   .lv-prestart-sub { font-size: 1rem; }
   .lv-ended-count { font-size: 1.25rem; }
+  .lv-doors-pill { font-size: 1rem; padding: 8px 14px; }
+  .lv-event-qr { gap: 12px; font-size: 1rem; }
+  .lv-event-qr-code { width: 72px; height: 72px; }
   .lv-off { padding: 28px 20px; gap: 14px; }
   .lv-off-icon { width: 64px; height: 64px; }
   .lv-off-title { font-size: 1.75rem; }

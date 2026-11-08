@@ -78,6 +78,8 @@ class EventConfig(BaseModel):
     hero_tag_status: Optional[str] = "Stage Ready"
     payment_url: Optional[str] = None
     external_link_url: Optional[str] = None
+    doors_open_time: Optional[str] = ""
+    post_event_link_url: Optional[str] = ""
 
 class StorageConfig(BaseModel):
     # The event folder is the single place everything lives:

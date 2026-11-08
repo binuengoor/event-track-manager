@@ -12,11 +12,41 @@
   let galleryImages = [];
   let galleryIndex = 0;
   let galleryTimer = null;
+  let postEventQrUrl = '';
   let lastServerOk = 0;
   let lastChannelAt = 0;
 
   function currentMode() {
     return L.selectState(state.status, Date.now(), targetStartTime.getTime());
+  }
+
+  function safeHttpUrl(value) {
+    if (typeof value !== 'string' || !value.trim()) return '';
+    try {
+      const url = new URL(value.trim());
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return '';
+      return url.href;
+    } catch (_) { return ''; }
+  }
+
+  function renderEventDetails(data) {
+    const doorsTime = typeof data.doors_open_time === 'string' ? data.doors_open_time.trim() : '';
+    $('doors-open-time').textContent = doorsTime;
+    const url = safeHttpUrl(data.post_event_link_url);
+    const qr = $('post-event-qr');
+    if (!url) {
+      qr.innerHTML = '';
+      postEventQrUrl = '';
+      return;
+    }
+    if (url === postEventQrUrl) return;
+    try {
+      qr.innerHTML = window.EtmQr.toSvg(url, {label: 'QR code for event photos and feedback'});
+      postEventQrUrl = url;
+    } catch (_) {
+      qr.innerHTML = '';
+      postEventQrUrl = '';
+    }
   }
 
   function pad2(n) { return String(n).padStart(2, '0'); }
@@ -72,6 +102,8 @@
     show('live-active-content', mode !== 'off');
     show('up-next-section', mode === 'live' && (data.up_next || []).length > 0);
     show('countdown-card', mode === 'prestart');
+    show('doors-open-pill', mode === 'prestart' && Boolean(String(data.doors_open_time || '').trim()));
+    show('post-event-qr-wrap', mode === 'ended' && Boolean(postEventQrUrl));
     show('now-performing-card', mode === 'live');
     const label = $('section-status-text');
     if (label) label.textContent = mode === 'prestart' ? 'Stage Countdown' : 'Now on Stage';
@@ -142,6 +174,7 @@
     $('ended-event').textContent = title;
     $('prestart-event-name').textContent = data.event_name || '';
     $('prestart-event-sub').textContent = data.event_subtitle || '';
+    renderEventDetails(data);
     if (data.event_start_time_iso) {
       const parsed = new Date(data.event_start_time_iso);
       if (!isNaN(parsed.getTime())) targetStartTime = parsed;

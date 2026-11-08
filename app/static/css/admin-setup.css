@@ -187,6 +187,7 @@
 .as-age-group-add { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 8px; }
 .as-age-group-add-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .as-age-group-add-actions .as-checkline { min-height: 44px; margin: 0; }
+.as-event-detail-input { min-height: 44px; }
 .as-list-row strong { font-size: 14px; color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
 .as-list-row .as-badge { margin-right: auto; }
 .as-list-row .spacer { flex: 1; }

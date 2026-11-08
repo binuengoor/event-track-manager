@@ -337,6 +337,8 @@ async function loadSettings() {
     updateCharCounters();
     setValue("setting-event-date-time", adminSettings.event_start_time || adminSettings.event_date_time);
     setValue("setting-event-time-range", adminSettings.event_time_range);
+    setValue("setting-doors-open-time", adminSettings.doors_open_time || "");
+    setValue("setting-post-event-link-url", adminSettings.post_event_link_url || "");
     setValue("setting-event-venue", adminSettings.event_venue);
     setValue("setting-event-poster-url", adminSettings.event_poster_url);
     setValue("setting-entry-id-prefix", adminSettings.entry_id_prefix);
