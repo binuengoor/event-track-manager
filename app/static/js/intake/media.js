@@ -57,22 +57,14 @@ function setMediaType(type) {
   if (audioBtn) audioBtn.classList.toggle('hidden', audioExts().length === 0);
   if (videoBtn) videoBtn.classList.toggle('hidden', videoExts().length === 0);
 
+  audioBtn?.setAttribute('aria-pressed', String(type !== 'video'));
+  videoBtn?.setAttribute('aria-pressed', String(type === 'video'));
   if (type === 'video') {
-    if (audioBtn) audioBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition' + (audioExts().length ? '' : ' hidden');
-    if (videoBtn) videoBtn.className = 'py-2.5 px-3 rounded-lg bg-purple-600 text-white flex items-center justify-center gap-1.5 transition shadow';
-    if (badge) {
-      badge.textContent = `Video (${extList(exts)})`;
-      badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-purple-950/80 text-purple-300 border border-purple-500/40 font-medium';
-    }
+    if (badge) badge.textContent = `Video (${extList(exts)})`;
     if (hint) hint.textContent = 'Video plays on the stage monitor (720p). The sound team checks length and sound before it goes live.';
     if (label && label.textContent.includes('audio')) label.textContent = 'Tap to select or drag a video file here';
   } else {
-    if (audioBtn) audioBtn.className = 'py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow';
-    if (videoBtn) videoBtn.className = 'py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition' + (videoExts().length ? '' : ' hidden');
-    if (badge) {
-      badge.textContent = `Audio (${extList(exts)})`;
-      badge.className = 'text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium';
-    }
+    if (badge) badge.textContent = `Audio (${extList(exts)})`;
     if (hint) hint.textContent = 'A normal audio backing track for the venue sound system.';
     if (label && label.textContent.includes('video')) label.textContent = 'Tap to select or drag an audio file here';
   }
@@ -90,14 +82,14 @@ function updateSubmitButtonText() {
 
   if (isSongTitleMissing(selectedEntry)) {
     submitBtn.disabled = false;
-    submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-bold text-sm shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2 transition cursor-pointer';
-    submitText.innerHTML = '<span class="flex items-center justify-center gap-1.5"><i data-lucide="edit-3" class="w-4 h-4"></i> Add Song Title to Upload Track</span>';
+    submitBtn.className = 'me-btn me-btn-block me-btn-warn';
+    submitText.textContent = 'Add Song Title to Upload Track';
     if (window.lucide) lucide.createIcons();
     return;
   }
 
   submitBtn.disabled = false;
-  submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed';
+  submitBtn.className = 'me-btn me-btn-primary me-btn-block';
 
   const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.track_version;
   const isVideo = currentMediaType === 'video';
@@ -125,11 +117,13 @@ function initPreviewWaveSurfer() {
   }
 
   container.innerHTML = '';
+  const css = getComputedStyle(document.documentElement);
+  const token = (name, fallback) => (css.getPropertyValue(name).trim() || fallback);
   previewWavesurfer = WaveSurfer.create({
     container: container,
-    waveColor: '#64748b',
-    progressColor: '#f97316',
-    cursorColor: '#fb923c',
+    waveColor: token('--text-muted', '#8A92A0'),
+    progressColor: token('--accent-primary', '#F06449'),
+    cursorColor: token('--text-primary', '#F3F4F6'),
     cursorWidth: 2,
     barWidth: 2,
     barGap: 1,
@@ -140,14 +134,14 @@ function initPreviewWaveSurfer() {
 
   const playBtn = document.getElementById('preview-play-btn');
   if (playBtn) {
-    playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 ml-0.5"></i>';
+    playBtn.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
     if (window.lucide) lucide.createIcons();
   }
 
   previewWavesurfer.on('play', () => {
     window.auroraEffect?.setActive(true);
     if (playBtn) {
-      playBtn.innerHTML = '<i data-lucide="pause" class="w-4 h-4 text-white fill-current"></i>';
+      playBtn.innerHTML = '<i data-lucide="pause" class="w-5 h-5"></i>';
       if (window.lucide) lucide.createIcons();
     }
   });
@@ -155,7 +149,7 @@ function initPreviewWaveSurfer() {
   previewWavesurfer.on('pause', () => {
     window.auroraEffect?.setActive(false);
     if (playBtn) {
-      playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
+      playBtn.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
       if (window.lucide) lucide.createIcons();
     }
   });
@@ -163,7 +157,7 @@ function initPreviewWaveSurfer() {
   previewWavesurfer.on('finish', () => {
     window.auroraEffect?.setActive(false);
     if (playBtn) {
-      playBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4 text-white fill-current ml-0.5"></i>';
+      playBtn.innerHTML = '<i data-lucide="play" class="w-5 h-5"></i>';
       if (window.lucide) lucide.createIcons();
     }
   });
@@ -247,14 +241,36 @@ function updateActiveTrackBadge() {
   const badge = document.getElementById('active-track-badge');
   if (!selectedEntry) return;
 
-  if (isSongTitleMissing(selectedEntry)) {
-    badge.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Title Missing</span>';
-  } else if (selectedEntry.track_status === 'Acoustic') {
-    badge.innerHTML = '<span class="text-blue-400 flex items-center gap-1"><i data-lucide="guitar" class="w-3.5 h-3.5"></i> Acoustic (No Track)</span>';
-  } else if (selectedEntry.track_status === 'Uploaded' || selectedEntry.track_version) {
-    badge.innerHTML = '<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Track on file</span>';
-  } else {
-    badge.innerHTML = '<span class="text-amber-400 flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> No track yet</span>';
-  }
+  let kind = 'wait';
+  let icon = 'clock';
+  let text = 'No track yet';
+  if (isSongTitleMissing(selectedEntry)) { kind = 'bad'; icon = 'alert-triangle'; text = 'Title missing'; }
+  else if (selectedEntry.track_status === 'Acoustic') { kind = 'info'; icon = 'guitar'; text = 'Acoustic (no track)'; }
+  else if (selectedEntry.track_status === 'Uploaded' || selectedEntry.track_version) { kind = 'ok'; icon = 'check'; text = 'Track on file'; }
+  badge.dataset.kind = kind;
+  badge.innerHTML = `<i data-lucide="${icon}" class="w-4 h-4"></i><span>${text}</span>`;
+  renderReadiness(selectedEntry);
   if (window.lucide) lucide.createIcons();
+}
+
+// Song, Track, Ready: the first step that is not done is the current one (numbered, highlighted).
+function renderReadiness(song) {
+  const list = document.getElementById('entry-readiness');
+  if (!list || !song) return;
+  const songDone = !isSongTitleMissing(song);
+  const trackDone = song.track_status === 'Uploaded' || Boolean(song.track_version) || song.track_status === 'Acoustic';
+  const steps = [
+    { label: 'Song', done: songDone },
+    { label: 'Track', done: songDone && trackDone },
+    { label: 'Ready', done: songDone && trackDone },
+  ];
+  let currentFound = false;
+  list.innerHTML = steps.map((step, i) => {
+    let state = 'todo';
+    if (step.done) state = 'done';
+    else if (!currentFound) { state = 'current'; currentFound = true; }
+    const mark = state === 'done' ? '&#10003;' : String(i + 1);
+    const word = state === 'done' ? 'done' : state === 'current' ? 'next step' : 'to do';
+    return `<li class="is-${state}"><span class="me-step-dot" aria-hidden="true">${mark}</span><span>${step.label}<span class="sr-only">, ${word}</span></span></li>`;
+  }).join('');
 }

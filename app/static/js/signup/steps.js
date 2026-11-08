@@ -61,12 +61,14 @@ function applyAvailability() {
   // Only one possible choice: no chooser, just the matching heading.
   const available = Object.keys(choices).filter((k) => choices[k]);
   $("choice-section").hidden = available.length <= 1;
-  if (!choices[state.choice] && available.length) setChoice(available[0]);
+  const wanted = new URLSearchParams(location.search).get("choice");  // home page "Bring a dish" link
+  if (wanted && choices[wanted] && !state.choiceFromUrlApplied) { state.choiceFromUrlApplied = true; setChoice(wanted); }
+  else if (!choices[state.choice] && available.length) setChoice(available[0]);
 
   const title = $("signup-banner-title");
   const desc = $("signup-banner-desc");
   if (closed) {
-    title.textContent = "Sign up";
+    title.textContent = "Sign-up status";
     desc.textContent = "Sign-ups are closed.";
   } else if (perform && !dish) {
     title.textContent = "Sign up to perform";
@@ -78,8 +80,16 @@ function applyAvailability() {
     title.textContent = "Sign up";
     desc.textContent = "Perform on stage, bring a dish, or both. It takes about a minute.";
   }
+  state.baseTitle = title.textContent;
+  // Links on the closed card only show when the matching page is in the site navigation.
+  document.querySelectorAll("[data-needs-nav]").forEach((el) => {
+    el.hidden = !document.querySelector(`.guest-navigation a[href="${el.dataset.needsNav}"]`);
+  });
   syncChoiceUI();
 }
+
+// Dish-only sign-ups are one page (name, phone, dish); every other choice is a stepper.
+function singlePage() { return state.choice === "dish"; }
 
 function steps() { return STEP_SEQUENCE[state.choice] || STEP_SEQUENCE.perform; }
 
@@ -92,31 +102,57 @@ function setChoice(value) {
 
 function syncChoiceUI() {
   const wantsAct = state.choice !== "dish";
+  if (state.baseTitle === "Sign up") {
+    $("signup-banner-title").textContent = state.choice === "dish" ? "Bring a dish" : "Sign up";
+  }
   $("age-group-wrap").hidden = !wantsAct;
   updateGuardian();
   $("performer-name-label").textContent = state.choice === "dish" ? "Your name or family name" : "Your name";
-  if (state.step >= steps().length) state.step = 0;
+  if (state.step >= steps().length || singlePage()) state.step = 0;
   showStep();
 }
 
 function showStep() {
   const seq = steps();
-  document.querySelectorAll("[data-step]").forEach((el) => { el.hidden = el.dataset.step !== seq[state.step]; });
-  const last = state.step === seq.length - 1;
+  const single = singlePage();
+  document.querySelectorAll("[data-step]").forEach((el) => {
+    el.hidden = single ? !seq.includes(el.dataset.step) : el.dataset.step !== seq[state.step];
+  });
+  $("signup-form").classList.toggle("is-single", single);
+  const last = single || state.step === seq.length - 1;
   $("back-btn").hidden = state.step === 0;
+  $("home-link").hidden = state.step !== 0;
   const nextKey = seq[state.step + 1];
   $("submit-btn-text").textContent = last
-    ? (seq.length === 1 ? "Sign up" : "Complete sign-up")
+    ? "Submit"
     : (nextKey === "act" ? "Continue to your song" : "Continue to dish");
-  $("step-status").textContent = `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[seq[state.step]]}`;
-  if (seq[state.step] === "dish") renderFoodGroups();
+  const current = seq[state.step];
+  $("step-status").textContent = single ? "" : `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[current]}`;
+  const onDish = single || current === "dish";
+  $("skip-dish-btn").hidden = !(state.choice === "both" && current === "dish");
+  $("add-song-btn").hidden = !(single && performEnabled());
+  if (onDish) renderFoodGroups();
   renderStepper();
   hideFormError();
+  syncBarNotes();
+  refreshErrorSummary();
+}
+
+// Small notes under the primary button: the upload hint (song step) and the picked dish (dish step).
+function syncBarNotes() {
+  const seq = steps();
+  const onAct = !singlePage() && seq[state.step] === "act";
+  const onDish = singlePage() || seq[state.step] === "dish";
+  $("upload-hint").hidden = !onAct || $("acoustic").checked;
+  const picked = document.querySelector('input[name="food_item_id"]:checked');
+  const note = $("dish-selected-note");
+  note.hidden = !(onDish && picked);
+  if (picked) note.textContent = `${picked.dataset.name || "Your dish"} selected. You can change it later in My entry.`;
 }
 
 function renderStepper() {
   const ol = $("stepper");
-  const n = steps().length;
+  const n = singlePage() ? 1 : steps().length;
   ol.innerHTML = "";
   for (let i = 0; i < n; i++) {
     const li = document.createElement("li");
@@ -127,5 +163,5 @@ function renderStepper() {
 
 function goToStep(key) {
   const idx = steps().indexOf(key);
-  if (idx >= 0) { state.step = idx; showStep(); }
+  if (idx >= 0) { state.step = singlePage() ? 0 : idx; showStep(); }
 }

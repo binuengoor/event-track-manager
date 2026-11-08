@@ -56,6 +56,39 @@ function updateGuardian() {
   }
   const adultBox = $("adult-privacy-box");
   if (adultBox) adultBox.hidden = show;
+  $("junior-privacy-note").hidden = !show;
+  if (!show) $("use-guardian-phone").checked = true;
+  syncGuardianPhone();
+  updateJuniorPrivacy();
+}
+
+// Junior sign-ups can use the guardian's phone as the contact: the phone field then steps aside.
+function usingGuardianPhone() {
+  return isJunior() && $("use-guardian-phone").checked;
+}
+
+function syncGuardianPhone() {
+  const useGuardian = usingGuardianPhone();
+  $("phone-field").hidden = useGuardian;
+  if (useGuardian) {
+    $("contact-info").value = "";
+    setErr("contact-info", "");
+  }
+  const gp = $("guardian-phone").value.trim();
+  $("use-guardian-phone-value").textContent = gp;
+  $("use-guardian-phone-value").hidden = !gp;
+}
+
+// "Anika Menon" -> "Anika M."
+function publicShortName(name) {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+}
+
+function updateJuniorPrivacy() {
+  const short = publicShortName($("performer-name").value);
+  $("junior-privacy-title").textContent = short ? `Shown publicly as ${short}` : "Shown publicly with first name and last initial";
 }
 
 function renderPerformanceTypes(types) {

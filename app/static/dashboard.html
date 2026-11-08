@@ -1,19 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <script src="/static/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0B0D10">
   <meta name="view-transition" content="same-origin">
   <title>Schedule - Event Track Manager</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
   <script src="/static/js/icons.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 <link rel="stylesheet" href="/static/css/app.css?v=1">
@@ -21,8 +15,9 @@
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/schedule.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+<body class="page-schedule min-h-screen flex flex-col antialiased relative">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
 
@@ -46,51 +41,51 @@
   <script src="/static/js/nav.js"></script>
 
   <!-- Main Content -->
-  <main id="main-content" class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-8 space-y-4">
+  <main id="main-content" class="sch-main flex-1 w-full mx-auto">
 
-    <div id="offline-banner" class="gf-offline" role="status" aria-live="polite" hidden>
-      You are offline. Showing the schedule as of <span id="offline-time"></span>.
+    <div id="offline-banner" class="sch-offline" role="status" aria-live="polite" hidden>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l10 18H2z"/><path d="M12 10v5M12 18h.01"/></svg>
+      <span>You are offline. Showing the schedule as of <span id="offline-time" class="sch-mono"></span>.</span>
     </div>
 
-    <div class="gf-card" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem">
-      <div>
-        <h2 id="dashboard-header-title" class="text-xl sm:text-2xl font-black text-white m-0">Schedule</h2>
-        <p id="dashboard-header-desc" class="gf-muted" style="margin:.25rem 0 0">The running order and the food board.</p>
-      </div>
-      <div id="dashboard-tabs-container" class="gf-segment" role="group" aria-label="Schedule view">
-        <button type="button" id="tab-songs-btn" aria-pressed="true">Lineup <span id="songs-count-badge">0</span></button>
-        <button type="button" id="tab-food-btn" aria-pressed="false">Food <span id="food-count-badge">0</span></button>
+    <div class="sch-head">
+      <h2 id="dashboard-header-title" class="sch-title">Schedule</h2>
+      <p id="dashboard-header-desc" class="sch-desc">The running order and the food board.</p>
+      <div id="dashboard-tabs-container" class="sch-tabs" role="group" aria-label="Schedule view">
+        <button type="button" id="tab-songs-btn" aria-pressed="true">Lineup <span id="songs-count-badge" class="sch-count">0</span></button>
+        <button type="button" id="tab-food-btn" aria-pressed="false">Food <span id="food-count-badge" class="sch-count">0</span></button>
       </div>
     </div>
 
     <!-- LINEUP -->
-    <section id="section-songs" class="space-y-3" aria-label="Lineup">
-      <div style="display:flex;flex-wrap:wrap;gap:.5rem">
-        <label for="song-search-input" class="gf-label" style="position:absolute;left:-9999px">Search the lineup</label>
-        <input type="search" id="song-search-input" class="gf-input" style="flex:1 1 12rem" placeholder="Search performer or song">
-        <label for="type-filter-select" class="gf-label" style="position:absolute;left:-9999px">Filter by type</label>
-        <select id="type-filter-select" class="gf-select" style="flex:0 0 auto;width:auto">
+    <section id="section-songs" class="sch-section" aria-label="Lineup">
+      <div class="sch-filters">
+        <label for="song-search-input" class="sr-only">Search the lineup</label>
+        <input type="search" id="song-search-input" class="sch-input" placeholder="Search performer or song">
+        <label for="type-filter-select" class="sr-only">Filter by type</label>
+        <select id="type-filter-select" class="sch-select">
           <option value="">All types</option>
           <option value="solo">Solo</option>
           <option value="duet">Duet</option>
           <option value="group">Group</option>
         </select>
-        <button type="button" id="refresh-dashboard-btn" class="gf-btn" aria-label="Refresh">Refresh</button>
+        <button type="button" id="refresh-dashboard-btn" class="sch-btn" aria-label="Refresh">Refresh</button>
       </div>
-      <ol id="lineup-list" class="gf-lineup" aria-live="polite">
-        <li class="gf-muted" style="padding:1.5rem;text-align:center">Loading the lineup...</li>
+      <ol id="lineup-list" class="sch-lineup" aria-live="polite">
+        <li class="sch-empty">Loading the lineup...</li>
       </ol>
     </section>
 
     <!-- FOOD BOARD -->
-    <section id="section-food" class="space-y-3" aria-label="Food board" hidden>
-      <div class="gf-card">
-        <p class="m-0 font-bold text-white"><span id="food-stats-pill">0 of 0 taken</span></p>
-        <p id="dashboard-serving-note" class="gf-muted" style="margin:.25rem 0 0"></p>
-        <p class="gf-muted" style="margin:.25rem 0 0">You do not have to perform to bring a dish.</p>
-        <p style="margin:.75rem 0 0"><a id="bring-dish-link" class="gf-btn gf-btn-primary" href="/signup">Bring a dish</a></p>
+    <section id="section-food" class="sch-section" aria-label="Food board" hidden>
+      <div class="sch-foodhead">
+        <div id="food-progress" class="sch-progress" role="progressbar" aria-label="Dishes claimed" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"><div id="food-progress-fill" class="sch-progress-fill"></div></div>
+        <p class="sch-foodstat"><span id="food-stats-pill">0 of 0 taken</span></p>
+        <p id="dashboard-serving-note" class="sch-note"></p>
+        <p class="sch-note">You do not have to perform to bring a dish.</p>
+        <p class="sch-bring"><a id="bring-dish-link" class="sch-btn" href="/signup">Bring a dish</a></p>
       </div>
-      <div id="dashboard-food-groups"></div>
+      <div id="dashboard-food-groups" class="sch-groups"></div>
     </section>
 
   </main>

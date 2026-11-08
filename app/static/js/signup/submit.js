@@ -7,6 +7,13 @@ async function handleSubmit(e) {
   const seq = steps();
   const key = seq[state.step];
 
+  if (singlePage()) {
+    // Dish-only sign-up: one page, so check every section before sending.
+    const results = seq.map((k) => VALIDATORS[k]());
+    if (results.every(Boolean)) await submitSignup();
+    else if (!results[results.length - 1]) $("food-groups-container").querySelector("input")?.focus();
+    return;
+  }
   if (!VALIDATORS[key]()) return;
   if (state.step < seq.length - 1) {
     state.step += 1;
@@ -59,6 +66,18 @@ function buildPayload() {
     payload.food_signup = { item_id: food.value, dish_description: $("dish-description").value.trim() };
   }
   return payload;
+}
+
+// Step 3 is optional for "Both": skipping it signs up to perform only.
+async function skipDish() {
+  for (const k of ["about", "act"]) {
+    if (!VALIDATORS[k]()) { goToStep(k); return; }
+  }
+  document.querySelectorAll('input[name="food_item_id"]').forEach((r) => { r.checked = false; });
+  setChoice("perform");
+  state.step = steps().length - 1;
+  showStep();
+  await submitSignup();
 }
 
 async function submitSignup() {
@@ -118,17 +137,21 @@ function showDone(response, request) {
   const parts = [];
   if (act) parts.push(`${act.song_title ? act.song_title + ", " : ""}${act.performance_type.toLowerCase()}`);
   if (hasDish) parts.push(state.lastResult?.dishName ? `dish: ${state.lastResult.dishName}` : "your dish is on the food board");
-  const tail = ids.length ? " Keep this entry id; you can edit from My entry." : "";
+  const editsLocked = c.performer_edits_enabled === false;
+  const tail = ids.length && !editsLocked ? " Keep this entry id; you can edit from My entry." : "";
   $("done-message").textContent = `Thank you, ${name}! You are signed up for ${eventLabel()}.${parts.length ? " " + parts.join("; ") + "." : ""}${tail}`;
 
   const upload = $("done-upload");
-  const canUpload = Boolean(act) && !act.is_acoustic && c.track_upload_enabled !== false;
+  const wantsTrack = Boolean(act) && !act.is_acoustic;
+  const canUpload = wantsTrack && c.track_upload_enabled !== false;
   upload.hidden = !canUpload;
+  $("done-uploads-closed").hidden = !(wantsTrack && c.track_upload_enabled === false);
+  $("done-edits-locked").hidden = !editsLocked;
   upload.href = `/my-entry?name=${encodeURIComponent(name)}`;
 
   const canAddAct = performEnabled();
   $("done-add-act").hidden = !canAddAct;
-  $("done-add-act").firstChild.textContent = act ? "Add another act" : "Add an act";
+  $("done-add-act-title").textContent = act ? "Add another act" : "Add an act";
   $("done-add-dish").hidden = !(dishEnabled() && !hasDish);
 
   const pay = $("done-payment");
@@ -146,7 +169,6 @@ function showDone(response, request) {
 async function restartForm(choice) {
   ["song-title", "movie-name", "stage-notes", "partner-name", "partner-phone", "dish-description"].forEach((id) => { $(id).value = ""; });
   $("acoustic").checked = false;
-  $("upload-hint").hidden = false;
   $("song-dup-box").hidden = true;
   document.querySelectorAll('input[name="food_item_id"]').forEach((r) => { r.checked = false; });
   state.partnerSame = null;

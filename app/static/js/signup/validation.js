@@ -10,13 +10,44 @@ function setErr(field, msg) {
     err.hidden = !msg;
   }
   if (input && "ariaInvalid" in input) input.setAttribute("aria-invalid", msg ? "true" : "false");
+  refreshErrorSummary();
   return !msg;
+}
+
+// Summary box above the fields: one link per visible error, so a keyboard or screen-reader user can jump to each.
+let errorSummarySig = "";
+function errorTargetFor(errEl) {
+  return $(errEl.id.replace(/^err-/, "")) || errEl.closest("fieldset")?.querySelector("input") || errEl.closest(".gf-field")?.querySelector("input");
+}
+function refreshErrorSummary() {
+  const box = $("error-summary");
+  const list = $("error-summary-list");
+  if (!box || !list) return;
+  const errs = Array.from(document.querySelectorAll("#signup-form .gf-error"))
+    .filter((e) => !e.hidden && e.textContent.trim() && !e.parentElement.closest("[hidden]"));
+  const sig = errs.map((e) => `${e.id}:${e.textContent}`).join("|");
+  if (sig === errorSummarySig) return;
+  errorSummarySig = sig;
+  list.innerHTML = "";
+  if (!errs.length) { box.hidden = true; return; }
+  $("error-summary-heading").textContent = `Fix ${errs.length} thing${errs.length === 1 ? "" : "s"} to continue`;
+  errs.forEach((e) => {
+    const li = document.createElement("li");
+    const a = document.createElement("a");
+    a.href = "#";
+    a.textContent = e.textContent;
+    a.addEventListener("click", (ev) => { ev.preventDefault(); errorTargetFor(e)?.focus(); });
+    li.appendChild(a);
+    list.appendChild(li);
+  });
+  box.hidden = false;
 }
 
 function showFormError(msg) {
   const el = $("form-error");
   el.textContent = msg;
   el.hidden = !msg;
+  if (msg) el.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 function hideFormError() { showFormError(""); }
 
@@ -43,7 +74,10 @@ const VALIDATORS = {
       const gp = $("guardian-phone").value.trim();
       if (!gp) fail("guardian-phone", "Enter a guardian phone number.");
       else if (!isValidPhone(gp)) fail("guardian-phone", "Enter a 10-digit phone number for the guardian.");
-      if (phone && !isValidPhone(phone)) fail("contact-info", "Enter a 10-digit phone number, or leave it blank to use the guardian's.");
+      if (!usingGuardianPhone()) {
+        if (!phone) fail("contact-info", "Enter your phone number, or tick the box to use the guardian's.");
+        else if (!isValidPhone(phone)) fail("contact-info", "Enter a 10-digit phone number, or use the guardian's.");
+      }
     } else if (!phone) {
       fail("contact-info", "Enter your phone number.");
     } else if (!isValidPhone(phone)) {
@@ -102,15 +136,17 @@ function bindEvents() {
   const nameInput = $("performer-name");
   nameInput.addEventListener("input", () => {
     setErr("performer-name", "");
+    updateJuniorPrivacy();
     state.profileChecked = state.profileChecked === nameInput.value.trim().toLowerCase() ? state.profileChecked : "";
     updateNameLookup();
   });
   $("contact-info").addEventListener("input", () => { setErr("contact-info", ""); $("phone-note").hidden = true; });
   $("guardian-name").addEventListener("input", () => setErr("guardian-name", ""));
-  $("guardian-phone").addEventListener("input", () => setErr("guardian-phone", ""));
+  $("guardian-phone").addEventListener("input", () => { setErr("guardian-phone", ""); syncGuardianPhone(); });
+  $("use-guardian-phone").addEventListener("change", syncGuardianPhone);
 
   $("song-title").addEventListener("input", updateSongWarning);
-  $("acoustic").addEventListener("change", () => { $("upload-hint").hidden = $("acoustic").checked; });
+  $("acoustic").addEventListener("change", () => { syncBarNotes(); });
 
   $("partner-name").addEventListener("input", () => {
     setErr("partner-name", "");
@@ -135,6 +171,7 @@ function bindEvents() {
     if (e.target && e.target.name === "food_item_id") {
       setErr("food", "");
       $("selected-food-box").hidden = false;
+      syncBarNotes();
     }
   });
 
@@ -142,6 +179,8 @@ function bindEvents() {
     if (state.step > 0) { state.step -= 1; showStep(); }
   });
   $("signup-form").addEventListener("submit", handleSubmit);
+  $("skip-dish-btn").addEventListener("click", skipDish);
+  $("add-song-btn").addEventListener("click", () => { setChoice("both"); window.scrollTo({ top: 0 }); });
 
   $("done-add-act").addEventListener("click", () => restartForm("perform"));
   $("done-add-dish").addEventListener("click", () => restartForm("dish"));

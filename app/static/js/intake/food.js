@@ -104,35 +104,31 @@ async function checkPerformerFoodStatus(name) {
       }
 
       performerFoodSignup = data.food_signup;
+      // Dish-only people can still sign up to perform; their name and phone carry over on the sign-up page.
+      const sing = (data.stage_performances_enabled !== false && !(data.performances || []).length)
+        ? `<a href="/signup" class="me-cta"><span class="me-cta-text"><strong>Want to sing too?</strong><span>Sign up to perform. Your name and phone carry over.</span></span><span class="me-cta-go">Sign up</span></a>`
+        : '';
 
       if (performerFoodSignup && performerFoodSignup.item_id) {
-        // User has claimed food item -> Green Card
+        // Claimed: the "My dish" card (name, group, serving size, note, change and release)
         ctaSection.innerHTML = `
-          <div class="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-start gap-3">
-              <div class="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
-                <i data-lucide="utensils" class="w-4 h-4"></i>
+          <section class="me-card me-dish" aria-labelledby="my-dish-heading">
+            <div class="me-row me-row-top">
+              <div class="me-dish-text">
+                <span class="me-eyebrow" id="my-dish-heading">My dish</span>
+                <span class="me-dish-name">${escapeHtml(performerFoodSignup.item_name)}</span>
+                <span class="me-small">${escapeHtml(performerFoodSignup.group_name)} &middot; ${escapeHtml(foodServingNote)}</span>
+                ${performerFoodSignup.dish_description ? `<span class="me-small">Note: ${escapeHtml(performerFoodSignup.dish_description)}</span>` : ''}
               </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <h4 class="text-sm font-bold text-white">${escapeHtml(performerFoodSignup.item_name)}</h4>
-                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 font-bold border border-amber-500/40">YOURS</span>
-                </div>
-                <p class="text-xs text-slate-300 mt-0.5">${performerFoodSignup.dish_description ? escapeHtml(performerFoodSignup.dish_description) : 'No description provided'}</p>
-                <p class="text-[11px] text-emerald-400/80 mt-0.5">Group: ${escapeHtml(performerFoodSignup.group_name)} &bull; ${escapeHtml(foodServingNote)}</p>
-              </div>
+              <span class="me-status" data-kind="ok">Yours</span>
             </div>
-            <div class="flex items-center gap-2 self-end sm:self-center">
-              <button type="button" id="change-food-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-200 border border-slate-700 transition flex items-center gap-1">
-                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                <span>Change Dish</span>
-              </button>
-              <button type="button" id="release-food-btn" class="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900/60 text-xs font-semibold text-rose-300 border border-rose-500/40 transition flex items-center gap-1">
-                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-                <span>Release</span>
-              </button>
+            <div class="me-two">
+              <button type="button" id="change-food-btn" class="me-btn me-btn-primary">Change dish</button>
+              <button type="button" id="release-food-btn" class="me-btn me-btn-danger">Release dish</button>
             </div>
-          </div>
+            <p class="me-small">Releasing frees the slot for someone else. You will be asked to confirm. You can pick another dish any time.</p>
+          </section>
+          ${sing}
         `;
 
         document.getElementById('change-food-btn').addEventListener('click', () => {
@@ -160,24 +156,18 @@ async function checkPerformerFoodStatus(name) {
         });
 
       } else {
-        // No food item claimed -> Yellow CTA Card
+        // Nothing claimed: invite them to pick an open slot
         ctaSection.innerHTML = `
-          <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div class="flex items-start gap-3">
-              <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-                <i data-lucide="utensils" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-sm font-bold text-white">You have not picked a dish yet</h4>
-                <p class="text-xs text-amber-300/90 mt-0.5">You do not have to perform to bring a dish. Pick an open slot from the food board.</p>
-                <p class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(foodServingNote)}</p>
-              </div>
+          <section class="me-card me-dish" aria-labelledby="my-dish-heading">
+            <div class="me-dish-text">
+              <span class="me-eyebrow" id="my-dish-heading">My dish</span>
+              <span class="me-dish-name">You have not picked a dish yet</span>
+              <span class="me-small">You do not have to perform to bring a dish. Pick an open slot from the food board.</span>
+              <span class="me-small">${escapeHtml(foodServingNote)}</span>
             </div>
-            <button type="button" id="pick-food-btn" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 transition flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-              <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-              <span>Pick a Dish</span>
-            </button>
-          </div>
+            <button type="button" id="pick-food-btn" class="me-btn me-btn-primary me-btn-block">Pick a dish</button>
+          </section>
+          ${sing}
         `;
 
         document.getElementById('pick-food-btn').addEventListener('click', () => {
@@ -226,12 +216,9 @@ function openFoodSelector(preselectItemId = null, prefillDesc = '') {
     if (items.length === 0) return; // Hide empty groups
 
     html += `
-      <div class="space-y-2">
-        <h5 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-          <span>●</span>
-          <span>${escapeHtml(group.name)}</span>
-        </h5>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <fieldset class="me-pick-group">
+        <legend class="me-eyebrow">${escapeHtml(group.name)}</legend>
+        <div class="me-pick-grid">
     `;
 
     items.forEach(item => {
@@ -241,27 +228,23 @@ function openFoodSelector(preselectItemId = null, prefillDesc = '') {
 
       if (isClaimedByOther) {
         html += `
-          <div class="p-2.5 rounded-xl bg-slate-950/40 border border-slate-800/60 opacity-60 flex items-center justify-between text-xs">
-            <span class="text-slate-400 line-through">${escapeHtml(item.name)}</span>
-            <span class="text-[10px] text-rose-400 font-mono">Taken${item.signer_name ? ' \u00b7 ' + escapeHtml(item.signer_name) : ''}</span>
+          <div class="me-pick is-taken">
+            <span class="me-pick-name">${escapeHtml(item.name)}</span>
+            <span class="me-pick-tag">Taken${item.signer_name ? ' \u00b7 ' + escapeHtml(item.signer_name) : ''}</span>
           </div>
         `;
       } else {
         html += `
-          <label class="p-2.5 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition ${
-            isSelected ? 'bg-amber-500/15 border-amber-500/60 text-white' : 'bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700'
-          }">
-            <div class="flex items-center gap-2">
-              <input type="radio" name="food_item_radio" value="${item.item_id}" ${isSelected ? 'checked' : ''} class="text-amber-500 accent-amber-500 focus:ring-amber-500">
-              <span class="font-medium">${escapeHtml(item.name)}</span>
-            </div>
-            <span class="text-[10px] font-semibold uppercase ${isOwn ? 'text-amber-300' : 'text-emerald-400'}">${isOwn ? 'Yours' : 'Open'}</span>
+          <label class="me-pick${isSelected ? ' is-selected' : ''}">
+            <input type="radio" name="food_item_radio" value="${item.item_id}" ${isSelected ? 'checked' : ''}>
+            <span class="me-pick-name">${escapeHtml(item.name)}</span>
+            <span class="me-pick-tag">${isOwn ? 'Yours' : 'Open'}</span>
           </label>
         `;
       }
     });
 
-    html += `</div></div>`;
+    html += `</div></fieldset>`;
   });
 
   pickerContainer.innerHTML = html;
@@ -270,10 +253,8 @@ function openFoodSelector(preselectItemId = null, prefillDesc = '') {
   // Handle radio select highlighting
   document.querySelectorAll('input[name="food_item_radio"]').forEach(r => {
     r.addEventListener('change', () => {
-      document.querySelectorAll('#food-groups-picker label').forEach(lbl => {
-        lbl.className = 'p-2.5 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition bg-slate-950 border-slate-800 text-slate-200 hover:border-slate-700';
-      });
-      r.closest('label').className = 'p-2.5 rounded-xl border flex items-center justify-between text-xs cursor-pointer transition bg-amber-500/15 border-amber-500/60 text-white';
+      document.querySelectorAll('#food-groups-picker .me-pick').forEach(lbl => lbl.classList.remove('is-selected'));
+      r.closest('label').classList.add('is-selected');
     });
   });
 

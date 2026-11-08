@@ -1,19 +1,13 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <script src="/static/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="theme-color" content="#0B0D10">
   <meta name="view-transition" content="same-origin">
   <title>My entry - Event Track Manager</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
   <script src="/static/js/icons.js"></script>
   <script src="/static/vendor/wavesurfer.min.js" defer></script>
   <link rel="stylesheet" href="/static/css/style.css">
@@ -22,8 +16,9 @@
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/my-entry.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+<body class="page-entry min-h-screen flex flex-col antialiased relative">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
 
@@ -44,587 +39,483 @@
   </header>
   <script src="/static/js/nav.js"></script>
 
-  <!-- Main Content -->
-  <main id="main-content" class="flex-1 max-w-2xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
-    <!-- Intro Card -->
-    <div class="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800 p-5 rounded-2xl shadow-xl">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xl font-bold text-white flex items-center gap-2">
-          <span id="performer-hub-title">My entry</span>
-        </h2>
-        <a href="/signup" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
-          <span>Not registered yet?</span>
-          <i data-lucide="arrow-right" class="w-3 h-3"></i>
-        </a>
-      </div>
-      <p id="performer-hub-desc" class="text-sm text-slate-400 leading-relaxed">
+  <!-- Main Content -->
+  <main id="main-content" class="me-main flex-1 w-full mx-auto">
+
+    <div class="me-head">
+      <h2 id="performer-hub-title" class="me-title">My entry</h2>
+      <p id="performer-hub-desc" class="me-desc">
         Pick your name to edit your song, upload your track or paste a link, and manage your dish.
       </p>
-
-      <!-- Quick Resource Links: Sign-Up Sheet & Payment Page -->
-      <div class="mt-4 pt-3.5 border-t border-slate-800/80 flex flex-wrap items-center gap-2.5">
-        <a href="/schedule" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 transition shadow-sm">
-          <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-indigo-400"></i>
+      <div class="me-links">
+        <a href="/schedule" class="me-chip">
+          <i data-lucide="calendar" class="w-4 h-4"></i>
           <span>View the schedule</span>
         </a>
-        <a id="payment-page-link" href="#" target="_blank" class="hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-xs font-semibold text-slate-300 hover:text-white border border-slate-700 hover:border-slate-600 transition shadow-sm">
-          <i data-lucide="credit-card" class="w-3.5 h-3.5 text-amber-400"></i>
+        <a id="payment-page-link" href="#" target="_blank" rel="noopener" class="hidden me-chip">
+          <i data-lucide="credit-card" class="w-4 h-4"></i>
           <span>Event Payment</span>
-          <i data-lucide="external-link" class="w-3 h-3 text-slate-500"></i>
+          <i data-lucide="external-link" class="w-4 h-4"></i>
         </a>
-        <div id="payment-page-placeholder" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950/60 text-xs font-medium text-slate-500 border border-slate-800/80">
-          <i data-lucide="credit-card" class="w-3.5 h-3.5 text-slate-600"></i>
+        <span id="payment-page-placeholder" class="me-chip is-static">
+          <i data-lucide="credit-card" class="w-4 h-4"></i>
           <span>Payment (Coming Soon)</span>
-        </div>
+        </span>
       </div>
     </div>
 
     <!-- Potluck Only Event Banner (when stage_performances_enabled is false) -->
-    <div id="potluck-only-event-notice" class="hidden p-5 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 text-center space-y-2">
-      <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
-        <i data-lucide="utensils" class="w-5 h-5"></i>
+    <div id="potluck-only-event-notice" class="hidden me-notice">
+      <i data-lucide="utensils" class="w-5 h-5"></i>
+      <div>
+        <h3 class="me-notice-title">Community Potluck Gathering</h3>
+        <p>This event is dedicated to food and community dinner (no stage performances). Check or update your potluck food contribution below.</p>
       </div>
-      <h4 class="text-sm font-bold text-white">Community Potluck Gathering</h4>
-      <p class="text-xs text-slate-300 max-w-md mx-auto">This event is dedicated to food and community dinner (no stage performances). Check or update your potluck food contribution below.</p>
     </div>
 
-    <!-- 1. Performer Selection -->
-    <div class="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl">
-      <label for="performer-select" class="block text-sm font-semibold text-slate-200 mb-2 flex items-center justify-between">
-        <span class="flex items-center gap-2">
-          <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">1</span>
-          <span id="performer-select-label-text">Select Performer</span>
-        </span>
-        <span id="performer-count-badge" class="text-xs text-slate-400 font-normal">Loading participants...</span>
-      </label>
-      
-      <div class="relative">
-        <select id="performer-select" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent appearance-none cursor-pointer">
-          <option value="">Choose your name…</option>
-        </select>
-        <div class="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-          <i data-lucide="chevron-down" class="w-4 h-4"></i>
-        </div>
+    <!-- 1. Performer lookup by name -->
+    <section class="me-card me-lookup" aria-labelledby="performer-select-heading">
+      <div class="me-row">
+        <label for="performer-select" class="me-label" id="performer-select-heading"><span id="performer-select-label-text">Select Performer</span></label>
+        <span id="performer-count-badge" class="me-small">Loading participants...</span>
       </div>
+      <select id="performer-select" class="me-select">
+        <option value="">Choose your name…</option>
+      </select>
+      <p class="me-small"><a href="/signup" class="me-link">Not registered yet? Sign up</a></p>
+    </section>
 
-      <div id="selected-performer-bar" class="hidden mt-3 pt-3 border-t border-slate-800 flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-xs text-slate-400">Selected Participant:</span>
-          <span id="selected-performer-display-name" class="text-xs font-bold text-white"></span>
-        </div>
-        <button type="button" id="edit-performer-name-btn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-medium flex items-center gap-1.5 transition border border-slate-700">
-          <i data-lucide="edit-3" class="w-3 h-3 text-orange-400"></i>
-          <span>Edit Name</span>
-        </button>
-      </div>
+    <!-- Signed-up-as bar (shown once a name is chosen) -->
+    <div id="selected-performer-bar" class="hidden me-signed">
+      <span class="me-signed-text">Signed up as <strong id="selected-performer-display-name"></strong></span>
+      <span class="me-signed-actions">
+        <button type="button" id="edit-performer-name-btn" class="me-link-btn">Edit name</button>
+        <button type="button" id="not-you-btn" class="me-link-btn">Not you?</button>
+      </span>
     </div>
 
     <!-- Song Selection & Track Upload Form -->
-    <form id="intake-form" class="space-y-6">
+    <form id="intake-form" class="me-form" novalidate>
 
-      <!-- 2. Registered Performances -->
-      <div id="song-selection-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-3">
-        <div class="flex items-center justify-between">
-          <label class="block text-sm font-semibold text-slate-200 flex items-center gap-2">
-            <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">2</span>
-            <span>Your Registered Performances</span>
-          </label>
-          <button type="button" id="add-performance-btn" class="hidden px-2.5 py-1 rounded-xl bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/30 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 shadow-sm">
-            <i data-lucide="plus-circle" class="w-3.5 h-3.5 text-orange-400"></i>
-            <span>Add Another Performance</span>
-          </button>
-        </div>
-        
-        <div id="song-options-container" class="space-y-2.5 pt-1">
-          <!-- Populated dynamically -->
-        </div>
+      <!-- 2. Registered performances (act cards) -->
+      <section id="song-selection-section" class="hidden me-stack" aria-labelledby="song-selection-heading">
+        <h3 id="song-selection-heading" class="me-eyebrow">Your acts</h3>
 
-        <!-- Missing Song Name Alert Box -->
-        <div id="missing-song-alert" class="hidden p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div class="flex items-start gap-2.5 text-amber-300 text-xs">
-            <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
-            <div>
-              <strong class="font-bold text-amber-200 block">Song title is missing for this entry!</strong>
-              <span>You must specify a song title before uploading a backing track.</span>
-            </div>
+        <div id="song-options-container" class="me-stack"><!-- Populated dynamically --></div>
+
+        <!-- Readiness for the selected act: Song, Track, Ready -->
+        <ol id="entry-readiness" class="me-steps" aria-label="Readiness of the selected act"></ol>
+
+        <button type="button" id="add-performance-btn" class="hidden me-btn me-btn-block">
+          <span aria-hidden="true">+</span>
+          <span>Add Another Performance</span>
+        </button>
+
+        <!-- Missing song title -->
+        <div id="missing-song-alert" class="hidden me-alert is-warn" role="status">
+          <i data-lucide="alert-circle" class="w-5 h-5"></i>
+          <div class="me-alert-body">
+            <strong class="me-alert-title">Song title is missing for this entry</strong>
+            <span>You must specify a song title before uploading a backing track.</span>
+            <button type="button" id="alert-add-title-btn" class="me-btn me-btn-small">
+              <i data-lucide="edit-3" class="w-4 h-4"></i>
+              <span>Add Title Now</span>
+            </button>
           </div>
-          <button type="button" id="alert-add-title-btn" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shrink-0 transition flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20">
-            <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-            <span>Add Title Now</span>
-          </button>
         </div>
-      </div>
+      </section>
 
-      <!-- 3. Food Sign-Up CTA Card (Dynamic based on performer's food status) -->
-      <div id="food-cta-section" class="hidden">
-        <!-- Injected dynamically via JS: Yellow Pick-a-Dish or Green Claimed Card -->
-      </div>
+      <!-- 3. My dish (claimed card or pick-a-dish card, injected by JS) -->
+      <div id="food-cta-section" class="hidden"></div>
 
-      <!-- Inline Food Selector Modal/Card (expands when picking/changing food) -->
-      <div id="food-selector-card" class="hidden bg-slate-900/95 border border-amber-500/40 p-5 rounded-2xl space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
-              <i data-lucide="utensils" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-white">Select Potluck Food Item</h3>
-              <p id="food-serving-note-display" class="text-xs text-amber-300">Bring one dish to share</p>
-            </div>
-          </div>
-          <button type="button" id="close-food-selector-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
-            <i data-lucide="x" class="w-4 h-4"></i>
-          </button>
-        </div>
-
-        <div id="food-groups-picker" class="space-y-4 max-h-80 overflow-y-auto pr-1">
-          <!-- Populated dynamically with grouped food items -->
-        </div>
-
-        <!-- Description input and Save -->
-        <div class="pt-3 border-t border-slate-800 space-y-3">
+      <!-- Dish picker (opens when picking or changing a dish) -->
+      <section id="food-selector-card" class="hidden me-card" aria-labelledby="food-selector-heading">
+        <div class="me-row">
           <div>
-            <label for="food-dish-input" class="block text-xs font-semibold text-slate-300 mb-1">What dish are you bringing? (Optional details)</label>
-            <input type="text" id="food-dish-input" placeholder="e.g. Samosa, Chicken 65, Gulab Jamun" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500 focus:outline-none">
+            <h3 id="food-selector-heading" class="me-card-title">Select a dish</h3>
+            <p id="food-serving-note-display" class="me-small">Bring one dish to share</p>
           </div>
-          <div class="flex items-center justify-end gap-2">
-            <button type="button" id="cancel-food-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
-              Cancel
-            </button>
-            <button type="button" id="save-food-btn" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-xs font-bold text-white shadow-md shadow-amber-500/20 transition disabled:opacity-50">
-              Save Food Sign-Up
-            </button>
-          </div>
+          <button type="button" id="close-food-selector-btn" class="me-icon-btn" aria-label="Close dish picker">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
         </div>
-      </div>
+        <div id="food-groups-picker" class="me-picker"><!-- Populated dynamically with grouped food items --></div>
+        <div class="me-field">
+          <label for="food-dish-input" class="me-label">Add a note (optional)</label>
+          <input type="text" id="food-dish-input" placeholder="e.g. Mild spice. Contains cashews." class="me-input">
+          <p class="me-small">Shown on the food board. Handy for allergies or serving needs.</p>
+        </div>
+        <div class="me-actions">
+          <button type="button" id="cancel-food-btn" class="me-btn">Cancel</button>
+          <button type="button" id="save-food-btn" class="me-btn me-btn-primary">Save Food Sign-Up</button>
+        </div>
+      </section>
 
       <!-- Acoustic Event Notice (when track_upload_enabled is false) -->
-      <div id="acoustic-event-notice-card" class="hidden p-6 rounded-3xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
-        <div class="w-10 h-10 rounded-2xl bg-sky-500/20 text-sky-400 mx-auto flex items-center justify-center">
-          <i data-lucide="guitar" class="w-5 h-5"></i>
+      <div id="acoustic-event-notice-card" class="hidden me-notice">
+        <i data-lucide="guitar" class="w-5 h-5"></i>
+        <div>
+          <h3 class="me-notice-title">Live / Acoustic Performance Event</h3>
+          <p>Backing track audio uploads are disabled for this event. Your song is marked for live on-stage performance.</p>
         </div>
-        <h4 class="text-sm font-bold text-white">Live / Acoustic Performance Event</h4>
-        <p class="text-xs text-slate-400 max-w-sm mx-auto">Backing track audio uploads are disabled for this event. Your song is marked for live on-stage performance.</p>
       </div>
 
-      <!-- 4. Track Upload Tabs (appears once song selected) -->
-      <div id="upload-methods-section" class="hidden bg-slate-900/90 border border-slate-800 p-5 rounded-2xl space-y-4">
-        
-        <!-- Existing Track Audio Preview Card -->
-        <div id="existing-track-card" class="hidden p-4 rounded-xl bg-slate-950 border border-emerald-500/40 space-y-3">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-              <span>Active Backing Track on File</span>
-            </div>
-            <span class="text-xs text-slate-400 font-mono" id="track-size-badge">-- MB</span>
+      <!-- 4. Track: preview, formats, upload or link -->
+      <section id="upload-methods-section" class="hidden me-card me-stack" aria-labelledby="upload-action-title">
+
+        <!-- Existing track preview -->
+        <div id="existing-track-card" class="hidden me-track">
+          <div class="me-row">
+            <span class="me-track-title"><i data-lucide="check-circle-2" class="w-5 h-5"></i><span>Track on file</span></span>
+            <span class="me-mono me-small" id="track-size-badge">-- MB</span>
           </div>
-          <div class="p-3 bg-slate-900 rounded-xl border border-slate-800 space-y-2">
-            <div class="flex items-center justify-between text-xs text-slate-300">
-              <span id="track-filename-display" class="truncate font-mono text-slate-200 font-medium">song.mp3</span>
-              <span id="track-duration-display" class="shrink-0 text-slate-400 font-mono ml-2">--:--</span>
-            </div>
-            <div id="preview-audio-container" class="flex items-center gap-3 pt-1">
-              <button type="button" id="preview-play-btn" class="w-9 h-9 rounded-full bg-gradient-to-tr from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white flex items-center justify-center shrink-0 shadow shadow-orange-500/30 transition active:scale-95">
-                <i data-lucide="play" class="w-4 h-4 ml-0.5" id="preview-play-icon"></i>
-              </button>
-              <div id="preview-waveform" class="flex-1 h-10 bg-slate-950 rounded-lg overflow-hidden border border-slate-800 cursor-pointer flex items-center">
-                <div id="preview-waveform-inner" class="w-full h-full"></div>
-              </div>
-            </div>
-            <!-- Video Track Preview Element -->
-            <div id="preview-video-container" class="hidden rounded-xl overflow-hidden bg-black border border-slate-800">
-              <video id="preview-video-player" class="w-full max-h-56 object-contain" controls playsinline></video>
+          <div class="me-row">
+            <span id="track-filename-display" class="me-mono me-filename">song.mp3</span>
+            <span id="track-duration-display" class="me-mono me-small">--:--</span>
+          </div>
+          <div id="preview-audio-container" class="me-player">
+            <button type="button" id="preview-play-btn" class="me-play" aria-label="Play or pause the preview">
+              <i data-lucide="play" class="w-5 h-5" id="preview-play-icon"></i>
+            </button>
+            <div id="preview-waveform" class="me-wave">
+              <div id="preview-waveform-inner" class="me-wave-inner"></div>
             </div>
           </div>
-          <p class="text-xs text-slate-400 leading-normal" id="existing-track-hint">
-            Listen/watch above to verify your track. If you're happy with it, you're all set! If you wish to replace it, choose an upload method below.
+          <div id="preview-video-container" class="hidden me-video">
+            <video id="preview-video-player" controls playsinline></video>
+          </div>
+          <p class="me-small" id="existing-track-hint">
+            Listen or watch above to check your track. If you are happy with it, you are all set. To replace it, choose an upload method below.
           </p>
         </div>
 
-        <!-- Acoustic Notice Banner -->
-        <div id="acoustic-notice-banner" class="hidden p-4 rounded-xl bg-blue-950/40 border border-blue-500/40 space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2 text-blue-300 text-xs font-bold">
-              <i data-lucide="guitar" class="w-4 h-4 text-blue-400"></i>
-              <span>Marked as Acoustic Performance</span>
-            </div>
-            <button type="button" id="switch-to-track-btn" class="text-xs text-blue-300 hover:text-white underline font-semibold transition">
-              Switch to Track Upload
-            </button>
+        <!-- Acoustic notice -->
+        <div id="acoustic-notice-banner" class="hidden me-alert is-info" role="status">
+          <i data-lucide="guitar" class="w-5 h-5"></i>
+          <div class="me-alert-body">
+            <strong class="me-alert-title">Marked as acoustic performance</strong>
+            <span>No audio track upload is required. If you decide to use a backing track instead, switch to track upload.</span>
+            <button type="button" id="switch-to-track-btn" class="me-btn me-btn-small">Switch to Track Upload</button>
           </div>
-          <p class="text-xs text-blue-200/90 leading-normal">
-            You've marked this performance as acoustic / live instruments. No audio track upload is required. If you decide to use a backing track instead, click "Switch to Track Upload" above.
-          </p>
         </div>
 
-        <label id="upload-methods-label" class="block text-sm font-semibold text-slate-200 flex items-center justify-between pt-1">
-          <span class="flex items-center gap-2">
-            <span class="w-6 h-6 rounded-lg bg-orange-500/20 text-orange-400 text-xs flex items-center justify-center font-bold">4</span>
-            <span id="upload-action-title">Provide Backing Track</span>
-          </span>
-          <span id="active-track-badge" class="text-xs"></span>
-        </label>
-
-        <!-- Media Format Choice: Audio MP3 vs Video MP4 with Lyrics -->
-        <div class="space-y-1.5">
-          <label class="block text-xs font-semibold text-slate-300 flex items-center justify-between">
-            <span>Choose Track Format</span>
-            <span id="media-type-badge" class="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-orange-400 border border-slate-700 font-medium">🎵 Audio Track (MP3)</span>
-          </label>
-          <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-xs font-semibold">
-            <button type="button" id="type-audio-btn" class="py-2.5 px-3 rounded-lg bg-orange-500 text-white flex items-center justify-center gap-1.5 transition shadow">
-              <i data-lucide="music-2" class="w-3.5 h-3.5"></i>
-              <span>🎵 Audio (MP3, WAV or M4A)</span>
-            </button>
-            <button type="button" id="type-video-btn" class="py-2.5 px-3 rounded-lg text-slate-400 hover:text-slate-200 flex items-center justify-center gap-1.5 transition">
-              <i data-lucide="video" class="w-3.5 h-3.5 text-purple-400"></i>
-              <span>🎬 Video (MP4 or WebM)</span>
-            </button>
-          </div>
-          <p id="media-type-hint" class="text-xs text-slate-400">Standard studio-grade audio backing track for on-stage sound.</p>
+        <div class="me-row">
+          <h3 id="upload-action-title" class="me-card-title">Provide Backing Track</h3>
+          <span id="active-track-badge" class="me-badge"></span>
         </div>
 
-        <!-- Method Tabs -->
-        <div class="grid grid-cols-2 p-1 bg-slate-950 rounded-xl border border-slate-800 text-sm font-medium">
-          <button type="button" id="tab-file" class="py-2 rounded-lg bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 transition shadow">
-            <i data-lucide="upload" class="w-4 h-4"></i>
-            <span>Upload File</span>
+        <!-- Format: audio or video -->
+        <div class="me-field">
+          <div class="me-row">
+            <span class="me-label" id="media-format-label">Track format</span>
+            <span id="media-type-badge" class="me-badge">Audio Track</span>
+          </div>
+          <div class="me-seg" role="group" aria-labelledby="media-format-label">
+            <button type="button" id="type-audio-btn" aria-pressed="true">
+              <i data-lucide="music-2" class="w-4 h-4"></i><span>Audio</span>
+            </button>
+            <button type="button" id="type-video-btn" aria-pressed="false">
+              <i data-lucide="video" class="w-4 h-4"></i><span>Video</span>
+            </button>
+          </div>
+          <p id="media-type-hint" class="me-small">Standard studio-grade audio backing track for on-stage sound.</p>
+        </div>
+
+        <!-- Method: file or link -->
+        <div class="me-seg" role="group" aria-label="How to provide the track">
+          <button type="button" id="tab-file" aria-pressed="true">
+            <i data-lucide="upload" class="w-4 h-4"></i><span>Upload File</span>
           </button>
-          <button type="button" id="tab-youtube" class="py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition">
-            <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
-            <span>Paste a link</span>
+          <button type="button" id="tab-youtube" aria-pressed="false">
+            <i data-lucide="link" class="w-4 h-4"></i><span>Paste a link</span>
           </button>
         </div>
 
-        <!-- Tab Content 1: Direct File Upload -->
-        <div id="file-upload-pane" class="space-y-3">
-          <div id="drop-zone" class="border-2 border-dashed border-slate-700 hover:border-orange-500/60 rounded-xl p-6 text-center cursor-pointer transition bg-slate-950/40 group">
-            <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a" class="hidden">
-            <div class="w-12 h-12 mx-auto rounded-full bg-orange-500/10 text-orange-400 flex items-center justify-center mb-3 group-hover:scale-110 transition">
-              <i data-lucide="cloud-upload" class="w-6 h-6"></i>
-            </div>
-            <p class="text-sm font-semibold text-slate-200" id="file-select-label">Tap to select or drag audio file here</p>
-            <p class="text-xs text-slate-400 mt-1" id="max-size-hint">MP3, WAV or M4A up to 200 MB</p>
+        <!-- File pane -->
+        <div id="file-upload-pane" class="me-stack">
+          <div id="drop-zone" class="me-drop">
+            <input type="file" id="audio-file-input" accept=".mp3,.wav,.m4a" class="hidden" aria-label="Choose a track file">
+            <i data-lucide="upload" class="w-6 h-6 me-drop-icon"></i>
+            <button type="button" id="choose-track-btn" class="me-btn me-btn-primary">Choose a track</button>
+            <p class="me-drop-label" id="file-select-label">Tap to select or drag audio file here</p>
+            <p class="me-small" id="max-size-hint">MP3, WAV or M4A up to 200 MB</p>
+            <p class="me-small">Limits are set by the organizers. We check length and sound before it goes to the sound team.</p>
           </div>
-          <div id="file-info-bar" class="hidden p-3 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
-            <div class="flex items-center gap-2 overflow-hidden text-slate-300">
-              <i data-lucide="file-audio" class="w-4 h-4 shrink-0 text-orange-400"></i>
-              <span id="file-name-display" class="truncate font-medium">filename.mp3</span>
-            </div>
-            <span id="file-size-display" class="text-slate-400 shrink-0 ml-2">4.2 MB</span>
+          <div id="file-info-bar" class="hidden me-fileinfo">
+            <span class="me-fileinfo-name"><i data-lucide="file-audio" class="w-5 h-5"></i><span id="file-name-display" class="me-filename">filename.mp3</span></span>
+            <span id="file-size-display" class="me-mono me-small">4.2 MB</span>
           </div>
         </div>
 
-        <!-- Tab Content 2: YouTube Link -->
-        <div id="youtube-upload-pane" class="hidden space-y-3">
-          <div>
-            <label for="youtube-url-input" class="block text-xs font-medium text-slate-300 mb-1.5">Paste a YouTube or SoundCloud link to one song</label>
-            <div class="relative">
-              <input type="url" id="youtube-url-input" placeholder="Paste a YouTube or SoundCloud link" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pr-10">
-              <div class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
-                <i data-lucide="link" class="w-4 h-4"></i>
-              </div>
-            </div>
+        <!-- Link pane -->
+        <div id="youtube-upload-pane" class="hidden me-stack">
+          <div class="me-field">
+            <label for="youtube-url-input" class="me-label">Paste a YouTube or SoundCloud link to one song</label>
+            <input type="url" id="youtube-url-input" placeholder="Paste a YouTube or SoundCloud link" class="me-input" autocomplete="off">
           </div>
-          <p class="text-xs text-slate-400 flex items-center gap-1.5 bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-            <i data-lucide="sparkles" class="w-4 h-4 text-orange-400 shrink-0"></i>
-            <span>Our dedicated audio worker will extract the high-quality MP3 directly and save it with the event.</span>
-          </p>
+          <p class="me-small">The sound team's audio worker downloads the track from your link and saves it with the event.</p>
         </div>
 
-        <!-- Archival Note -->
-        <div id="archival-notice" class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-400 flex items-start gap-2">
-          <i data-lucide="archive" class="w-4 h-4 text-slate-400 shrink-0 mt-0.5"></i>
-          <span><strong>Version Safety:</strong> If you upload a track again, the existing file is automatically moved to the <code class="text-orange-300">_archive</code> folder, keeping only your latest version active for the stage show.</span>
-        </div>
+        <!-- Version note -->
+        <p id="archival-notice" class="me-small me-archive">
+          <strong>Version safety:</strong> if you upload a track again, the existing file moves to the <code>_archive</code> folder and only your latest version stays active for the stage show.
+        </p>
 
-        <!-- Submit Button -->
-        <button type="submit" id="submit-btn" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed">
-          <i data-lucide="upload-cloud" class="w-4 h-4"></i>
+        <!-- Submit -->
+        <button type="submit" id="submit-btn" class="me-btn me-btn-primary me-btn-block">
+          <i data-lucide="upload-cloud" class="w-5 h-5"></i>
           <span id="submit-text">Upload Track</span>
         </button>
 
-        <!-- Or Mark Acoustic Button -->
-        <div id="acoustic-toggle-container" class="text-center pt-1">
-          <button type="button" id="mark-acoustic-btn" class="text-xs text-slate-400 hover:text-orange-400 inline-flex items-center gap-1.5 transition underline font-medium">
-            <i data-lucide="guitar" class="w-3.5 h-3.5"></i>
-            <span id="mark-acoustic-text">Playing acoustic with live instruments? Click to mark as No Track Needed</span>
+        <!-- Or mark acoustic -->
+        <div id="acoustic-toggle-container" class="me-center">
+          <button type="button" id="mark-acoustic-btn" class="me-link-btn">
+            <i data-lucide="guitar" class="w-4 h-4"></i>
+            <span id="mark-acoustic-text">Playing acoustic with live instruments? Mark as No Track Needed</span>
           </button>
         </div>
 
-        <!-- Progress Indicator -->
-        <div id="progress-container" class="hidden space-y-2">
-          <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-            <div id="progress-bar" class="bg-gradient-to-r from-orange-500 to-amber-400 h-full w-0 transition-all duration-300"></div>
+        <!-- Upload progress -->
+        <div id="progress-container" class="hidden me-progress">
+          <div class="me-row">
+            <span id="progress-name" class="me-progress-name">Uploading</span>
+            <span id="progress-pct" class="me-mono me-pct" aria-hidden="true">0%</span>
           </div>
-          <p id="progress-text" class="text-xs text-center text-slate-400" role="status" aria-live="polite">Processing upload...</p>
-          <div class="text-center"><button type="button" id="cancel-upload-btn" class="text-xs text-slate-300 underline hover:text-white">Cancel</button></div>
+          <div id="progress-track" class="me-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Upload progress">
+            <div id="progress-bar" class="me-bar-fill"></div>
+          </div>
+          <ol id="progress-stages" class="hidden me-stages" aria-label="Link steps">
+            <li data-stage="check" class="is-done"><span class="me-stage-bar"></span><span>Link checked</span></li>
+            <li data-stage="download" class="is-current"><span class="me-stage-bar"></span><span>Downloading</span></li>
+            <li data-stage="process"><span class="me-stage-bar"></span><span>Processing</span></li>
+          </ol>
+          <div class="me-row">
+            <div>
+              <p id="progress-text" class="me-progress-text" role="status" aria-live="polite">Processing upload...</p>
+              <p id="progress-detail" class="me-small"></p>
+            </div>
+            <button type="button" id="cancel-upload-btn" class="me-btn me-btn-small">Cancel</button>
+          </div>
+          <p class="me-small">Keep this page open until it finishes.</p>
         </div>
 
-      </div>
+      </section>
 
     </form>
 
-    <!-- Success Modal / Toast -->
-    <div id="success-card" class="hidden bg-emerald-950/40 border border-emerald-500/40 p-5 rounded-2xl space-y-3 animate-fade-in">
-      <div class="flex items-center gap-3 text-emerald-400">
-        <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
-          <i data-lucide="check-circle" class="w-6 h-6"></i>
-        </div>
-        <div>
-          <h3 class="font-bold text-base text-emerald-200">Track Uploaded Successfully!</h3>
-          <p id="success-summary" class="text-xs text-emerald-400/90">Your track has been saved and is ready for the sound team.</p>
-        </div>
+    <!-- Success -->
+    <div id="success-card" class="hidden me-alert is-ok" role="status">
+      <i data-lucide="check-circle" class="w-5 h-5"></i>
+      <div class="me-alert-body">
+        <strong class="me-alert-title" id="success-title">Track uploaded</strong>
+        <span id="success-summary">Your track has been saved and is ready for the sound team.</span>
+        <div id="success-details" class="me-details"><!-- Details injected via JS --></div>
+        <button type="button" id="upload-another-btn" class="me-btn me-btn-small">Replace track or add another</button>
       </div>
-      <div id="success-details" class="p-3 bg-slate-950/60 rounded-xl text-xs text-slate-300 space-y-1 border border-emerald-500/20">
-        <!-- Details injected via JS -->
-      </div>
-      <button type="button" id="upload-another-btn" class="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
-        <span>Upload track for another performance</span>
-        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-      </button>
     </div>
 
-    <!-- Error Toast -->
-    <div id="error-card" role="alert" aria-live="polite" class="hidden bg-rose-950/40 border border-rose-500/40 p-4 rounded-2xl flex items-start gap-3 text-rose-300 text-xs">
-      <i data-lucide="alert-triangle" class="w-5 h-5 text-rose-400 shrink-0 mt-0.5"></i>
-      <div class="flex-1">
-        <strong class="font-semibold text-rose-200 block mb-0.5">Notice</strong>
+    <!-- Error -->
+    <div id="error-card" role="alert" aria-live="polite" class="hidden me-alert is-error">
+      <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+      <div class="me-alert-body">
+        <strong class="me-alert-title" id="error-title">Something went wrong</strong>
         <span id="error-message">Something went wrong.</span>
-        <div class="mt-2"><button type="button" id="retry-upload-btn" class="hidden px-3 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-100 font-semibold">Try again</button></div>
+        <div class="me-alert-actions">
+          <button type="button" id="error-action-btn" class="hidden me-btn me-btn-small">Choose another file</button>
+          <button type="button" id="retry-upload-btn" class="hidden me-btn me-btn-small">Try again</button>
+        </div>
       </div>
-      <button type="button" onclick="document.getElementById('error-card').classList.add('hidden')" aria-label="Dismiss" class="text-rose-400 hover:text-rose-200">
-        <i data-lucide="x" class="w-4 h-4"></i>
+      <button type="button" id="dismiss-error-btn" aria-label="Dismiss" class="me-icon-btn">
+        <i data-lucide="x" class="w-5 h-5"></i>
       </button>
     </div>
 
-    <!-- Others' Registered Songs Section (Transparency Preview) -->
-    <div id="others-songs-section" class="pt-6 border-t border-slate-800/80 space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-bold text-slate-300 flex items-center gap-2">
-          <i data-lucide="music-2" class="w-4 h-4 text-orange-400"></i>
-          <span>Others' Registered Songs</span>
-        </h3>
-        <a href="/schedule" class="text-xs text-orange-400 hover:text-orange-300 flex items-center gap-1 font-semibold">
-          <span>Full schedule</span>
-          <i data-lucide="external-link" class="w-3 h-3"></i>
-        </a>
+    <!-- Others' registered songs (so people can avoid duplicate picks) -->
+    <section id="others-songs-section" class="me-others" aria-labelledby="others-heading">
+      <div class="me-row">
+        <h3 id="others-heading" class="me-eyebrow">Others' registered songs</h3>
+        <a href="/schedule" class="me-link">Full schedule</a>
       </div>
-      <p class="text-xs text-slate-400">
-        Check what songs others have picked to avoid duplicate selections:
-      </p>
-      <div class="relative">
-        <input type="text" id="others-search-input" placeholder="Search songs or singers..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:ring-1 focus:ring-orange-500 focus:outline-none">
-      </div>
-      <div id="others-songs-list" tabindex="0" role="region" aria-label="Everyone's songs" class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+      <p class="me-small">Check what songs others have picked to avoid duplicate selections.</p>
+      <label for="others-search-input" class="sr-only">Search songs or singers</label>
+      <input type="text" id="others-search-input" placeholder="Search songs or singers..." class="me-input">
+      <div id="others-songs-list" tabindex="0" role="region" aria-label="Everyone's songs" class="me-others-list">
         <!-- Populated dynamically via JS -->
       </div>
-    </div>
+    </section>
 
   </main>
 
   <!-- Edit Song Modal -->
-  <div id="edit-song-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-          <i data-lucide="edit-3" class="w-4 h-4 text-orange-400"></i>
-          <span>Edit Performance Details</span>
-        </h3>
-        <button type="button" id="close-edit-modal-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <i data-lucide="x" class="w-4 h-4"></i>
+  <div id="edit-song-modal" class="hidden me-modal" role="dialog" aria-modal="true" aria-labelledby="edit-song-heading">
+    <div class="me-modal-panel">
+      <div class="me-row">
+        <h3 id="edit-song-heading" class="me-card-title">Edit Performance Details</h3>
+        <button type="button" id="close-edit-modal-btn" class="me-icon-btn" aria-label="Close">
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="edit-song-form" class="space-y-3.5">
+      <form id="edit-song-form" class="me-stack">
         <input type="hidden" id="edit-entry-id">
-        <div>
-          <label for="edit-song-title" class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
-          <input type="text" id="edit-song-title" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <div id="edit-song-dup-warning" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
+        <div class="me-field">
+          <label for="edit-song-title" class="me-label">Song Title *</label>
+          <input type="text" id="edit-song-title" required class="me-input">
+          <div id="edit-song-dup-warning" class="hidden me-warnbox"></div>
         </div>
-        <div>
-          <label for="edit-perf-type" class="block text-xs font-semibold text-slate-300 mb-1">Performance Type</label>
-          <select id="edit-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div class="me-field">
+          <label for="edit-perf-type" class="me-label">Performance Type</label>
+          <select id="edit-perf-type" class="me-select">
             <option value="Solo">Solo</option>
             <option value="Duet">Duet</option>
             <option value="Group">Group</option>
           </select>
         </div>
-        <div id="edit-partner-row" class="hidden">
-          <label for="edit-partner-name" class="block text-xs font-semibold text-slate-300 mb-1">Partner Name</label>
-          <input type="text" id="edit-partner-name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <div id="edit-partner-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
-            <span class="block font-semibold mb-1 text-amber-300">Matching registered participants:</span>
-            <div id="edit-partner-matched-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        <div id="edit-partner-row" class="hidden me-field">
+          <label for="edit-partner-name" class="me-label">Partner Name</label>
+          <input type="text" id="edit-partner-name" class="me-input">
+          <div id="edit-partner-dup-box" class="hidden me-warnbox">
+            <span class="me-warnbox-title">Matching registered participants:</span>
+            <div id="edit-partner-matched-list" class="me-chips"></div>
           </div>
         </div>
-        <div id="edit-partner-phone-row" class="hidden">
-          <label for="edit-partner-phone" class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number</label>
-          <input type="tel" id="edit-partner-phone" placeholder="e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div id="edit-partner-phone-row" class="hidden me-field">
+          <label for="edit-partner-phone" class="me-label">Partner Phone Number</label>
+          <input type="tel" id="edit-partner-phone" placeholder="e.g. (555) 123-4567" class="me-input">
         </div>
-        <div id="edit-group-members-row" class="hidden">
-          <label for="edit-group-members" class="block text-xs font-semibold text-slate-300 mb-1">Group Members</label>
-          <input type="text" id="edit-group-members" placeholder="Comma-separated names" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <div id="edit-group-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
-            <span class="block font-semibold mb-1 text-amber-300">Tap to add registered participant:</span>
-            <div id="edit-group-matched-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+        <div id="edit-group-members-row" class="hidden me-field">
+          <label for="edit-group-members" class="me-label">Group Members</label>
+          <input type="text" id="edit-group-members" placeholder="Comma-separated names" class="me-input">
+          <div id="edit-group-dup-box" class="hidden me-warnbox">
+            <span class="me-warnbox-title">Tap to add registered participant:</span>
+            <div id="edit-group-matched-list" class="me-chips"></div>
           </div>
         </div>
 
-        <div>
-          <label for="edit-movie-name" class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
-          <input type="text" id="edit-movie-name" placeholder="e.g. Sarvam Maya" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div class="me-field">
+          <label for="edit-movie-name" class="me-label">Movie / Album Name (Optional)</label>
+          <input type="text" id="edit-movie-name" placeholder="e.g. Sarvam Maya" class="me-input">
         </div>
 
-        <div>
-          <label for="edit-stage-notes" class="block text-xs font-semibold text-slate-300 mb-1">Replace stage / technical notes (optional)</label>
-          <input type="text" id="edit-stage-notes" placeholder="e.g. Needs 2 wireless mics, acoustic guitar DI" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <p class="text-xs text-slate-400 mt-1">Existing notes are private. Leave blank to keep them.</p>
-          <label class="flex items-center gap-2 mt-2 text-xs text-slate-300"><input type="checkbox" id="clear-stage-notes"> Clear existing notes</label>
+        <div class="me-field">
+          <label for="edit-stage-notes" class="me-label">Replace stage / technical notes (optional)</label>
+          <input type="text" id="edit-stage-notes" placeholder="e.g. Needs 2 wireless mics, acoustic guitar DI" class="me-input">
+          <p class="me-small">Existing notes are private. Leave blank to keep them.</p>
+          <label class="me-check"><input type="checkbox" id="clear-stage-notes"><span>Clear existing notes</span></label>
         </div>
 
         <input type="hidden" id="edit-youtube-url" value="">
 
-        <div class="pt-1">
-          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-            <input type="checkbox" id="edit-acoustic-check" class="rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
-            <div>
-              <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <i data-lucide="guitar" class="w-3.5 h-3.5 text-orange-400"></i>
-                <span>Acoustic Performance (No Backing Track Upload Needed)</span>
-              </span>
-              <span class="text-xs text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
-            </div>
-          </label>
-        </div>
+        <label class="me-check me-check-box">
+          <input type="checkbox" id="edit-acoustic-check">
+          <span>
+            <strong>Acoustic Performance (No Backing Track Upload Needed)</strong>
+            <small>Live instruments only. Track upload requirement will be waived.</small>
+          </span>
+        </label>
 
-        <div class="flex items-center justify-end gap-2 pt-2">
-          <button type="button" id="cancel-edit-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
-            Cancel
-          </button>
-          <button type="submit" id="save-edit-btn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
-            Save Changes
-          </button>
+        <div class="me-actions">
+          <button type="button" id="cancel-edit-btn" class="me-btn">Cancel</button>
+          <button type="submit" id="save-edit-btn" class="me-btn me-btn-primary">Save Changes</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Rename Performer Modal -->
-  <div id="rename-performer-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 class="font-bold text-sm text-white flex items-center gap-2">
-          <i data-lucide="user-check" class="w-4 h-4 text-orange-400"></i>
-          <span>Edit Performer Name</span>
-        </h3>
-        <button type="button" id="close-rename-modal-btn" class="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
-          <i data-lucide="x" class="w-4 h-4"></i>
+  <div id="rename-performer-modal" class="hidden me-modal" role="dialog" aria-modal="true" aria-labelledby="rename-heading">
+    <div class="me-modal-panel">
+      <div class="me-row">
+        <h3 id="rename-heading" class="me-card-title">Edit Performer Name</h3>
+        <button type="button" id="close-rename-modal-btn" class="me-icon-btn" aria-label="Close">
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <form id="rename-performer-form" class="space-y-3.5">
-        <div>
-          <label for="new-performer-name-input" class="block text-xs font-semibold text-slate-300 mb-1">New Participant Name *</label>
-          <input type="text" id="new-performer-name-input" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <p class="text-xs text-slate-400 mt-1">This will update your name across all your performances and potluck contributions.</p>
+      <form id="rename-performer-form" class="me-stack">
+        <div class="me-field">
+          <label for="new-performer-name-input" class="me-label">New Participant Name *</label>
+          <input type="text" id="new-performer-name-input" required class="me-input">
+          <p class="me-small">This will update your name across all your performances and potluck contributions.</p>
         </div>
-        <div id="rename-error-msg" class="hidden text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2.5 rounded-lg"></div>
-        <div class="flex items-center justify-end gap-2 pt-1">
-          <button type="button" id="cancel-rename-btn" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
-            Cancel
-          </button>
-          <button type="submit" id="save-rename-btn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
-            Save Name
-          </button>
+        <div id="rename-error-msg" class="hidden me-formerror" role="alert"></div>
+        <div class="me-actions">
+          <button type="button" id="cancel-rename-btn" class="me-btn">Cancel</button>
+          <button type="submit" id="save-rename-btn" class="me-btn me-btn-primary">Save Name</button>
         </div>
       </form>
     </div>
   </div>
 
   <!-- Add Performance Modal -->
-  <div id="add-performance-modal" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+  <div id="add-performance-modal" class="hidden me-modal" role="dialog" aria-modal="true" aria-labelledby="add-perf-heading">
+    <div class="me-modal-panel">
+      <div class="me-row">
         <div>
-          <h3 class="font-bold text-sm text-white flex items-center gap-2">
-            <i data-lucide="plus-circle" class="w-4 h-4 text-orange-400"></i>
-            <span>Add Another Performance</span>
-          </h3>
-          <p class="text-xs text-slate-400" id="add-perf-modal-subtitle">Add a 2nd song for this participant</p>
+          <h3 id="add-perf-heading" class="me-card-title">Add Another Performance</h3>
+          <p class="me-small" id="add-perf-modal-subtitle">Add a 2nd song for this participant</p>
         </div>
-        <button type="button" id="close-add-perf-modal" class="text-slate-400 hover:text-white p-1 rounded-lg">
-          <i data-lucide="x" class="w-4 h-4"></i>
+        <button type="button" id="close-add-perf-modal" class="me-icon-btn" aria-label="Close">
+          <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="add-perf-form" class="space-y-3.5">
-        <div>
-          <label for="add-perf-type" class="block text-xs font-semibold text-slate-300 mb-1">Performance Type *</label>
-          <select id="add-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+      <form id="add-perf-form" class="me-stack">
+        <div class="me-field">
+          <label for="add-perf-type" class="me-label">Performance Type *</label>
+          <select id="add-perf-type" class="me-select">
             <option value="Solo">Solo</option>
             <option value="Duet">Duet</option>
             <option value="Group">Group</option>
           </select>
-          <p id="add-perf-solo-warning" class="hidden text-xs text-amber-400 mt-1">Note: Only 1 solo performance is allowed per participant.</p>
+          <p id="add-perf-solo-warning" class="hidden me-small me-warn-text">Note: Only 1 solo performance is allowed per participant.</p>
         </div>
 
-        <div id="add-perf-partner-row" class="hidden space-y-3">
-          <div>
-            <label for="add-perf-partner" class="block text-xs font-semibold text-slate-300 mb-1">Duet / Group Partner(s) *</label>
-            <input type="text" id="add-perf-partner" list="add-perf-partner-list" placeholder="Choose registered participant or type name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div id="add-perf-partner-row" class="hidden me-stack">
+          <div class="me-field">
+            <label for="add-perf-partner" class="me-label">Duet / Group Partner(s) *</label>
+            <input type="text" id="add-perf-partner" list="add-perf-partner-list" placeholder="Choose registered participant or type name" class="me-input">
             <datalist id="add-perf-partner-list"></datalist>
-            <div id="add-perf-partner-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
-              <span class="block font-semibold mb-1 text-amber-300">Matching registered participants:</span>
-              <div id="add-perf-partner-matched-list" class="flex flex-wrap gap-1.5 pt-0.5"></div>
+            <div id="add-perf-partner-dup-box" class="hidden me-warnbox">
+              <span class="me-warnbox-title">Matching registered participants:</span>
+              <div id="add-perf-partner-matched-list" class="me-chips"></div>
             </div>
-            <p class="text-xs text-slate-500 mt-1">Select from registered participants or type name (comma-separated for group).</p>
+            <p class="me-small">Select from registered participants or type name (comma-separated for group).</p>
           </div>
-          <div id="add-perf-partner-phone-wrap" class="hidden">
-            <label for="add-perf-partner-phone" class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number *</label>
-            <input type="tel" id="add-perf-partner-phone" placeholder="Partner's mobile e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-            <p class="text-xs text-slate-500 mt-1">Required for unlisted duet partners so organizers can identify them.</p>
+          <div id="add-perf-partner-phone-wrap" class="hidden me-field">
+            <label for="add-perf-partner-phone" class="me-label">Partner Phone Number *</label>
+            <input type="tel" id="add-perf-partner-phone" placeholder="Partner's mobile e.g. (555) 123-4567" class="me-input">
+            <p class="me-small">Required for unlisted duet partners so organizers can identify them.</p>
           </div>
         </div>
 
-        <div>
-          <label for="add-perf-song-title" class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
-          <input type="text" id="add-perf-song-title" required placeholder="e.g. Kannalane" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
-          <div id="add-perf-song-dup-warning" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
+        <div class="me-field">
+          <label for="add-perf-song-title" class="me-label">Song Title *</label>
+          <input type="text" id="add-perf-song-title" required placeholder="e.g. Kannalane" class="me-input">
+          <div id="add-perf-song-dup-warning" class="hidden me-warnbox"></div>
         </div>
 
-        <div>
-          <label for="add-perf-movie-name" class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
-          <input type="text" id="add-perf-movie-name" placeholder="e.g. Bombay" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div class="me-field">
+          <label for="add-perf-movie-name" class="me-label">Movie / Album Name (Optional)</label>
+          <input type="text" id="add-perf-movie-name" placeholder="e.g. Bombay" class="me-input">
         </div>
 
-        <div>
-          <label for="add-perf-stage-notes" class="block text-xs font-semibold text-slate-300 mb-1">Stage Notes / Special Requests (Optional)</label>
-          <input type="text" id="add-perf-stage-notes" placeholder="e.g. 2 wireless mics needed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
+        <div class="me-field">
+          <label for="add-perf-stage-notes" class="me-label">Stage Notes / Special Requests (Optional)</label>
+          <input type="text" id="add-perf-stage-notes" placeholder="e.g. 2 wireless mics needed" class="me-input">
         </div>
 
-        <div class="pt-1">
-          <label class="flex items-center gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-            <input type="checkbox" id="add-perf-acoustic" class="rounded bg-slate-900 border-slate-700 text-orange-500 focus:ring-orange-500 w-4 h-4">
-            <div>
-              <span class="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <i data-lucide="guitar" class="w-3.5 h-3.5 text-blue-400"></i>
-                <span>Acoustic Performance (No Backing Track Upload Needed)</span>
-              </span>
-              <span class="text-xs text-slate-400 block mt-0.5">Live instruments only. Track upload requirement will be waived.</span>
-            </div>
-          </label>
-        </div>
+        <label class="me-check me-check-box">
+          <input type="checkbox" id="add-perf-acoustic">
+          <span>
+            <strong>Acoustic Performance (No Backing Track Upload Needed)</strong>
+            <small>Live instruments only. Track upload requirement will be waived.</small>
+          </span>
+        </label>
 
-        <div class="flex items-center justify-end gap-2 pt-2">
-          <button type="button" id="cancel-add-perf-btn" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 transition">
-            Cancel
-          </button>
-          <button type="submit" id="submit-add-perf-btn" class="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-500 text-xs font-bold text-white shadow-md shadow-orange-600/20 transition">
-            Add Performance
-          </button>
+        <div class="me-actions">
+          <button type="button" id="cancel-add-perf-btn" class="me-btn">Cancel</button>
+          <button type="submit" id="submit-add-perf-btn" class="me-btn me-btn-primary">Add Performance</button>
         </div>
       </form>
     </div>

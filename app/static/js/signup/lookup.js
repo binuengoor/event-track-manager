@@ -17,7 +17,7 @@ function renderFoodGroups() {
     if (!groupItems.length) return;
     const wrap = document.createElement("div");
     wrap.className = "gf-dish-group";
-    const h = document.createElement("h4");
+    const h = document.createElement("h3");
     const gName = document.createElement("span");
     gName.textContent = group.name;
     const gCount = document.createElement("span");

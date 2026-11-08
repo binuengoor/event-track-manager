@@ -1,0 +1,195 @@
+/* Sign-up flow (/signup): phone-first stepper, segmented choices, dish cards, error summary, done and closed cards.
+   Loaded AFTER guest-forms.css (shared with other pages), which stays untouched: every rule here is scoped to
+   body.signup-page and out-specifies it. Colours come from tokens.css only (light and dark). */
+
+body.signup-page {
+  --su-line: color-mix(in srgb, var(--text-muted) 75%, var(--bg-surface-1));   /* 3:1 control edge on both themes */
+  --su-tint: color-mix(in srgb, var(--accent-primary) 9%, var(--bg-surface-1));
+  --su-tint-line: color-mix(in srgb, var(--accent-primary) 30%, var(--bg-surface-1));
+  font-family: var(--font-sans);
+}
+html body.signup-page { background-color: var(--bg-canvas) !important; }
+
+/* ------------------------------------------------------------------ page frame */
+body.signup-page #main-content { display: flex; flex-direction: column; gap: 14px; padding: 12px 20px 24px; }
+body.signup-page #main-content > * { margin-top: 0; }
+.su-sr, #signup-form .gf-title, #step-dish legend.gf-label, #signup-form #step-dish-title {
+  position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+#signup-form.is-single #step-dish-title {
+  position: static; width: auto; height: auto; overflow: visible; clip: auto; clip-path: none; white-space: normal;
+  margin: 4px 0 6px; font-size: 14px; font-weight: 600; color: var(--text-primary);
+}
+
+.su-nav-row { display: flex; align-items: center; min-height: 44px; margin-bottom: -8px; }
+.su-back { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; min-width: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 500; color: var(--text-secondary); cursor: pointer; text-decoration: none; }
+.su-back:hover { color: var(--text-primary); }
+main:has(#signup-form[hidden]) #signup-nav-row { display: none; }
+main:has(#signup-done:not([hidden])) #signup-banner { display: none; }
+
+.su-head { margin: 0 0 -6px; }
+.su-head h1 { margin: 0; font-size: 24px; line-height: 30px; letter-spacing: -.01em; font-weight: 700; color: var(--text-primary); }
+
+#signup-form { display: flex; flex-direction: column; flex: 1; }
+#signup-form.is-single .gf-stepper, #signup-form.is-single .gf-step-status { display: none; }
+.gf-stepper { gap: 6px; margin: 8px 0 0; }
+.gf-stepper li { height: 4px; border-radius: 2px; background: var(--border-subtle); }
+.gf-step-status { margin: 4px 0 14px; font-size: 13px; font-weight: 400; color: var(--text-muted); }
+#signup-form.is-single::before { content: ""; display: block; height: 6px; }
+
+body.signup-page #signup-form > .gf-card { background: none; border: 0; border-radius: 0; padding: 0; margin: 0 0 16px; }
+
+/* ------------------------------------------------------------------ labels, inputs, errors */
+body.signup-page .gf-fieldset { margin: 0 0 12px; }
+body.signup-page .gf-field { margin: 0 0 12px; min-width: 0; }
+body.signup-page .gf-label { display: block; margin: 0 0 6px; padding: 0; font-size: 14px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-primary); }
+body.signup-page label.gf-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.su-hint { font-size: 12px; font-weight: 400; color: var(--text-muted); }
+.su-hint-block { margin: 6px 0 0; font-size: 12px; line-height: 1.4; color: var(--text-muted); }
+
+body.signup-page .gf-input { box-sizing: border-box; width: 100%; height: 52px; min-height: 52px; padding: 0 14px; border: 1px solid var(--su-line); border-radius: 14px; background: var(--bg-surface-1); font-size: 16px; color: var(--text-primary); }
+body.signup-page .gf-input::placeholder { color: var(--text-muted); opacity: 1; }
+body.signup-page .gf-input:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; border-color: var(--su-line); }
+body.signup-page .gf-input[aria-invalid="true"] { border: 2px solid var(--status-danger-fg); padding: 0 13px; }
+
+body.signup-page .gf-error { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0; font-size: 13px; line-height: 1.35; font-weight: 500; color: var(--status-danger-fg); }
+body.signup-page .gf-error::before { content: ""; flex: 0 0 16px; width: 16px; height: 16px; margin-top: 1px; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v6M12 16.5v.01'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v6M12 16.5v.01'/%3E%3C/svg%3E") center / contain no-repeat; }
+body.signup-page .gf-note { margin: 6px 0 0; font-size: 13px; line-height: 1.35; color: var(--text-secondary); }
+body.signup-page .gf-form-error { margin: 0 0 12px; border-radius: 14px; }
+
+.su-summary { margin: 0 0 12px; padding: 10px 14px 2px; border: 1px solid var(--status-danger-fg); border-radius: 14px; background: var(--status-danger-bg); }
+.su-summary-title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 700; color: var(--status-danger-fg); }
+.su-summary ul { margin: 0; padding: 0; list-style: none; }
+.su-summary li a { display: flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--status-danger-fg); text-decoration: underline; }
+
+/* ------------------------------------------------------------------ segmented choices (I want to / Type) */
+body.signup-page .gf-choices, body.signup-page #perf-type.gf-radio-row {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg-surface-2);
+}
+body.signup-page #perf-type.gf-radio-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+body.signup-page .gf-choice, body.signup-page #perf-type .gf-radio {
+  flex: initial; flex-direction: row; gap: 0; min-height: 44px; padding: 0 8px; border: 1px solid transparent; border-radius: 9px;
+  background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500;
+}
+body.signup-page .gf-choice:hover, body.signup-page #perf-type .gf-radio:hover { border-color: var(--su-line); }
+body.signup-page .gf-choice:has(input:checked), body.signup-page #perf-type .gf-radio:has(input:checked) {
+  background: var(--bg-surface-1); border-color: var(--su-line); color: var(--text-primary); font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ age group list */
+body.signup-page #age-group-options, body.signup-page #partner-age-options {
+  display: block; overflow: hidden; border: 1px solid var(--su-line); border-radius: 14px; background: var(--bg-surface-1);
+}
+body.signup-page #age-group-options .gf-radio, body.signup-page #partner-age-options .gf-radio {
+  display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 12px; width: 100%; min-height: 44px; box-sizing: border-box;
+  padding: 0 14px; border: 0; border-radius: 0; background: transparent; text-align: left; font-size: 15px; font-weight: 500; color: var(--text-primary);
+}
+body.signup-page #age-group-options .gf-radio + .gf-radio, body.signup-page #partner-age-options .gf-radio + .gf-radio { border-top: 1px solid var(--border-subtle); }
+body.signup-page #age-group-options .gf-radio::before, body.signup-page #partner-age-options .gf-radio::before {
+  content: ""; flex: 0 0 22px; width: 22px; height: 22px; box-sizing: border-box; border-radius: 999px; border: 2px solid var(--su-line);
+}
+body.signup-page #age-group-options .gf-radio:has(input:checked), body.signup-page #partner-age-options .gf-radio:has(input:checked) { background: var(--su-tint); font-weight: 600; }
+body.signup-page #age-group-options .gf-radio:has(input:checked)::before, body.signup-page #partner-age-options .gf-radio:has(input:checked)::before {
+  border-color: var(--accent-primary); background: radial-gradient(circle, var(--accent-primary) 0 5px, transparent 5.5px);
+}
+body.signup-page #age-group-options .gf-radio span, body.signup-page #partner-age-options .gf-radio span { flex: 1; }
+body.signup-page .gf-radio small { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+
+/* ------------------------------------------------------------------ checkboxes, info rows */
+.su-check { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; box-sizing: border-box; padding: 2px 0; font-size: 14px; line-height: 1.4; color: var(--text-secondary); cursor: pointer; }
+.su-check input { flex: 0 0 24px; width: 24px; height: 24px; margin: 0; accent-color: var(--accent-primary); }
+.su-check small { display: block; margin-top: 2px; font-size: 13px; color: var(--text-muted); }
+.su-check small:empty { display: none; }
+#adult-privacy-box { margin: 0 0 12px; }
+.su-info { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-surface-2); }
+.su-info svg { flex: 0 0 20px; margin-top: 1px; color: var(--accent-text); }
+.su-info strong { display: block; font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.su-info small { display: block; margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--text-secondary); }
+
+/* match and guardian boxes */
+body.signup-page .gf-box { margin-top: 10px; padding: 12px; border: 1px solid var(--su-tint-line); border-radius: 14px; background: var(--su-tint); color: var(--text-primary); font-size: 14px; line-height: 1.4; }
+body.signup-page .gf-box-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+body.signup-page .gf-box-actions > * { flex: 1 1 8.5rem; }
+body.signup-page #guardian-container.gf-box { margin: 0; padding: 0; border: 0; background: none; }
+.su-guardian-lead { margin: 0 0 8px; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.su-guardian-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 10px; }
+@media (max-width: 359px) { .su-guardian-grid { grid-template-columns: 1fr; } }
+
+/* ------------------------------------------------------------------ buttons */
+body.signup-page .gf-btn { min-height: 48px; padding: 0 18px; border: 1px solid var(--su-line); border-radius: 14px; background: var(--bg-surface-1); color: var(--text-primary); font-size: 15px; font-weight: 600; }
+body.signup-page .gf-btn:hover { background: var(--bg-surface-2); border-color: var(--su-line); }
+body.signup-page .gf-btn-small { min-height: 44px; padding: 0 12px; border-radius: 12px; font-size: 14px; }
+body.signup-page .gf-btn-primary, body.signup-page .gf-btn-primary:hover { background: var(--accent-primary); border-color: var(--accent-primary); color: var(--accent-on); }
+body.signup-page .gf-btn-primary:hover { filter: brightness(1.08); }
+body.signup-page .gf-btn[disabled] { opacity: 1; background: var(--border-strong); border-color: var(--border-strong); color: var(--text-secondary); }
+.su-link-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; margin-top: 4px; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--accent-text); cursor: pointer; }
+
+/* sticky action bar */
+body.signup-page .gf-actions { position: sticky; bottom: 0; z-index: 20; display: flex; flex-direction: column; gap: 6px; margin: auto -20px -24px; padding: 10px 20px calc(14px + env(safe-area-inset-bottom, 0px)); background: var(--bg-canvas); border-top: 1px solid var(--border-subtle); }
+body.signup-page .gf-actions .gf-btn-primary { flex: none; width: 100%; height: 52px; min-height: 52px; font-size: 16px; }
+.su-bar-note { margin: 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--text-muted); }
+
+/* ------------------------------------------------------------------ dish cards */
+.su-dish-intro { margin: 0 0 8px; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+body.signup-page .gf-dish-group { margin-top: 14px; }
+body.signup-page .gf-dish-group h3 { display: flex; justify-content: flex-start; gap: 6px; margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+body.signup-page .gf-dish-group h3 span + span::before { content: "\00B7\00A0"; }
+body.signup-page .gf-dish-grid { display: flex; flex-direction: column; gap: 8px; }
+body.signup-page .gf-dish { position: relative; box-sizing: border-box; min-height: 56px; gap: 12px; padding: 0 14px; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--bg-surface-1); color: var(--text-primary); }
+body.signup-page label.gf-dish:hover { border-color: var(--su-line); }
+body.signup-page .gf-dish:has(input:checked) { padding: 0 13px; border: 2px solid var(--accent-primary); background: var(--bg-surface-1); }
+body.signup-page .gf-dish:has(input:focus-visible) { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+body.signup-page .gf-dish input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+body.signup-page .gf-dish-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; }
+body.signup-page .gf-dish-who { margin-top: 1px; font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+body.signup-page .gf-dish.is-taken { opacity: 1; }
+body.signup-page .gf-dish.is-taken .gf-dish-name { color: var(--text-secondary); }
+body.signup-page .gf-dish-tag { padding: 4px 10px; border: 0; font: 600 12px var(--font-mono); letter-spacing: 0; text-transform: none; }
+
+/* ------------------------------------------------------------------ done card */
+#signup-done { display: flex; flex-direction: column; gap: 14px; }
+.su-done-head, .su-card { display: flex; flex-direction: column; gap: 8px; padding: 18px; border: 1px solid var(--border-subtle); border-radius: 20px; background: var(--bg-surface-1); }
+.su-done-head { align-items: center; text-align: center; }
+.su-done-check { display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; border-radius: 999px; background: var(--status-playing-bg); color: var(--status-playing-fg); }
+.gf-done h1 { margin: 0; font-size: 24px; letter-spacing: -.01em; font-weight: 700; color: var(--text-primary); }
+body.signup-page .gf-entry-id { margin: 0 4px; padding: 0; border: 0; background: none; font: 600 28px var(--font-mono); letter-spacing: .02em; color: var(--accent-text); }
+.su-done-head .gf-muted { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+.su-notice { padding: 12px 14px; border: 1px solid var(--status-cued-fg); border-radius: 14px; background: var(--status-cued-bg); color: var(--text-primary); font-size: 14px; line-height: 1.45; }
+.su-notice p { margin: 0; }
+.su-notice-title { font-weight: 700; margin-bottom: 2px !important; }
+body.signup-page .gf-eyebrow { margin: 6px 0 -6px; font-size: 12px; font-weight: 700; letter-spacing: .06em; color: var(--text-muted); }
+body.signup-page .gf-next { display: grid; gap: 8px; margin: 0; }
+body.signup-page .gf-next .gf-btn { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; width: 100%; min-height: 60px; box-sizing: border-box; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: 14px; background: var(--bg-surface-1); font-weight: 400; text-align: left; }
+.gf-next-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 12px; background: var(--su-tint); color: var(--accent-text); }
+.gf-next-text { display: flex; flex: 1; flex-direction: column; gap: 1px; min-width: 0; }
+.gf-next-title { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+body.signup-page .gf-next .gf-btn small { font-size: 13px; line-height: 1.35; font-weight: 400; color: var(--text-secondary); }
+.gf-next-chev { flex: 0 0 20px; color: var(--text-muted); }
+.su-pay { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--su-tint-line); border-radius: 16px; background: var(--su-tint); }
+.su-pay .gf-muted { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.su-pay-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.su-pay .gf-btn { width: 100%; height: auto; min-height: 48px; padding: 10px 14px; border-radius: 12px; text-align: center; }
+
+/* ------------------------------------------------------------------ closed card */
+.su-closed { gap: 12px; }
+.su-closed-head { display: flex; align-items: center; gap: 12px; }
+.su-closed-head h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary); }
+.su-closed-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 40px; width: 40px; height: 40px; border-radius: 999px; background: var(--bg-surface-2); color: var(--text-secondary); }
+.su-lead { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-secondary); }
+.su-lead strong { color: var(--text-primary); }
+.su-still .gf-eyebrow { margin: 0 0 4px; }
+.su-still ul { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.5; color: var(--text-primary); }
+.su-closed-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.su-closed-actions .gf-btn { flex: 1 1 8.5rem; padding: 0 10px; }
+
+/* ------------------------------------------------------------------ phones: the sticky action bar replaces the bottom nav while the form is open */
+@media (max-width: 767px) {
+  body.signup-page:has(#signup-form:not([hidden])) { padding-bottom: 0; }
+  body.signup-page:has(#signup-form:not([hidden])) .guest-navigation { display: none; }
+}
+@media (min-width: 768px) {
+  body.signup-page #main-content { padding-top: 24px; }
+  body.signup-page .gf-actions { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
+}

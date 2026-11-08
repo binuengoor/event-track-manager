@@ -1,9 +1,18 @@
 // UI helpers (errors, formatting, toast).
 // Classic script: shares globals with the other intake files (see load order in the page).
 
-function showError(msg) {
+// Shows the error card. opts.title is the bold heading; opts.action is 'file' or 'link' to offer the matching recovery button.
+function showError(msg, opts = {}) {
   const errCard = document.getElementById('error-card');
   document.getElementById('error-message').textContent = msg;
+  const titleEl = document.getElementById('error-title');
+  if (titleEl) titleEl.textContent = opts.title || 'Something went wrong';
+  const actionBtn = document.getElementById('error-action-btn');
+  if (actionBtn) {
+    actionBtn.dataset.action = opts.action || '';
+    actionBtn.textContent = opts.action === 'link' ? 'Paste a different link' : 'Choose another file';
+    actionBtn.classList.toggle('hidden', !opts.action);
+  }
   document.getElementById('retry-upload-btn')?.classList.toggle('hidden', !lastSubmitFailed);
   errCard.classList.remove('hidden');
   errCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -36,15 +45,11 @@ function escapeHtml(str) {
 function renderTypePill(perfType) {
   const raw = (perfType || 'Solo').trim();
   const lower = raw.toLowerCase();
-  let colorClasses = 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
-  if (lower.includes('duet')) {
-    colorClasses = 'bg-purple-500/15 text-purple-300 border-purple-500/30';
-  } else if (lower.includes('group')) {
-    colorClasses = 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30';
-  } else if (lower.includes('acoustic') || lower.includes('live')) {
-    colorClasses = 'bg-amber-500/15 text-amber-300 border-amber-500/30';
-  }
-  return `<span class="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${colorClasses} tracking-wide shrink-0">${escapeHtml(raw)}</span>`;
+  let kind = 'solo';
+  if (lower.includes('duet')) kind = 'duet';
+  else if (lower.includes('group')) kind = 'group';
+  else if (lower.includes('acoustic') || lower.includes('live')) kind = 'live';
+  return `<span class="me-type" data-kind="${kind}">${escapeHtml(raw)}</span>`;
 }
 
 function showToast(message, type = 'success') {
@@ -52,14 +57,12 @@ function showToast(message, type = 'success') {
   if (!toast) {
     toast = document.createElement('div');
     toast.id = 'intake-toast';
-    toast.className = 'fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-xs font-bold text-white shadow-xl transition-all duration-300 transform translate-y-10 opacity-0 flex items-center gap-2';
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
     document.body.appendChild(toast);
   }
   toast.textContent = message;
-  toast.className = `fixed bottom-5 right-5 z-50 px-4 py-3 rounded-2xl text-xs font-bold text-white shadow-xl transition-all duration-300 transform translate-y-0 opacity-100 flex items-center gap-2 ${
-    type === 'error' ? 'bg-rose-600 border border-rose-500' : 'bg-emerald-600 border border-emerald-500'
-  }`;
-  setTimeout(() => {
-    toast.classList.add('translate-y-10', 'opacity-0');
-  }, 4000);
+  toast.className = `me-toast is-visible ${type === 'error' ? 'is-error' : 'is-ok'}`;
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => { toast.classList.remove('is-visible'); }, 4000);
 }

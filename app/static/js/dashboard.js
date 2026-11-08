@@ -160,7 +160,7 @@ async function loadPerformances() {
       lineupFromCache = true;
       showOffline(true, cached.savedAt);
     } else {
-      $("lineup-list").innerHTML = '<li class="gf-muted" style="padding:1.5rem;text-align:center">Could not load the lineup. Check your connection and tap Refresh.</li>';
+      $("lineup-list").innerHTML = '<li class="sch-empty">Could not load the lineup. Check your connection and tap Refresh.</li>';
       showOffline(!navigator.onLine);
       return;
     }
@@ -168,7 +168,7 @@ async function loadPerformances() {
 
   if (eventInfo.dashboard_enabled === false) {
     $("songs-count-badge").textContent = "Locked";
-    $("lineup-list").innerHTML = '<li class="gf-muted" style="padding:1.5rem;text-align:center">The lineup is private for this event and stays hidden until stage time.</li>';
+    $("lineup-list").innerHTML = '<li class="sch-empty">The lineup is private for this event and stays hidden until stage time.</li>';
     return;
   }
   $("songs-count-badge").textContent = performancesData.length;
@@ -201,48 +201,66 @@ function renderLineup() {
   list.innerHTML = "";
   if (!filtered.length) {
     const li = document.createElement("li");
-    li.className = "gf-muted";
-    li.style.cssText = "padding:1.5rem;text-align:center";
+    li.className = "sch-empty";
     li.textContent = performancesData.length ? "No acts match your search." : "No acts are scheduled yet.";
     list.appendChild(li);
     return;
   }
 
-  let laterShown = false;
-  filtered.forEach((p) => {
+  // "Up next" is the first scheduled upcoming act after the one on stage (or the first upcoming act when none is on stage).
+  const nowIndex = filtered.findIndex((p) => p.status === "now");
+  let nextShown = false;
+  let laterLabelShown = false;
+  filtered.forEach((p, index) => {
     const seq = sequenceOf(p);
     const status = p.status === "now" || p.status === "done" ? p.status : "upcoming";
+    const isNext = status === "upcoming" && !nextShown && seq !== null && index > nowIndex;
+    if (isNext) nextShown = true;
     const li = document.createElement("li");
-    li.className = "gf-act" + (status === "now" ? " is-now" : status === "done" ? " is-done" : "");
+    li.className = "sch-act" + (status === "now" ? " is-now" : status === "done" ? " is-done" : isNext ? " is-next" : "");
+    if (status === "upcoming" && !isNext && !laterLabelShown && index > nowIndex) { li.classList.add("is-first-later"); laterLabelShown = true; }
+    li.dataset.status = status;
 
     const num = document.createElement("span");
-    num.className = "gf-act-num";
+    num.className = "sch-act-num";
     num.textContent = seq !== null ? String(seq).padStart(2, "0") : "--";
 
     const body = document.createElement("div");
-    const title = document.createElement("div");
-    title.className = "gf-act-title";
+    body.className = "sch-act-body";
+    if (status === "now" || isNext) {
+      const label = document.createElement("span");
+      label.className = "sch-act-label";
+      label.textContent = status === "now" ? "Now on stage" : "Up next";
+      body.appendChild(label);
+    }
+    const title = document.createElement("span");
+    title.className = "sch-act-title";
     title.textContent = hasRealTitle(p.song_title) ? p.song_title : "Song to be announced";
-    const sub = document.createElement("div");
-    sub.className = "gf-act-sub";
+    const sub = document.createElement("span");
+    sub.className = "sch-act-sub";
     sub.textContent = `${singers(p)} · ${p.performance_type || "Solo"}`;
     if (p.movie_name) sub.textContent += ` · ${p.movie_name}`;
     body.append(title, sub);
     if (me && String(p.performer_name || "").trim().toLowerCase() === me) {
       const a = document.createElement("a");
       a.href = `/my-entry?name=${encodeURIComponent(p.performer_name)}`;
-      a.textContent = " Yours: open my entry";
-      a.className = "gf-act-sub";
-      sub.appendChild(document.createElement("br"));
-      sub.appendChild(a);
+      a.textContent = "Yours: open my entry";
+      a.className = "sch-act-mine";
+      body.appendChild(a);
     }
 
-    const tag = document.createElement("span");
-    if (status === "now") { tag.className = "gf-act-tag"; tag.textContent = "On stage"; }
-    else if (status === "done") { tag.className = "gf-act-tag done"; tag.textContent = "Done"; }
-    else if (!laterShown && status === "upcoming" && seq !== null) { tag.className = "gf-act-tag up"; tag.textContent = "Up next"; laterShown = true; }
-
-    li.append(num, body, tag);
+    li.append(num, body);
+    if (status === "now") {
+      const icon = document.createElement("span");
+      icon.className = "sch-act-play";
+      icon.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4l14 8-14 8z"/></svg>';
+      li.appendChild(icon);
+    } else if (status === "done") {
+      const tag = document.createElement("span");
+      tag.className = "sch-act-tag";
+      tag.textContent = "Done";
+      li.appendChild(tag);
+    }
     list.appendChild(li);
   });
 }
@@ -269,9 +287,19 @@ async function loadFood() {
   if (foodData.enabled === false) foodBtn.hidden = true;
   else foodBtn.hidden = false;
 
-  $("dashboard-serving-note").textContent = foodData.serving_note ? `Open slots: ${foodData.open_items ?? 0} · ${foodData.serving_note}` : "";
+  const openCount = foodData.open_items ?? Math.max(0, (Number(foodData.total_items) || 0) - (Number(foodData.taken_items) || 0));
+  $("dashboard-serving-note").textContent = foodData.serving_note ? `${openCount} slots still open · ${foodData.serving_note}` : `${openCount} slots still open`;
   $("food-stats-pill").textContent = `${foodData.taken_items} of ${foodData.total_items} taken`;
   $("food-count-badge").textContent = `${foodData.taken_items}/${foodData.total_items}`;
+  const total = Number(foodData.total_items) || 0;
+  const taken = Number(foodData.taken_items) || 0;
+  const bar = $("food-progress");
+  if (bar) {
+    bar.setAttribute("aria-valuemax", String(total));
+    bar.setAttribute("aria-valuenow", String(taken));
+    bar.setAttribute("aria-valuetext", `${taken} of ${total} dishes claimed`);
+    $("food-progress-fill").style.width = total ? `${Math.min(100, Math.round((taken / total) * 100))}%` : "0%";
+  }
   renderFoodGroups();
 }
 
@@ -285,7 +313,7 @@ function renderFoodGroups() {
 
   if (!groups.length) {
     const p = document.createElement("p");
-    p.className = "gf-card gf-muted";
+    p.className = "sch-empty";
     p.textContent = "No dishes are listed yet.";
     container.appendChild(p);
     return;
@@ -295,54 +323,55 @@ function renderFoodGroups() {
     const groupItems = items.filter((i) => i.group_id === group.group_id);
     if (!groupItems.length) return;
     const wrap = document.createElement("div");
-    wrap.className = "gf-card gf-dish-group";
-    wrap.style.marginTop = ".75rem";
-    const h = document.createElement("h4");
+    wrap.className = "sch-group";
+    const h = document.createElement("h3");
+    h.className = "sch-group-head";
     const gName = document.createElement("span");
     gName.textContent = group.name;
     const gCount = document.createElement("span");
+    gCount.className = "sch-group-count";
     gCount.textContent = `${groupItems.filter((i) => !i.is_taken).length} open`;
     h.append(gName, gCount);
     const grid = document.createElement("div");
-    grid.className = "gf-dish-grid";
+    grid.className = "sch-dishes";
 
     groupItems.forEach((item) => {
       const row = document.createElement("div");
-      row.className = "gf-dish" + (item.is_taken ? " is-taken" : "");
-      const name = document.createElement("span");
-      name.className = "gf-dish-name";
+      row.className = "sch-dish" + (item.is_taken ? " is-taken" : "");
+      const name = document.createElement("div");
+      name.className = "sch-dish-body";
       const text = document.createElement("span");
+      text.className = "sch-dish-name";
       text.textContent = item.name;
-      name.appendChild(text);
+      const who = document.createElement("span");
+      who.className = "sch-dish-who";
+      name.append(text, who);
 
       const mine = item.is_taken && me && String(item.signer_name || "").trim().toLowerCase() === me;
-      if (item.is_taken && !mine) {
+      if (mine) {
+        who.textContent = [item.signer_name, "You"].join(" · ");
+        if (item.dish_description) who.textContent = [item.signer_name, "You", item.dish_description].join(" · ");
+      } else if (item.is_taken) {
         // Someone else's slot: show who, and the dish note if they left one.
-        const who = document.createElement("span");
-        who.className = "gf-dish-who";
         who.textContent = [item.signer_name, item.dish_description].filter(Boolean).join(" · ");
-        text.appendChild(who);
-      } else if (mine && item.dish_description) {
-        const who = document.createElement("span");
-        who.className = "gf-dish-who";
-        who.textContent = item.dish_description;
-        text.appendChild(who);
+      } else {
+        who.textContent = "Open";
       }
 
       let right;
       if (mine) {
         right = document.createElement("a");
         right.href = `/my-entry?name=${encodeURIComponent(item.signer_name)}`;
-        right.className = "gf-dish-tag yours";
+        right.className = "sch-pill sch-pill-yours";
         right.textContent = "Yours";
       } else if (item.is_taken) {
         right = document.createElement("span");
-        right.className = "gf-dish-tag taken";
+        right.className = "sch-pill sch-pill-taken";
         right.textContent = "Taken";
       } else {
         right = document.createElement("a");
         right.href = `/my-entry?food_item=${encodeURIComponent(item.item_id)}`;
-        right.className = "gf-btn gf-btn-small";
+        right.className = "sch-btn sch-btn-primary";
         right.textContent = "I'll bring it";
       }
       row.append(name, right);

@@ -21,8 +21,9 @@
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/signup.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+<body class="signup-page bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
 
@@ -34,7 +35,7 @@
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 id="nav-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</h1>
+          <p id="nav-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</p>
           <p id="nav-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
@@ -48,22 +49,48 @@
   <!-- Main Content -->
   <main id="main-content" class="flex-1 max-w-3xl w-full mx-auto px-4 py-6 sm:py-10 space-y-6">
 
-    <div class="gf-card">
-      <h2 id="signup-banner-title" class="text-2xl sm:text-3xl font-black text-white tracking-tight">Sign up</h2>
-      <p id="signup-banner-desc" class="gf-muted mt-1">Perform on stage, bring a dish, or both. It takes about a minute.</p>
+    <div id="signup-nav-row" class="su-nav-row">
+      <a id="home-link" href="/" class="su-back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Home</a>
+      <button type="button" id="back-btn" class="su-back" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>Back</button>
     </div>
 
-    <div id="signup-closed-banner" class="gf-box" role="status" hidden>
-      <strong>Sign-ups are closed.</strong> Thanks for your interest. Please reach out to the organizers for more information.
+    <div id="signup-banner" class="su-head">
+      <h1 id="signup-banner-title">Sign up</h1>
+      <p id="signup-banner-desc" class="su-sr">Perform on stage, bring a dish, or both. It takes about a minute.</p>
     </div>
+
+    <section id="signup-closed-banner" class="su-card su-closed" role="status" aria-labelledby="closed-title" hidden>
+      <div class="su-closed-head">
+        <span class="su-closed-icon" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+        <h2 id="closed-title">Sign-ups are closed</h2>
+      </div>
+      <p class="su-lead"><strong>Sign-ups are closed.</strong> Thanks for your interest. Please reach out to the organizers for more information.</p>
+      <div class="su-still">
+        <p class="gf-eyebrow">YOU CAN STILL</p>
+        <ul>
+          <li data-needs-nav="/schedule">Check the Schedule and the running order</li>
+          <li data-needs-nav="/live">Follow the show on the Live screen</li>
+          <li>Ask an organizer at the venue if something must change</li>
+        </ul>
+      </div>
+      <div class="su-closed-actions">
+        <a href="/schedule" data-needs-nav="/schedule" class="gf-btn gf-btn-primary">See the Schedule</a>
+        <a href="/" class="gf-btn">Back to home</a>
+      </div>
+    </section>
 
     <form id="signup-form" novalidate aria-label="Sign-up form">
       <ol id="stepper" class="gf-stepper" aria-hidden="true"></ol>
       <p id="step-status" class="gf-step-status" aria-live="polite"></p>
 
+      <div id="error-summary" class="su-summary" role="alert" tabindex="-1" hidden>
+        <p class="su-summary-title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.01"/></svg><span id="error-summary-heading">Fix 1 thing to continue</span></p>
+        <ul id="error-summary-list"></ul>
+      </div>
+
       <!-- STEP: ABOUT YOU -->
       <section id="step-about" data-step="about" class="gf-card" aria-labelledby="step-about-title">
-        <h3 id="step-about-title" class="gf-title">About you</h3>
+        <h2 id="step-about-title" class="gf-title">About you</h2>
 
         <fieldset id="choice-section" class="gf-fieldset">
           <legend class="gf-label">I want to</legend>
@@ -84,8 +111,8 @@
           </div>
         </div>
 
-        <div class="gf-field">
-          <label for="contact-info" class="gf-label">Phone <span class="gf-muted" style="text-transform:none;letter-spacing:0">For event coordination</span></label>
+        <div id="phone-field" class="gf-field">
+          <label for="contact-info" class="gf-label"><span>Phone</span> <span class="su-hint">For event coordination</span></label>
           <input type="tel" id="contact-info" class="gf-input" autocomplete="tel" inputmode="tel" placeholder="(555) 123-4567" aria-describedby="err-contact-info phone-note" required>
           <p id="err-contact-info" class="gf-error" role="alert" aria-live="polite" hidden></p>
           <p id="phone-note" class="gf-note" hidden></p>
@@ -98,22 +125,34 @@
         </fieldset>
 
         <div id="guardian-container" class="gf-box" hidden>
-          <p class="m-0 font-bold">A parent or guardian is needed for this age group.</p>
-          <div class="gf-field" style="margin-top:.75rem">
-            <label for="guardian-name" class="gf-label">Parent or guardian name</label>
-            <input type="text" id="guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-guardian-name">
-            <p id="err-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+          <p class="su-guardian-lead">A parent or guardian is needed for this age group.</p>
+          <div class="su-guardian-grid">
+            <div class="gf-field">
+              <label for="guardian-name" class="gf-label">Guardian name</label>
+              <input type="text" id="guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-guardian-name">
+              <p id="err-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+            </div>
+            <div class="gf-field">
+              <label for="guardian-phone" class="gf-label">Guardian phone</label>
+              <input type="tel" id="guardian-phone" class="gf-input" autocomplete="off" inputmode="tel" aria-describedby="err-guardian-phone">
+              <p id="err-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+            </div>
           </div>
-          <div class="gf-field" style="margin-bottom:0">
-            <label for="guardian-phone" class="gf-label">Guardian phone</label>
-            <input type="tel" id="guardian-phone" class="gf-input" autocomplete="off" inputmode="tel" aria-describedby="err-guardian-phone">
-            <p id="err-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
-          </div>
+          <label class="su-check">
+            <input type="checkbox" id="use-guardian-phone" checked>
+            <span>Use the guardian's phone as the sign-up phone<small id="use-guardian-phone-value"></small></span>
+          </label>
         </div>
 
-        <div id="adult-privacy-box" class="gf-field" style="margin-top:.75rem">
-          <label class="flex items-center gap-2 cursor-pointer text-sm">
-            <input type="checkbox" id="public-first-name-only" class="gf-check">
+        <div id="junior-privacy-note" class="su-info" hidden>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01"/></svg>
+          <span><strong id="junior-privacy-title">Shown publicly with first name and last initial</strong>
+          <small>Junior names are shortened on public screens. Organizers see the full name.</small></span>
+        </div>
+
+        <div id="adult-privacy-box" class="gf-field">
+          <label class="su-check">
+            <input type="checkbox" id="public-first-name-only">
             <span>Show only my first name and last initial on public screens</span>
           </label>
         </div>
@@ -121,7 +160,7 @@
 
       <!-- STEP: YOUR ACT -->
       <section id="step-act" data-step="act" class="gf-card" aria-labelledby="step-act-title" hidden>
-        <h3 id="step-act-title" class="gf-title">Your song</h3>
+        <h2 id="step-act-title" class="gf-title">Your song</h2>
 
         <div class="gf-field">
           <label for="song-title" class="gf-label">Song title</label>
@@ -147,7 +186,7 @@
           <div id="partner-match-box" class="gf-box" role="group" aria-label="Same person?" hidden>
             <p id="partner-match-text" class="m-0"></p>
             <div class="gf-box-actions">
-              <button type="button" id="partner-same-yes" class="gf-btn gf-btn-small">Yes, same person</button>
+              <button type="button" id="partner-same-yes" class="gf-btn gf-btn-small gf-btn-primary">Yes, same person</button>
               <button type="button" id="partner-same-no" class="gf-btn gf-btn-small">No, someone else</button>
             </div>
           </div>
@@ -155,21 +194,26 @@
           <div id="partner-new-box" hidden>
             <p id="partner-new-note" class="gf-note"></p>
             <div class="gf-field" style="margin-top:.75rem">
-              <label for="partner-phone" class="gf-label">Partner phone <span class="gf-muted" style="text-transform:none;letter-spacing:0">For event coordination</span></label>
-              <input type="tel" id="partner-phone" class="gf-input" inputmode="tel" autocomplete="off" aria-describedby="err-partner-phone">
+              <label for="partner-phone" class="gf-label"><span>Partner phone</span> <span class="su-hint">For event coordination</span></label>
+              <input type="tel" id="partner-phone" class="gf-input" inputmode="tel" autocomplete="off" placeholder="10-digit phone" aria-describedby="err-partner-phone">
               <p id="err-partner-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
             </div>
             <fieldset class="gf-fieldset">
               <legend class="gf-label">Partner age group</legend>
               <div id="partner-age-options" class="gf-radio-row"></div>
+              <p class="su-hint-block">If your partner is a junior, we will also ask for a guardian name and phone.</p>
             </fieldset>
             <div id="partner-guardian-box" hidden>
-              <label for="partner-guardian-name" class="gf-label">Partner's guardian name</label>
-              <input id="partner-guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-partner-guardian-name">
-              <p id="err-partner-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
-              <label for="partner-guardian-phone" class="gf-label">Partner's guardian phone</label>
-              <input id="partner-guardian-phone" type="tel" class="gf-input" inputmode="tel" autocomplete="off" aria-describedby="err-partner-guardian-phone">
-              <p id="err-partner-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+              <div class="gf-field">
+                <label for="partner-guardian-name" class="gf-label">Partner's guardian name</label>
+                <input id="partner-guardian-name" class="gf-input" autocomplete="off" aria-describedby="err-partner-guardian-name">
+                <p id="err-partner-guardian-name" class="gf-error" role="alert" aria-live="polite" hidden></p>
+              </div>
+              <div class="gf-field">
+                <label for="partner-guardian-phone" class="gf-label">Partner's guardian phone</label>
+                <input id="partner-guardian-phone" type="tel" class="gf-input" inputmode="tel" autocomplete="off" aria-describedby="err-partner-guardian-phone">
+                <p id="err-partner-guardian-phone" class="gf-error" role="alert" aria-live="polite" hidden></p>
+              </div>
             </div>
           </div>
         </div>
@@ -179,54 +223,80 @@
           <input type="text" id="stage-notes" class="gf-input" placeholder="e.g. Needs 2 wireless mics (only the sound team sees this)">
         </div>
 
-        <label class="gf-check">
+        <label class="su-check">
           <input type="checkbox" id="acoustic">
           <span>Acoustic or no track needed (I will sing or play live)
             <small>Tick this and you will not be asked for a track.</small></span>
         </label>
-        <p id="upload-hint" class="gf-muted" style="margin:.75rem 0 0">You can upload a track after you submit.</p>
       </section>
 
       <!-- STEP: DISH -->
       <section id="step-dish" data-step="dish" class="gf-card" aria-labelledby="step-dish-title" hidden>
-        <h3 id="step-dish-title" class="gf-title">Choose a dish</h3>
-        <p class="gf-muted" style="margin:0 0 .5rem"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
+        <h2 id="step-dish-title" class="gf-title">Choose a dish</h2>
+        <p class="gf-muted su-dish-intro"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
         <fieldset class="gf-fieldset" aria-describedby="err-food">
           <legend class="gf-label">Open dish slots</legend>
           <div id="food-groups-container"></div>
           <p id="err-food" class="gf-error" role="alert" aria-live="polite" hidden></p>
         </fieldset>
-        <div id="selected-food-box" class="gf-field" style="margin-top:1rem" hidden>
+        <div id="selected-food-box" class="gf-field" hidden>
           <label for="dish-description" class="gf-label">Note for organizers (optional)</label>
           <input type="text" id="dish-description" class="gf-input" placeholder="e.g. Mild spice. Contains cashews.">
         </div>
+        <button type="button" id="skip-dish-btn" class="su-link-btn" hidden>Skip, I am only singing</button>
+        <button type="button" id="add-song-btn" class="su-link-btn" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Want to sing too? Add a song</button>
       </section>
 
       <p id="form-error" class="gf-form-error" role="alert" aria-live="polite" hidden></p>
 
       <div class="gf-actions">
-        <button type="button" id="back-btn" class="gf-btn" hidden>Back</button>
         <button type="submit" id="submit-btn" class="gf-btn gf-btn-primary"><span id="submit-btn-text">Continue</span></button>
+        <p id="upload-hint" class="su-bar-note">You can upload a track after you submit.</p>
+        <p id="dish-selected-note" class="su-bar-note" hidden></p>
       </div>
     </form>
 
     <!-- POST SIGN-UP CARD -->
-    <section id="signup-done" class="gf-card gf-done" aria-labelledby="done-title" tabindex="-1" hidden>
-      <h2 id="done-title">You are signed up</h2>
-      <div id="done-entry-ids"></div>
-      <p id="done-message" class="gf-muted"></p>
+    <section id="signup-done" class="gf-done" aria-labelledby="done-title" tabindex="-1" hidden>
+      <div class="su-done-head">
+        <span class="su-done-check" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg></span>
+        <h1 id="done-title">You are signed up</h1>
+        <div id="done-entry-ids"></div>
+        <p id="done-message" class="gf-muted"></p>
+      </div>
+
+      <div id="done-uploads-closed" class="su-notice" hidden>
+        <p class="su-notice-title">Uploads are closed</p>
+        <p>Track uploads have ended so the sound team can prepare. Your song and details are saved. If you need a late track, talk to the sound team at the venue.</p>
+      </div>
+      <div id="done-edits-locked" class="su-notice" hidden>
+        <p class="su-notice-title">Edits are locked</p>
+        <p>The lineup is frozen so the show runs smoothly. Changes to acts, songs and dishes are paused. Tell an organizer at the venue if something must change.</p>
+      </div>
 
       <p class="gf-eyebrow">WHAT NEXT</p>
       <div class="gf-next">
-        <a id="done-upload" href="/my-entry" class="gf-btn gf-btn-primary">Upload track now<small id="done-upload-hint">Choose a file or paste a YouTube or SoundCloud link.</small></a>
-        <button type="button" id="done-add-act" class="gf-btn">Add another act<small>Same name and phone, new song</small></button>
-        <button type="button" id="done-add-dish" class="gf-btn">Add a dish<small>Pick an open slot on the food board</small></button>
+        <a id="done-upload" href="/my-entry" class="gf-btn">
+          <span class="gf-next-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 20h16"/></svg></span>
+          <span class="gf-next-text"><span class="gf-next-title">Upload track now</span><small id="done-upload-hint">Choose a file or paste a YouTube or SoundCloud link.</small></span>
+          <svg class="gf-next-chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </a>
+        <button type="button" id="done-add-act" class="gf-btn">
+          <span class="gf-next-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+          <span class="gf-next-text"><span id="done-add-act-title" class="gf-next-title">Add another act</span><small>Same name and phone, new song</small></span>
+          <svg class="gf-next-chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
+        <button type="button" id="done-add-dish" class="gf-btn">
+          <span class="gf-next-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13h18a9 9 0 0 1-18 0z"/><path d="M12 4v4M8 13V9M16 13V9"/></svg></span>
+          <span class="gf-next-text"><span class="gf-next-title">Add a dish</span><small>Pick an open slot on the food board</small></span>
+          <svg class="gf-next-chev" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+        </button>
       </div>
 
-      <div id="done-payment" hidden>
-        <p class="gf-eyebrow">SIGN-UP FEE</p>
+      <div id="done-payment" class="su-pay" hidden>
+        <p class="su-pay-title">Sign-up fee</p>
         <p class="gf-muted">Paid on the organizer's own payment page. We never see your card. The organizer marks you as paid.</p>
-        <a id="done-payment-link" class="gf-btn" href="#" target="_blank" rel="noopener noreferrer">Pay the sign-up fee (opens the organizer's payment page)</a>
+        <a id="done-payment-link" class="gf-btn gf-btn-primary" href="#" target="_blank" rel="noopener noreferrer">Pay the sign-up fee (opens the organizer's payment page)</a>
       </div>
     </section>
 

@@ -4,7 +4,7 @@
 // Guest sign-up: one progressive form (About you -> Your act -> Dish), then a "what next" card.
 // Choices: Perform / Bring a dish / Both. Backend: POST /api/signup (registration_type performer | food_only | both).
 const NAME_KEY = "etm_guest_name";
-const STEP_LABELS = { about: "About you", act: "Your song", dish: "Dish" };
+const STEP_LABELS = { about: "About you", act: "Your song", dish: "A dish (optional)" };
 const STEP_SEQUENCE = { perform: ["about", "act"], dish: ["about", "dish"], both: ["about", "act", "dish"] };
 
 const state = {
@@ -34,7 +34,6 @@ async function loadSignupConfig() {
     const res = await fetch("/api/signup/config");
     if (!res.ok) throw new Error("Failed to load registration configuration");
     state.config = await res.json();
-    window.auroraEffect?.setActive(true, 1200);
     const c = state.config;
 
     const brand = c.header_brand_title || c.event_name;

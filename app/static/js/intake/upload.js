@@ -43,7 +43,7 @@ function handleFileSelected(file) {
     if (infoBar) infoBar.classList.add('hidden');
     if (label) label.textContent = currentMediaType === 'video' ? 'Tap to select or drag a video file here' : 'Tap to select or drag an audio file here';
     lastSubmitFailed = false;
-    showError(`${problem.title}. ${problem.text}`);
+    showError(problem.text, { title: problem.title, action: 'file' });
     return;
   }
 
@@ -95,7 +95,7 @@ async function handleFormSubmit(e) {
 
   if (!selectedEntry) {
     lastSubmitFailed = false;
-    showError('Please select a song from the list first.');
+    showError('Please select a song from the list first.', { title: 'Choose an act first' });
     return;
   }
 
@@ -115,14 +115,14 @@ async function handleFormSubmit(e) {
     const fileInput = document.getElementById('audio-file-input');
     if (!fileInput.files || fileInput.files.length === 0) {
       lastSubmitFailed = false;
-      showError(`Please choose ${isVideo ? 'a video' : 'an audio'} file first.`);
+      showError(`Please choose ${isVideo ? 'a video' : 'an audio'} file first.`, { title: 'No file chosen', action: 'file' });
       return;
     }
     const file = fileInput.files[0];
     const problem = checkFile(file);
     if (problem) {
       lastSubmitFailed = false;
-      showError(`${problem.title}. ${problem.text}`);
+      showError(problem.text, { title: problem.title, action: 'file' });
       return;
     }
     formData.append('file', file);
@@ -130,13 +130,13 @@ async function handleFormSubmit(e) {
     const raw = document.getElementById('youtube-url-input').value.trim();
     if (!raw) {
       lastSubmitFailed = false;
-      showError('Paste a public YouTube or SoundCloud link to one song.');
+      showError('Paste a public YouTube or SoundCloud link to one song.', { title: 'No link yet', action: 'link' });
       return;
     }
     const link = validLink(raw);
     if (!link) {
       lastSubmitFailed = false;
-      showError('We could not use that link. Paste a public YouTube or SoundCloud link to one song. Private videos and playlists do not work.');
+      showError('Paste a public YouTube or SoundCloud link to one song. Private videos and playlists do not work.', { title: 'We could not use that link', action: 'link' });
       return;
     }
     formData.append('youtube_url', link);
@@ -147,10 +147,32 @@ async function handleFormSubmit(e) {
   const progressBar = document.getElementById('progress-bar');
   const progressText = document.getElementById('progress-text');
   const isLink = currentMethod === 'youtube';
+  const setProgress = (pct) => {
+    progressBar.style.width = pct + '%';
+    document.getElementById('progress-track')?.setAttribute('aria-valuenow', String(pct));
+    const pctEl = document.getElementById('progress-pct');
+    if (pctEl) pctEl.textContent = pct + '%';
+  };
+  const detail = document.getElementById('progress-detail');
+  const stages = document.getElementById('progress-stages');
+  const setStage = (name) => {
+    const order = ['check', 'download', 'process'];
+    stages?.querySelectorAll('li').forEach((li) => {
+      const idx = order.indexOf(li.dataset.stage);
+      const at = name === 'done' ? order.length : order.indexOf(name);
+      li.className = idx < at ? 'is-done' : idx === at ? 'is-current' : '';
+    });
+  };
+  const nameEl = document.getElementById('progress-name');
+  if (nameEl) nameEl.textContent = isLink ? (document.getElementById('youtube-url-input').value.trim().replace(/^https?:\/\/(www\.)?/, '') || 'Link') : (formData.get('file')?.name || 'Track');
+  stages?.classList.toggle('hidden', !isLink);
+  if (isLink) setStage('download');
+  if (detail) detail.textContent = '';
+  const startedAt = Date.now();
 
   submitBtn.disabled = true;
   progressContainer.classList.remove('hidden');
-  progressBar.style.width = isLink ? '35%' : '0%';
+  setProgress(isLink ? 35 : 0);
   progressText.textContent = isLink
     ? 'Checking the link, then downloading and processing. This can take a minute.'
     : 'Starting upload...';
@@ -159,13 +181,21 @@ async function handleFormSubmit(e) {
     const res = await sendUpload(formData, (loaded, total) => {
       if (loaded === null) {
         // All bytes are on the server: it now checks length and sound.
-        progressBar.style.width = '100%';
+        setProgress(100);
         progressText.textContent = 'Upload finished. Checking length and sound...';
+        if (detail) detail.textContent = '';
         return;
       }
       const pct = Math.max(1, Math.min(99, Math.round((loaded / total) * 100)));
-      progressBar.style.width = pct + '%';
-      progressText.textContent = `${pct}%  ·  ${formatBytes(loaded)} of ${formatBytes(total)}`;
+      setProgress(pct);
+      progressText.textContent = `Uploading ${pct}%`;
+      const elapsed = (Date.now() - startedAt) / 1000;
+      let eta = '';
+      if (elapsed > 2 && loaded > 0 && pct >= 3) {
+        const secs = Math.max(1, Math.round((total - loaded) / (loaded / elapsed)));
+        eta = secs >= 90 ? ` \u00b7 about ${Math.ceil(secs / 60)} min left` : ` \u00b7 about ${secs} s left`;
+      }
+      if (detail) detail.textContent = `${formatBytes(loaded)} of ${formatBytes(total)}${eta}`;
     });
 
     if (!res.ok) {
@@ -175,14 +205,15 @@ async function handleFormSubmit(e) {
       if (res.status === 502 || res.status === 504) {
         throw new Error(`The upload timed out (HTTP ${res.status}). Try again, or export a smaller file.`);
       }
-      const detail = res.body && typeof res.body.detail === 'string' ? res.body.detail : '';
-      throw new Error(detail || `Upload failed (HTTP ${res.status}). Please try again.`);
+      const detailMsg = res.body && typeof res.body.detail === 'string' ? res.body.detail : '';
+      throw new Error(detailMsg || `Upload failed (HTTP ${res.status}). Please try again.`);
     }
     const result = res.body;
     if (!result) throw new Error('The upload reached the server, but its reply was unexpected. Check My entry to see if the track is there.');
 
     lastSubmitFailed = false;
-    progressBar.style.width = '100%';
+    setProgress(100);
+    if (isLink) setStage('done');
     progressText.textContent = 'Done!';
 
     setTimeout(() => {
@@ -192,10 +223,13 @@ async function handleFormSubmit(e) {
 
       const successCard = document.getElementById('success-card');
       const detailsBox = document.getElementById('success-details');
+      const kind = result.media_type ? String(result.media_type).toLowerCase() : (isVideo ? 'video' : 'audio');
+      document.getElementById('success-title').textContent = result.duration ? `Ready. ${result.duration}, ${kind}` : 'Track uploaded';
+      document.getElementById('success-summary').textContent = `${result.filename || 'Your track'} passed the checks. The sound team has it.`;
       detailsBox.innerHTML = `
         <p><strong>Performer:</strong> ${escapeHtml(result.performer_name)}</p>
         <p><strong>Song:</strong> ${escapeHtml(result.song_title)}</p>
-        <p><strong>Track file:</strong> <code class="text-orange-300">${escapeHtml(result.filename)}</code></p>
+        <p><strong>Track file:</strong> <code>${escapeHtml(result.filename)}</code></p>
       `;
       successCard.classList.remove('hidden');
       if (window.lucide) lucide.createIcons();
@@ -207,6 +241,6 @@ async function handleFormSubmit(e) {
     progressContainer.classList.add('hidden');
     if (err && err.cancelled) { lastSubmitFailed = false; hideError(); return; }
     lastSubmitFailed = true;
-    showError(err?.message || 'Something went wrong while uploading.');
+    showError(err?.message || 'Something went wrong while uploading.', { title: 'The upload did not finish' });
   }
 }

@@ -52,7 +52,7 @@ function setupPartnerAutocomplete(inputEl, dupBoxEl, listEl, getExcludedNames) {
       matches.forEach(m => {
         const pill = document.createElement('button');
         pill.type = 'button';
-        pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+        pill.className = 'me-chip-btn';
         pill.textContent = m;
         pill.addEventListener('click', () => {
           inputEl.value = m;
@@ -92,7 +92,7 @@ function setupGroupAutocomplete(inputEl, dupBoxEl, listEl, getExcludedNames) {
       matches.forEach(m => {
         const pill = document.createElement('button');
         pill.type = 'button';
-        pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+        pill.className = 'me-chip-btn';
         pill.textContent = m;
         pill.addEventListener('click', () => {
           parts[parts.length - 1] = ' ' + m;
@@ -120,10 +120,10 @@ function setupSongDuplicateWarning(inputEl, warningBoxEl, getExcludeEntryId) {
         ? `${escapeHtml(dup.performer_name)} & ${escapeHtml(dup.partner_name)}` 
         : escapeHtml(dup.performer_name);
       warningBoxEl.innerHTML = `
-        <div class="flex items-start gap-2">
-          <i data-lucide="alert-circle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+        <div class="me-warnbox-row">
+          <i data-lucide="alert-circle" class="w-5 h-5"></i>
           <div>
-            <span class="font-bold text-amber-300">Song already chosen:</span>
+            <span class="me-warnbox-title">Song already chosen:</span>
             <span>"<strong>${escapeHtml(dup.song_title)}</strong>" has already been selected by <strong>${singer}</strong> (${escapeHtml(dup.performance_type || 'Solo')}).</span>
           </div>
         </div>

@@ -43,7 +43,7 @@ async function initEventInfo() {
         const audioBtn = document.getElementById('type-audio-btn');
         const videoBtn = document.getElementById('type-video-btn');
         (only === 'audio' ? videoBtn : audioBtn)?.classList.add('hidden');
-        audioBtn?.parentElement?.classList.replace('grid-cols-2', 'grid-cols-1');
+        audioBtn?.parentElement?.classList.add('is-single');
         if (typeof setMediaType === 'function') setMediaType(only);
       }
 
@@ -137,7 +137,7 @@ async function loadPerformances() {
     }
   } catch (err) {
     badge.textContent = 'Error loading names';
-    showError(err.message || 'Could not connect to database backend');
+    showError(err.message || 'Could not connect to the server. Check your connection and refresh the page.', { title: 'We could not load the names' });
   }
 }
 
@@ -199,19 +199,17 @@ function renderOthersSongs(filterQuery = '') {
     : validSongs;
 
   if (filtered.length === 0) {
-    listEl.innerHTML = '<p class="text-xs text-slate-500 py-2">No matching songs found.</p>';
+    listEl.innerHTML = '<p class="me-empty">No matching songs found.</p>';
     return;
   }
 
   listEl.innerHTML = filtered.map(p => `
-    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800/80 text-xs">
-      <div class="truncate mr-2">
-        <span class="font-semibold text-white">${escapeHtml(p.song_title)}</span>
-        <span class="text-slate-400 block text-[11px]">${escapeHtml(p.performer_name)}${p.partner_name ? ' & ' + escapeHtml(p.partner_name) : ''}</span>
+    <div class="me-other">
+      <div class="me-other-text">
+        <span class="me-other-title">${escapeHtml(p.song_title)}</span>
+        <span class="me-other-who">${escapeHtml(p.performer_name)}${p.partner_name ? ' & ' + escapeHtml(p.partner_name) : ''}</span>
       </div>
-      <div class="shrink-0 flex items-center gap-1.5">
-        ${renderTypePill(p.performance_type)}
-      </div>
+      ${renderTypePill(p.performance_type)}
     </div>
   `).join('');
 }

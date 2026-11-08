@@ -38,8 +38,8 @@ function setupEventListeners() {
 
   tabFile.addEventListener('click', () => {
     currentMethod = 'file';
-    tabFile.className = 'py-2 rounded-lg bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 transition shadow';
-    tabYoutube.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition';
+    tabFile.setAttribute('aria-pressed', 'true');
+    tabYoutube.setAttribute('aria-pressed', 'false');
     filePane.classList.remove('hidden');
     ytPane.classList.add('hidden');
     updateSubmitButtonText();
@@ -48,8 +48,8 @@ function setupEventListeners() {
 
   tabYoutube.addEventListener('click', () => {
     currentMethod = 'youtube';
-    tabYoutube.className = 'py-2 rounded-lg bg-orange-500 text-white font-semibold flex items-center justify-center gap-2 transition shadow';
-    tabFile.className = 'py-2 rounded-lg text-slate-400 hover:text-slate-200 font-medium flex items-center justify-center gap-2 transition';
+    tabYoutube.setAttribute('aria-pressed', 'true');
+    tabFile.setAttribute('aria-pressed', 'false');
     ytPane.classList.remove('hidden');
     filePane.classList.add('hidden');
     updateSubmitButtonText();
@@ -70,14 +70,14 @@ function setupEventListeners() {
   });
   dropZone.addEventListener('dragover', (e) => {
     e.preventDefault();
-    dropZone.classList.add('border-orange-500', 'bg-orange-500/5');
+    dropZone.classList.add('is-dragover');
   });
   dropZone.addEventListener('dragleave', () => {
-    dropZone.classList.remove('border-orange-500', 'bg-orange-500/5');
+    dropZone.classList.remove('is-dragover');
   });
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault();
-    dropZone.classList.remove('border-orange-500', 'bg-orange-500/5');
+    dropZone.classList.remove('is-dragover');
     if (selectedEntry && isSongTitleMissing(selectedEntry)) {
       openEditSongModal(selectedEntry);
       showToast('Please specify your song title before uploading a track.', 'error');
@@ -102,6 +102,26 @@ function setupEventListeners() {
 
   document.getElementById('retry-upload-btn')?.addEventListener('click', () => {
     handleFormSubmit({ preventDefault() {} });
+  });
+  document.getElementById('dismiss-error-btn')?.addEventListener('click', hideError);
+  document.getElementById('error-action-btn')?.addEventListener('click', (ev) => {
+    hideError();
+    if (ev.currentTarget.dataset.action === 'link') {
+      if (currentMethod !== 'youtube') tabYoutube.click();
+      const urlInput = document.getElementById('youtube-url-input');
+      urlInput.focus();
+      urlInput.select();
+    } else {
+      if (currentMethod !== 'file') tabFile.click();
+      fileInput.click();
+    }
+  });
+  document.getElementById('not-you-btn')?.addEventListener('click', () => {
+    performerSelect.value = '';
+    selectedPerformer = '';
+    try { localStorage.removeItem(NAME_KEY); } catch (_) { /* private mode */ }
+    handlePerformerSelected('');
+    performerSelect.focus();
   });
   document.getElementById('cancel-upload-btn')?.addEventListener('click', () => {
     if (activeXhr) activeXhr.abort();

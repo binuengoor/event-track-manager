@@ -1,0 +1,237 @@
+/* Guest home (/): boards Main, GHomeDark, GHomePotluck, GHomeEnded. Colours are tokens.css tokens; the handful of extra shades
+   the boards use (hero glow, card tint, the four poster hues) are defined below as local variables with the board's value. */
+html[data-theme="dark"], html[data-theme="dark"] body { background-color: var(--bg-canvas) !important; }
+
+.gh-home {
+  --gh-glow: #24150F;
+  --gh-card-bg: #251512;
+  --gh-card-edge: #5A2A20;
+  --gh-tile-bg: var(--bg-surface-1);
+  --gh-tint: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-surface-1));
+  --gh-shadow: 0 8px 24px rgb(0 0 0 / .4);
+  --gh-btn-shadow: 0 6px 16px rgb(0 0 0 / .4);
+  --gh-edge: var(--gad-edge, #6B7385);
+  --gh-c1: #C84B31; --gh-c2: #E8A33D; --gh-c3: #0D7A5F; --gh-c4: #3B4A9E;   /* the four hues of the poster mark */
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+  color: var(--text-primary);
+}
+html[data-theme="light"] .gh-home {
+  --gh-glow: #FFE9DC;
+  --gh-card-bg: #FFF4EE;
+  --gh-card-edge: #F1C9BB;
+  --gh-tile-bg: #FFFFFF;
+  --gh-tint: #FDEBE6;
+  --gh-shadow: 0 8px 24px rgb(200 75 49 / .15);
+  --gh-btn-shadow: 0 6px 16px rgb(200 75 49 / .15);
+  --gh-edge: var(--gad-edge, #9A927F);
+}
+.gh-home [hidden] { display: none !important; }
+.gh-home .guest-admin-link { display: none; }   /* the header pill replaces the footer link on this page */
+.gh-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ------------------------------------------------------------ backdrop: glow always, aurora only in dark (spec: hero only) */
+.gh-backdrop {
+  position: absolute; inset: 0 0 auto 0; height: min(560px, 66vh); z-index: 0; overflow: hidden; pointer-events: none;
+  background: linear-gradient(180deg, var(--gh-glow) 0%, transparent 100%);
+}
+.gh-backdrop aurora-background {
+  position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, transparent 100%); mask-image: linear-gradient(180deg, #000 0%, transparent 100%);
+}
+html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
+
+/* ------------------------------------------------------------ header */
+.gh-header {
+  position: relative; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px max(20px, calc((100% - 1040px) / 2)) 4px;
+  background: transparent !important; border-bottom: 0 !important;
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+.gh-brand { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; min-height: 44px; text-decoration: none; }
+.gh-eyebrow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--accent-text); }
+.gh-brand-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-secondary); }
+.gh-brand-sub:empty { display: none; }
+.gh-header .guest-navigation { margin-inline: auto; }
+.gh-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.gh-pill, .gh-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 44px; box-sizing: border-box;
+  border: 1px solid var(--gh-edge); background: var(--bg-surface-1); color: var(--text-secondary);
+  font: 500 13px var(--font-sans); cursor: pointer;
+}
+.gh-pill { padding: 0 16px; border-radius: var(--radius-full); }
+.gh-icon-btn { width: 44px; border-radius: var(--radius-full); }
+.gh-pill:hover, .gh-icon-btn:hover { color: var(--text-primary); background: var(--bg-surface-2); }
+
+/* ------------------------------------------------------------ layout */
+.gh-main {
+  position: relative; z-index: 10; box-sizing: border-box; width: 100%; max-width: 1080px; margin: 0 auto;
+  padding: 8px 20px 32px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; align-items: start;
+}
+.gh-main > .gh-food, .gh-main > .gh-notes, .gh-main > .gh-sponsors { grid-column: 1 / -1; }
+.gh-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+@media (min-width: 900px) {
+  .gh-main { grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 24px; padding-top: 20px; }
+}
+
+/* ------------------------------------------------------------ hero */
+.gh-hero { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.gh-poster {
+  position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden;
+  min-height: 150px; border-radius: 20px;
+}
+.gh-poster-img { display: block; width: 100%; max-height: min(52vh, 460px); object-fit: contain; }
+.gh-poster-fallback { color: rgb(255 255 255 / .2); line-height: 0; }
+.gh-hero[data-poster="img"] .gh-poster-fallback { display: none; }
+.gh-hero[data-poster="img"] .gh-poster { background: #fff; border: 1px solid var(--border-subtle); box-shadow: var(--gh-shadow); }
+.gh-hero[data-poster="none"] .gh-poster {
+  height: 210px; justify-content: flex-end; padding-right: 8px;
+  background: linear-gradient(135deg, #C84B31 0%, #7A2B1B 55%, #2A1410 100%);
+}
+.gh-title h1 {
+  margin: 0; font-size: 30px; line-height: 1.08; letter-spacing: -.02em; font-weight: 700; text-wrap: balance;
+  color: var(--accent-primary);
+}
+.gh-subtitle { margin: 4px 0 0; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+.gh-subtitle:empty { display: none; }
+.gh-hero[data-poster="none"] .gh-title { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; color: #fff; }
+.gh-hero[data-poster="none"] .gh-title h1 { color: #fff; font-size: 32px; line-height: 1.05; }
+.gh-hero[data-poster="none"] .gh-subtitle { color: #FFE9E2; }
+@media (min-width: 900px) {
+  .gh-title h1 { font-size: 40px; }
+  .gh-hero[data-poster="none"] .gh-title h1 { font-size: 44px; }
+  .gh-hero[data-poster="none"] .gh-poster { height: 300px; }
+}
+
+.gh-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.gh-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: var(--radius-full);
+  background: var(--gh-tint); color: var(--accent-text); font-size: 12px; font-weight: 600; line-height: 1.3;
+}
+.gh-status[data-state="ready"] { background: var(--status-playing-bg); color: var(--status-playing-fg); }
+.gh-status[data-state="live"] { background: var(--status-danger-bg); color: var(--status-danger-fg); }
+.gh-status[data-state="ended"] { background: var(--bg-surface-2); color: var(--text-secondary); }
+.gh-status-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: currentColor; }
+.gh-status[data-state="live"] .gh-status-dot { animation: gh-pulse 1.4s ease-in-out infinite; }
+.gh-status[data-state="ended"] .gh-status-dot { display: none; }
+@keyframes gh-pulse { 50% { opacity: .35; } }
+.gh-hero[data-poster="none"] .gh-chip { background: rgb(0 0 0 / .32); color: #fff; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .28); }
+
+/* ------------------------------------------------------------ date, countdown, venue */
+.gh-card {
+  display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 20px;
+  background: var(--gh-card-bg); border: 1px solid var(--gh-card-edge); box-shadow: var(--gh-shadow);
+}
+.gh-card-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.gh-when { margin: 0; font-size: 13px; font-weight: 500; color: var(--text-secondary); }
+.gh-countdown-chip {
+  padding: 4px 10px; border-radius: var(--radius-full); background: var(--accent-primary); color: var(--accent-on);
+  font: 700 13px var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.gh-countdown-chip:empty { display: none; }
+.gh-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.gh-tile { padding: 10px 0; text-align: center; border-radius: 12px; background: var(--gh-tile-bg); border: 1px solid var(--gh-card-edge); }
+.gh-num { display: block; font: 600 24px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--accent-text); }
+.gh-unit { display: block; margin-top: 2px; font-size: 12px; color: var(--text-secondary); }
+[data-mode="potluck"] .gh-tile { border-color: transparent; color: #fff; }
+[data-mode="potluck"] .gh-tile .gh-num, [data-mode="potluck"] .gh-tile .gh-unit { color: inherit; }
+[data-mode="potluck"] .gh-tile:nth-child(1) { background: var(--gh-c1); }
+[data-mode="potluck"] .gh-tile:nth-child(2) { background: var(--gh-c2); color: #141518; }
+[data-mode="potluck"] .gh-tile:nth-child(3) { background: var(--gh-c3); }
+[data-mode="potluck"] .gh-tile:nth-child(4) { background: var(--gh-c4); }
+
+.gh-state-copy { display: none; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.gh-state-copy h2 { margin: 0; font-size: 24px; line-height: 1.2; letter-spacing: -.01em; font-weight: 700; }
+.gh-state-copy p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-secondary); }
+.gh-state-copy p:empty { display: none; }
+.gh-state-badge { padding: 6px 12px; border-radius: var(--radius-full); background: var(--bg-surface-2); color: var(--text-secondary); font-size: 12px; font-weight: 600; }
+.gh-card[data-state="live"] .gh-state-copy, .gh-card[data-state="ended"] .gh-state-copy { display: flex; }
+.gh-card[data-state="live"] .gh-tiles, .gh-card[data-state="ended"] .gh-tiles { display: none; }
+.gh-card[data-state="live"] .gh-state-badge { background: var(--status-danger-bg); color: var(--status-danger-fg); }
+.gh-card[data-state="ended"] { background: var(--bg-surface-1); border-color: var(--border-subtle); box-shadow: none; }
+.gh-card[data-state="ended"] .gh-countdown-chip, .gh-card[data-state="live"] .gh-countdown-chip { display: none; }
+
+.gh-venue {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: 13px; line-height: 1.4;
+  color: var(--text-secondary); text-decoration: none;
+}
+.gh-venue svg { flex: none; }
+.gh-venue:hover span { text-decoration: underline; }
+.gh-venue-sub { display: inline; }
+
+/* ------------------------------------------------------------ buttons */
+.gh-ctas { display: flex; flex-direction: column; gap: 10px; }
+.gh-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box;
+  min-height: 52px; padding: 0 20px; border-radius: 14px; border: 1px solid transparent;
+  font: 600 16px var(--font-sans); text-decoration: none; cursor: pointer;
+}
+.gh-btn-primary { background: var(--accent-primary); color: var(--accent-on); box-shadow: var(--gh-btn-shadow); }
+.gh-btn-primary:hover { filter: brightness(1.06); }
+.gh-btn-outline { background: var(--bg-surface-1); border-color: var(--accent-primary); color: var(--accent-text); }
+.gh-btn-outline:hover { background: var(--bg-surface-2); }
+.gh-btn-small { min-height: 44px; padding: 0 18px; font-size: 14px; border-radius: 12px; border-color: var(--gh-edge); background: var(--bg-surface-1); color: var(--text-primary); }
+.gh-btn-small:hover { background: var(--bg-surface-2); }
+.gh-notice { margin: 0; padding: 14px; border-radius: 12px; background: var(--bg-surface-2); color: var(--text-secondary); font-size: 14px; text-align: center; }
+.gh-link { display: flex; align-items: center; justify-content: center; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--accent-text); }
+.gh-link-btn { min-height: 44px; min-width: 44px; padding: 0 8px; border: 0; background: none; font: 600 13px var(--font-sans); color: var(--accent-text); text-decoration: underline; cursor: pointer; }
+.gh-mono { font: 600 12px var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+
+/* ------------------------------------------------------------ potluck food preview */
+.gh-food { display: flex; flex-direction: column; gap: 8px; }
+.gh-food-head { display: flex; align-items: baseline; justify-content: space-between; }
+.gh-food-head h2, .gh-sponsors h2 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
+.gh-bar { height: 8px; border-radius: 4px; background: var(--border-subtle); overflow: hidden; }
+.gh-bar span { display: block; height: 100%; width: 0; background: var(--status-playing-fg); }
+.gh-food-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 900px) { .gh-food-list { grid-template-columns: 1fr 1fr; } }
+.gh-dish {
+  display: flex; align-items: center; gap: 12px; min-height: 60px; box-sizing: border-box; padding: 8px 8px 8px 14px;
+  background: var(--bg-surface-1); border: 1px solid var(--border-subtle); border-radius: 14px;
+}
+.gh-dish-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.gh-dish-name { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+.gh-dish-sub { font-size: 13px; color: var(--text-secondary); overflow-wrap: anywhere; }
+.gh-tag { margin-right: 6px; padding: 6px 12px; border-radius: var(--radius-full); background: var(--status-playing-bg); color: var(--status-playing-fg); font-size: 12px; font-weight: 600; }
+
+/* ------------------------------------------------------------ general notes */
+.gh-notes { padding: 16px; border-radius: 16px; background: var(--bg-surface-1); border: 1px solid var(--border-subtle); }
+.gh-notes-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+.gh-notes-body { font-size: 14px; line-height: 1.6; color: var(--text-primary); overflow-wrap: anywhere; }
+.gh-notes-body > :first-child { margin-top: 0; }
+.gh-notes-body > :last-child { margin-bottom: 0; }
+.gh-notes-body h1, .gh-notes-body h2, .gh-notes-body h3, .gh-notes-body h4 { margin: 14px 0 6px; line-height: 1.3; font-weight: 700; }
+.gh-notes-body h1 { font-size: 20px; } .gh-notes-body h2 { font-size: 18px; } .gh-notes-body h3 { font-size: 16px; } .gh-notes-body h4 { font-size: 15px; }
+.gh-notes-body p { margin: 0 0 10px; }
+.gh-notes-body ul { margin: 0 0 10px; padding-left: 22px; list-style: disc; }
+.gh-notes-body ol { margin: 0 0 10px; padding-left: 22px; list-style: decimal; }
+.gh-notes-body a { color: var(--accent-text); text-decoration: underline; }
+.gh-notes-body code { padding: 1px 6px; border-radius: 6px; background: var(--bg-surface-2); font: 13px var(--font-mono); }
+.gh-notes-body pre { margin: 10px 0; padding: 12px; border-radius: 12px; background: var(--bg-surface-2); overflow-x: auto; }
+.gh-notes-body pre code { padding: 0; background: none; }
+.gh-notes-body blockquote { margin: 10px 0; padding-left: 12px; border-left: 3px solid var(--accent-primary); color: var(--text-secondary); }
+.gh-notes-body hr { margin: 14px 0; border: 0; border-top: 1px solid var(--border-subtle); }
+
+/* ------------------------------------------------------------ sponsor reel */
+.gh-sponsors { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.gh-sponsors-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gh-reel { overflow-x: auto; border-radius: 14px; scrollbar-width: thin; }
+.gh-reel:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
+.gh-reel.is-marquee {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+.gh-reel-track { display: flex; gap: 10px; width: max-content; margin: 0; padding: 2px 0; list-style: none; }
+.gh-reel-track li {
+  flex: 0 0 150px; height: 60px; display: flex; align-items: center; justify-content: center;
+  border-radius: 14px; background: #fff; border: 1px solid var(--border-subtle);
+}
+.gh-reel-track img { max-width: 88%; max-height: 44px; object-fit: contain; }
+.gh-reel.is-marquee .gh-reel-track { animation: gh-reel var(--reel-time, 30s) linear infinite; }
+.gh-reel.is-marquee:hover .gh-reel-track, .gh-reel.is-paused .gh-reel-track { animation-play-state: paused; }
+@keyframes gh-reel { to { transform: translateX(var(--reel-shift, -50%)); } }
+@media (prefers-reduced-motion: reduce) {
+  .gh-reel.is-marquee .gh-reel-track, .gh-status[data-state="live"] .gh-status-dot { animation: none; }
+}

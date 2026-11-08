@@ -116,7 +116,7 @@ function setupAddPerformanceModal() {
         matches.forEach(m => {
           const pill = document.createElement('button');
           pill.type = 'button';
-          pill.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs shadow transition';
+          pill.className = 'me-chip-btn';
           pill.textContent = m;
           pill.addEventListener('click', () => {
             if (isGroup) {

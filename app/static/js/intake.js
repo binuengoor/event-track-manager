@@ -63,8 +63,8 @@ function handleUrlQueryParams() {
     const hint = document.getElementById('food-cta-section');
     hint.classList.remove('hidden');
     hint.innerHTML = `
-      <div class="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
-        <span>Please choose your name from Step 1 above to sign up for this dish.</span>
+      <div class="me-alert is-warn" role="status">
+        <div class="me-alert-body"><span>Choose your name above to sign up for this dish.</span></div>
       </div>
     `;
   }

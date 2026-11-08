@@ -1,661 +1,134 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <script src="/static/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#000000">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0B0D10">
   <meta name="view-transition" content="same-origin">
   <title>Event</title>
-  <style>
-    :root, html, body {
-      background-color: #000000 !important;
-      color-scheme: dark;
-    }
-  </style>
-  <script src="/static/js/icons.js"></script>
-  <script src="/static/vendor/marked.umd.js"></script>
+  <script src="/static/js/icons.js" defer></script>
+  <script src="/static/vendor/marked.umd.js" defer></script>
   <link rel="stylesheet" href="/static/css/style.css">
   <link rel="stylesheet" href="/static/css/aurora.css">
   <script src="/static/js/aurora.js" defer></script>
-  <style>
-    @keyframes pulse-slow {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.85; transform: scale(1.02); }
-    }
-    .poster-glow {
-      box-shadow: 0 0 50px -10px rgba(249, 115, 22, 0.25);
-    }
-    /* Explicit Markdown Styling Overrides */
-    .markdown-rendered h1 {
-      font-size: 1.4rem !important;
-      font-weight: 800 !important;
-      color: #ffffff !important;
-      margin-top: 1rem !important;
-      margin-bottom: 0.5rem !important;
-      line-height: 1.3 !important;
-      display: block !important;
-    }
-    .markdown-rendered h2 {
-      font-size: 1.2rem !important;
-      font-weight: 700 !important;
-      color: #f8fafc !important;
-      margin-top: 0.85rem !important;
-      margin-bottom: 0.4rem !important;
-      line-height: 1.3 !important;
-      display: block !important;
-    }
-    .markdown-rendered h3 {
-      font-size: 1.05rem !important;
-      font-weight: 700 !important;
-      color: #fbbf24 !important;
-      margin-top: 0.75rem !important;
-      margin-bottom: 0.35rem !important;
-      line-height: 1.3 !important;
-      display: block !important;
-    }
-    .markdown-rendered h4 {
-      font-size: 0.95rem !important;
-      font-weight: 600 !important;
-      color: #f59e0b !important;
-      margin-top: 0.6rem !important;
-      margin-bottom: 0.25rem !important;
-      display: block !important;
-    }
-    .markdown-rendered p {
-      color: #cbd5e1 !important;
-      margin-bottom: 0.6rem !important;
-      line-height: 1.6 !important;
-    }
-    .markdown-rendered ul {
-      list-style-type: disc !important;
-      padding-left: 1.5rem !important;
-      margin-bottom: 0.6rem !important;
-      color: #cbd5e1 !important;
-    }
-    .markdown-rendered ol {
-      list-style-type: decimal !important;
-      padding-left: 1.5rem !important;
-      margin-bottom: 0.6rem !important;
-      color: #cbd5e1 !important;
-    }
-    .markdown-rendered li {
-      margin-bottom: 0.25rem !important;
-    }
-    .markdown-rendered pre {
-      background: #020617 !important;
-      border: 1px solid #334155 !important;
-      padding: 0.85rem 1rem !important;
-      border-radius: 0.75rem !important;
-      margin: 0.75rem 0 !important;
-      overflow-x: auto !important;
-      display: block !important;
-    }
-    .markdown-rendered pre code {
-      background: transparent !important;
-      border: none !important;
-      padding: 0 !important;
-      color: #e2e8f0 !important;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-      font-size: 0.8rem !important;
-    }
-    .markdown-rendered code {
-      background: rgba(15, 23, 42, 0.9) !important;
-      color: #fbbf24 !important;
-      border: 1px solid rgba(251, 191, 36, 0.25) !important;
-      padding: 0.15rem 0.4rem !important;
-      border-radius: 0.375rem !important;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-      font-size: 0.8rem !important;
-    }
-    .markdown-rendered blockquote {
-      border-left: 3px solid #f59e0b !important;
-      padding-left: 0.85rem !important;
-      color: #94a3b8 !important;
-      font-style: italic !important;
-      margin: 0.6rem 0 !important;
-    }
-    .markdown-rendered strong {
-      color: #ffffff !important;
-      font-weight: 700 !important;
-    }
-    .markdown-rendered em {
-      color: #fde68a !important;
-      font-style: italic !important;
-    }
-    .markdown-rendered a {
-      color: #38bdf8 !important;
-      text-decoration: underline !important;
-    }
-    .markdown-rendered hr {
-      border-color: #334155 !important;
-      margin: 1rem 0 !important;
-    }
-  </style>
-<link rel="stylesheet" href="/static/css/app.css?v=1">
+  <link rel="stylesheet" href="/static/css/app.css?v=1">
   <link rel="stylesheet" href="/static/css/a11y.css">
   <link rel="stylesheet" href="/static/css/tokens.css">
   <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/guest-home.css">
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
+<body class="gh-home">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <!-- Dynamic Ambient Aurora Fluid Light Effect -->
-  <aurora-background></aurora-background>
+  <!-- Hero backdrop: soft glow in both themes; the animated aurora is dark-theme only (see guest-home.css). -->
+  <div class="gh-backdrop" aria-hidden="true"><aurora-background></aurora-background></div>
 
-  <!-- Top Navigation Bar -->
-  <header class="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-30">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/" class="flex items-center gap-3 group">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20 group-hover:scale-105 transition">
-          <i data-lucide="music" class="w-5 h-5"></i>
-        </div>
-        <div>
-          <h1 id="nav-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</h1>
-          <p id="nav-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
-        </div>
-      </a>
+  <header class="gh-header">
+    <a href="/" class="gh-brand">
+      <span id="nav-event-title" class="gh-eyebrow">Event Track Manager</span>
+      <span id="nav-event-subtitle" class="gh-brand-sub">Musical Night</span>
+    </a>
 
-      <!-- Quick Nav Links -->
-      <nav aria-label="Main"></nav>
+    <!-- Server-rendered guest navigation replaces this element (app/guest_navigation.py). -->
+    <nav aria-label="Main"></nav>
+
+    <div class="gh-actions">
+      <button type="button" id="theme-toggle-btn" class="gh-icon-btn" aria-label="Colour theme">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+        <span id="theme-toggle-label" class="gh-sr">Auto</span>
+      </button>
+      <button type="button" id="admin-signin-btn" class="gh-pill" data-admin-signin>Admin sign-in</button>
     </div>
   </header>
-  <script src="/static/js/nav.js"></script>
 
-  <!-- Main Hero & Hub Content -->
-  <main id="main-content" class="flex-1 max-w-4xl w-full mx-auto px-4 py-6 sm:py-10 space-y-8">
+  <main id="main-content" class="gh-main">
 
-    <!-- Event Banner / Animated Poster -->
-    <div class="relative overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 poster-glow transition-all">
-      <div id="poster-container" class="w-full flex items-center justify-center bg-slate-950/80 overflow-hidden">
-        <img id="event-poster-img" style="display:none"
-             alt="Event poster" 
-             class="w-full max-h-[460px] object-contain mx-auto"
-             onerror="this.style.display='none'; document.getElementById('poster-fallback').classList.remove('hidden');" />
-        
-        <!-- Fallback Graphic if poster image is loading or missing -->
-        <div id="poster-fallback" class="py-12 px-6 text-center">
-          <div class="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 flex items-center justify-center text-white shadow-xl shadow-orange-500/30">
-            <i data-lucide="music-2" class="w-8 h-8"></i>
-          </div>
+    <!-- Poster / animated GIF, with a gradient stand-in until one is set. The title sits over the stand-in. -->
+    <section class="gh-hero" id="hero" data-poster="none" aria-labelledby="event-title-display">
+      <div id="poster-container" class="gh-poster">
+        <img id="event-poster-img" style="display:none" alt="Event poster" class="gh-poster-img">
+        <div id="poster-fallback" class="gh-poster-fallback" aria-hidden="true">
+          <svg viewBox="0 0 200 200" width="200" height="200" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round"><circle cx="100" cy="100" r="70" stroke-dasharray="110 330"/><circle cx="100" cy="100" r="50" stroke-dasharray="90 230" stroke-dashoffset="-120" opacity=".7"/><circle cx="100" cy="100" r="30" stroke-dasharray="60 130" stroke-dashoffset="-210" opacity=".5"/></svg>
         </div>
       </div>
+      <div class="gh-title">
+        <h1 id="event-title-display">Event</h1>
+        <p id="event-subtitle-display" class="gh-subtitle"></p>
+        <div class="gh-chips">
+          <span class="gh-chip" id="hero-primary-tag"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3l1.8 5.4L19 10l-5.2 1.6L12 17l-1.8-5.4L5 10l5.2-1.6z"/></svg><span id="hero-primary-tag-text">Musical Evening</span></span>
+          <span class="gh-chip gh-status" id="status-pill" data-state="ready"><span class="gh-status-dot" aria-hidden="true"></span><span id="status-pill-text">Stage Ready</span></span>
+        </div>
+      </div>
+    </section>
 
-      <!-- Event Details Overlay Bar -->
-      <div class="p-5 sm:p-6 bg-gradient-to-t from-slate-900 via-slate-900/95 to-slate-900/80 border-t border-slate-800/80 space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 id="event-title-display" class="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Event
-            </h2>
-            <p id="event-subtitle-display" class="text-xs sm:text-sm text-amber-400 font-medium mt-0.5">
-              
-            </p>
-          </div>
+    <div class="gh-side">
 
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 text-xs font-semibold">
-              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-              <span id="hero-primary-tag-text">Musical Evening</span>
-            </span>
-            <div id="status-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold">
-              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span id="status-pill-text">Stage Ready</span>
-            </div>
-          </div>
+      <!-- Date, countdown, venue. Three states: counting down, live now, ended. -->
+      <section id="countdown-card" class="gh-card" data-state="upcoming" aria-label="Event date and countdown">
+        <div class="gh-card-row">
+          <p class="gh-when"><span id="event-datetime-text"></span><span class="gh-when-sep" aria-hidden="true"> &middot; </span><span id="event-time-range-text"></span></p>
+          <span id="countdown-chip" class="gh-countdown-chip"></span>
         </div>
 
-        <!-- Venue and Date Info Pills -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <div class="flex items-start gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800">
-            <div class="w-9 h-9 rounded-xl bg-orange-500/10 text-orange-400 flex items-center justify-center shrink-0 mt-0.5">
-              <i data-lucide="calendar" class="w-4 h-4"></i>
-            </div>
-            <div>
-              <p class="text-xs uppercase tracking-wider font-semibold text-slate-400">Date & Time</p>
-              <p id="event-datetime-text" class="text-sm font-bold text-white">Saturday, Sep 19, 2026</p>
-              <p id="event-time-range-text" class="text-xs text-amber-400 font-medium">5:00 PM - 9:00 PM EDT</p>
-            </div>
-          </div>
-
-          <a id="venue-link" href="https://maps.google.com/?q=1+Scouting+Wy,+Exton,+PA+19341,+USA" target="_blank" class="flex items-start gap-3 p-3 rounded-2xl bg-slate-950/60 border border-slate-800 hover:border-slate-700 transition group">
-            <div class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition">
-              <i data-lucide="map-pin" class="w-4 h-4"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between">
-                <p class="text-xs uppercase tracking-wider font-semibold text-slate-400">Venue Location</p>
-                <i data-lucide="external-link" class="w-3 h-3 text-slate-500 group-hover:text-white transition"></i>
-              </div>
-              <p id="venue-name-text" class="text-sm font-bold text-white truncate">1 Scouting Wy</p>
-              <p id="venue-sub-text" class="text-xs text-slate-300 font-medium truncate">Exton, PA 19341, USA</p>
-            </div>
-          </a>
+        <div class="gh-state-copy">
+          <span class="gh-state-badge" id="countdown-heading-badge">Countdown</span>
+          <h2 id="countdown-status-title">The music begins soon</h2>
+          <p id="countdown-status-sub"></p>
         </div>
 
-        <!-- General Notes & Guidelines Section -->
-        <div id="general-notes-card" class="hidden p-4 sm:p-5 rounded-2xl bg-slate-950/70 border border-amber-500/20 space-y-2.5">
-          <div class="flex items-center gap-2 text-xs font-bold text-amber-400">
-            <i data-lucide="info" class="w-4 h-4 shrink-0"></i>
-            <span>General Notes & Guidelines</span>
-          </div>
-          <div id="general-notes-content" class="markdown-rendered text-sm"></div>
+        <div id="countdown-tiles" class="gh-tiles" role="timer" aria-label="Time until the event starts">
+          <div class="gh-tile"><span id="cd-days" class="gh-num">00</span><span class="gh-unit">days</span></div>
+          <div class="gh-tile"><span id="cd-hours" class="gh-num">00</span><span class="gh-unit">hours</span></div>
+          <div class="gh-tile"><span id="cd-mins" class="gh-num">00</span><span class="gh-unit">min</span></div>
+          <div class="gh-tile"><span id="cd-secs" class="gh-num">00</span><span class="gh-unit">sec</span></div>
         </div>
+
+        <a id="venue-link" class="gh-venue" href="https://maps.google.com/?q=" target="_blank" rel="noopener">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span><span id="venue-name-text"></span><span id="venue-sub-text" class="gh-venue-sub"></span><span class="gh-sr"> (opens in maps)</span></span>
+        </a>
+      </section>
+
+      <!-- Calls to action. JS shows the ones the event's feature flags allow. -->
+      <div class="gh-ctas" id="ctas">
+        <a id="card-live" class="gh-btn gh-btn-primary" href="/live" hidden><span id="card-live-title">Open Live</span></a>
+        <a id="card-signup" class="gh-btn gh-btn-primary" href="/signup"><span id="card-signup-title">Sign up to perform</span></a>
+        <a id="card-dish" class="gh-btn gh-btn-outline" href="/signup?choice=dish"><span id="card-dish-title">Bring a dish</span></a>
+        <a id="card-schedule" class="gh-btn gh-btn-primary" href="/schedule" hidden><span id="card-schedule-title">See the Schedule</span></a>
+        <p id="signup-closed-note" class="gh-notice" hidden>Sign-ups for this event are currently closed.</p>
       </div>
     </div>
 
-    <!-- Live Stage Countdown Card -->
-    <div id="countdown-card" class="relative overflow-hidden p-6 sm:p-7 rounded-3xl bg-gradient-to-br from-slate-900 via-slate-900 to-amber-950/40 border border-amber-500/30 shadow-xl shadow-amber-500/5">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold uppercase tracking-wider mb-2">
-            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
-            <span id="countdown-heading-badge">Stage Countdown</span>
-          </div>
-          <h3 id="countdown-status-title" class="text-lg sm:text-xl font-bold text-white tracking-tight">The Music Begins Soon</h3>
-          <p id="countdown-status-sub" class="text-xs sm:text-sm text-slate-400 mt-0.5">Counting down to Saturday, September 19, 2026 at 5:00 PM EDT</p>
-        </div>
+    <!-- Potluck-only events: live food board preview. -->
+    <section id="food-preview" class="gh-food" hidden aria-labelledby="food-preview-title">
+      <div class="gh-food-head"><h2 id="food-preview-title">Food board</h2><span id="food-preview-count" class="gh-mono"></span></div>
+      <div id="food-preview-bar" class="gh-bar" role="img" aria-label="Dishes taken"><span></span></div>
+      <ul id="food-preview-list" class="gh-food-list"></ul>
+      <a id="food-preview-more" class="gh-link" href="/schedule">See the full food board</a>
+    </section>
 
-        <!-- 4 Countdown Tiles -->
-        <div id="countdown-tiles" class="grid grid-cols-4 gap-2 sm:gap-3 text-center shrink-0">
-          <div class="px-3 py-2 rounded-2xl bg-slate-950/80 border border-amber-500/30 min-w-[62px]">
-            <span id="cd-days" class="text-xl sm:text-2xl font-black text-white font-mono">00</span>
-            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-0.5">Days</span>
-          </div>
-          <div class="px-3 py-2 rounded-2xl bg-slate-950/80 border border-amber-500/30 min-w-[62px]">
-            <span id="cd-hours" class="text-xl sm:text-2xl font-black text-white font-mono">00</span>
-            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-0.5">Hours</span>
-          </div>
-          <div class="px-3 py-2 rounded-2xl bg-slate-950/80 border border-amber-500/30 min-w-[62px]">
-            <span id="cd-mins" class="text-xl sm:text-2xl font-black text-white font-mono">00</span>
-            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-0.5">Mins</span>
-          </div>
-          <div class="px-3 py-2 rounded-2xl bg-slate-950/80 border border-amber-500/30 min-w-[62px]">
-            <span id="cd-secs" class="text-xl sm:text-2xl font-black text-amber-400 font-mono">00</span>
-            <span class="block text-xs uppercase tracking-wider text-slate-400 font-bold mt-0.5">Secs</span>
-          </div>
-        </div>
+    <!-- General notes from the organizer (markdown), only when set. -->
+    <section id="general-notes-card" class="gh-notes" hidden aria-labelledby="general-notes-title">
+      <h2 id="general-notes-title" class="gh-notes-title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>General notes &amp; guidelines</h2>
+      <div id="general-notes-content" class="gh-notes-body"></div>
+    </section>
+
+    <!-- Sponsor reel: the event gallery images, shown only when the organizer added some. -->
+    <section id="sponsors" class="gh-sponsors" hidden aria-labelledby="sponsors-title">
+      <div class="gh-sponsors-head">
+        <h2 id="sponsors-title">Thank you to our sponsors</h2>
+        <button type="button" id="sponsors-toggle" class="gh-link-btn" aria-pressed="false" hidden>Pause</button>
       </div>
-    </div>
-
-    <!-- The 6 Core Action Cards Grid -->
-    <div class="space-y-3">
-      <div class="flex items-center justify-between px-1">
-        <h3 class="text-xs uppercase tracking-wider font-bold text-slate-400 flex items-center gap-1.5">
-          <i data-lucide="layers" class="w-3.5 h-3.5 text-orange-400"></i>
-          <span>Event Navigation Hub</span>
-        </h3>
-        <span class="text-xs text-slate-500">Tap any destination below</span>
+      <div id="sponsor-reel" class="gh-reel" tabindex="0" role="group" aria-label="Sponsor reel">
+        <ul id="sponsor-track" class="gh-reel-track"></ul>
       </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-
-        <!-- 1. Self-Service Registration Card -->
-        <a id="card-signup" href="/signup" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/50 shadow-lg hover:shadow-emerald-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="user-plus" class="w-6 h-6"></i>
-              </div>
-              <span id="card-signup-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider">
-                Register
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-emerald-400 transition flex items-center gap-1.5">
-                <span id="card-signup-title">Sign Up</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p id="card-signup-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Perform, bring a dish, or both. It takes about a minute.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-400">
-            <span>Register Now</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
-        <!-- 2. My entry card -->
-        <a id="card-performer" href="/my-entry" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-orange-500/50 shadow-lg hover:shadow-orange-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-500/20 to-amber-500/20 border border-orange-500/30 text-orange-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="mic-2" class="w-6 h-6"></i>
-              </div>
-              <span id="card-performer-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20 uppercase tracking-wider">
-                Performers
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-orange-400 transition flex items-center gap-1.5">
-                <span id="card-performer-title">My entry</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p id="card-performer-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Edit your song, upload your track (<span class="text-slate-300 font-medium">MP3, WAV, M4A, MP4, WebM</span>) or paste a YouTube or SoundCloud link, and manage your dish.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-orange-400">
-            <span id="card-performer-cta">Open my entry</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
-        <!-- 3. Schedule card -->
-        <a id="card-dashboard" href="/schedule" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-indigo-500/50 shadow-lg hover:shadow-indigo-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
-              </div>
-              <span id="card-dashboard-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase tracking-wider">
-                Community
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-indigo-400 transition flex items-center gap-1.5">
-                <span id="card-dashboard-title">Schedule</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p id="card-dashboard-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                The running order and the food board. See who sings when and which dishes are still open.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-indigo-400">
-            <span id="card-dashboard-cta">See the schedule</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
-        <!-- 4. Live Program Card -->
-        <a id="card-live" href="/live" class="group relative flex flex-col justify-between p-5 rounded-3xl bg-slate-900/90 hover:bg-slate-900 border border-slate-800 hover:border-rose-500/50 shadow-lg hover:shadow-rose-500/10 transition-all duration-200">
-          <div class="space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500/20 to-pink-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center group-hover:scale-110 transition">
-                <i data-lucide="radio" class="w-6 h-6"></i>
-              </div>
-              <span id="card-live-badge" class="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider">
-                Event Day
-              </span>
-            </div>
-            <div>
-              <h4 class="text-base font-bold text-white group-hover:text-rose-400 transition flex items-center gap-1.5">
-                <span>Live</span>
-                <i data-lucide="arrow-right" class="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition"></i>
-              </h4>
-              <p id="card-live-desc" class="text-xs text-slate-400 leading-relaxed mt-1">
-                Follow real-time stage progress, see who is currently performing, and check upcoming songs on stage lineup.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-xs font-semibold text-rose-400">
-            <span>View Stage Queue</span>
-            <i data-lucide="chevron-right" class="w-4 h-4"></i>
-          </div>
-        </a>
-
-      </div>
-    </div>
+    </section>
 
   </main>
 
-  <script src="/static/js/utils.js"></script>
-  <script>
-    // Initialize Lucide icons
-    lucide.createIcons();
-
-    let targetEventDate = new Date("2026-09-19T17:00:00-04:00");
-
-    async function loadEventInfo() {
-      try {
-        const res = await fetch("/api/event-info");
-        if (!res.ok) return;
-        const info = await res.json();
-
-        if (info.poster_url) {
-          const img = document.getElementById("event-poster-img");
-          img.onload = () => {
-            img.style.display = "";
-            document.getElementById("poster-fallback").classList.add("hidden");
-          };
-          img.src = info.poster_url;
-        }
-
-        if (info.event_start_time_iso) {
-          const parsed = new Date(info.event_start_time_iso);
-          if (!isNaN(parsed.getTime())) {
-            targetEventDate = parsed;
-          }
-        }
-
-        if (info.header_brand_title) {
-          const navTitle = document.getElementById("nav-event-title");
-          if (navTitle) navTitle.textContent = info.header_brand_title;
-          document.title = info.event_name || info.header_brand_title;
-        }
-        if (info.header_brand_subtitle) {
-          const navSub = document.getElementById("nav-event-subtitle");
-          if (navSub) navSub.textContent = info.header_brand_subtitle;
-        }
-        if (info.event_name || info.app_title) {
-          const titleDisplay = document.getElementById("event-title-display");
-          if (titleDisplay) titleDisplay.textContent = (window.cleanEventName ? window.cleanEventName(info.event_name || info.app_title) : (info.event_name || info.app_title));
-        }
-
-        if (info.venue) {
-          const parts = info.venue.split(",");
-          if (parts.length > 0) {
-            document.getElementById("venue-name-text").textContent = parts[0].trim();
-            document.getElementById("venue-sub-text").textContent = parts.slice(1).join(",").trim() || "Exton, PA 19341";
-            document.getElementById("venue-link").href = `https://maps.google.com/?q=${encodeURIComponent(info.venue)}`;
-          }
-        }
-
-        if (info.time_range) {
-          document.getElementById("event-time-range-text").textContent = info.time_range;
-          eventDurationMs = parseRangeDurationMs(info.time_range) || eventDurationMs;
-        }
-
-        if (info.hero_tag_primary) {
-          const primaryTagEl = document.getElementById("hero-primary-tag-text");
-          if (primaryTagEl) primaryTagEl.textContent = info.hero_tag_primary;
-        }
-
-        if (info.hero_tag_status) {
-          const statusTagEl = document.getElementById("status-pill-text");
-          if (statusTagEl && !statusTagEl.dataset.isLive) statusTagEl.textContent = info.hero_tag_status;
-        }
-
-        // Dynamic card updates based on active feature toggles & presets
-        const signupBadge = document.getElementById("card-signup-badge");
-        const signupTitle = document.getElementById("card-signup-title");
-        const signupDesc = document.getElementById("card-signup-desc");
-        const performerBadge = document.getElementById("card-performer-badge");
-        const performerTitle = document.getElementById("card-performer-title");
-        const performerDesc = document.getElementById("card-performer-desc");
-        const performerCta = document.getElementById("card-performer-cta");
-        const dashboardBadge = document.getElementById("card-dashboard-badge");
-        const dashboardTitle = document.getElementById("card-dashboard-title");
-        const dashboardDesc = document.getElementById("card-dashboard-desc");
-        const dashboardCta = document.getElementById("card-dashboard-cta");
-        const liveBadge = document.getElementById("card-live-badge");
-        const liveDesc = document.getElementById("card-live-desc");
-
-        // Master switch: Stage performances disabled (e.g. Potluck Social / Dinner Only)
-        if (info.stage_performances_enabled === false) {
-          if (signupBadge) signupBadge.textContent = "Potluck";
-          if (signupTitle) signupTitle.textContent = "Potluck Sign-Up";
-          if (signupDesc) signupDesc.textContent = "Choose and coordinate a potluck dish to bring and share with the community.";
-
-          if (performerBadge) {
-            performerBadge.textContent = "Attendees";
-            performerBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider";
-          }
-          if (performerTitle) performerTitle.textContent = "My dish";
-          if (performerDesc) performerDesc.textContent = "Check your registration and coordinate your community potluck dish contribution.";
-          if (performerCta) performerCta.textContent = "Manage Potluck Dish";
-
-          if (dashboardBadge) {
-            dashboardBadge.textContent = "Food Board";
-            dashboardBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 uppercase tracking-wider";
-          }
-          if (dashboardTitle) dashboardTitle.textContent = "Food board";
-          if (dashboardDesc) dashboardDesc.textContent = "Public community board showing all potluck dishes, commitments, and needed items.";
-          if (dashboardCta) dashboardCta.textContent = "View Food Board";
-
-          if (liveBadge) {
-            liveBadge.textContent = "Inactive";
-            liveBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-          }
-          if (liveDesc) liveDesc.textContent = "Live stage display inactive (no stage performance program for this event).";
-        } else {
-          // Standard / Musical event logic
-          if (info.signup_enabled === false && info.food_signup_enabled === false) {
-            if (signupBadge) {
-              signupBadge.textContent = "Closed";
-              signupBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-            }
-            if (signupDesc) signupDesc.textContent = "Sign-ups for this event are currently closed.";
-          } else if (info.signup_enabled === false && info.food_signup_enabled === true) {
-            if (signupBadge) signupBadge.textContent = "Potluck";
-            if (signupTitle) signupTitle.textContent = "Potluck Sign-Up";
-            if (signupDesc) signupDesc.textContent = "Choose and coordinate a potluck dish to bring and share with the community.";
-          } else if (info.signup_enabled === true && info.food_signup_enabled === false) {
-            if (signupBadge) signupBadge.textContent = "Performers";
-            if (signupTitle) signupTitle.textContent = "Performer Sign-Up";
-            if (signupDesc) signupDesc.textContent = "Register your solo or group performance for the stage lineup.";
-          }
-
-          if (info.performer_edits_enabled === false) {
-            if (performerBadge) {
-              performerBadge.textContent = "Locked";
-              performerBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-            }
-          }
-
-          if (info.track_upload_enabled === false) {
-            if (performerDesc) performerDesc.textContent = "Manage acoustic / live band songs and stage requirements (backing track uploads disabled).";
-          }
-
-          if (info.dashboard_enabled === false) {
-            if (dashboardBadge) {
-              dashboardBadge.textContent = "Private";
-              dashboardBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider";
-            }
-            if (dashboardDesc) dashboardDesc.textContent = "Performance setlist transparency locked for private competition mode.";
-          }
-
-          if (info.live_display_enabled === false) {
-            if (liveBadge) {
-              liveBadge.textContent = "Inactive";
-              liveBadge.className = "text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 uppercase tracking-wider";
-            }
-          }
-        }
-
-        if (window.adaptNavigationForEventConfig) {
-          window.adaptNavigationForEventConfig(info);
-        }
-
-        if (info.general_notes && info.general_notes.trim()) {
-          const notesCard = document.getElementById("general-notes-card");
-          const notesContent = document.getElementById("general-notes-content");
-          if (notesCard && notesContent) {
-            let renderedHtml = "";
-            if (window.marked && typeof window.marked.parse === "function") {
-              renderedHtml = window.marked.parse(info.general_notes, { breaks: true, gfm: true });
-            } else {
-              // Fallback simple markdown formatter for bold, italic, headings, lists, and linebreaks
-              renderedHtml = info.general_notes
-                .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-                .replace(/^### (.*$)/gm, '<h3 class="text-amber-400 font-bold mt-2 mb-1">$1</h3>')
-                .replace(/^## (.*$)/gm, '<h2 class="text-slate-100 font-bold text-sm mt-3 mb-1">$1</h2>')
-                .replace(/^# (.*$)/gm, '<h1 class="text-slate-100 font-extrabold text-base mt-3 mb-1">$1</h1>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/```([\s\S]*?)```/g, '<pre class="p-2 bg-slate-950 rounded-lg border border-slate-800 text-xs font-mono my-2 overflow-x-auto"><code>$1</code></pre>')
-                .replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 bg-slate-950 text-amber-400 rounded border border-amber-400/20 font-mono text-xs">$1</code>')
-                .replace(/^[*-]\s+(.*)$/gm, '<li class="ml-4 list-disc">$1</li>')
-                .replace(/\n\n/g, '<br/><br/>')
-                .replace(/\n/g, '<br/>');
-            }
-            notesContent.innerHTML = renderedHtml;
-            notesCard.classList.remove("hidden");
-            lucide.createIcons();
-          }
-        }
-      } catch (e) {
-        console.warn("Could not fetch event info:", e);
-      }
-    }
-
-    // Event window: derived from "5:00 PM - 9:00 PM" style ranges (default 5 hours)
-    let eventDurationMs = 5 * 3600 * 1000;
-    function parseRangeDurationMs(range) {
-      const m = String(range).match(/(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?\s*(?:-|–|—|to)\s*(\d{1,2})(?::(\d{2}))?\s*(AM|PM)/i);
-      if (!m) return null;
-      const to24 = (h, min, ap) => { h = parseInt(h, 10) % 12; if (/pm/i.test(ap)) h += 12; return h * 60 + parseInt(min || "0", 10); };
-      const endAp = m[6];
-      const start = to24(m[1], m[2], m[3] || endAp);
-      let end = to24(m[4], m[5], endAp);
-      if (end <= start) end += 24 * 60;
-      return (end - start) * 60000;
-    }
-
-    function updateCountdown() {
-      const now = new Date();
-      const diffMs = targetEventDate.getTime() - now.getTime();
-
-      if (diffMs <= -eventDurationMs) {
-        // Event is over
-        document.getElementById("countdown-heading-badge").textContent = "EVENT ENDED";
-        document.getElementById("countdown-status-title").textContent = "Thank you for being part of the night!";
-        document.getElementById("countdown-status-sub").textContent = "The program has wrapped up. Browse the final running order on the Schedule, and see you at the next one.";
-        const tiles = document.getElementById("countdown-tiles");
-        if (tiles) tiles.classList.add("hidden");
-        const pill = document.getElementById("status-pill");
-        pill.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-700/40 text-slate-300 border border-slate-600/50 text-xs font-semibold";
-        document.getElementById("status-pill-text").textContent = "EVENT ENDED";
-        return;
-      }
-
-      if (diffMs <= 0) {
-        // Event has started!
-        document.getElementById("countdown-heading-badge").textContent = "LIVE NOW";
-        document.getElementById("countdown-status-title").textContent = "The Program is Live on Stage!";
-        document.getElementById("countdown-status-sub").textContent = "Performances are now underway. Open Live to see who is on stage.";
-        document.getElementById("cd-days").textContent = "00";
-        document.getElementById("cd-hours").textContent = "00";
-        document.getElementById("cd-mins").textContent = "00";
-        document.getElementById("cd-secs").textContent = "00";
-        
-        const pill = document.getElementById("status-pill");
-        pill.className = "inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold animate-pulse";
-        document.getElementById("status-pill-text").textContent = "LIVE ON STAGE";
-        return;
-      }
-
-      const totalSecs = Math.floor(diffMs / 1000);
-      const days = Math.floor(totalSecs / 86400);
-      const hours = Math.floor((totalSecs % 86400) / 3600);
-      const mins = Math.floor((totalSecs % 3600) / 60);
-      const secs = totalSecs % 60;
-
-      document.getElementById("cd-days").textContent = String(days).padStart(2, '0');
-      document.getElementById("cd-hours").textContent = String(hours).padStart(2, '0');
-      document.getElementById("cd-mins").textContent = String(mins).padStart(2, '0');
-      document.getElementById("cd-secs").textContent = String(secs).padStart(2, '0');
-    }
-
-    loadEventInfo().then(() => {
-      updateCountdown();
-      setInterval(updateCountdown, 1000);
-    });
-  </script>
+  <script src="/static/js/utils.js" defer></script>
+  <script src="/static/js/guest-home.js" defer></script>
 </body>
 </html>

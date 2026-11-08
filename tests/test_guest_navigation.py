@@ -64,7 +64,8 @@ def test_active_link_has_visible_style():
         response = client.get('/signup')
     shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
     active = shell.split('href="/signup" aria-current="page"', 1)[1].split('</a>', 1)[0]
-    assert 'bg-orange-600' in active
+    # The active tab is marked by aria-current and styled in guest-navigation.css (no utility colour class).
+    assert 'class="gn-link' in active
 
 
 @pytest.mark.parametrize(('old', 'new'), [

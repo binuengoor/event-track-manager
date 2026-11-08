@@ -119,7 +119,7 @@ async function handlePerformerSelected(name) {
   const userSongs = window.performerProfileData.performances || [];
 
   if (userSongs.length === 0) {
-    songContainer.innerHTML = '<p class="text-xs text-amber-400">No registered songs found for this name.</p>';
+    songContainer.innerHTML = '<p class="me-empty">No registered songs found for this name.</p>';
     songSection.classList.remove('hidden');
     uploadSection.classList.add('hidden');
     return;
@@ -132,67 +132,54 @@ async function handlePerformerSelected(name) {
       updateSelectedSong(song);
     }
 
-    let statusClass = 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+    let statusKind = 'wait';
     let statusLabel = 'Track Pending';
     if (song.track_status === 'Uploaded') {
-      statusClass = 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+      statusKind = 'ok';
       statusLabel = 'Track Uploaded';
     } else if (song.track_status === 'Acoustic') {
-      statusClass = 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      statusKind = 'info';
       statusLabel = 'Acoustic / No Track';
     } else if (isSongTitleMissing(song)) {
-      statusClass = 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+      statusKind = 'bad';
       statusLabel = 'Song Name Missing';
     }
 
+    const missing = isSongTitleMissing(song);
+    const partner = (song.partner_name || '').trim();
+    const primary = (song.performer_name || '').trim();
+    const current = (selectedPerformer || '').trim().toLowerCase();
+    const withName = partner ? (current && partner.toLowerCase() === current ? primary : partner) : '';
     const card = document.createElement('div');
-    card.className = `p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-      isChecked ? 'border-orange-500 bg-orange-500/10' : 'border-slate-800 bg-slate-950/60 hover:border-slate-700'
-    }`;
+    card.className = 'me-act' + (isChecked ? ' is-selected' : '') + (userSongs.length === 1 ? ' is-single' : '');
     card.innerHTML = `
-      <label class="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-        <input type="radio" name="selected_song" value="${song.entry_id}" ${isChecked ? 'checked' : ''} class="text-orange-500 focus:ring-orange-500 accent-orange-500">
-        <div class="truncate">
-          <div class="font-semibold text-sm ${isSongTitleMissing(song) ? 'text-amber-300 italic' : 'text-white'} truncate">
-            ${escapeHtml(!isSongTitleMissing(song) ? song.song_title : 'Untitled Song (Click Edit)')}
-            ${song.movie_name ? `<span class="text-xs font-normal text-slate-400 ml-1.5 font-sans">(${escapeHtml(song.movie_name)})</span>` : ''}
-          </div>
-          <div class="text-xs text-slate-400 flex items-center gap-1.5 mt-1 flex-wrap">
+      <label class="me-act-main">
+        <input type="radio" name="selected_song" value="${song.entry_id}" ${isChecked ? 'checked' : ''}>
+        <span class="me-act-text">
+          <span class="me-act-meta">
+            <span class="me-mono">${escapeHtml(song.entry_id || '')}</span>
             ${renderTypePill(song.performance_type)}
-            ${(() => {
-              const current = (selectedPerformer || '').trim().toLowerCase();
-              const primary = (song.performer_name || '').trim();
-              const partner = (song.partner_name || '').trim();
-              if (!partner) return '';
-              if (current && partner.toLowerCase() === current) {
-                return `<span class="text-slate-400">with ${escapeHtml(primary)}</span>`;
-              } else {
-                return `<span class="text-slate-400">with ${escapeHtml(partner)}</span>`;
-              }
-            })()}
-            <span class="text-slate-500">•</span>
-            <span class="font-mono text-slate-400">Seq #${song.sequence_order || 'TBD'}</span>
-          </div>
-        </div>
-      </label>
-      <div class="flex items-center gap-2 self-end sm:self-center shrink-0">
-        <span class="text-xs px-2.5 py-1 rounded-full border ${statusClass} font-medium">
-          ${statusLabel}
+            ${withName ? `<span>with ${escapeHtml(withName)}</span>` : ''}
+            <span class="me-mono">Seq #${song.sequence_order || 'TBD'}</span>
+          </span>
+          <span class="me-act-title${missing ? ' is-missing' : ''}">${escapeHtml(!missing ? song.song_title : 'Untitled Song (tap Edit)')}</span>
+          ${song.movie_name ? `<span class="me-act-movie">${escapeHtml(song.movie_name)}</span>` : ''}
         </span>
+      </label>
+      <div class="me-act-side">
+        <span class="me-status" data-kind="${statusKind}">${statusLabel}</span>
         ${(window.performerProfileData && window.performerProfileData.edits_enabled === false)
-          ? `<span class="px-2.5 py-1 rounded-lg bg-slate-900 text-slate-500 text-xs font-semibold flex items-center gap-1 border border-slate-800" title="Edits are currently locked"><i data-lucide="lock" class="w-3.5 h-3.5"></i><span>Locked</span></span>`
-          : `<button type="button" class="edit-song-btn px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1 border border-slate-700 transition" title="Edit song details">
-              <i data-lucide="edit-2" class="w-3.5 h-3.5 text-orange-400"></i>
+          ? `<span class="me-locked" title="Edits are currently locked"><i data-lucide="lock" class="w-4 h-4"></i><span>Locked</span></span>`
+          : `<button type="button" class="edit-song-btn me-pill-btn" title="Edit song details">
+              <i data-lucide="edit-2" class="w-4 h-4"></i>
               <span>Edit</span>
             </button>`}
       </div>
     `;
 
     card.querySelector('input').addEventListener('change', () => {
-      document.querySelectorAll('#song-options-container > div').forEach(c => {
-        c.className = 'p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-slate-800 bg-slate-950/60 hover:border-slate-700';
-      });
-      card.className = 'p-3.5 rounded-xl border transition flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-orange-500 bg-orange-500/10';
+      document.querySelectorAll('#song-options-container > .me-act').forEach(c => c.classList.remove('is-selected'));
+      card.classList.add('is-selected');
       updateSelectedSong(song);
     });
 
