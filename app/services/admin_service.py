@@ -26,7 +26,7 @@ class AdminService:
                 result[k] = v
 
         defaults = {
-            "header_brand_title": getattr(settings.event, "header_brand_title", "EMA Paattukoottam"),
+            "header_brand_title": getattr(settings.event, "header_brand_title", "") or "Event",
             "header_brand_subtitle": getattr(settings.event, "header_brand_subtitle", "Musical Night"),
             "event_name": settings.event.name,
             "event_subtitle": settings.event.subtitle,

@@ -89,7 +89,7 @@
     if (!data) return;
     renderAnnouncement();
 
-    const title = data.header_brand_title || 'EMA Paattukoottam';
+    const title = data.header_brand_title || 'Event';
     $('live-event-title').textContent = title;
     document.title = `Live Stage Program - ${title}`;
     $('live-event-subtitle').textContent = data.header_brand_subtitle || data.event_subtitle || 'Musical Night';

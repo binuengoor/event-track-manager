@@ -352,7 +352,7 @@ class AudioService:
         queue = event_service.get_stage_queue()
 
         timestamp_str = datetime.now().strftime("%Y%m%d_%H%M")
-        zip_filename = f"Paattukoottam_Stage_Tracks_{timestamp_str}.zip"
+        zip_filename = f"{settings.event.id or 'event'}_Stage_Tracks_{timestamp_str}.zip"
 
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             tmp_path = tmp.name

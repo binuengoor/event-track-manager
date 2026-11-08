@@ -72,6 +72,7 @@
         <span class="w-px h-5 bg-slate-700 mx-1" aria-hidden="true"></span>
         ${ADMIN_LINKS.map(pill).join('')}
       </nav>
+      ${window.etmTheme ? '<button type="button" id="theme-toggle-btn" class="theme-toggle" aria-label="Colour theme"><span id="theme-toggle-label"></span></button>' : ''}
       <button type="button" id="site-menu-btn" class="xl:hidden p-2.5 rounded-xl bg-slate-800/70 border border-slate-700/80 text-slate-100 transition active:scale-95" aria-label="Open menu" aria-expanded="false" aria-controls="site-menu-sheet">
         <i data-lucide="menu" class="w-5 h-5"></i>
       </button>`;
@@ -87,6 +88,18 @@
       <div class="grid grid-cols-2 gap-2">${ADMIN_LINKS.map(tile).join('')}</div>`;
     header.style.position = header.style.position || 'sticky';
     header.appendChild(sheet);
+
+    const themeBtn = wrapper.querySelector('#theme-toggle-btn');
+    if (themeBtn) {
+      const names = { system: 'Auto', light: 'Light', dark: 'Dark' };
+      const paint = () => {
+        const c = window.etmTheme.get();
+        themeBtn.querySelector('#theme-toggle-label').textContent = names[c];
+        themeBtn.setAttribute('aria-label', `Colour theme: ${names[c]}. Activate to change.`);
+      };
+      themeBtn.addEventListener('click', () => { window.etmTheme.cycle(); paint(); });
+      paint();
+    }
 
     const btn = wrapper.querySelector('#site-menu-btn');
     const setOpen = (open) => {

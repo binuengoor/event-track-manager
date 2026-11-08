@@ -56,7 +56,7 @@ function setupActionHandlers() {
     }
 
     const payload = {
-      header_brand_title: headerTitleVal || "EMA Paattukoottam",
+      header_brand_title: headerTitleVal || "Event",
       header_brand_subtitle: headerSubVal || "Musical Night",
       event_name: titleVal,
       event_subtitle: subVal,

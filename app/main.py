@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="EMA Paattukoottam Event & Track Manager",
+    title="Event Track Manager",
     description="Track manager, self-service registration, potluck food sign-up, and stage console",
     version="2.0.0",
     lifespan=lifespan

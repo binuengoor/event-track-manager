@@ -187,7 +187,7 @@ async function loadSettings() {
     adminSettings = await res.json();
 
     // Event details
-    setValue("setting-header-brand-title", adminSettings.header_brand_title || "EMA Paattukoottam");
+    setValue("setting-header-brand-title", adminSettings.header_brand_title || "");
     setValue("setting-header-brand-subtitle", adminSettings.header_brand_subtitle || "Musical Night");
     const navTitle = document.getElementById("nav-event-title");
     if (navTitle && adminSettings.header_brand_title) navTitle.textContent = adminSettings.header_brand_title;
@@ -277,7 +277,7 @@ function renderPerformanceTypeChips() {
   container.innerHTML = perfTypes.map((t, idx) => `
     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-700 text-xs font-bold text-white shadow-sm">
       <span>${t}</span>
-      <button type="button" onclick="removePerfType(${idx})" class="text-slate-400 hover:text-rose-400 ml-1">
+      <button type="button" onclick="removePerfType(${idx})" aria-label="Remove this performance type" class="text-slate-400 hover:text-rose-400 ml-1">
         <i data-lucide="x" class="w-3.5 h-3.5"></i>
       </button>
     </span>
@@ -301,7 +301,7 @@ function renderAgeGroupsTable() {
           ? '<span class="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-bold">Guardian Required</span>' 
           : '<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-semibold">Self-Registration</span>'}
       </div>
-      <button type="button" onclick="removeAgeGroup(${idx})" class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1">
+      <button type="button" onclick="removeAgeGroup(${idx})" aria-label="Remove this age group" class="text-xs text-rose-400 hover:text-rose-300 font-semibold flex items-center gap-1">
         <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
       </button>
     </div>

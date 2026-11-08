@@ -12,7 +12,7 @@
   transform: translateY(-200%);
 }
 .skip-link:focus { transform: translateY(0); }
-:focus-visible { outline: 3px solid #fb923c; outline-offset: 3px; }
+:focus-visible { outline: 3px solid var(--focus-ring, #fb923c); outline-offset: 3px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -20,4 +20,20 @@
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Touch targets: 44 px floor on phone layouts (SPEC 6.6). Measured by the audit script in docs/RUNBOOK.md. */
+header a.flex.items-center.gap-3,
+.guest-admin-link a,
+main a.text-xs, main a.inline-flex.items-center,
+#others-search-input { display: inline-flex; align-items: center; min-height: 44px; }
+header a.flex.items-center.gap-3 { display: flex; }
+#others-search-input { display: block; }
+
+/* Phone layouts: every button, select and text field is at least 44 x 44 */
+@media (max-width: 767px) {
+  button, select, summary, [role="button"], #site-menu-btn,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) { min-height: 44px; min-width: 44px; }
+  footer a { display: inline-flex; align-items: center; min-height: 44px; padding-inline: .25rem; }
+  .pay-check, input[type="checkbox"], input[type="radio"] { min-width: 24px; min-height: 24px; }
 }

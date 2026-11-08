@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
     stageVideo.removeAttribute('src');
     stageVideo.load();
     standbyBadge.textContent = 'Standby';
-    stagePerformer.textContent = 'EMA Paattukoottam';
+    stagePerformer.textContent = document.title.split(' - ').pop() || 'Event';
     stageSong.textContent = 'Waiting for the next act';
     stageActType.textContent = 'Standing by';
     cuedSummary.textContent = 'Standing by...';

@@ -63,7 +63,7 @@ class RegistrationService:
             if p.get("song_title") and not p.get("is_song_name_missing")
         ]
 
-        header_brand_title = get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "EMA Paattukoottam")
+        header_brand_title = get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "") or "Event"
         header_brand_subtitle = get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "Musical Night")
 
         return {
@@ -370,7 +370,7 @@ class RegistrationService:
             "performer_name": NamePrivacy(db_service.get_all_performances()).name(clean_name),
             "entry_ids": created_ids,
             "food_signup_id": food_signup_id,
-            "message": "Registration completed successfully! Welcome to Paattukoottam."
+            "message": f"Registration completed successfully! Welcome to {get_setting('header_brand_title') or getattr(settings.event, 'header_brand_title', '') or 'the event'}."
         }
 
 

@@ -63,7 +63,7 @@ def _brand(html: str) -> str:
     """Replace the template placeholder brand with the event's own (escaped) header text."""
     title = escape(str(get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "") or "Event"))
     subtitle = escape(str(get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "") or ""))
-    html = html.replace("EMA Paattukoottam", title)
+    html = html.replace("Event Track Manager", title)
     return html.replace(">Musical Night<", f">{subtitle}<")
 
 

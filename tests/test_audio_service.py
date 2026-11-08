@@ -35,7 +35,7 @@ def test_stream_file_range(tmp_path, monkeypatch):
 
 def test_export_sequenced_zip():
     buf, filename = audio_service.export_sequenced_zip()
-    assert filename.startswith("Paattukoottam_Stage_Tracks_")
+    assert filename.startswith("test-event_Stage_Tracks_")
     assert filename.endswith(".zip")
     
     with zipfile.ZipFile(buf, "r") as zf:

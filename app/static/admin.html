@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" class="bg-black" style="background-color: #000000; color-scheme: dark;">
+<html lang="en" data-theme="dark" class="bg-black" style="background-color: #000000; color-scheme: dark;">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
   <meta name="view-transition" content="same-origin">
-  <title>Stage Playback Console - EMA Paattukoottam</title>
+  <title>Stage Playback Console - Event Track Manager</title>
   <style>
     :root, html, body {
       background-color: #000000 !important;
@@ -42,6 +42,8 @@
   </style>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
   <link rel="stylesheet" href="/static/css/a11y.css">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/theme.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white pb-52">
   <a class="skip-link" href="#main-content">Skip to main content</a>
@@ -106,7 +108,7 @@
           <i data-lucide="disc-3" class="w-5 h-5 animate-spin" style="animation-duration: 6s;"></i>
         </div>
         <div>
-          <h1 id="admin-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <h1 id="admin-event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</h1>
           <p id="admin-event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
@@ -200,7 +202,7 @@
       <div class="flex items-center gap-2 flex-wrap">
         <label id="output-device-wrap" class="hidden items-center gap-1.5 text-xs text-slate-400" title="Send playback to this output (for example the audio interface)">
           <i data-lucide="speaker" class="w-3.5 h-3.5 text-slate-400"></i>
-          <select id="output-device-select" class="bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 px-2"></select>
+          <select id="output-device-select" aria-label="Audio output device" class="bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 px-2"></select>
         </label>
 
         <button id="download-zip-btn" class="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700 hover:border-emerald-500/40 transition" title="Download all sequenced tracks into a ZIP archive for offline USB backup">
@@ -452,7 +454,7 @@
     <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
       <div class="flex items-center gap-2">
         <i data-lucide="heart" class="w-4 h-4 text-rose-500"></i>
-        <span>EMA Paattukoottam Musical Evening &bull; All Rights Reserved</span>
+        <span><span data-brand>Event Track Manager</span> &bull; All Rights Reserved</span>
       </div>
       <div class="flex items-center gap-4 flex-wrap">
         <a href="/" class="hover:text-slate-300 transition flex items-center gap-1"><i data-lucide="home" class="w-3.5 h-3.5"></i> Home</a>

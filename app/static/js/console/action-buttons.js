@@ -146,7 +146,7 @@ export function setupActionButtons() {
         a.href = url;
 
         const disp = res.headers.get('Content-Disposition');
-        let filename = `Paattukoottam_Stage_Tracks_${Date.now()}.zip`;
+        let filename = `Stage_Tracks_${Date.now()}.zip`;
         if (disp && disp.includes('filename=')) {
           filename = disp.split('filename=')[1].replace(/["']/g, '').trim();
         }

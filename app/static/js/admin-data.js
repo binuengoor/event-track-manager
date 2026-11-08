@@ -104,7 +104,7 @@
       const c = current(s);
       const changed = !!pay.changes[s.participant_id];
       return `<tr class="${changed ? 'bg-amber-500/5' : ''}">
-        <td class="px-3.5 py-2.5"><input type="checkbox" class="pay-check w-4 h-4 accent-emerald-500" data-id="${esc(s.participant_id)}" ${c.paid ? 'checked' : ''}></td>
+        <td class="px-3.5 py-2.5"><input type="checkbox" aria-label="Paid" class="pay-check w-4 h-4 accent-emerald-500" data-id="${esc(s.participant_id)}" ${c.paid ? 'checked' : ''}></td>
         <td class="px-3.5 py-2.5 font-semibold ${c.paid ? 'text-emerald-300' : 'text-white'}">${esc(s.name)}${s.paid_at && !changed && c.paid ? `<span class="ml-2 text-[10px] text-slate-500 font-normal">${esc(s.paid_at.slice(0, 10))}</span>` : ''}</td>
         <td class="px-3.5 py-2.5 text-slate-400">${esc(s.age_group || '')}</td>
         <td class="px-3.5 py-2.5 text-slate-400 max-w-[18rem] truncate" title="${esc(s.songs.join('; '))}">${esc(s.songs.join('; '))}</td>

@@ -104,6 +104,9 @@ def test_accessibility_hooks():
     assert 'aria-current' in JS
     assert re.search(r'<nav id="admin-rail"[^>]*aria-label', HTML)
     assert "role=\"switch\"" in HTML and "role=\"switch\"" in DASH_JS
-    assert ":focus-visible" in CSS and "#C84B31" in CSS
+    assert ":focus-visible" in CSS and "--admin-accent: var(--accent-primary)" in CSS
+    import pathlib
+    tokens = (pathlib.Path(__file__).resolve().parents[1] / "app/static/css/tokens.css").read_text()
+    assert "#C84B31" in tokens  # the light accent lives in the token file
     assert "min-height: 44px" in CSS
     assert "admin-shell.css" in HTML and "admin-dashboard.js" in HTML

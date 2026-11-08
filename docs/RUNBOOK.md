@@ -153,3 +153,9 @@ mkdir -p out frames && node docs/screenshots.js
 ffmpeg -y -framerate 8 -i frames/f%03d.jpg -vf "scale=300:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96:stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" out/aurora.gif
 cp out/*.jpg out/aurora.gif docs/images/
 ```
+
+## 11. Accessibility and theme audit (Phase 3)
+
+`tests/test_theme_contrast.py` checks every colour pair in `app/static/css/tokens.css` for WCAG AA in both themes and that each page loads the right theme files. For the live checks (axe violations per theme, 44 px touch targets) paste `docs/a11y-audit.js` into the browser console of a running instance; it explains how to serve axe-core locally.
+
+Themes: guest and admin pages follow the device setting, with an Auto / Light / Dark button in the header (stored in the browser as `etm-theme`). The console, stage monitor and `/live` are always dark.

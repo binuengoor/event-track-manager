@@ -1,0 +1,51 @@
+/* Design tokens (SPEC 6.6, "Warm Stage Studio"). Dark is the default; guest and admin pages can switch to light
+   (theme.js sets html[data-theme]). Console, stage monitor and /live are always dark and never load theme.js.
+   Every pair is checked by tests/test_theme_contrast.py (WCAG AA). */
+:root, html[data-theme="dark"] {
+  --bg-canvas: #0B0D10;
+  --bg-surface-1: #13161B;
+  --bg-surface-2: #1C2027;
+  --bg-elevated: #252A34;
+  --text-primary: #F3F4F6;
+  --text-secondary: #9CA3AF;
+  --text-muted: #8A92A0;
+  --border-subtle: #262B35;
+  --border-strong: #3D4554;
+  --accent-primary: #F06449;
+  --accent-on: #1A0B07;          /* text on the accent: dark in dark mode (6.14:1) */
+  --accent-text: #F06449;        /* accent used as small text or link on canvas */
+  --status-playing-fg: #34D399; --status-playing-bg: #064E3B;
+  --status-cued-fg: #FBBF24;    --status-cued-bg: #451A03;
+  --status-danger-fg: #F87171;  --status-danger-bg: #450A0A;
+  --focus-ring: #F3F4F6;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-6: 24px; --space-8: 32px;
+  --radius-sm: 8px; --radius-md: 12px; --radius-lg: 16px; --radius-full: 999px;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / .25); --shadow-2: 0 8px 24px rgb(0 0 0 / .35);
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --text-sm: clamp(.875rem, .85rem + .1vw, .9375rem);
+  --text-base: clamp(1rem, .96rem + .15vw, 1.0625rem);
+  --text-lg: clamp(1.125rem, 1.05rem + .3vw, 1.3125rem);
+  --text-xl: clamp(1.375rem, 1.2rem + .8vw, 1.875rem);
+  --ease: cubic-bezier(.2, .7, .2, 1); --dur-1: 120ms; --dur-2: 240ms;
+  --z-bar: 40; --z-modal: 60; --z-toast: 80;
+}
+html[data-theme="light"] {
+  --bg-canvas: #FAF8F5;
+  --bg-surface-1: #FFFFFF;
+  --bg-surface-2: #F2EFE9;
+  --bg-elevated: #FFFFFF;
+  --text-primary: #141518;
+  --text-secondary: #525866;
+  --text-muted: #5F6778;
+  --border-subtle: #E4E0D8;
+  --border-strong: #C7C1B5;
+  --accent-primary: #C84B31;
+  --accent-on: #FFFFFF;          /* white on the light accent (4.66:1) */
+  --accent-text: #B5412A;        /* small accent text on canvas (5.28:1; #C84B31 measures 4.40) */
+  --status-playing-fg: #0D7A5F; --status-playing-bg: #E6F4F0;
+  --status-cued-fg: #B45309;    --status-cued-bg: #FEF3C7;
+  --status-danger-fg: #B91C1C;  --status-danger-bg: #FEE2E2;
+  --focus-ring: #141518;
+  --shadow-1: 0 1px 2px rgb(20 21 24 / .08); --shadow-2: 0 8px 24px rgb(20 21 24 / .12);
+}

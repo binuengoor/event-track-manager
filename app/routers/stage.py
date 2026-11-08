@@ -80,7 +80,7 @@ def _redact_live_status(status: Dict[str, Any], active_id: Optional[str]) -> Dic
 def get_live_status(request: Request):
     status = stage_service.get_live_status()
     # Ensure live event names stay in sync with runtime settings
-    status["header_brand_title"] = get_setting("header_brand_title", getattr(settings.event, "header_brand_title", "EMA Paattukoottam"))
+    status["header_brand_title"] = get_setting("header_brand_title", getattr(settings.event, "header_brand_title", "") or "Event")
     status["header_brand_subtitle"] = get_setting("header_brand_subtitle", getattr(settings.event, "header_brand_subtitle", "Musical Night"))
     status["event_name"] = get_setting("event_name", status.get("event_name"))
     status["event_subtitle"] = get_setting("event_subtitle", status.get("event_subtitle"))

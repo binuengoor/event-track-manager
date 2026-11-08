@@ -2,11 +2,12 @@
 <html lang="en" class="bg-black" style="background-color: #000000; color-scheme: dark;">
 <head>
   <meta charset="UTF-8">
+  <script src="/static/js/theme.js"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#000000">
   <meta name="view-transition" content="same-origin">
-  <title>My entry - EMA Paattukoottam</title>
+  <title>My entry - Event Track Manager</title>
   <style>
     :root, html, body {
       background-color: #000000 !important;
@@ -17,17 +18,15 @@
   <script src="/static/js/icons.js"></script>
   <script src="/static/vendor/wavesurfer.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
-  <link rel="stylesheet" href="/static/css/aurora.css">
-  <script src="/static/js/aurora.js" defer></script>
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/guest-forms.css">
   <link rel="stylesheet" href="/static/css/a11y.css">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/theme.css">
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-orange-500 selection:text-white relative">
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
-  <!-- Dynamic Ambient Aurora Fluid Light Effect -->
-  <aurora-background></aurora-background>
 
   <!-- Navigation Bar -->
   <header class="border-b border-slate-800/80 bg-slate-900/50 backdrop-blur-md sticky top-0 z-30">
@@ -37,7 +36,7 @@
           <i data-lucide="music" class="w-5 h-5"></i>
         </div>
         <div>
-          <h1 id="event-title" class="font-bold text-base sm:text-lg text-white leading-tight">EMA Paattukoottam</h1>
+          <h1 id="event-title" class="font-bold text-base sm:text-lg text-white leading-tight">Event Track Manager</h1>
           <p id="event-subtitle" class="text-xs text-orange-400 font-medium">Musical Night</p>
         </div>
       </a>
@@ -420,7 +419,7 @@
       <div class="relative">
         <input type="text" id="others-search-input" placeholder="Search songs or singers..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-slate-500 focus:ring-1 focus:ring-orange-500 focus:outline-none">
       </div>
-      <div id="others-songs-list" class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+      <div id="others-songs-list" tabindex="0" role="region" aria-label="Everyone's songs" class="max-h-60 overflow-y-auto space-y-1.5 pr-1">
         <!-- Populated dynamically via JS -->
       </div>
     </div>
@@ -443,12 +442,12 @@
       <form id="edit-song-form" class="space-y-3.5">
         <input type="hidden" id="edit-entry-id">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
+          <label for="edit-song-title" class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
           <input type="text" id="edit-song-title" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <div id="edit-song-dup-warning" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
         </div>
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Performance Type</label>
+          <label for="edit-perf-type" class="block text-xs font-semibold text-slate-300 mb-1">Performance Type</label>
           <select id="edit-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
             <option value="Solo">Solo</option>
             <option value="Duet">Duet</option>
@@ -456,7 +455,7 @@
           </select>
         </div>
         <div id="edit-partner-row" class="hidden">
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Partner Name</label>
+          <label for="edit-partner-name" class="block text-xs font-semibold text-slate-300 mb-1">Partner Name</label>
           <input type="text" id="edit-partner-name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <div id="edit-partner-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
             <span class="block font-semibold mb-1 text-amber-300">Matching registered participants:</span>
@@ -464,11 +463,11 @@
           </div>
         </div>
         <div id="edit-partner-phone-row" class="hidden">
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number</label>
+          <label for="edit-partner-phone" class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number</label>
           <input type="tel" id="edit-partner-phone" placeholder="e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
         </div>
         <div id="edit-group-members-row" class="hidden">
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Group Members</label>
+          <label for="edit-group-members" class="block text-xs font-semibold text-slate-300 mb-1">Group Members</label>
           <input type="text" id="edit-group-members" placeholder="Comma-separated names" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <div id="edit-group-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
             <span class="block font-semibold mb-1 text-amber-300">Tap to add registered participant:</span>
@@ -477,12 +476,12 @@
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
+          <label for="edit-movie-name" class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
           <input type="text" id="edit-movie-name" placeholder="e.g. Sarvam Maya" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Replace stage / technical notes (optional)</label>
+          <label for="edit-stage-notes" class="block text-xs font-semibold text-slate-300 mb-1">Replace stage / technical notes (optional)</label>
           <input type="text" id="edit-stage-notes" placeholder="e.g. Needs 2 wireless mics, acoustic guitar DI" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <p class="text-xs text-slate-400 mt-1">Existing notes are private. Leave blank to keep them.</p>
           <label class="flex items-center gap-2 mt-2 text-xs text-slate-300"><input type="checkbox" id="clear-stage-notes"> Clear existing notes</label>
@@ -529,7 +528,7 @@
       </div>
       <form id="rename-performer-form" class="space-y-3.5">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">New Participant Name *</label>
+          <label for="new-performer-name-input" class="block text-xs font-semibold text-slate-300 mb-1">New Participant Name *</label>
           <input type="text" id="new-performer-name-input" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <p class="text-xs text-slate-400 mt-1">This will update your name across all your performances and potluck contributions.</p>
         </div>
@@ -564,7 +563,7 @@
 
       <form id="add-perf-form" class="space-y-3.5">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Performance Type *</label>
+          <label for="add-perf-type" class="block text-xs font-semibold text-slate-300 mb-1">Performance Type *</label>
           <select id="add-perf-type" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
             <option value="Solo">Solo</option>
             <option value="Duet">Duet</option>
@@ -575,7 +574,7 @@
 
         <div id="add-perf-partner-row" class="hidden space-y-3">
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Duet / Group Partner(s) *</label>
+            <label for="add-perf-partner" class="block text-xs font-semibold text-slate-300 mb-1">Duet / Group Partner(s) *</label>
             <input type="text" id="add-perf-partner" list="add-perf-partner-list" placeholder="Choose registered participant or type name" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
             <datalist id="add-perf-partner-list"></datalist>
             <div id="add-perf-partner-dup-box" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs">
@@ -585,25 +584,25 @@
             <p class="text-xs text-slate-500 mt-1">Select from registered participants or type name (comma-separated for group).</p>
           </div>
           <div id="add-perf-partner-phone-wrap" class="hidden">
-            <label class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number *</label>
+            <label for="add-perf-partner-phone" class="block text-xs font-semibold text-slate-300 mb-1">Partner Phone Number *</label>
             <input type="tel" id="add-perf-partner-phone" placeholder="Partner's mobile e.g. (555) 123-4567" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
             <p class="text-xs text-slate-500 mt-1">Required for unlisted duet partners so organizers can identify them.</p>
           </div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
+          <label for="add-perf-song-title" class="block text-xs font-semibold text-slate-300 mb-1">Song Title *</label>
           <input type="text" id="add-perf-song-title" required placeholder="e.g. Kannalane" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
           <div id="add-perf-song-dup-warning" class="hidden mt-2 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs"></div>
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
+          <label for="add-perf-movie-name" class="block text-xs font-semibold text-slate-300 mb-1">Movie / Album Name (Optional)</label>
           <input type="text" id="add-perf-movie-name" placeholder="e.g. Bombay" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1">Stage Notes / Special Requests (Optional)</label>
+          <label for="add-perf-stage-notes" class="block text-xs font-semibold text-slate-300 mb-1">Stage Notes / Special Requests (Optional)</label>
           <input type="text" id="add-perf-stage-notes" placeholder="e.g. 2 wireless mics needed" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:ring-2 focus:ring-orange-500 focus:outline-none">
         </div>
 
