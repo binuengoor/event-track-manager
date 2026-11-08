@@ -575,7 +575,7 @@ connectivity, one-handed use). The external plan added: peer-level destinations 
 | Area | Destinations (max 5) | Requires |
 |---|---|---|
 | Guest | Home `/` · Schedule `/schedule` (stage lineup and potluck menu as a segmented switch) · Sign up `/signup` (primary accent) · My entry `/my-entry` · Live `/live` | Schedule: `dashboard_enabled`; Sign up: `signup_enabled` or `food_signup_enabled`; My entry: `performer_edits_enabled` or `track_upload_enabled` or food on; Live: `live_display_enabled` (kept in guest navigation because family at home can follow along) |
-| Venue screen | `/live` full-screen, no navigation | `live_display_enabled` |
+| Venue screen | `/live` full-screen without navigation at 768 px and wider; guest bottom navigation below 768 px | `live_display_enabled` |
 | Console | Own compact header, no tab bar on laptop; `/console/monitor` full-screen | `console_enabled` and operator/admin sign-in |
 | Admin | **1 Overview** (readiness, quick preset, wizard banner, totals, show-day quick controls) · **2 Lineup** (running order, track status, incoming matcher) · **3 People and Potluck** (roster, payments, dishes, downloads) · **4 Setup and Rules** (details, features and presets, rules) · **5 System** (events, snapshots, offline ZIP, activity, backups) | Lineup only with `stage_performances_enabled` |
 

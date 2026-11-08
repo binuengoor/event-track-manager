@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/static/css/theme.css">
   <link rel="stylesheet" href="/static/css/live.css">
 </head>
-<body data-mode="live">
+<body class="live-page" data-mode="live">
   <a class="skip-link" href="#main-content">Skip to main content</a>
   <aurora-background></aurora-background>
   <div class="lv-scrim" aria-hidden="true"></div>
@@ -25,7 +25,7 @@
       <h1 id="live-event-title" class="lv-title">Event Track Manager</h1>
       <p id="live-event-subtitle" class="lv-subtitle">Musical Night</p>
     </div>
-    <!-- Required by the page shell; the venue screen has no navigation, so it stays empty. -->
+    <!-- Guest navigation is injected here for compact screens. -->
     <nav aria-label="Main" class="hidden"></nav>
     <span id="live-badge" class="chip wait"><span class="dot" aria-hidden="true"></span><span id="live-badge-text">Starting soon</span></span>
   </header>

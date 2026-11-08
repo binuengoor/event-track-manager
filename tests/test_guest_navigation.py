@@ -79,12 +79,25 @@ def test_old_guest_routes_permanently_redirect(old, new):
     assert response.headers['location'] == new
 
 
-def test_live_is_full_screen_without_guest_navigation():
+def test_live_navigation_is_reserved_for_phones():
     with TestClient(app) as client:
         response = client.get('/live')
     assert response.status_code == 200
-    assert '<nav aria-label="Main"' not in response.text
+    shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
+    assert 'href="/live" aria-current="page"' in shell
+    assert 'class="live-page"' in response.text
+    assert 'href="/static/css/guest-navigation.css"' in response.text
     assert 'guest-admin-link' not in response.text
+
+
+def test_live_navigation_css_hides_it_except_on_phones():
+    from pathlib import Path
+
+    css = Path(__file__).parents[1] / 'app' / 'static' / 'css' / 'guest-navigation.css'
+    rules = css.read_text()
+    assert 'body.live-page .guest-navigation { display: none; }' in rules
+    assert '@media (max-width: 767px)' in rules
+    assert 'body.live-page .guest-navigation { display: grid; }' in rules
 
 
 def test_single_destination_has_no_navigation_bar():

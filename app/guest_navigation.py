@@ -56,7 +56,7 @@ def render_guest_navigation(html: str, path: str) -> str:
                 f'{glyph}<span class="gn-label">{escape(label)}</span>{dot}</a>')
 
     items = ''.join(link(href, label) for href, label in links)
-    shell = f'<nav aria-label="Main" class="guest-navigation">{items}</nav>' if len(links) >= 2 and path != '/live' else ''
+    shell = f'<nav aria-label="Main" class="guest-navigation">{items}</nav>' if len(links) >= 2 else ''
     # Page templates each have one simple nav within their first header.
     pattern = r'(<header\b[^>]*>.*?)(<nav\b[^>]*>.*?</nav>)(.*?</header>)'
     result, count = re.subn(pattern, lambda m: m.group(1) + shell + m.group(3), html, count=1, flags=re.S)

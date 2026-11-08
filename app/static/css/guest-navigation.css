@@ -14,6 +14,9 @@ html[data-theme="light"] {
 
 /* ---------------------------------------------------------------- navigation */
 .guest-navigation { display: flex; align-items: center; gap: .25rem; }
+/* Live is a full-screen venue display except on phones. Use a stable page class because
+   live-view.js changes data-mode as the show moves between states. */
+body.live-page .guest-navigation { display: none; }
 .gn-link {
   position: relative;
   display: inline-flex;
@@ -63,6 +66,7 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
     background: var(--bg-surface-1);
     border-top: 1px solid var(--border-subtle);
   }
+  body.live-page .guest-navigation { display: grid; }
   .gn-link {
     flex-direction: column;
     gap: 3px;
