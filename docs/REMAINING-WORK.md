@@ -65,3 +65,14 @@ Real browser, real files, at 390 and 1280 widths, light and dark:
 
 ## F. Suggested order
 A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, then A7, A8 (+pin-status), A9, A10 only if time.
+
+## Progress 2026-11-08
+
+| Package | Status |
+|---|---|
+| A1 | Implementation and automated tests added; **not complete** until axe audit and full browser interaction checks pass. Empty Lineup inspected at 390×844 and 1280×800 in light and dark. Claude artifact reader unavailable in this session. |
+| B4, A2–A9, B1–B3, B5 | Not started; continue in section F order. |
+| A10 | Optional; not started. |
+| D | Not performed; no Lighthouse or screen-reader results. |
+
+Browser test isolation finding: setting only `EVENTS_DIR` is insufficient on a fresh event: startup copies the legacy database and tracks from `CACHE_DIR`. Set `EVENT_DIR`, `CACHE_DIR`, `TRACKS_DIR`, and `GALLERY_DIR` to fresh scratch paths when testing. The first scratch instance copied legacy data into `/private/tmp/etm-browser-data`; originals were left in place. Do not delete that copy without the owner's permission.

@@ -299,12 +299,22 @@
           <span role="cell" data-c="track"><span class="ad-pill ${playing ? 'accent' : b.cls}">${playing ? 'Now playing' : esc(b.label)}</span></span>
           <span role="cell" data-c="media" class="dim">${esc(media)}</span>
           <span role="cell" data-c="time" class="mono">${esc(fmtDuration(p.duration))}</span>
-          <span role="cell" data-c="acts" class="acts"><button type="button" class="ad-icon-btn lineup-restore" data-entry="${esc(p.entry_id)}" aria-label="Restore previous track for ${esc(p.performer_name)}" title="Restore previous track from archive">${ICON_RESTORE}</button></span>
+          <span role="cell" data-c="acts" class="acts">
+            <button type="button" class="ad-icon-btn lineup-restore" data-entry="${esc(p.entry_id)}" aria-label="Restore previous track for ${esc(p.performer_name)}" title="Restore previous track from archive">${ICON_RESTORE}</button>
+            <button type="button" class="admin-btn admin-btn-sm admin-btn-secondary lineup-replace-trigger" data-entry="${esc(p.entry_id)}" aria-label="Replace track for ${esc(p.performer_name)}">Replace</button><input class="sr-only lineup-file" type="file" accept="audio/*,video/mp4,video/webm" data-entry="${esc(p.entry_id)}" tabindex="-1" aria-hidden="true">
+            <button type="button" class="admin-btn admin-btn-sm admin-btn-danger lineup-delete" data-entry="${esc(p.entry_id)}">Delete</button>
+          </span>
           <span class="al-msg sub-msg hidden" role="status"></span></div>`;
       }).join('');
       list.querySelectorAll('.lineup-restore').forEach((btn) => btn.addEventListener('click', () => restoreTrack(btn)));
+      list.querySelectorAll('.lineup-file').forEach((input) => input.addEventListener('change', () => replaceTrack(input)));
+      list.querySelectorAll('.lineup-replace-trigger').forEach((button) => button.addEventListener('click', () => {
+        const input = Array.from(list.querySelectorAll('.lineup-file')).find((item) => item.dataset.entry === button.dataset.entry);
+        input?.click();
+      }));
+      list.querySelectorAll('.lineup-delete').forEach((button) => button.addEventListener('click', () => deleteAct(button)));
     }
-    if (foot) foot.textContent = `Showing ${rows.length} of ${lineupAll.length} act${lineupAll.length === 1 ? '' : 's'}. The running order is changed in the sound console.`;
+    if (foot) foot.textContent = `Showing ${rows.length} of ${lineupAll.length} act${lineupAll.length === 1 ? '' : 's'}.`;
   }
 
   async function loadLineup() {
@@ -330,12 +340,83 @@
         const files = (data && data.files) || [];
         if (count) { count.textContent = String(files.length); count.classList.toggle('hidden', !files.length); }
         incoming.innerHTML = files.length
-          ? files.map((f) => `<div class="ad-file"><b>${esc(f.name)}</b><small>${esc(fmtBytes(f.size))}${f.modified ? ' &middot; ' + esc(fmtWhen(f.modified)) : ''}</small><span><span class="ad-pill warn">Not attached to an act</span></span></div>`).join('')
+          ? files.map((f) => `<div class="ad-file"><b>${esc(f.name)}</b><small>${esc(fmtBytes(f.size))}${f.modified ? ' &middot; ' + esc(fmtWhen(f.modified)) : ''}</small><span><span class="ad-pill warn">Not attached to an act</span></span><div class="ad-btn-row"><select class="ad-select lineup-match-act" aria-label="Choose act for ${esc(f.name)}"><option value="">Choose an act</option>${lineupAll.map((p) => `<option value="${esc(p.entry_id)}">${esc(p.entry_id)} · ${esc(p.performer_name)} — ${esc(p.song_title || 'Untitled')}</option>`).join('')}</select><button type="button" class="admin-btn admin-btn-sm admin-btn-primary lineup-match" data-filename="${esc(f.name)}">Match to act</button></div></div>`).join('')
           : '<p class="ad-empty">No unmatched files. Everything that arrived is attached to an act.</p>';
       } catch (e) {
         incoming.innerHTML = `<p class="ad-empty">Could not check for unmatched files: ${esc(e.message)}</p>`;
       }
+      incoming?.querySelectorAll('.lineup-match').forEach((button) => button.addEventListener('click', () => matchIncoming(button)));
     }
+  }
+
+  async function replaceTrack(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    input.disabled = true;
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      await api(`/api/admin/acts/${encodeURIComponent(input.dataset.entry)}/track`, { method: 'POST', body });
+      toast('Track replaced');
+      await loadLineup();
+    } catch (e) { toast(`Could not replace track: ${e.message}`, true); }
+    finally { input.disabled = false; input.value = ''; }
+  }
+
+  async function deleteAct(button) {
+    const id = button.dataset.entry;
+    const typed = window.prompt(`Type DELETE to remove ${id} and archive its track.`);
+    if (!confirmMatches(typed, 'DELETE')) return;
+    button.disabled = true;
+    try {
+      await api(`/api/admin/acts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      toast(`${id} deleted; track archived`);
+      await loadLineup();
+    } catch (e) { toast(`Could not delete ${id}: ${e.message}`, true); button.disabled = false; }
+  }
+
+  async function matchIncoming(button) {
+    const file = button.dataset.filename;
+    const select = button.parentElement.querySelector('.lineup-match-act');
+    if (!select || !select.value) { toast('Choose an act first', true); return; }
+    button.disabled = true;
+    try {
+      await api(`/api/admin/acts/${encodeURIComponent(select.value)}/match`, sendJson('POST', { filename: file }));
+      toast(`Matched ${file}`);
+      await loadLineup();
+    } catch (e) { toast(`Could not match file: ${e.message}`, true); button.disabled = false; }
+  }
+
+  async function addAct(event) {
+    event.preventDefault();
+    const form = el('lineup-add-form');
+    const submit = form.querySelector('[type="submit"]');
+    const message = el('lineup-add-message');
+    message.classList.add('hidden');
+    submit.disabled = true;
+    try {
+      await api('/api/admin/acts', sendJson('POST', {
+        performer_name: el('lineup-add-performer').value.trim(),
+        song_title: el('lineup-add-song').value.trim(),
+        performance_type: el('lineup-add-type').value,
+        partner_name: el('lineup-add-partner').value.trim() || null,
+      }));
+      form.reset(); form.classList.add('hidden');
+      el('lineup-add-act').setAttribute('aria-expanded', 'false');
+      toast('Act added');
+      await loadLineup();
+    } catch (e) {
+      message.textContent = `Could not add act: ${e.message}`;
+      message.classList.remove('hidden');
+    } finally { submit.disabled = false; }
+  }
+
+  async function saveLineupOrder() {
+    const button = el('lineup-save-order');
+    button.disabled = true;
+    try { await api('/api/push-sequence', { method: 'POST' }); toast('Running order saved'); await loadLineup(); }
+    catch (e) { toast(`Could not save order: ${e.message}`, true); }
+    finally { button.disabled = false; }
   }
 
   async function restoreTrack(btn) {
@@ -535,6 +616,10 @@
 
   function bind() {
     el('lineup-refresh')?.addEventListener('click', loadLineup);
+    el('lineup-save-order')?.addEventListener('click', saveLineupOrder);
+    el('lineup-add-act')?.addEventListener('click', () => { const form = el('lineup-add-form'); form.classList.toggle('hidden'); el('lineup-add-act').setAttribute('aria-expanded', String(!form.classList.contains('hidden'))); if (!form.classList.contains('hidden')) el('lineup-add-performer').focus(); });
+    el('lineup-add-cancel')?.addEventListener('click', () => { el('lineup-add-form').classList.add('hidden'); el('lineup-add-act').setAttribute('aria-expanded', 'false'); });
+    el('lineup-add-form')?.addEventListener('submit', addAct);
     el('lineup-search')?.addEventListener('input', (e) => { lineupQuery = e.target.value; renderLineupRows(); });
     el('system-snapshots-refresh')?.addEventListener('click', loadSnapshots);
     el('system-manage-events')?.addEventListener('click', () => el('manage-events-btn')?.click());

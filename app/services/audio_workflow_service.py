@@ -73,6 +73,8 @@ class AudioWorkflowService:
         original_filename: Optional[str] = None,
         media_type: str = "audio",
         file_path: Optional[str] = None,
+        audit_source: str = "upload",
+        audit_role: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Validates, transcodes, verifies, and synchronizes a backing track (audio or video) for a performance."""
         if not feature_enabled("track_upload_enabled"):
@@ -212,7 +214,8 @@ class AudioWorkflowService:
                 entry_id=entry_id,
                 summary=f"Uploaded {track_type_label} track file '{canonical_filename}' for {entry_id} ('{target_entry.song_title}')",
                 details=json.dumps({"filename": upload_name, "duration": duration_str, "media_type": track_type_label}),
-                source="upload"
+                source=audit_source,
+                role=audit_role,
             )
 
         return {

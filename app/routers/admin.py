@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Optional
-from fastapi import APIRouter, Body, HTTPException, Depends
+from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile
 from fastapi.responses import FileResponse
 
 from app.services.admin_service import admin_service
@@ -9,9 +9,9 @@ from app.services.readiness_service import readiness_service
 from app.services.db_service import db_service
 from app.services.export_service import export_service, SnapshotError
 from app.services import lineup_service
+from app.exceptions import InvalidAudioError, FileTooLargeError, PerformanceNotFoundError
 from app.routers.auth import verify_admin_pin
 from app.schemas import AdminParticipantUpdateRequest
-from app.exceptions import PerformanceNotFoundError
 
 logger = logging.getLogger("admin-router")
 
@@ -181,3 +181,61 @@ def restore_previous_track(entry_id: str, _authorized: bool = Depends(verify_adm
     if result is None:
         raise HTTPException(status_code=404, detail="Entry not found.")
     return result
+
+
+@router.post("/api/admin/acts")
+def add_admin_act(payload: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        return lineup_service.add_act(payload)
+    except lineup_service.LineupActionError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+
+
+@router.delete("/api/admin/acts/{entry_id}")
+def delete_admin_act(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+    perf = db_service.get_performance(entry_id)
+    if not perf:
+        raise HTTPException(status_code=404, detail="Act not found.")
+    archived_tracks = lineup_service.track_store.archive_existing(entry_id)
+    try:
+        return admin_service.delete_participant(entry_id)
+    except PerformanceNotFoundError as ex:
+        if db_service.get_performance(entry_id) is not None:
+            lineup_service.restore_archived_tracks(archived_tracks)
+        raise HTTPException(status_code=404, detail=str(ex))
+    except Exception:
+        # admin_service can fail after the DELETE committed (for example while logging).
+        # In that case the performance.deleted listener has also archived the track;
+        # restoring it would leave an orphaned live track with no performance row.
+        if db_service.get_performance(entry_id) is not None:
+            lineup_service.restore_archived_tracks(archived_tracks)
+        raise
+
+
+@router.post("/api/admin/acts/{entry_id}/track")
+async def replace_admin_act_track(entry_id: str, file: UploadFile = File(...),
+                                  _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        return await lineup_service.replace_track(entry_id, file)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Act not found.")
+    except lineup_service.LineupActionError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    except InvalidAudioError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))
+    except FileTooLargeError as ex:
+        raise HTTPException(status_code=413, detail=str(ex))
+    except PerformanceNotFoundError as ex:
+        raise HTTPException(status_code=404, detail=str(ex))
+
+
+@router.post("/api/admin/acts/{entry_id}/match")
+def match_admin_act_track(entry_id: str, payload: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
+    try:
+        return lineup_service.match_incoming(entry_id, str(payload.get("filename") or ""))
+    except FileNotFoundError as ex:
+        if db_service.get_performance(entry_id) is None:
+            raise HTTPException(status_code=404, detail="Act not found.")
+        raise HTTPException(status_code=404, detail="Incoming file not found.") from ex
+    except lineup_service.LineupActionError as ex:
+        raise HTTPException(status_code=400, detail=str(ex))

@@ -184,7 +184,23 @@
           <a href="/console" class="admin-btn admin-btn-primary">Open Sound Console</a>
         </div>
       </div>
-      <p class="ad-card-s">The running order is changed in the sound console. Here you see each act and whether its track is ready.</p>
+      <div class="ad-card-h ad-lineup-actions">
+        <p class="ad-card-s">Manage acts and tracks here. Dragging and running order changes stay in the sound console.</p>
+        <div class="ad-btn-row">
+          <button type="button" id="lineup-save-order" class="admin-btn admin-btn-secondary">Save order</button>
+          <button type="button" id="lineup-add-act" class="admin-btn admin-btn-primary" aria-expanded="false" aria-controls="lineup-add-form">Add act</button>
+        </div>
+      </div>
+      <form id="lineup-add-form" class="ad-card hidden" aria-label="Add act">
+        <div class="ad-btn-row">
+          <label class="sr-only" for="lineup-add-performer">Performer name</label><input id="lineup-add-performer" class="ad-input" required maxlength="120" placeholder="Performer name">
+          <label class="sr-only" for="lineup-add-song">Song title</label><input id="lineup-add-song" class="ad-input" required maxlength="200" placeholder="Song title">
+          <label class="sr-only" for="lineup-add-type">Performance type</label><select id="lineup-add-type" class="ad-select"><option>Solo</option><option>Duet</option><option>Group</option></select>
+          <label class="sr-only" for="lineup-add-partner">Partner name (optional)</label><input id="lineup-add-partner" class="ad-input" maxlength="200" placeholder="Partner name (optional)">
+          <button type="submit" class="admin-btn admin-btn-primary">Save act</button>
+          <button type="button" id="lineup-add-cancel" class="admin-btn admin-btn-secondary">Cancel</button>
+        </div><p id="lineup-add-message" class="al-msg sub-msg hidden" role="status"></p>
+      </form>
       <div class="ad-lineup">
         <section class="ad-table" aria-label="Running order">
           <div id="lineup-list" role="table" aria-label="Running order and tracks"></div>

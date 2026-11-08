@@ -638,6 +638,8 @@ empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the 
 - **Optional per-event file-facts table (Phase 5):** `track_facts(entry_id, file_name, sha256, size, duration, loudness_lufs, gain_db, checked_at)`, rebuilt from the folder at any time; the folder remains the truth.
 - No new services; no change of database engine.
 
+Admin Lineup also supports adding and deleting acts, replacing tracks, matching incoming files to acts, and saving the running order. Deletion archives the track; entry IDs are not reused. These actions require Admin authentication.
+
 ### 6.9 Console and live upgrades
 
 | Upgrade | Detail | Provenance |
