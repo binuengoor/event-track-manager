@@ -9,10 +9,10 @@ function updateSortIndicators() {
     if (!el) return;
     if (currentSort.column === key) {
       el.textContent = currentSort.direction === "asc" ? "▲" : "▼";
-      el.className = "text-orange-400 font-mono text-xs font-bold";
+      el.className = "is-active";
     } else {
       el.textContent = "↕";
-      el.className = "text-slate-600 font-mono text-xs";
+      el.className = "";
     }
   });
 }
@@ -21,11 +21,8 @@ function setCategoryFilter(filter) {
   activeCategoryFilter = filter;
   document.querySelectorAll(".part-filter-pill").forEach(pill => {
     const f = pill.dataset.filter;
-    if (f === filter) {
-      pill.className = "part-filter-pill px-3 py-1.5 rounded-lg text-xs font-bold transition bg-orange-500 text-white shadow";
-    } else {
-      pill.className = "part-filter-pill px-3 py-1.5 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white";
-    }
+    pill.className = f === filter ? "part-filter-pill ap-pill is-on" : "part-filter-pill ap-pill";
+    pill.setAttribute("aria-pressed", f === filter ? "true" : "false");
   });
   renderParticipantsTable();
 }
@@ -154,7 +151,7 @@ async function loadParticipants() {
   try {
     const res = await fetch("/api/admin/participants");
     if (!res.ok) {
-      tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-rose-400">Failed to load participants</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" class="is-empty" style="color:var(--status-danger-fg)">Failed to load participants</td></tr>`;
       return;
     }
     allParticipants = await res.json();
@@ -163,7 +160,7 @@ async function loadParticipants() {
     renderParticipantsTable();
   } catch (err) {
     console.error("loadParticipants error:", err);
-    tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-rose-400">Error loading participants</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="is-empty" style="color:var(--status-danger-fg)">Error loading participants</td></tr>`;
   }
 }
 
@@ -237,121 +234,95 @@ function renderParticipantsTable() {
   updateSortIndicators();
 
   if (list.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-500">No participants found matching criteria.</td></tr>`;
+    if (groupedParticipants.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="is-empty"><div class="ap-empty">
+        <span class="ap-empty-ico"><i data-lucide="users"></i></span>
+        <h3>No acts yet</h3>
+        <p>Performers sign up themselves. Share the sign-up link and acts will appear here as they arrive.</p>
+        <a class="ap-btn ap-btn-primary" href="/signup" target="_blank" rel="noopener">Open the sign-up page</a>
+      </div></td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="6" class="is-empty">No participants found matching criteria.</td></tr>`;
+    }
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
   tbody.innerHTML = list.map(p => {
     const isJunior = (p.age_group || "").toLowerCase().includes("junior");
-    const ageBadgeClass = isJunior
-      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-      : "bg-blue-500/10 text-blue-400 border border-blue-500/20";
+    const ageBadgeClass = isJunior ? "ap-chip ap-chip-warn" : "ap-chip ap-chip-muted";
 
     // Seq display
-    const seqDisplay = p.seq_list.length > 0 
-      ? p.seq_list.sort((a, b) => a - b).map(s => `<span class="font-bold text-orange-400">#${s}</span>`).join(", ")
-      : `<span class="text-slate-500">-</span>`;
+    const seqDisplay = p.seq_list.length > 0
+      ? p.seq_list.sort((a, b) => a - b).map(s => `<span class="ap-seq">#${s}</span>`).join(", ")
+      : `<span class="ap-meta">-</span>`;
 
     // Track status display
     let trackStatusHtml = "";
     if (p.readyCount === p.totalActs && p.totalActs > 0) {
       if (p.acousticCount === p.totalActs) {
-        trackStatusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30"><i data-lucide="guitar" class="w-3 h-3"></i><span>${p.totalActs}/${p.totalActs} Acoustic</span></span>`;
+        trackStatusHtml = `<span class="ap-chip ap-chip-info"><i data-lucide="guitar"></i><span>${p.totalActs}/${p.totalActs} Acoustic</span></span>`;
       } else {
-        trackStatusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"><i data-lucide="check-circle" class="w-3 h-3"></i><span>${p.totalActs}/${p.totalActs} Ready</span></span>`;
+        trackStatusHtml = `<span class="ap-chip ap-chip-ok"><i data-lucide="check-circle"></i><span>${p.totalActs}/${p.totalActs} Ready</span></span>`;
       }
     } else if (p.readyCount > 0) {
-      trackStatusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30"><i data-lucide="clock" class="w-3 h-3"></i><span>${p.readyCount}/${p.totalActs} Ready</span></span>`;
+      trackStatusHtml = `<span class="ap-chip ap-chip-warn"><i data-lucide="clock"></i><span>${p.readyCount}/${p.totalActs} Ready</span></span>`;
     } else {
-      trackStatusHtml = `<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700"><i data-lucide="alert-circle" class="w-3 h-3"></i><span>0/${p.totalActs} Pending</span></span>`;
+      trackStatusHtml = `<span class="ap-chip ap-chip-muted"><i data-lucide="alert-circle"></i><span>0/${p.totalActs} Pending</span></span>`;
     }
 
     // Food sign-up display
     let foodHtml = "";
     if (p.food_signup) {
       foodHtml = `
-        <div class="space-y-0.5">
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-bold text-[10px]">
-            <i data-lucide="utensils" class="w-3 h-3"></i>
-            <span>${escapeHtml(p.food_signup.item_name)}</span>
-          </span>
-          ${p.food_signup.dish_description ? `<div class="text-[10px] text-slate-400 truncate max-w-[140px] pl-1" title="${escapeHtml(p.food_signup.dish_description)}">${escapeHtml(p.food_signup.dish_description)}</div>` : ''}
+        <div class="ap-person">
+          <span class="ap-chip ap-chip-ok"><i data-lucide="utensils"></i><span>${escapeHtml(p.food_signup.item_name)}</span></span>
+          ${p.food_signup.dish_description ? `<span class="ap-meta" title="${escapeHtml(p.food_signup.dish_description)}">${escapeHtml(p.food_signup.dish_description)}</span>` : ''}
         </div>
       `;
     } else {
-      foodHtml = `
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-500 text-[10px]">
-          <i data-lucide="minus-circle" class="w-3 h-3"></i>
-          <span>None</span>
-        </span>
-      `;
+      foodHtml = `<span class="ap-chip ap-chip-muted">No dish</span>`;
     }
 
     // Acts list with individual Edit / Delete actions
     const actsHtml = `
-      <div class="space-y-1.5">
-        <div class="text-[11px] font-bold text-white flex items-center gap-1.5">
-          <span>${p.totalActs} ${p.totalActs === 1 ? 'Act' : 'Acts'}</span>
+      <div class="ap-acts-count">${p.totalActs} ${p.totalActs === 1 ? 'Act' : 'Acts'}</div>
+      ${p.performances.map((perf, idx) => `
+        <div class="ap-act">
+          <div class="ap-act-main">
+            <b>${escapeHtml(perf.performance_type || 'Solo')}</b>:
+            ${perf.song_title ? escapeHtml(perf.song_title) : '<i>No song</i>'}
+            ${perf.display_partner ? `<small>w/ ${escapeHtml(perf.display_partner)}${perf.partner_phone && perf.display_partner === perf.partner_name ? ` <span class="ap-mono">(${escapeHtml(perf.partner_phone)})</span>` : (perf.contact_info && perf.display_partner === perf.performer_name ? ` <span class="ap-mono">(${escapeHtml(perf.contact_info)})</span>` : '')}</small>` : ''}
+          </div>
+          <div class="ap-act-btns">
+            <button type="button" data-action="edit-participant" data-entry-id="${escapeHtml(perf.entry_id)}" class="ap-iconbtn" title="Edit ${escapeHtml(perf.entry_id)}" aria-label="Edit entry ${escapeHtml(perf.entry_id)}">
+              <i data-lucide="edit-3"></i>
+            </button>
+            <button type="button" data-action="delete-participant" data-entry-id="${escapeHtml(perf.entry_id)}" data-name="${escapeHtml(p.performer_name)}" class="ap-iconbtn ap-iconbtn-danger" title="Delete ${escapeHtml(perf.entry_id)}" aria-label="Delete entry ${escapeHtml(perf.entry_id)}">
+              <i data-lucide="trash-2"></i>
+            </button>
+          </div>
         </div>
-        <div class="space-y-1 text-[10px]">
-          ${p.performances.map((perf, idx) => `
-            <div class="flex items-center justify-between gap-1.5 p-1 rounded bg-slate-900/60 border border-slate-800/60">
-              <div class="truncate max-w-[160px]">
-                <span class="font-bold text-orange-400">${escapeHtml(perf.performance_type || 'Solo')}</span>: 
-                <span class="text-slate-300 font-medium">${perf.song_title ? escapeHtml(perf.song_title) : '<span class="italic text-slate-500">No song</span>'}</span>
-                ${perf.display_partner ? `<span class="text-[9px] text-amber-300 block truncate">w/ ${escapeHtml(perf.display_partner)}${perf.partner_phone && perf.display_partner === perf.partner_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.partner_phone)})</span>` : (perf.contact_info && perf.display_partner === perf.performer_name ? ` <span class="text-slate-400 font-mono text-[9px]">(${escapeHtml(perf.contact_info)})</span>` : '')}</span>` : ''}
-              </div>
-              <div class="flex items-center gap-0.5 shrink-0">
-                <button type="button" data-action="edit-participant" data-entry-id="${escapeHtml(perf.entry_id)}" class="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition" title="Edit ${escapeHtml(perf.entry_id)}">
-                  <i data-lucide="edit-3" class="w-3 h-3 pointer-events-none"></i>
-                </button>
-                <button type="button" data-action="delete-participant" data-entry-id="${escapeHtml(perf.entry_id)}" data-name="${escapeHtml(p.performer_name)}" class="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition" title="Delete ${escapeHtml(perf.entry_id)}">
-                  <i data-lucide="trash-2" class="w-3 h-3 pointer-events-none"></i>
-                </button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-      </div>
+      `).join('')}
     `;
 
     return `
-      <tr class="hover:bg-slate-800/30 transition">
-        <td class="px-3.5 py-3 font-mono text-xs">
-          ${seqDisplay}
-        </td>
-        <td class="px-3.5 py-3">
-          <div class="font-bold text-white flex items-center gap-1.5">
-            <span>${escapeHtml(p.performer_name)}</span>
-            <span class="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${ageBadgeClass}">${escapeHtml(p.age_group)}</span>
+      <tr>
+        <td data-label="Seq">${seqDisplay}</td>
+        <td data-label="Participant">
+          <div class="ap-person">
+            <b><span>${escapeHtml(p.performer_name)}</span><span class="${ageBadgeClass}">${escapeHtml(p.age_group)}</span></b>
+            ${p.contact_info ? `<span class="ap-meta"><i data-lucide="phone"></i><span class="ap-mono">${escapeHtml(p.contact_info)}</span></span>` : ''}
+            ${p.guardian_name ? `<span class="ap-meta"><i data-lucide="shield"></i><span>${escapeHtml(p.guardian_name)}</span>${p.guardian_phone ? `<span class="ap-mono">(${escapeHtml(p.guardian_phone)})</span>` : ''}</span>` : (!p.contact_info && p.guardian_phone ? `<span class="ap-meta ap-mono">${escapeHtml(p.guardian_phone)}</span>` : '')}
           </div>
-          ${p.contact_info ? `
-            <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-              <i data-lucide="phone" class="w-3 h-3 text-slate-500"></i>
-              <span class="font-mono text-[10px]">${escapeHtml(p.contact_info)}</span>
-            </div>
-          ` : ''}
-          ${p.guardian_name ? `
-            <div class="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
-              <i data-lucide="shield" class="w-3 h-3 text-slate-500"></i>
-              <span>${escapeHtml(p.guardian_name)}</span>
-              ${p.guardian_phone ? `<span class="text-slate-500 font-mono text-[10px]">(${escapeHtml(p.guardian_phone)})</span>` : ''}
-            </div>
-          ` : (!p.contact_info && p.guardian_phone ? `<div class="text-[10px] text-slate-500 font-mono mt-0.5">${escapeHtml(p.guardian_phone)}</div>` : '')}
         </td>
-        <td class="px-3.5 py-3">
-          ${actsHtml}
-        </td>
-        <td class="px-3.5 py-3">
-          ${trackStatusHtml}
-        </td>
-        <td class="px-3.5 py-3">
-          ${foodHtml}
-        </td>
-        <td class="px-3.5 py-3 text-right">
-          <a href="/performer?name=${encodeURIComponent(p.performer_name)}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-orange-500/20 text-slate-300 hover:text-orange-400 border border-slate-700/60 font-semibold transition text-[11px]" title="Open Performer Hub">
+        <td data-label="Performances">${actsHtml}</td>
+        <td data-label="Track status">${trackStatusHtml}</td>
+        <td data-label="Dish">${foodHtml}</td>
+        <td data-label="Hub" style="text-align:right">
+          <a href="/performer?name=${encodeURIComponent(p.performer_name)}" target="_blank" rel="noopener" class="ap-hub" title="Open Performer Hub">
             <span>Hub</span>
-            <i data-lucide="external-link" class="w-3 h-3"></i>
+            <i data-lucide="external-link"></i>
           </a>
         </td>
       </tr>

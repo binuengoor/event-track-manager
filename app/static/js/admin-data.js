@@ -23,7 +23,7 @@
   async function loadSheet(showSpinner) {
     const table = document.getElementById('sheet-table');
     if (!table) return;
-    if (showSpinner) table.innerHTML = '<tbody><tr><td class="p-6 text-center text-slate-500">Loading the latest data...</td></tr></tbody>';
+    if (showSpinner) table.innerHTML = '<tbody><tr><td class="is-empty">Loading the latest data...</td></tr></tbody>';
     try {
       sheet = await api('/api/admin/data');
     } catch (e) { toast(e.message, true); return; }
@@ -39,21 +39,21 @@
   function renderSheet() {
     if (!sheet) return;
     const tabs = document.getElementById('sheet-tabs');
-    tabs.innerHTML = sheet.tables.map((t) => `<button type="button" data-t="${esc(t.id)}" class="sheet-tab px-3.5 py-1.5 rounded-xl text-xs font-bold border transition ${t.id === activeTab ? 'bg-emerald-600 text-white border-emerald-500' : 'bg-slate-950 text-slate-300 border-slate-700 hover:text-white'}">${esc(t.title)} <span class="opacity-70 font-mono">${t.count}</span></button>`).join('');
+    tabs.innerHTML = sheet.tables.map((t) => `<button type="button" data-t="${esc(t.id)}" aria-pressed="${t.id === activeTab}" class="sheet-tab ap-pill${t.id === activeTab ? ' is-on' : ''}">${esc(t.title)} <span class="n">${t.count}</span></button>`).join('');
     tabs.querySelectorAll('.sheet-tab').forEach((b) => b.addEventListener('click', () => { activeTab = b.dataset.t; query = ''; document.getElementById('sheet-search').value = ''; renderSheet(); renderDownloadMenu(); }));
 
     const t = sheet.tables.find((x) => x.id === activeTab);
     const table = document.getElementById('sheet-table');
-    if (!t) { table.innerHTML = '<tbody><tr><td class="p-6 text-center text-slate-500">Nothing to show yet.</td></tr></tbody>'; return; }
+    if (!t) { table.innerHTML = '<tbody><tr><td class="is-empty">Nothing to show yet.</td></tr></tbody>'; return; }
     const q = query.trim().toLowerCase();
     const rows = q ? t.rows.filter((r) => Object.values(r).some((v) => String(v).toLowerCase().includes(q))) : t.rows;
-    const head = `<thead class="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold sticky top-0 z-10"><tr><th class="px-2.5 py-2.5 border-r border-slate-800 text-right w-10">#</th>${t.columns.map((c) => `<th class="px-3 py-2.5 border-r border-slate-800 whitespace-nowrap">${esc(c)}</th>`).join('')}</tr></thead>`;
+    const head = `<thead><tr><th class="ix">#</th>${t.columns.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>`;
     const body = rows.length
-      ? rows.map((r, i) => `<tr class="${i % 2 ? 'bg-slate-900/40' : ''} hover:bg-slate-800/50"><td class="px-2.5 py-2 border-r border-slate-800/70 text-right text-slate-600 font-mono">${i + 1}</td>${t.columns.map((c) => {
+      ? rows.map((r, i) => `<tr><td class="ix">${i + 1}</td>${t.columns.map((c) => {
           const v = r[c]; const isNum = typeof v === 'number';
-          return `<td class="px-3 py-2 border-r border-slate-800/70 ${isNum ? 'text-right font-mono' : ''} max-w-[22rem] truncate" title="${esc(v)}">${esc(v)}</td>`;
+          return `<td class="${isNum ? 'num' : ''}" title="${esc(v)}">${esc(v)}</td>`;
         }).join('')}</tr>`).join('')
-      : `<tr><td colspan="${t.columns.length + 1}" class="p-8 text-center text-slate-500">${q ? 'No rows match your search.' : 'No rows yet.'}</td></tr>`;
+      : `<tr><td colspan="${t.columns.length + 1}" class="is-empty">${q ? 'No rows match your search.' : 'No rows yet.'}</td></tr>`;
     table.innerHTML = head + `<tbody>${body}</tbody>`;
     document.getElementById('sheet-note').textContent = t.note || '';
     document.getElementById('sheet-count').textContent = `${rows.length}${q ? ` of ${t.count}` : ''} row${rows.length === 1 ? '' : 's'}`;
@@ -64,7 +64,7 @@
     if (!menu || !sheet) return;
     const tabTitle = (sheet.tables.find((t) => t.id === activeTab) || {}).title || 'this tab';
     const labels = { xlsx: ['Excel workbook (.xlsx)', 'All tabs in one file'], csv: ['CSV (.csv)', `Just "${tabTitle}"`], tsv: ['TSV (.tsv)', `Just "${tabTitle}"`], json: ['JSON (.json)', `Just "${tabTitle}"`], zip: ['CSV bundle (.zip)', 'One CSV per tab'] };
-    menu.innerHTML = Object.keys(sheet.formats).map((f) => `<a href="/api/admin/data/download?format=${f}&sheet=${encodeURIComponent(activeTab || '')}" class="block px-3 py-2 rounded-xl hover:bg-slate-800 text-xs"><span class="font-bold text-white">${esc(labels[f][0])}</span><span class="block text-[11px] text-slate-400">${esc(labels[f][1])}</span></a>`).join('');
+    menu.innerHTML = Object.keys(sheet.formats).map((f) => `<a href="/api/admin/data/download?format=${f}&sheet=${encodeURIComponent(activeTab || '')}" ><b>${esc(labels[f][0])}</b><span>${esc(labels[f][1])}</span></a>`).join('');
   }
 
   function bindSheet() {
@@ -103,13 +103,13 @@
     body.innerHTML = shown.length ? shown.map((s) => {
       const c = current(s);
       const changed = !!pay.changes[s.participant_id];
-      return `<tr class="${changed ? 'bg-amber-500/5' : ''}">
-        <td class="px-3.5 py-2.5"><input type="checkbox" aria-label="Paid" class="pay-check w-4 h-4 accent-emerald-500" data-id="${esc(s.participant_id)}" ${c.paid ? 'checked' : ''}></td>
-        <td class="px-3.5 py-2.5 font-semibold ${c.paid ? 'text-emerald-300' : 'text-white'}">${esc(s.name)}${s.paid_at && !changed && c.paid ? `<span class="ml-2 text-[10px] text-slate-500 font-normal">${esc(s.paid_at.slice(0, 10))}</span>` : ''}</td>
-        <td class="px-3.5 py-2.5 text-slate-400">${esc(s.age_group || '')}</td>
-        <td class="px-3.5 py-2.5 text-slate-400 max-w-[18rem] truncate" title="${esc(s.songs.join('; '))}">${esc(s.songs.join('; '))}</td>
-        <td class="px-3.5 py-2.5"><input type="text" maxlength="200" data-id="${esc(s.participant_id)}" value="${esc(c.note)}" placeholder="e.g. Zelle" class="pay-note w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-white"></td></tr>`;
-    }).join('') : `<tr><td colspan="5" class="p-8 text-center text-slate-500">${pay.singers.length ? 'No one matches.' : 'No singers registered yet.'}</td></tr>`;
+      return `<tr class="${changed ? 'ap-row-dirty' : ''}">
+        <td data-label="Paid"><label class="ap-check"><input type="checkbox" aria-label="Paid: ${esc(s.name)}" class="pay-check" data-id="${esc(s.participant_id)}" ${c.paid ? 'checked' : ''}></label></td>
+        <td data-label="Name" class="ap-paid-name ${c.paid ? 'is-paid' : ''}">${esc(s.name)}${s.paid_at && !changed && c.paid ? `<span class="ap-paid-date">${esc(s.paid_at.slice(0, 10))}</span>` : ''}</td>
+        <td data-label="Age" style="color:var(--text-secondary)">${esc(s.age_group || '')}</td>
+        <td data-label="Songs" style="color:var(--text-secondary);max-width:18rem" title="${esc(s.songs.join('; '))}">${esc(s.songs.join('; '))}</td>
+        <td data-label="Note"><input type="text" maxlength="200" data-id="${esc(s.participant_id)}" value="${esc(c.note)}" placeholder="e.g. Zelle" aria-label="Payment note: ${esc(s.name)}" class="pay-note ap-input"></td></tr>`;
+    }).join('') : `<tr><td colspan="5" class="is-empty">${pay.singers.length ? 'No one matches.' : 'No singers registered yet. Singers appear here as soon as they sign up.'}</td></tr>`;
 
     body.querySelectorAll('.pay-check').forEach((el) => el.addEventListener('change', () => setChange(el.dataset.id, { paid: el.checked })));
     body.querySelectorAll('.pay-note').forEach((el) => el.addEventListener('change', () => setChange(el.dataset.id, { note: el.value })));
@@ -117,9 +117,12 @@
     const paidNow = pay.singers.filter((s) => current(s).paid).length;
     const total = pay.singers.length;
     document.getElementById('pay-summary').textContent = `${paidNow} of ${total} paid`;
-    document.getElementById('pay-bar').style.width = total ? `${Math.round((paidNow / total) * 100)}%` : '0%';
+    const pct = total ? Math.round((paidNow / total) * 100) : 0;
+    document.getElementById('pay-bar').style.width = `${pct}%`;
+    document.getElementById('pay-progress')?.setAttribute('aria-valuenow', String(pct));
     const n = Object.keys(pay.changes).length;
     document.getElementById('pay-dirty').textContent = n ? `${n} unsaved change${n === 1 ? '' : 's'}` : 'No unsaved changes';
+    document.getElementById('pay-savebar')?.classList.toggle('is-dirty', n > 0);
     document.getElementById('pay-save').disabled = !n;
     document.getElementById('pay-discard').disabled = !n;
     const all = document.getElementById('pay-all');
@@ -139,7 +142,7 @@
     document.getElementById('pay-search')?.addEventListener('input', (e) => { pay.q = e.target.value; renderPayments(); });
     document.querySelectorAll('.pay-filter').forEach((b) => b.addEventListener('click', () => {
       pay.filter = b.dataset.f;
-      document.querySelectorAll('.pay-filter').forEach((x) => { x.className = `pay-filter px-3 py-1.5 rounded-lg text-xs font-bold ${x === b ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'}`; });
+      document.querySelectorAll('.pay-filter').forEach((x) => { x.className = `pay-filter ap-pill${x === b ? ' is-on' : ''}`; x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       renderPayments();
     }));
     document.getElementById('pay-all')?.addEventListener('change', (e) => {

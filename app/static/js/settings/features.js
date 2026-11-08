@@ -77,42 +77,16 @@ function renderFeatureToggles() {
 
   container.innerHTML = FEATURE_DEFINITIONS.map(feat => {
     const isEnabled = Boolean(adminSettings[feat.key] !== false);
-    const badgeColor = isEnabled ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" : "bg-slate-800 text-slate-400 border-slate-700";
-    const statusText = isEnabled ? "ACTIVE" : "DISABLED";
-    const btnStyle = isEnabled
-      ? "bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30"
-      : "bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700";
-    const btnLabel = isEnabled ? "Enabled" : "Disabled";
-
     return `
-      <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800/90 flex flex-col justify-between gap-3 transition hover:border-slate-700">
-        <div class="space-y-2">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2.5">
-              <div class="w-8 h-8 rounded-xl ${isEnabled ? 'bg-orange-500/20 text-orange-400' : 'bg-slate-800 text-slate-500'} flex items-center justify-center shrink-0">
-                <i data-lucide="${feat.icon}" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="text-xs font-bold text-white">${feat.name}</h4>
-                <span class="text-[10px] text-slate-400">${feat.category}</span>
-              </div>
-            </div>
-            <span class="text-[9px] font-bold px-2 py-0.5 rounded-full border ${badgeColor}">${statusText}</span>
-          </div>
-          <p class="text-[11px] text-slate-400 leading-relaxed">${feat.desc}</p>
+      <div class="as-switch-row">
+        <div class="as-switch-text">
+          <span id="feat-label-${feat.key}" class="as-switch-name">${feat.name}<span class="as-switch-state ${isEnabled ? "on" : ""}" aria-hidden="true">${isEnabled ? "On" : "Off"}</span></span>
+          <span id="feat-desc-${feat.key}" class="as-switch-desc">${feat.desc}</span>
         </div>
-        <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-          <span class="text-[11px] text-slate-400 font-medium">Toggle Status:</span>
-          <button type="button" class="feature-toggle-btn px-3 py-1.5 rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5 ${btnStyle}" data-feature-key="${feat.key}">
-            <i data-lucide="${isEnabled ? 'check' : 'x'}" class="w-3.5 h-3.5"></i>
-            <span>${btnLabel}</span>
-          </button>
-        </div>
+        <button type="button" role="switch" class="as-switch feature-toggle-btn" aria-checked="${isEnabled}" aria-labelledby="feat-label-${feat.key}" aria-describedby="feat-desc-${feat.key}" data-feature-key="${feat.key}"></button>
       </div>
     `;
   }).join("");
-
-  if (window.lucide) lucide.createIcons();
 
   container.querySelectorAll(".feature-toggle-btn").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -132,6 +106,7 @@ function renderFeatureToggles() {
           if (key === "signup_enabled") updateSignupToggleButton(nextVal);
           if (key === "food_signup_enabled") updateFoodToggleButton(nextVal);
           renderFeatureToggles();
+          container.querySelector(`[data-feature-key="${key}"]`)?.focus();
           showToast(`Feature updated: ${key} is now ${nextVal ? 'enabled' : 'disabled'}`);
         } else {
           showToast("Failed to update feature", true);

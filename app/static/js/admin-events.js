@@ -40,18 +40,18 @@
     const body = document.getElementById('events-table-body');
     if (!body || !state) return;
     body.innerHTML = state.events.map((e) => `
-      <tr class="${e.active ? 'bg-orange-500/5' : ''}">
-        <td class="px-3 py-3"><div class="font-bold text-white flex items-center gap-2">${esc(nice(e.name))}${e.active ? '<span class="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px]">ACTIVE</span>' : ''}</div>
-          <div class="text-slate-500 font-mono text-[10px]">${esc(e.id)}${e.start_time ? ' · ' + esc(e.start_time) : ''}</div></td>
-        <td class="px-3 py-3 text-slate-300">${e.performances}<span class="text-slate-500"> · ${e.participants} people</span></td>
-        <td class="px-3 py-3 text-slate-300">${e.potluck_taken}/${e.potluck_total}</td>
-        <td class="px-3 py-3 text-slate-300">${e.paid || 0}</td>
-        <td class="px-3 py-3 text-slate-300">${e.media_files ? `${e.media_files} files · ${fmtBytes(e.media_bytes)}` : '<span class="text-slate-500">none</span>'}</td>
-        <td class="px-3 py-3 text-slate-400">${esc(e.last_activity || '')}</td>
-        <td class="px-3 py-3 text-right whitespace-nowrap">
-          <button type="button" class="ev-activate px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold border border-slate-700 disabled:opacity-40" data-id="${esc(e.id)}" ${e.active || !state.switching_enabled ? 'disabled' : ''}>Make active</button>
-          <button type="button" class="ev-clear px-3 py-1.5 rounded-lg bg-rose-900/40 hover:bg-rose-900/70 text-rose-200 font-bold border border-rose-500/30 disabled:opacity-40" data-id="${esc(e.id)}" ${e.media_files ? '' : 'disabled'}>Clear media</button>
-        </td></tr>`).join('') || '<tr><td colspan="7" class="p-6 text-center text-slate-500">No events yet.</td></tr>';
+      <tr class="${e.active ? 'active' : ''}">
+        <th scope="row" class="as-row-head"><div class="name">${esc(nice(e.name))}${e.active ? '<span class="as-badge ok">Active</span>' : ''}</div>
+          <div class="id">${esc(e.id)}${e.start_time ? ' &middot; ' + esc(e.start_time) : ''}</div></th>
+        <td>${e.performances}<span class="muted"> &middot; ${e.participants} people</span></td>
+        <td class="num">${e.potluck_taken}/${e.potluck_total}</td>
+        <td class="num">${e.paid || 0}</td>
+        <td>${e.media_files ? `${e.media_files} files &middot; ${fmtBytes(e.media_bytes)}` : '<span class="muted">none</span>'}</td>
+        <td>${esc(e.last_activity || '')}</td>
+        <td class="acts">
+          <button type="button" class="ev-activate as-btn as-btn-sm" data-id="${esc(e.id)}" ${e.active || !state.switching_enabled ? 'disabled' : ''}>Make active</button>
+          <button type="button" class="ev-clear as-btn as-btn-sm as-btn-danger" data-id="${esc(e.id)}" ${e.media_files ? '' : 'disabled'}>Clear media</button>
+        </td></tr>`).join('') || '<tr><td colspan="7" class="empty">No events yet.</td></tr>';
     body.querySelectorAll('.ev-activate').forEach((b) => b.addEventListener('click', () => switchTo(b.dataset.id)));
     body.querySelectorAll('.ev-clear').forEach((b) => b.addEventListener('click', () => askClear(b.dataset.id)));
   }
@@ -71,14 +71,15 @@
     const box = document.getElementById('clear-media-box');
     box.classList.remove('hidden');
     box.innerHTML = `
-      <div class="font-bold text-rose-200 text-sm">Clear media for "${esc(nice(ev.name))}"?</div>
-      <p class="text-slate-300">This permanently deletes <strong>${ev.media_files} audio/video file(s) (${fmtBytes(ev.media_bytes)})</strong> from this event's <code>tracks/</code>, <code>tracks/_archive/</code> and <code>incoming/</code> folders.
+      <strong class="t">Clear media for "${esc(nice(ev.name))}"?</strong>
+      <p>This permanently deletes <strong>${ev.media_files} audio/video file(s) (${fmtBytes(ev.media_bytes)})</strong> from this event's <code>tracks/</code>, <code>tracks/_archive/</code> and <code>incoming/</code> folders.
       Sign-ups, potluck, payments and settings are <strong>kept</strong>. Acts will show "no track" again.${ev.active ? ' <strong>This is the active event.</strong>' : ''}</p>
-      <p class="text-slate-500">Copies in a browser's offline vault or in a cloud sync target are not touched.</p>
-      <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
-        <input id="clear-confirm" placeholder="Type ${esc(id)} to confirm" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-mono">
-        <button type="button" id="clear-cancel" class="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">Cancel</button>
-        <button type="button" id="clear-go" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold disabled:opacity-40" disabled>Delete media</button>
+      <p>Copies in a browser's offline vault or in a cloud sync target are not touched.</p>
+      <div class="as-confirm-row">
+        <label for="clear-confirm" class="as-hidden-label">Type ${esc(id)} to confirm</label>
+        <input id="clear-confirm" placeholder="Type ${esc(id)} to confirm" autocomplete="off" class="as-input as-mono">
+        <button type="button" id="clear-cancel" class="as-btn">Cancel</button>
+        <button type="button" id="clear-go" class="as-btn as-btn-danger" disabled>Delete media</button>
       </div>`;
     const input = document.getElementById('clear-confirm');
     const go = document.getElementById('clear-go');
@@ -133,7 +134,8 @@
     document.getElementById('event-select')?.addEventListener('change', (e) => switchTo(e.target.value));
     document.getElementById('new-event-btn')?.addEventListener('click', openNew);
     document.getElementById('ne-create')?.addEventListener('click', create);
-    document.getElementById('manage-events-btn')?.addEventListener('click', async () => { await load(); show('manage-events-modal'); if (window.lucide) lucide.createIcons(); });
+    document.getElementById('manage-events-btn')?.addEventListener('click', async () => { await load(); show('manage-events-modal'); document.getElementById('me-title')?.focus(); if (window.lucide) lucide.createIcons(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { hide('new-event-modal'); hide('manage-events-modal'); } });
     document.querySelectorAll('[data-close-modal]').forEach((b) => b.addEventListener('click', () => { hide('new-event-modal'); hide('manage-events-modal'); }));
     if (typeof window.loadAllAdminData === 'function') {
       const original = window.loadAllAdminData;

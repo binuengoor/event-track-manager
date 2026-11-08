@@ -15,24 +15,30 @@ function renderFoodGroupsList() {
   if (!list) return;
 
   if (foodGroups.length === 0) {
-    list.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs">No food groups defined. Add one above.</div>`;
+    list.innerHTML = `<div class="ap-empty">
+      <span class="ap-empty-ico"><i data-lucide="utensils"></i></span>
+      <h3>No dishes yet</h3>
+      <p>Start from a menu, then edit it. Paste a menu or pick a template under Quick add, or add a group above.</p>
+      <button type="button" class="ap-btn ap-btn-primary" onclick="document.getElementById('bulk-food-text').focus()">Go to Quick add</button>
+    </div>`;
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
   list.innerHTML = foodGroups.map((g, idx) => `
-    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
-      <div class="flex items-center gap-3">
-        <span class="text-slate-500 font-mono text-[11px]">${idx + 1}</span>
+    <div class="ap-listrow">
+      <div class="lead">
+        <span class="ix">${idx + 1}</span>
         <div>
-          <strong class="text-white font-bold text-sm">${g.name}</strong>
-          <span class="text-[11px] text-slate-400 block">${g.taken_count || 0}/${g.item_count || 0} slots claimed (${g.open_count || 0} open)</span>
+          <strong>${escapeHtml(g.name)}</strong>
+          <small>${g.taken_count || 0} of ${g.item_count || 0} slots claimed (${g.open_count || 0} open)</small>
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
-        <button onclick="moveGroup(${idx}, -1)" ${idx === 0 ? 'disabled class="opacity-30 p-1.5"' : 'class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300"'} title="Move Up"><i data-lucide="arrow-up" class="w-3.5 h-3.5"></i></button>
-        <button onclick="moveGroup(${idx}, 1)" ${idx === foodGroups.length - 1 ? 'disabled class="opacity-30 p-1.5"' : 'class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300"'} title="Move Down"><i data-lucide="arrow-down" class="w-3.5 h-3.5"></i></button>
-        <button onclick="renameGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300" title="Rename"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-        <button onclick="deleteGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-rose-400" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+      <div class="acts">
+        <button type="button" onclick="moveGroup(${idx}, -1)" class="ap-iconbtn" ${idx === 0 ? 'disabled' : ''} title="Move up" aria-label="Move ${escapeHtml(g.name)} up"><i data-lucide="arrow-up"></i></button>
+        <button type="button" onclick="moveGroup(${idx}, 1)" class="ap-iconbtn" ${idx === foodGroups.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move ${escapeHtml(g.name)} down"><i data-lucide="arrow-down"></i></button>
+        <button type="button" onclick="renameGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="ap-iconbtn" title="Rename" aria-label="Rename ${escapeHtml(g.name)}"><i data-lucide="edit-3"></i></button>
+        <button type="button" onclick="deleteGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(g.name)}"><i data-lucide="trash-2"></i></button>
       </div>
     </div>
   `).join("");
@@ -78,25 +84,25 @@ function renderFoodItemsList() {
   const filtered = filterId ? foodItems.filter(i => i.group_id === filterId) : foodItems;
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="p-4 text-center text-slate-500 text-xs">No food items found in this selection.</div>`;
+    list.innerHTML = `<div class="ap-empty-inline">No dish slots in this selection.</div>`;
     return;
   }
 
   list.innerHTML = filtered.map(item => `
-    <div class="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs">
-      <div class="min-w-0">
-        <div class="flex items-center gap-2">
-          <span class="w-2 h-2 rounded-full ${item.is_taken ? 'bg-rose-500' : 'bg-emerald-500'}"></span>
-          <strong class="text-white font-bold">${item.name}</strong>
-          <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-semibold">${item.group_name}</span>
+    <div class="ap-listrow">
+      <div class="ap-slot-main">
+        <div class="ap-slot-top">
+          <strong>${escapeHtml(item.name)}</strong>
+          <span class="ap-chip ap-chip-muted">${escapeHtml(item.group_name)}</span>
+          ${item.is_taken ? '<span class="ap-chip ap-chip-ok">Claimed</span>' : '<span class="ap-chip ap-chip-warn">Open</span>'}
         </div>
-        ${item.is_taken 
-          ? `<p class="text-[11px] text-slate-400 mt-1 pl-4">Taken by <strong class="text-orange-400">${escapeHtml(item.signer_name)}</strong> ${item.signer_phone ? `<span class="text-slate-500 font-mono text-[10px]">(${escapeHtml(item.signer_phone)})</span> ` : ''}${item.dish_description ? `— "${escapeHtml(item.dish_description)}"` : ''}</p>`
-          : '<p class="text-[11px] text-emerald-400/80 mt-1 pl-4">Available for participant claim</p>'}
+        ${item.is_taken
+          ? `<p class="ap-slot-note">Taken by <b>${escapeHtml(item.signer_name)}</b> ${item.signer_phone ? `<span class="ap-mono">(${escapeHtml(item.signer_phone)})</span> ` : ''}${item.dish_description ? `: ${escapeHtml(item.dish_description)}` : ''}</p>`
+          : '<p class="ap-slot-note">No one has claimed this yet.</p>'}
       </div>
-      <div class="flex items-center gap-2">
-        <button onclick="openAdminFoodModal('${item.item_id}')" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300" title="Edit Item & Sign-Up"><i data-lucide="edit-3" class="w-3.5 h-3.5"></i></button>
-        <button onclick="deleteItem('${item.item_id}', '${escapeQuotes(item.name)}', ${item.is_taken})" class="p-1.5 rounded-lg bg-slate-900 hover:bg-rose-950 text-rose-400" title="Delete"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>
+      <div class="acts">
+        <button type="button" onclick="openAdminFoodModal('${item.item_id}')" class="ap-iconbtn" title="Edit slot and claim" aria-label="Edit ${escapeHtml(item.name)}"><i data-lucide="edit-3"></i></button>
+        <button type="button" onclick="deleteItem('${item.item_id}', '${escapeQuotes(item.name)}', ${item.is_taken})" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(item.name)}"><i data-lucide="trash-2"></i></button>
       </div>
     </div>
   `).join("");
@@ -130,8 +136,8 @@ window.openAdminFoodModal = function(itemId) {
 
   if (item.is_taken) {
     if (pill) {
-      pill.className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-rose-500/15 text-rose-300 border border-rose-500/30";
-      pill.textContent = "CLAIMED";
+      pill.className = "ap-chip ap-chip-ok";
+      pill.textContent = "Claimed";
     }
     signerNameInput.value = item.signer_name || "";
     signerPhoneInput.value = item.signer_phone || "";
@@ -140,8 +146,8 @@ window.openAdminFoodModal = function(itemId) {
     if (releaseCheckbox) releaseCheckbox.checked = false;
   } else {
     if (pill) {
-      pill.className = "text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30";
-      pill.textContent = "AVAILABLE";
+      pill.className = "ap-chip ap-chip-warn";
+      pill.textContent = "Open";
     }
     signerNameInput.value = "";
     signerPhoneInput.value = "";
