@@ -7,6 +7,8 @@ set -eu
 WAVESURFER_VERSION=7.12.12
 MARKED_VERSION=18.1.3
 LUCIDE_VERSION=1.70.0
+INTER_VERSION=5.3.0
+JBMONO_VERSION=5.3.0
 
 DIR="$(cd "$(dirname "$0")/.." && pwd)/app/static/vendor"
 mkdir -p "$DIR"
@@ -17,12 +19,15 @@ fetch() { curl -fsSL --retry 3 -o "$1" "$2"; }
 fetch wavesurfer.min.js "https://unpkg.com/wavesurfer.js@${WAVESURFER_VERSION}/dist/wavesurfer.min.js"
 fetch marked.umd.js "https://unpkg.com/marked@${MARKED_VERSION}/lib/marked.umd.js"
 fetch lucide.min.js "https://unpkg.com/lucide@${LUCIDE_VERSION}/dist/umd/lucide.min.js"
+mkdir -p fonts
+fetch fonts/inter-latin-wght-normal.woff2 "https://unpkg.com/@fontsource-variable/inter@${INTER_VERSION}/files/inter-latin-wght-normal.woff2"
+fetch fonts/jetbrains-mono-latin-wght-normal.woff2 "https://unpkg.com/@fontsource-variable/jetbrains-mono@${JBMONO_VERSION}/files/jetbrains-mono-latin-wght-normal.woff2"
 
 if [ "${1:-}" = "--update" ]; then
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum lucide.min.js marked.umd.js wavesurfer.min.js icons.svg > CHECKSUMS.sha256
+    sha256sum lucide.min.js marked.umd.js wavesurfer.min.js icons.svg fonts/*.woff2 fonts/LICENSE.txt > CHECKSUMS.sha256
   else
-    shasum -a 256 lucide.min.js marked.umd.js wavesurfer.min.js icons.svg > CHECKSUMS.sha256
+    shasum -a 256 lucide.min.js marked.umd.js wavesurfer.min.js icons.svg fonts/*.woff2 fonts/LICENSE.txt > CHECKSUMS.sha256
   fi
   echo "CHECKSUMS.sha256 rewritten"
 elif command -v sha256sum >/dev/null 2>&1; then

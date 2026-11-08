@@ -1,6 +1,10 @@
 /* Design tokens (SPEC 6.6, "Warm Stage Studio"). Dark is the default; guest and admin pages can switch to light
    (theme.js sets html[data-theme]). Console, stage monitor and /live are always dark and never load theme.js.
    Every pair is checked by tests/test_theme_contrast.py (WCAG AA). */
+@font-face { font-family: "Inter"; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/static/vendor/fonts/inter-latin-wght-normal.woff2") format("woff2-variations"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 100 800; font-display: swap;
+  src: url("/static/vendor/fonts/jetbrains-mono-latin-wght-normal.woff2") format("woff2-variations"); }
 :root, html[data-theme="dark"] {
   --bg-canvas: #0B0D10;
   --bg-surface-1: #13161B;

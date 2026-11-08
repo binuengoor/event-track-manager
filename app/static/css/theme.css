@@ -178,3 +178,9 @@ html[data-theme="light"] [class*="text-lime-100/"], html[data-theme="light"] [cl
 html[data-theme="light"] [class*="text-slate-300/"], html[data-theme="light"] [class*="text-slate-400/"] { color: var(--text-secondary); }
 html[data-theme="light"] [class*="text-slate-500/"], html[data-theme="light"] [class*="text-slate-600/"] { color: var(--text-muted); }
 .sheet-tab .opacity-70 { opacity: 1; color: var(--text-secondary); }
+
+/* Type: self-hosted Inter for UI, JetBrains Mono with tabular figures for codes, times and counts */
+body { font-family: var(--font-sans); font-size-adjust: none; }
+input, select, textarea, button { font-family: inherit; }
+.font-mono, code, kbd, samp, #now-seq-badge, .seq, .gf-act-num, .gf-entry-id, .admin-total strong, .al-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.gf-input, .gf-select, input[type="text"], input[type="tel"], input[type="search"], input[type="email"], textarea, select { font-size: max(16px, 1em); }

@@ -63,7 +63,8 @@ def test_pages_use_local_css_and_icons():
     for page in pages:
         text = page.read_text(encoding="utf-8")
         assert "/static/css/app.css" in text, page.name
-        assert "/static/vendor/lucide.min.js" in text, page.name
+        assert "/static/js/icons.js" in text, page.name
+        assert "lucide.min.js" not in text, f"{page.name} still loads the 470 KB icon library at runtime"
 
 
 def test_service_worker_precache_is_local():
@@ -86,5 +87,5 @@ def test_vendor_checksums_match():
         listed.add(name)
         actual = hashlib.sha256((STATIC / "vendor" / name).read_bytes()).hexdigest()
         assert actual == digest, f"{name} does not match CHECKSUMS.sha256"
-    on_disk = {p.name for p in (STATIC / "vendor").iterdir() if p.name != "CHECKSUMS.sha256"}
+    on_disk = {p.relative_to(STATIC / "vendor").as_posix() for p in (STATIC / "vendor").rglob("*") if p.is_file() and p.name != "CHECKSUMS.sha256"}
     assert on_disk == listed, "vendor/ contains files not covered by CHECKSUMS.sha256"
