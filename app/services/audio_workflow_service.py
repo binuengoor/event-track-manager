@@ -4,6 +4,8 @@ import shutil
 import subprocess
 import logging
 import asyncio
+import threading
+from contextlib import asynccontextmanager
 from typing import Optional, Dict, Any
 
 from app.features import feature_enabled
@@ -39,6 +41,56 @@ class AudioWorkflowService:
     VIDEO_EXTENSIONS = ("mp4", "webm")
     ALLOWED_EXTENSIONS = AUDIO_EXTENSIONS + VIDEO_EXTENSIONS
 
+    def __init__(self):
+        self._entry_locks = {}
+        self._entry_locks_guard = threading.Lock()
+
+    async def run_thread_to_completion(self, function, *args, **kwargs):
+        """Keep callers' locks held until thread work ends, even after request cancellation."""
+        work = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+        was_cancelled = False
+        while not work.done():
+            try:
+                await asyncio.shield(work)
+            except asyncio.CancelledError:
+                was_cancelled = True
+                current = asyncio.current_task()
+                if current is not None:
+                    current.uncancel()
+        try:
+            result = work.result()
+        except BaseException:
+            if was_cancelled:
+                raise asyncio.CancelledError
+            raise
+        if was_cancelled:
+            raise asyncio.CancelledError
+        return result
+
+    @asynccontextmanager
+    async def lock_entry(self, entry_id: str):
+        """Serialize track mutations without blocking an ASGI event loop while waiting."""
+        with self._entry_locks_guard:
+            record = self._entry_locks.get(entry_id)
+            if record is None:
+                record = {"lock": threading.Lock(), "users": 0}
+                self._entry_locks[entry_id] = record
+            record["users"] += 1
+        lock = record["lock"]
+        acquired = False
+        try:
+            while not lock.acquire(blocking=False):
+                await asyncio.sleep(0.01)
+            acquired = True
+            yield
+        finally:
+            if acquired:
+                lock.release()
+            with self._entry_locks_guard:
+                record["users"] -= 1
+                if record["users"] == 0 and self._entry_locks.get(entry_id) is record:
+                    del self._entry_locks[entry_id]
+
     @staticmethod
     def upload_limit_mb(is_video: bool) -> int:
         key, default = ("max_video_upload_mb", 500) if is_video else ("max_audio_upload_mb", 200)
@@ -65,6 +117,25 @@ class AudioWorkflowService:
             )
 
     async def process_track_upload(
+        self,
+        entry_id: str,
+        submission_type: str = "file",
+        youtube_url: Optional[str] = None,
+        file_content: Optional[bytes] = None,
+        original_filename: Optional[str] = None,
+        media_type: str = "audio",
+        file_path: Optional[str] = None,
+        audit_source: str = "upload",
+        audit_role: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        async with self.lock_entry(entry_id):
+            return await self._process_track_upload_locked(
+                entry_id=entry_id, submission_type=submission_type, youtube_url=youtube_url,
+                file_content=file_content, original_filename=original_filename, media_type=media_type,
+                file_path=file_path, audit_source=audit_source, audit_role=audit_role,
+            )
+
+    async def _process_track_upload_locked(
         self,
         entry_id: str,
         submission_type: str = "file",
@@ -175,20 +246,14 @@ class AudioWorkflowService:
 
         # 3. Store in the event folder (previous version is archived) and update the database
         try:
-            stored_path = await asyncio.to_thread(track_store.save, entry_id, cache_path, canonical_filename)
+            stored_path = await self.run_thread_to_completion(
+                self._save_track_and_update_metadata, entry_id, cache_path, canonical_filename,
+                duration_str, "video" if is_video else "audio")
         except Exception as e:
             logger.error("Failed to store track for %s: %s", entry_id, e)
             raise ExternalServiceError("Failed to save the track in the event folder")
 
         loudness_service.schedule(entry_id, stored_path)
-
-        event_service.update_track_metadata(
-            entry_id,
-            os.path.basename(stored_path),
-            status="Uploaded",
-            duration_str=duration_str,
-            media_type="video" if is_video else "audio",
-        )
 
         backup_service.trigger_backup()
         try:
@@ -228,6 +293,17 @@ class AudioWorkflowService:
             "duration": duration_str,
             "message": f"Successfully uploaded and queued '{canonical_filename}' for playback."
         }
+
+    @staticmethod
+    def _save_track_and_update_metadata(entry_id: str, cache_path: str, canonical_filename: str,
+                                        duration_str: str, media_type: str) -> str:
+        """Keep the filesystem install and its database metadata in one uncancellable worker section."""
+        stored_path = track_store.save(entry_id, cache_path, canonical_filename)
+        event_service.update_track_metadata(
+            entry_id, os.path.basename(stored_path), status="Uploaded",
+            duration_str=duration_str, media_type=media_type,
+        )
+        return stored_path
 
     def _ffprobe_duration(self, path: str) -> Optional[float]:
         """Asks ffprobe for the real duration. Raises InvalidAudioError when there is no playable stream or the

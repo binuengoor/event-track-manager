@@ -89,6 +89,14 @@ def test_lineup_and_system_use_the_backend_endpoints():
     assert "manage-events-modal" in HTML and "clear-media-box" in HTML  # clear media (typed event id) is kept
 
 
+def test_lineup_keeps_full_width_table_until_two_column_layout_fits():
+    lineup_css = (STATIC / "css" / "admin-overview.css").read_text()
+    assert re.search(
+        r"@media\s*\(min-width:\s*1320px\)\s*\{\s*\.ad-lineup\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+15rem\s*;",
+        lineup_css,
+    )
+
+
 def test_activity_log_shows_role():
     assert "item.role" in JS and "Role:" in JS
 

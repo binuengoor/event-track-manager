@@ -70,7 +70,7 @@ A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, th
 
 | Package | Status |
 |---|---|
-| A1 | Implementation and automated tests added; **not complete** until axe audit and full browser interaction checks pass. Empty Lineup inspected at 390×844 and 1280×800 in light and dark. Claude artifact reader unavailable in this session. |
+| A1 | Done (implementation and verification). Populated Lineup: axe 0 serious/critical at 390×844 and 1280×800 in both themes; 0 targets below 44 px on phone. Browser exercised add, delete, replace, match and Save order with scratch data. Claude artifact reader unavailable; board comparison remains outstanding. |
 | B4, A2–A9, B1–B3, B5 | Not started; continue in section F order. |
 | A10 | Optional; not started. |
 | D | Not performed; no Lighthouse or screen-reader results. |

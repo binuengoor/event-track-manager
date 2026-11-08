@@ -1,4 +1,6 @@
+import asyncio
 import os
+import threading
 import pytest
 
 from fastapi.testclient import TestClient
@@ -84,6 +86,139 @@ def test_delete_post_commit_error_does_not_restore_orphan_track(admin, monkeypat
     archived = [name for name in os.listdir(track_store.archive_dir) if entry_id in name]
     assert len(archived) == 1
     assert open(os.path.join(track_store.archive_dir, archived[0]), "rb").read() == b"archive-after-commit"
+
+
+@pytest.mark.parametrize("delete_route", ["acts", "participants"])
+def test_delete_waits_for_inflight_track_replacement(admin, monkeypatch, delete_route):
+    from app.services.audio_workflow_service import audio_workflow_service
+    from app.services.audio_service import audio_service
+
+    entry_id = _act()
+    started = threading.Event()
+    release = threading.Event()
+    async def controlled_transcode(_source, _destination, **_kwargs):
+        started.set()
+        await asyncio.to_thread(release.wait, 5)
+        return False
+
+    monkeypatch.setattr(audio_service, "async_transcode_to_standard_mp3", controlled_transcode)
+    monkeypatch.setattr(audio_workflow_service, "_verify_audio", lambda _path: "00:01")
+    upload_response = []
+    delete_response = []
+    upload_thread = threading.Thread(target=lambda: upload_response.append(
+        admin.post(f"/api/admin/acts/{entry_id}/track", files={"file": ("new.mp3", b"new-track", "audio/mpeg")})))
+    upload_thread.start()
+    assert started.wait(timeout=5), "replacement never reached verification"
+
+    delete_thread = threading.Thread(target=lambda: delete_response.append(
+        admin.delete(f"/api/admin/{delete_route}/{entry_id}")))
+    delete_thread.start()
+    try:
+        # With per-entry serialization, delete cannot commit while replacement is between
+        # verification and track installation. This short wait distinguishes the old race.
+        delete_thread.join(timeout=0.1)
+        assert delete_thread.is_alive(), "delete did not wait for the in-flight replacement"
+    finally:
+        release.set()
+        upload_thread.join(timeout=5)
+        delete_thread.join(timeout=5)
+
+    assert not upload_thread.is_alive() and not delete_thread.is_alive()
+    assert upload_response[0].status_code == 200, upload_response[0].text
+    assert delete_response[0].status_code == 200, delete_response[0].text
+    assert db_service.get_performance(entry_id) is None
+    assert track_store.find(entry_id) is None
+
+
+@pytest.mark.asyncio
+async def test_cancelled_thread_work_keeps_entry_lock_until_worker_finishes():
+    from app.services.audio_workflow_service import AudioWorkflowService
+
+    workflow = AudioWorkflowService()
+    started = threading.Event()
+    release = threading.Event()
+    acquired_by_waiter = threading.Event()
+
+    def blocked_work():
+        started.set()
+        assert release.wait(timeout=5)
+        return "finished"
+
+    async def first_request():
+        async with workflow.lock_entry("ENTRY-1"):
+            return await workflow.run_thread_to_completion(blocked_work)
+
+    async def waiting_request():
+        async with workflow.lock_entry("ENTRY-1"):
+            acquired_by_waiter.set()
+
+    first = asyncio.create_task(first_request())
+    assert await asyncio.to_thread(started.wait, 5)
+    first.cancel()
+    await asyncio.sleep(0.05)
+    assert not first.done(), "request cancellation released its lock while thread work was active"
+
+    waiter = asyncio.create_task(waiting_request())
+    await asyncio.sleep(0.05)
+    assert not acquired_by_waiter.is_set()
+
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await first
+    await waiter
+    assert acquired_by_waiter.is_set()
+    assert workflow._entry_locks == {}
+
+
+@pytest.mark.asyncio
+async def test_idle_entry_locks_are_removed_from_registry():
+    from app.services.audio_workflow_service import AudioWorkflowService
+
+    workflow = AudioWorkflowService()
+    for index in range(100):
+        async with workflow.lock_entry(f"missing-{index}"):
+            pass
+    assert workflow._entry_locks == {}
+
+
+@pytest.mark.asyncio
+async def test_cancel_during_track_install_finishes_metadata_update(monkeypatch, tmp_path):
+    from app.services.audio_workflow_service import audio_workflow_service
+    from app.services.audio_service import audio_service
+
+    entry_id = _act()
+    started = threading.Event()
+    release = threading.Event()
+    original_save = track_store.save
+
+    def delayed_save(*args, **kwargs):
+        started.set()
+        assert release.wait(timeout=5)
+        return original_save(*args, **kwargs)
+
+    async def leave_original_file(_source, _destination, **_kwargs):
+        return False
+
+    monkeypatch.setattr(track_store, "save", delayed_save)
+    monkeypatch.setattr(audio_service, "async_transcode_to_standard_mp3", leave_original_file)
+    monkeypatch.setattr(audio_workflow_service, "_verify_audio", lambda _path: "00:01")
+    upload = tmp_path / "replacement.mp3"
+    upload.write_bytes(b"replacement-track")
+
+    task = asyncio.create_task(audio_workflow_service.process_track_upload(
+        entry_id, file_path=str(upload), original_filename="replacement.mp3", audit_source="admin", audit_role="admin"))
+    assert await asyncio.to_thread(started.wait, 5)
+    task.cancel()
+    await asyncio.sleep(0.05)
+    assert not task.done(), "cancellation escaped while the install and metadata worker was active"
+    release.set()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    perf = db_service.get_performance(entry_id)
+    assert perf["track_status"] == "Uploaded"
+    assert perf["track_file"] == os.path.basename(track_store.find(entry_id))
+    assert open(track_store.find(entry_id), "rb").read() == b"replacement-track"
 
 
 def test_replace_track_archives_previous_and_updates_metadata(admin, monkeypatch):

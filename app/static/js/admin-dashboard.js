@@ -115,6 +115,15 @@
     return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || '';
   }
 
+  function renderAddActTypes() {
+    const select = el('lineup-add-type');
+    const types = settings().performance_types;
+    if (!select || !Array.isArray(types) || !types.length) return;
+    const selected = select.value;
+    select.innerHTML = types.map((type) => `<option value="${esc(type)}">${esc(type)}</option>`).join('');
+    if (types.includes(selected)) select.value = selected;
+  }
+
   // ------------------------------------------------------------------ overview
   const SWITCHES = [
     { key: 'signup_enabled', title: 'Sign-up open', desc: 'People can add themselves to the show.' },
@@ -615,6 +624,7 @@
   const loaders = { overview: refreshOverview, lineup: loadLineup, system: loadSystem };
 
   function bind() {
+    renderAddActTypes();
     el('lineup-refresh')?.addEventListener('click', loadLineup);
     el('lineup-save-order')?.addEventListener('click', saveLineupOrder);
     el('lineup-add-act')?.addEventListener('click', () => { const form = el('lineup-add-form'); form.classList.toggle('hidden'); el('lineup-add-act').setAttribute('aria-expanded', String(!form.classList.contains('hidden'))); if (!form.classList.contains('hidden')) el('lineup-add-performer').focus(); });
@@ -625,7 +635,7 @@
     el('system-manage-events')?.addEventListener('click', () => el('manage-events-btn')?.click());
     el('system-new-event')?.addEventListener('click', () => el('new-event-btn')?.click());
     document.addEventListener('etm:admin-tab', (ev) => { const f = loaders[ev.detail.tab]; if (f) f(); });
-    document.addEventListener('etm:settings-loaded', () => { renderBanner(); renderSwitches(); renderOverviewSub(); });
+    document.addEventListener('etm:settings-loaded', () => { renderAddActTypes(); renderBanner(); renderSwitches(); renderOverviewSub(); });
     if (typeof window.loadAllAdminData === 'function') {
       const original = window.loadAllAdminData;
       window.loadAllAdminData = async function () {

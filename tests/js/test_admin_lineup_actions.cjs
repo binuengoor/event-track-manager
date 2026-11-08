@@ -39,7 +39,7 @@ class FakeElement {
   click() { this.clickCount = (this.clickCount || 0) + 1; }
 }
 
-function setup({promptValue = 'DELETE'} = {}) {
+function setup({promptValue = 'DELETE', performanceTypes = ['Solo', 'Duet', 'Group']} = {}) {
   const els = Object.fromEntries([
     'lineup-list', 'lineup-foot', 'lineup-incoming', 'lineup-incoming-count', 'lineup-add-form',
     'lineup-add-message', 'lineup-add-act', 'lineup-add-cancel', 'lineup-save-order',
@@ -79,7 +79,7 @@ function setup({promptValue = 'DELETE'} = {}) {
   const sandbox = {
     console, fetch, document, FormData: class { constructor() { this.items = []; } append(...args) { this.items.push(args); } },
     prompt: () => promptValue, setTimeout, clearTimeout,
-    showToast() {}, setAdminPageSub() {}, currentAdminTab: 'lineup',
+    showToast() {}, setAdminPageSub() {}, currentAdminTab: 'lineup', adminSettings: {performance_types: performanceTypes},
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -88,6 +88,13 @@ function setup({promptValue = 'DELETE'} = {}) {
   for (const fn of docListeners['DOMContentLoaded'] || []) fn();
   return {els, calls, document, sandbox, replaceInput, replaceButton, deleteButton, matchButton, matchSelect, fetch};
 }
+
+test('Add act type options follow the configured performance types', () => {
+  const h = setup({performanceTypes: ['Solo', 'Dance Crew', 'Instrumental Duo']});
+  assert.match(h.els['lineup-add-type'].innerHTML, /<option value="Dance Crew">Dance Crew<\/option>/);
+  assert.match(h.els['lineup-add-type'].innerHTML, /<option value="Instrumental Duo">Instrumental Duo<\/option>/);
+  assert.doesNotMatch(h.els['lineup-add-type'].innerHTML, /value="Group"/);
+});
 
 async function loadLineup(h) { await h.document.dispatchEvent({type: 'etm:admin-tab', detail: {tab: 'lineup'}}); await new Promise(setImmediate); }
 
