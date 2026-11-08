@@ -359,19 +359,6 @@ class DBService:
     def update_participant(self, participant_id: str, **fields) -> bool:
         return self.participant_repo.update_participant(participant_id, **fields)
 
-    def reset_database(self):
-        with self._get_connection() as conn:
-            conn.execute("DROP TABLE IF EXISTS performances")
-            conn.execute("DROP TABLE IF EXISTS participants")
-            conn.execute("DROP TABLE IF EXISTS sync_meta")
-            conn.execute("DROP TABLE IF EXISTS app_settings")
-            conn.execute("DROP TABLE IF EXISTS food_signups")
-            conn.execute("DROP TABLE IF EXISTS food_items")
-            conn.execute("DROP TABLE IF EXISTS food_groups")
-            conn.execute("DROP TABLE IF EXISTS backup_log")
-            conn.execute("DROP TABLE IF EXISTS activity_logs")
-            conn.commit()
-        self._ensure_db()
 
 
 db_service = DBService()

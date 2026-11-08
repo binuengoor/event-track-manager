@@ -17,7 +17,7 @@ OLD_SETTING_IDS = [
     "save-rules-btn", "setting-entry-id-prefix", "setting-event-date-time", "setting-event-name", "setting-event-poster-url",
     "setting-event-subtitle", "setting-event-time-range", "setting-event-venue", "setting-food-serving-note",
     "setting-general-notes", "setting-header-brand-subtitle", "setting-header-brand-title", "setting-hero-tag-primary",
-    "setting-hero-tag-status", "setting-max-perfs", "setting-max-solo", "setting-payment-url", "setting-signup-sheet-url",
+    "setting-hero-tag-status", "setting-max-perfs", "setting-max-solo", "setting-payment-url", "setting-external-link-url",
     "sync-sheet-now-btn", "toggle-food-status-btn", "toggle-signup-status-btn",
 ]
 

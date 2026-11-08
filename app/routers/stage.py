@@ -47,7 +47,7 @@ def _run_or_404(fn, *args):
         raise HTTPException(status_code=404, detail=str(ex))
 
 
-PUBLIC_HIDDEN_ENTRY_KEYS = ("age_group", "partner_age_group", "track_status", "stage_notes", "extra_tags", "drive_file_name")
+PUBLIC_HIDDEN_ENTRY_KEYS = ("age_group", "partner_age_group", "track_status", "stage_notes", "extra_tags", "track_file")
 LIVE_ENTRY_LISTS = ("up_next", "upcoming", "performed", "on_hold")
 
 
@@ -57,8 +57,8 @@ def _redact_entry(row: Dict[str, Any], names: NamePrivacy) -> Dict[str, Any]:
     out["performer_name"] = names.name(row.get("performer_name"))
     if "partner_name" in out:
         out["partner_name"] = names.partners(row.get("partner_name"))
-    if out.get("drive_file_id"):
-        out["drive_file_id"] = "available"
+    if out.get("track_version"):
+        out["track_version"] = "available"
     return out
 
 
@@ -186,11 +186,11 @@ def _entries_response(entries, request: Request) -> JSONResponse:
     for r in strip_private(rows):
         # Keep track status for the performer hub, but never expose file names,
         # demographics or free-form tags on unauthenticated responses.
-        r = {k: v for k, v in r.items() if k not in ("stage_notes", "age_group", "partner_age_group", "extra_tags", "drive_file_name")}
+        r = {k: v for k, v in r.items() if k not in ("stage_notes", "age_group", "partner_age_group", "extra_tags", "track_file")}
         r["performer_name"] = names.name(r.get("performer_name"))
         r["partner_name"] = names.partners(r.get("partner_name"))
-        if r.get("drive_file_id"):
-            r["drive_file_id"] = "available"
+        if r.get("track_version"):
+            r["track_version"] = "available"
         public_rows.append(r)
     return JSONResponse(content=public_rows)
 
@@ -204,7 +204,8 @@ def list_performances(request: Request):
         raise HTTPException(status_code=500, detail="Failed to read performances")
 
 
-@router.post("/api/sync")
+@router.post("/api/export-now")
+@router.post("/api/sync")  # pre-rename alias, kept for one release
 def sync_data(_authorized: bool = Depends(verify_operator_pin)):
     """Writes signups.xlsx/csv and a database snapshot into the event folder (the database stays the source of truth)."""
     try:
@@ -267,14 +268,15 @@ def reorder_queue(payload: ReorderRequest, _authorized: bool = Depends(require_c
     try:
         updated = event_service.update_sequence_orders(
             [i.model_dump() for i in payload.items],
-            push=payload.push_to_sheet
+            push=payload.should_save_files
         )
         backup_service.trigger_backup()
         return {
             "status": "success",
             "updated_count": updated,
             "is_dirty": db_service.is_sequence_dirty(),
-            "pushed_to_sheet": payload.push_to_sheet
+            "files_saved": payload.should_save_files,
+            "pushed_to_sheet": payload.should_save_files  # pre-rename alias, kept for one release
         }
     except Exception as e:
         logger.exception("Failed to reorder queue: %s", e)

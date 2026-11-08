@@ -67,13 +67,12 @@ There is **no single central database**. Each event folder holds its own SQLite 
 |---|---|
 | Where are sign-ups, potluck claims, payments, settings, the activity log? | In that event's `event.db` (SQLite, WAL mode). It is the source of truth. |
 | What ties events together? | Nothing in the database. The only shared piece is the one-line pointer file `events/.active_event`. "New event -> copy from" copies rules, switches and the potluck **menu** once; it never links or shares rows afterwards. |
-| How does an act find its track? | By the **entry id inside the file name** (`PK-004` in `02_PK-004_Maya_Nair_Kannalane.mp3`), not by a stored path. The database keeps a cached copy (`drive_file_name` = file name, `drive_file_id` = size+mtime version) for fast screens. |
+| How does an act find its track? | By the **entry id inside the file name** (`PK-004` in `02_PK-004_Maya_Nair_Kannalane.mp3`), not by a stored path. The database keeps a cached copy (`track_file` = file name, `track_version` = size+mtime version) for fast screens. |
 | Who wins if the database and the folder disagree? | The folder, for tracks. The app re-scans `tracks/` (and adopts `incoming/`) every few seconds: a new matching file marks the act Uploaded; a missing file puts it back to Pending. Everything else (people, food, order, payments) is database-only. |
 | Do entry ids repeat across events? | Yes (`PK-001` exists in every event). That is safe because tracks are only ever looked up inside the active event's folder. |
 | What does an event cost to keep? | Its folder. Archive = zip it. **Clear media** deletes only its audio/video and keeps every record. |
 
-Column names such as `drive_file_id` / `drive_file_name` are leftovers from the Google Drive era. They now hold the local file name and a
-content version. See [docs/AUDIT-2026-11.md](docs/AUDIT-2026-11.md) for the full list of leftovers and known gaps.
+The old Google-era names (`drive_file_id`, `drive_file_name`, `signup_sheet_url`, `/api/sync`, `push_to_sheet`, `COL_*`) were renamed in schema version 3; databases and snapshots from older versions upgrade automatically (a `pre-migration-*.db` backup is taken first). `/api/sync`, `push_to_sheet` and `signup_sheet_url` still work as aliases for one release. See [docs/AUDIT-2026-11.md](docs/AUDIT-2026-11.md) for known gaps.
 
 ## Cloud sync is optional and lives outside the app
 

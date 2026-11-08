@@ -81,7 +81,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
     updatePlayerBarNotes(item.stage_notes || '');
 
     const isAcoustic = item.track_status === 'Acoustic';
-    const isVideo = (item.media_type === 'video') || (item.drive_file_name && item.drive_file_name.endsWith('.mp4'));
+    const isVideo = (item.media_type === 'video') || (item.track_file && item.track_file.endsWith('.mp4'));
 
     const previewContainer = document.getElementById('player-video-preview');
     const previewVid = document.getElementById('console-preview-video');
@@ -206,7 +206,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
       // 1. Check IndexedDB Audio Vault
       const cached = await getCachedTrack(item.entry_id);
       const isStale = cached && (
-        (item.drive_file_id && cached.drive_file_id && cached.drive_file_id !== item.drive_file_id) ||
+        (item.track_version && (cached.track_version || cached.drive_file_id) && (cached.track_version || cached.drive_file_id) !== item.track_version) ||
         (item.last_updated && cached.last_updated && cached.last_updated !== item.last_updated) ||
         (item.song_title && cached.song_title && cached.song_title !== item.song_title)
       );
@@ -241,7 +241,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
             await saveCachedTrack(item.entry_id, blob, {
               song_title: item.song_title,
               performer_name: item.performer_name,
-              drive_file_id: item.drive_file_id,
+              track_version: item.track_version,
               last_updated: item.last_updated
             });
             isVaultCached = true;

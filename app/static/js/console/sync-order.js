@@ -58,7 +58,7 @@ export async function handleSyncButtonClick() {
       showToast(`✓ Order saved for ${pushData.synced_count} acts. Track files renamed and export updated.`);
     } else {
       // Normal refresh
-      const syncRes = await fetch('/api/sync', { method: 'POST', headers: getAuthHeaders() });
+      const syncRes = await fetch('/api/export-now', { method: 'POST', headers: getAuthHeaders() });
       if (syncRes.ok) {
         const syncData = await syncRes.json();
         S.lastSyncedAt = syncData.last_synced_at;

@@ -151,7 +151,7 @@ def test_clear_media_deletes_files_but_keeps_every_record(admin, client):
     assert res["files_deleted"] == 4 and res["bytes_freed"] == 2048 + 1000 + 100 + 500
     assert track_store.find(a) is None and os.listdir(track_store.incoming_dir) == []
     perf = db_service.get_performance(a)
-    assert perf["track_status"] == "Pending" and not perf["drive_file_id"] and perf["performer_name"] == "Has Track"
+    assert perf["track_status"] == "Pending" and not perf["track_version"] and perf["performer_name"] == "Has Track"
     assert len(client.get("/api/performances").json()) == 2                      # sign-ups untouched
 
 

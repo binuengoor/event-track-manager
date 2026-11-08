@@ -105,13 +105,13 @@ def test_track_files_checks_expected_size():
     eid = res.json()["entry_ids"][0]
     path = os.path.join(track_store.tracks_dir, f"{eid}_Sized_S.mp3")
     open(path, "wb").write(b"x" * 100)
-    db_service.update_performance_field(eid, "drive_file_name", os.path.basename(path))
-    db_service.update_performance_field(eid, "drive_file_id", "v100-1700000000")
+    db_service.update_performance_field(eid, "track_file", os.path.basename(path))
+    db_service.update_performance_field(eid, "track_version", "v100-1700000000")
     assert readiness_service._track_files()["status"] == "ok"
-    db_service.update_performance_field(eid, "drive_file_id", "v999-1700000000")
+    db_service.update_performance_field(eid, "track_version", "v999-1700000000")
     check = readiness_service._track_files()
     assert check["status"] == "error" and eid in check["detail"] and "size" in check["detail"]
-    db_service.update_performance_field(eid, "drive_file_id", "legacy-opaque-id")  # size unknown: not flagged
+    db_service.update_performance_field(eid, "track_version", "legacy-opaque-id")  # size unknown: not flagged
     assert readiness_service._track_files()["status"] == "ok"
 
 

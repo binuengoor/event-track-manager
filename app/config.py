@@ -77,23 +77,7 @@ class EventConfig(BaseModel):
     hero_tag_primary: Optional[str] = "Musical Evening"
     hero_tag_status: Optional[str] = "Stage Ready"
     payment_url: Optional[str] = None
-    signup_sheet_url: Optional[str] = None
-
-class ColumnNamesConfig(BaseModel):
-    entry_id: str = "Entry ID"
-    performer_name: str = "Performer Name"
-    age_group: str = "Age Group"
-    performance_type: str = "Performance Type"
-    partner_name: str = "Duet Partner"
-    contact_info: str = "Contact Name and Phone"
-    song_title: str = "Song Name"
-    sequence_order: str = "Sequence"
-    performance_status: str = "Performance Status"
-    track_status: str = "Track Status"
-    duration: str = "Duration"
-    movie_name: str = "Movie/Album Name"
-    drive_file_id: str = "Drive File ID"
-    last_updated: str = "Last Updated"
+    external_link_url: Optional[str] = None
 
 class StorageConfig(BaseModel):
     # The event folder is the single place everything lives:
@@ -145,7 +129,6 @@ class BackupConfig(BaseModel):
 
 class AppConfig(BaseModel):
     event: EventConfig = Field(default_factory=EventConfig)
-    column_names: ColumnNamesConfig = Field(default_factory=ColumnNamesConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     downloader: DownloaderConfig = Field(default_factory=DownloaderConfig)
     signup: SignupConfig = Field(default_factory=SignupConfig)
@@ -208,30 +191,11 @@ def load_config() -> AppConfig:
     elif os.getenv("PAYMENT_URL"):
         config.event.payment_url = os.getenv("PAYMENT_URL")
 
-    if os.getenv("EVENT_SIGNUP_SHEET_URL"):
-        config.event.signup_sheet_url = os.getenv("EVENT_SIGNUP_SHEET_URL")
-    elif os.getenv("SIGNUP_SHEET_URL"):
-        config.event.signup_sheet_url = os.getenv("SIGNUP_SHEET_URL")
-
-    # 3. Dynamic Column Names
-    col_mapping = {
-        "COL_PERFORMER_NAME": "performer_name",
-        "COL_AGE_GROUP": "age_group",
-        "COL_PARTNER_NAME": "partner_name",
-        "COL_PERFORMANCE_TYPE": "performance_type",
-        "COL_CONTACT_INFO": "contact_info",
-        "COL_SEQUENCE": "sequence_order",
-        "COL_SONG_TITLE": "song_title",
-        "COL_MOVIE_NAME": "movie_name",
-        "COL_PERFORMANCE_STATUS": "performance_status",
-        "COL_TRACK_STATUS": "track_status",
-        "COL_DURATION": "duration",
-        "COL_DRIVE_FILE_ID": "drive_file_id",
-        "COL_LAST_UPDATED": "last_updated",
-    }
-    for env_k, field_name in col_mapping.items():
-        if os.getenv(env_k):
-            setattr(config.column_names, field_name, os.getenv(env_k))
+    # EVENT_SIGNUP_SHEET_URL and SIGNUP_SHEET_URL are the pre-rename names, still read for one release.
+    for env_name in ("EVENT_EXTERNAL_LINK_URL", "EXTERNAL_LINK_URL", "EVENT_SIGNUP_SHEET_URL", "SIGNUP_SHEET_URL"):
+        if os.getenv(env_name):
+            config.event.external_link_url = os.getenv(env_name)
+            break
 
     if os.getenv("LIVE_ORDER_BY"):
         config.live_order_by = os.getenv("LIVE_ORDER_BY")
@@ -381,7 +345,7 @@ def get_setting(key: str, default: Any = None) -> Any:
         "hero_tag_status": settings.event.hero_tag_status,
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url,
-        "signup_sheet_url": settings.event.signup_sheet_url,
+        "external_link_url": settings.event.external_link_url,
         "signup_enabled": settings.signup.signup_enabled,
         "food_signup_enabled": settings.signup.food_signup_enabled,
         "track_upload_enabled": settings.signup.track_upload_enabled,

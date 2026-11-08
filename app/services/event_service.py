@@ -79,9 +79,9 @@ class EventService:
                     ref = os.path.basename(path)
                     version = file_version(path)
                     target_status = "Acoustic" if p.get("track_status") == "Acoustic" else "Uploaded"
-                    if p.get("drive_file_id") != version or p.get("drive_file_name") != ref or p.get("track_status") != target_status:
-                        db_service.update_performance_field(entry_id, "drive_file_id", version)
-                        db_service.update_performance_field(entry_id, "drive_file_name", ref)
+                    if p.get("track_version") != version or p.get("track_file") != ref or p.get("track_status") != target_status:
+                        db_service.update_performance_field(entry_id, "track_version", version)
+                        db_service.update_performance_field(entry_id, "track_file", ref)
                         db_service.update_performance_field(entry_id, "track_status", target_status)
                         db_service.update_performance_field(entry_id, "media_type", media_type_for(path))
                         if not p.get("duration"):
@@ -89,9 +89,9 @@ class EventService:
                             if dur:
                                 db_service.update_performance_field(entry_id, "duration", dur)
                         changed += 1
-                elif p.get("drive_file_id") or p.get("track_status") == "Uploaded":
-                    db_service.update_performance_field(entry_id, "drive_file_id", None)
-                    db_service.update_performance_field(entry_id, "drive_file_name", None)
+                elif p.get("track_version") or p.get("track_status") == "Uploaded":
+                    db_service.update_performance_field(entry_id, "track_version", None)
+                    db_service.update_performance_field(entry_id, "track_file", None)
                     db_service.update_performance_field(entry_id, "track_status", "Pending")
                     changed += 1
             return changed
@@ -211,8 +211,8 @@ class EventService:
         db_service.update_performance_field(entry_id, "track_status", status)
         if file_name:
             path = track_store.find(entry_id)
-            db_service.update_performance_field(entry_id, "drive_file_id", file_version(path) if path else file_name)
-            db_service.update_performance_field(entry_id, "drive_file_name", file_name)
+            db_service.update_performance_field(entry_id, "track_version", file_version(path) if path else file_name)
+            db_service.update_performance_field(entry_id, "track_file", file_name)
         if duration_str:
             db_service.update_performance_field(entry_id, "duration", duration_str)
         if media_type:
@@ -245,9 +245,9 @@ class EventService:
             except OSError as ex:
                 logger.warning("Could not rename track for %s: %s", p["entry_id"], ex)
                 continue
-            if new_path and os.path.basename(new_path) != p.get("drive_file_name"):
-                db_service.update_performance_field(p["entry_id"], "drive_file_id", file_version(new_path))
-                db_service.update_performance_field(p["entry_id"], "drive_file_name", os.path.basename(new_path))
+            if new_path and os.path.basename(new_path) != p.get("track_file"):
+                db_service.update_performance_field(p["entry_id"], "track_version", file_version(new_path))
+                db_service.update_performance_field(p["entry_id"], "track_file", os.path.basename(new_path))
                 renamed += 1
         db_service.set_dirty_sequence(False)
         db_service.set_last_sync_time()

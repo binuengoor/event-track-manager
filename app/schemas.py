@@ -177,7 +177,12 @@ class SequenceItem(BaseModel):
 
 class ReorderRequest(BaseModel):
     items: List[SequenceItem]
-    push_to_sheet: bool = False
+    save_files: bool = False
+    push_to_sheet: Optional[bool] = None  # pre-rename alias of save_files, kept for one release
+
+    @property
+    def should_save_files(self) -> bool:
+        return bool(self.save_files or self.push_to_sheet)
 
 
 class PerformanceEntry(BaseModel):
@@ -192,8 +197,8 @@ class PerformanceEntry(BaseModel):
     performance_status: str = "Upcoming"
     track_status: str = "Pending"
     duration: Optional[str] = None
-    drive_file_id: Optional[str] = None
-    drive_file_name: Optional[str] = None
+    track_version: Optional[str] = None
+    track_file: Optional[str] = None
     last_updated: Optional[str] = None
     row_index: int = 0
     is_song_name_missing: bool = False
@@ -204,5 +209,5 @@ class PerformanceEntry(BaseModel):
     guardian_phone: Optional[str] = ""
     partner_age_group: Optional[str] = ""
     partner_phone: Optional[str] = ""
-    created_via: Optional[str] = "sheet"
+    created_via: Optional[str] = "signup"
     media_type: Optional[str] = "audio"

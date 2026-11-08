@@ -17,7 +17,7 @@ SONG_COLUMNS = [
     ("Age Group", "age_group"), ("Performance Type", "performance_type"), ("Duet Partner", "partner_name"),
     ("Contact Phone", "contact_info"), ("Guardian", "guardian_name"), ("Guardian Phone", "guardian_phone"),
     ("Partner Phone", "partner_phone"), ("Song", "song_title"), ("Movie/Album", "movie_name"),
-    ("Performance Status", "performance_status"), ("Track Status", "track_status"), ("Track File", "drive_file_name"),
+    ("Performance Status", "performance_status"), ("Track Status", "track_status"), ("Track File", "track_file"),
     ("Media", "media_type"), ("Duration", "duration"), ("Stage Notes", "stage_notes"),
     ("Signed Up Via", "created_via"), ("Last Updated", "last_updated"),
 ]

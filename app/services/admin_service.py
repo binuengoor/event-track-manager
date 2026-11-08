@@ -39,7 +39,7 @@ class AdminService:
             "hero_tag_status": getattr(settings.event, "hero_tag_status", "Stage Ready"),
             "event_poster_url": settings.event.poster_url,
             "payment_url": settings.event.payment_url or "",
-            "signup_sheet_url": settings.event.signup_sheet_url or "",
+            "external_link_url": settings.event.external_link_url or "",
             "signup_enabled": getattr(settings.signup, "signup_enabled", True),
             "food_signup_enabled": getattr(settings.signup, "food_signup_enabled", True),
             "track_upload_enabled": getattr(settings.signup, "track_upload_enabled", True),
@@ -136,7 +136,7 @@ class AdminService:
     STR_SETTINGS = {
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
-        "hero_tag_status", "event_poster_url", "payment_url", "signup_sheet_url", "food_serving_note",
+        "hero_tag_status", "event_poster_url", "payment_url", "external_link_url", "food_serving_note",
         "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset", "announcement",
     }
 
@@ -145,6 +145,7 @@ class AdminService:
         if not isinstance(items, dict):
             raise ValueError("Settings payload must be an object.")
         cleaned: Dict[str, Any] = {}
+        items = {("external_link_url" if k == "signup_sheet_url" else k): v for k, v in items.items()}  # pre-rename alias
         for k, v in items.items():
             if k in self.BOOL_SETTINGS:
                 if isinstance(v, str) and v.strip().lower() in ("true", "false"):

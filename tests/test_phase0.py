@@ -245,7 +245,7 @@ def test_readiness_reports_database_integrity(monkeypatch):
 
 def test_readiness_flags_database_tracks_missing_on_disk(client):
     eid = _signup(client)
-    db_service.update_performance_field(eid, "drive_file_name", "ghost.mp3")
+    db_service.update_performance_field(eid, "track_file", "ghost.mp3")
     db_service.update_performance_field(eid, "track_status", "Uploaded")
     check = _checks()["track_files"]
     assert check["status"] == "error" and eid in check["detail"]

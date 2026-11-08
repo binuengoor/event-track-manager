@@ -151,7 +151,7 @@ def test_upload_and_stream(tmp_path, monkeypatch):
     # The performance now shows the track and it is stored in the event folder
     perf = db_service.get_performance(temp_id)
     assert perf["track_status"] == "Uploaded"
-    assert perf["drive_file_name"] == data["filename"]
+    assert perf["track_file"] == data["filename"]
 
     # Now stream the track from the event folder
     stream_res = client.get(f"/api/stream/{temp_id}")
@@ -278,7 +278,7 @@ def test_event_info_has_payment_and_sheet_urls():
     res = client.get("/api/event-info")
     assert res.status_code == 200
     data = res.json()
-    assert "sheet_url" in data
+    assert "external_link_url" in data and data["sheet_url"] == data["external_link_url"]
     assert "payment_url" in data
 
 def test_event_service_reads_from_sqlite():
@@ -452,3 +452,20 @@ def test_sync_endpoint_requires_admin_pin():
     )
     assert res_auth.status_code == 200
     assert res_auth.json()["status"] == "success"
+
+
+def test_pre_rename_api_aliases_still_work():
+    from app.config import settings
+    client = TestClient(app)
+    admin = {"X-Admin-PIN": settings.admin_pin}
+    assert client.post("/api/sync").status_code == 401           # alias route exists and is guarded
+    assert client.post("/api/export-now").status_code == 401
+    assert client.post("/api/sync", headers=admin).status_code == 200
+    assert client.post("/api/export-now", headers=admin).status_code == 200
+    body = client.post("/api/reorder-queue", headers=admin, json={"items": [], "push_to_sheet": False}).json()
+    assert body["files_saved"] is False and body["pushed_to_sheet"] is False
+    body = client.post("/api/reorder-queue", headers=admin, json={"items": [], "save_files": True}).json()
+    assert body["files_saved"] is True and body["pushed_to_sheet"] is True
+    put = client.put("/api/admin/settings", headers=admin, json={"signup_sheet_url": "https://example.org/x"})
+    assert put.status_code == 200
+    assert client.get("/api/event-info").json()["external_link_url"] == "https://example.org/x"

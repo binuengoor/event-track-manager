@@ -10,7 +10,7 @@ export function createStageMonitorSync(getState) {
       return;
     }
     const isAcoustic = item.track_status === 'Acoustic';
-    const isVideo = (item.media_type === 'video') || (item.drive_file_name && item.drive_file_name.endsWith('.mp4'));
+    const isVideo = (item.media_type === 'video') || (item.track_file && item.track_file.endsWith('.mp4'));
     const currentTime = (wavesurfer && typeof wavesurfer.getCurrentTime === 'function') ? wavesurfer.getCurrentTime() : 0;
     channel.postMessage({
       type: eventType,

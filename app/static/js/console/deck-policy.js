@@ -11,7 +11,7 @@ export function isEligibleForStage(item) {
   if (!item) return false;
   const ptype = (item.performance_type || '').toLowerCase();
   if (ptype.includes('acoustic') || ptype.includes('live') || ptype.includes('group')) return true;
-  return item.track_status === 'Uploaded' || Boolean(item.drive_file_id);
+  return item.track_status === 'Uploaded' || Boolean(item.track_version);
 }
 
 // Next eligible act after the cued one (wrapping once), skipping done/held.

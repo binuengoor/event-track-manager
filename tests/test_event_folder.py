@@ -44,11 +44,11 @@ def test_dropping_a_file_in_tracks_marks_the_performance_uploaded_and_removal_re
     event_service.reconcile_tracks(force=True)
     perf = db_service.get_performance(eid)
     assert perf["track_status"] == "Uploaded"
-    assert perf["drive_file_name"] == os.path.basename(path)
+    assert perf["track_file"] == os.path.basename(path)
     os.remove(path)
     event_service.reconcile_tracks(force=True)
     perf = db_service.get_performance(eid)
-    assert perf["track_status"] == "Pending" and not perf["drive_file_id"]
+    assert perf["track_status"] == "Pending" and not perf["track_version"]
 
 
 def test_acoustic_acts_keep_their_status_when_a_file_exists():
@@ -91,7 +91,7 @@ def test_reorder_and_push_renames_files_to_the_new_sequence():
     assert res.status_code == 200
     assert os.path.basename(track_store.find(a)).startswith(f"02_{a}_")
     assert os.path.basename(track_store.find(b)).startswith(f"01_{b}_")
-    assert db_service.get_performance(a)["drive_file_name"] == os.path.basename(track_store.find(a))
+    assert db_service.get_performance(a)["track_file"] == os.path.basename(track_store.find(a))
     assert db_service.is_sequence_dirty() is False
 
 
@@ -149,7 +149,7 @@ def test_sync_endpoint_requires_pin_and_writes_files():
 def test_backup_status_describes_the_local_export():
     client = TestClient(app)
     status = client.get("/api/admin/backup-status", headers=ADMIN).json()
-    assert status["backup_target_sheet"] == "signups.xlsx"
+    assert status["backup_target_file"] == "signups.xlsx"
     assert status["event_dir"] == settings.storage.event_dir
 
 
@@ -170,15 +170,15 @@ def test_renumbering_keeps_the_file_version_so_the_offline_vault_stays_valid():
     _drop(track_store.tracks_dir, f"01_{eid}_Maya_Nair_Kannalane.mp3")
     event_service.reconcile_tracks(force=True)
     before = db_service.get_performance(eid)
-    assert before["drive_file_id"].startswith("v")
+    assert before["track_version"].startswith("v")
     client = TestClient(app)
     client.post("/api/reorder-queue", headers=ADMIN, json={"items": [{"entry_id": eid, "sequence_order": 7}], "push_to_sheet": True})
     after = db_service.get_performance(eid)
-    assert after["drive_file_name"].startswith(f"07_{eid}_") and after["drive_file_name"] != before["drive_file_name"]
-    assert after["drive_file_id"] == before["drive_file_id"]          # same content -> vault entry still valid
+    assert after["track_file"].startswith(f"07_{eid}_") and after["track_file"] != before["track_file"]
+    assert after["track_version"] == before["track_version"]          # same content -> vault entry still valid
     # replacing the content changes the version
     path = track_store.find(eid)
     with open(path, "wb") as f:
         f.write(b"different audio bytes" * 10)
     event_service.reconcile_tracks(force=True)
-    assert db_service.get_performance(eid)["drive_file_id"] != before["drive_file_id"]
+    assert db_service.get_performance(eid)["track_version"] != before["track_version"]

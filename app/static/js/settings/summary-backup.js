@@ -41,7 +41,7 @@ async function loadBackupStatus() {
         <span class="font-bold text-white flex items-center gap-2">
           <span class="w-2.5 h-2.5 rounded-full ${b.enabled ? 'bg-emerald-500' : 'bg-slate-600'}"></span>
           <span>Export file:</span>
-          <code class="text-orange-400">${b.backup_target_sheet}</code>
+          <code class="text-orange-400">${b.backup_target_file}</code>
         </span>
         <span class="text-[11px] font-semibold ${last && last.status === 'success' ? 'text-emerald-400' : 'text-slate-400'}">
           ${last ? `Status: ${last.status.toUpperCase()}` : 'No backups run yet'}

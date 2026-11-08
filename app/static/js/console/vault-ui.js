@@ -56,7 +56,7 @@ export async function handleSingleTrackCache(entryId, btn) {
       song_title: item.song_title,
       performer_name: item.performer_name,
       sequence_order: item.sequence_order,
-      drive_file_id: item.drive_file_id,
+      track_version: item.track_version,
       last_updated: item.last_updated
     });
     S.cachedVaultEntryIds.add(entryId);
@@ -178,7 +178,7 @@ export async function autoVaultSync(onlyId = null) {
         const item = S.queue.find(q => q.entry_id === entry.entry_id) || {};
         return saveCachedTrack(entry.entry_id, blob, {
           song_title: item.song_title, performer_name: item.performer_name, sequence_order: item.sequence_order,
-          drive_file_id: item.drive_file_id, last_updated: item.last_updated, kind: entry.kind, sha256,
+          track_version: item.track_version, last_updated: item.last_updated, kind: entry.kind, sha256,
         });
       },
       onProgress: p => { if (pill) pill.title = `Caching ${p.done}/${p.of}${p.failed ? `, ${p.failed} failed` : ''}`; },
@@ -238,7 +238,7 @@ export async function cacheAllTracksOffline() {
           song_title: item.song_title,
           performer_name: item.performer_name,
           sequence_order: item.sequence_order,
-          drive_file_id: item.drive_file_id,
+          track_version: item.track_version,
           last_updated: item.last_updated
         });
         cachedCount++;

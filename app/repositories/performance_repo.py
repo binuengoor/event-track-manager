@@ -106,7 +106,7 @@ class PerformanceRepository(BaseRepository):
             INSERT INTO performances (
                 entry_id, performer_name, performance_type, partner_name, partner_age_group, contact_info,
                 partner_phone, song_title, movie_name, sequence_order, performance_status, track_status,
-                duration, drive_file_id, drive_file_name, last_updated, row_index,
+                duration, track_version, track_file, last_updated, row_index,
                 is_song_name_missing, extra_tags_json, stage_notes, age_group,
                 guardian_name, guardian_phone, created_via, participant_id,
                 public_first_name_only, partner_guardian_name, partner_guardian_phone
@@ -276,13 +276,13 @@ class PerformanceRepository(BaseRepository):
                     guardian_name = getattr(p, "guardian_name", "") or ""
                     guardian_phone = getattr(p, "guardian_phone", "") or ""
                     partner_phone = getattr(p, "partner_phone", "") or ""
-                    created_via = getattr(p, "created_via", "sheet") or "sheet"
+                    created_via = getattr(p, "created_via", "signup") or "signup"
 
                     conn.execute("""
                     INSERT INTO performances (
                         entry_id, performer_name, performance_type, partner_name, contact_info,
                         song_title, movie_name, sequence_order, performance_status, track_status,
-                        duration, drive_file_id, drive_file_name, last_updated, row_index,
+                        duration, track_version, track_file, last_updated, row_index,
                         is_song_name_missing, extra_tags_json, stage_notes, age_group,
                         guardian_name, guardian_phone, partner_phone, created_via
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -297,8 +297,8 @@ class PerformanceRepository(BaseRepository):
                         performance_status=excluded.performance_status,
                         track_status=excluded.track_status,
                         duration=excluded.duration,
-                        drive_file_id=excluded.drive_file_id,
-                        drive_file_name=excluded.drive_file_name,
+                        track_version=excluded.track_version,
+                        track_file=excluded.track_file,
                         last_updated=excluded.last_updated,
                         row_index=excluded.row_index,
                         is_song_name_missing=excluded.is_song_name_missing,
@@ -320,8 +320,8 @@ class PerformanceRepository(BaseRepository):
                         p.performance_status,
                         p.track_status,
                         p.duration,
-                        p.drive_file_id,
-                        getattr(p, "drive_file_name", None),
+                        p.track_version,
+                        getattr(p, "track_file", None),
                         p.last_updated,
                         p.row_index,
                         1 if (getattr(p, "is_song_name_missing", False) or is_placeholder_song_title(getattr(p, "song_title", ""))) else 0,
@@ -386,7 +386,7 @@ class PerformanceRepository(BaseRepository):
     def update_performance_field(self, entry_id: str, field_name: str, value: Any):
         allowed_fields = {
             "performance_status", "track_status", "sequence_order", "duration",
-            "drive_file_id", "drive_file_name", "last_updated", "song_title",
+            "track_version", "track_file", "last_updated", "song_title",
             "stage_notes", "age_group", "guardian_name", "guardian_phone", "media_type"
         }
         if field_name not in allowed_fields:

@@ -16,7 +16,7 @@ def connect(path):
 def test_fresh_and_existing_legacy_migrate_and_backup(tmp_path):
     fresh = connect(tmp_path / "fresh.db")
     ensure_database(fresh)
-    assert fresh.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert fresh.execute("PRAGMA user_version").fetchone()[0] == migrations.SCHEMA_VERSION
     assert not (tmp_path / "backups").exists()
     fresh.close()
 
@@ -25,7 +25,7 @@ def test_fresh_and_existing_legacy_migrate_and_backup(tmp_path):
     legacy.execute("INSERT INTO app_settings (key, value) VALUES ('event_name', 'Original')")
     legacy.commit()
     ensure_database(legacy)
-    assert legacy.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert legacy.execute("PRAGMA user_version").fetchone()[0] == migrations.SCHEMA_VERSION
     assert legacy.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Original'
     backups = list((tmp_path / "backups").glob("pre-migration-*.db"))
     assert len(backups) == 1
@@ -50,7 +50,7 @@ def test_version_one_upgrade_preserves_data_and_backups_previous_schema(tmp_path
     assert "public_first_name_only" not in old_columns
 
     ensure_database(conn)
-    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == migrations.SCHEMA_VERSION
     assert conn.execute("SELECT value FROM app_settings WHERE key='event_name'").fetchone()[0] == 'Before upgrade'
     columns = {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
     assert {"public_first_name_only", "partner_guardian_name", "partner_guardian_phone"} <= columns
@@ -132,4 +132,66 @@ def test_snapshot_is_taken_while_ordinary_writers_are_locked(tmp_path, monkeypat
     backup = next((tmp_path / "backups").glob("pre-migration-*.db"))
     with sqlite3.connect(backup) as snapshot:
         assert snapshot.execute("SELECT value FROM app_settings WHERE key='before'").fetchone()[0] == "snapshot"
+    conn.close()
+
+
+def _google_era_db(path):
+    """A version-2 database as the Google-era layout left it: drive_* columns, 'sheet' rows, old setting key."""
+    conn = connect(path)
+    with pytest.MonkeyPatch.context() as prior:
+        prior.setattr(migrations, "SCHEMA_VERSION", 2)
+        ensure_database(conn)
+    conn.execute("INSERT INTO performances (entry_id, performer_name, drive_file_id, drive_file_name, created_via) "
+                 "VALUES ('PK-001', 'Ravi Kumar', 'v10-5', '01_PK-001_Ravi_Song.mp3', 'sheet')")
+    conn.execute("INSERT INTO performances (entry_id, performer_name, created_via) VALUES ('PK-002', 'Mala', 'performer_hub')")
+    conn.execute("INSERT INTO app_settings (key, value) VALUES ('signup_sheet_url', 'https://example.org/list')")
+    conn.commit()
+    return conn
+
+
+def test_google_era_database_migrates_to_current_names(tmp_path):
+    conn = _google_era_db(tmp_path / "event.db")
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(performances)")}
+    assert {"drive_file_id", "drive_file_name"} <= cols and conn.execute("PRAGMA user_version").fetchone()[0] == 2
+    ensure_database(conn)
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(performances)")}
+    assert {"track_version", "track_file"} <= cols and not {"drive_file_id", "drive_file_name"} & cols
+    row = dict(conn.execute("SELECT * FROM performances WHERE entry_id='PK-001'").fetchone())
+    assert (row["track_version"], row["track_file"], row["created_via"]) == ("v10-5", "01_PK-001_Ravi_Song.mp3", "signup")
+    assert conn.execute("SELECT created_via FROM performances WHERE entry_id='PK-002'").fetchone()[0] == "performer_hub"
+    assert conn.execute("SELECT value FROM app_settings WHERE key='external_link_url'").fetchone()[0] == "https://example.org/list"
+    assert conn.execute("SELECT count(*) FROM app_settings WHERE key='signup_sheet_url'").fetchone()[0] == 0
+    backups = list((tmp_path / "backups").glob("pre-migration-*.db"))
+    assert len(backups) == 1
+    with sqlite3.connect(backups[0]) as old:      # the pre-migration copy keeps the old layout
+        assert "drive_file_id" in {r[1] for r in old.execute("PRAGMA table_info(performances)")}
+    ensure_database(conn)                         # idempotent: no second backup
+    assert len(list((tmp_path / "backups").glob("pre-migration-*.db"))) == 1
+    conn.close()
+
+
+def test_old_snapshot_restores_into_new_code(tmp_path):
+    import shutil
+    _google_era_db(tmp_path / "old.db").close()
+    restored = tmp_path / "restored" / "event.db"
+    restored.parent.mkdir()
+    shutil.copyfile(tmp_path / "old.db", restored)
+    conn = connect(restored)
+    ensure_database(conn)
+    assert conn.execute("SELECT track_file FROM performances WHERE entry_id='PK-001'").fetchone()[0] == "01_PK-001_Ravi_Song.mp3"
+    conn.close()
+
+
+def test_failed_rename_migration_rolls_back(tmp_path, monkeypatch):
+    conn = _google_era_db(tmp_path / "event.db")
+
+    def boom(db):
+        db.execute("ALTER TABLE performances RENAME COLUMN drive_file_id TO track_version")
+        raise RuntimeError("rename failed")
+
+    monkeypatch.setitem(migrations.MIGRATIONS, 3, boom)
+    with pytest.raises(RuntimeError):
+        ensure_database(conn)
+    assert "drive_file_id" in {r[1] for r in conn.execute("PRAGMA table_info(performances)")}
+    assert conn.execute("PRAGMA user_version").fetchone()[0] == 2
     conn.close()

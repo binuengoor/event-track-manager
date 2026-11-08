@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Version 1 is the legacy-compatible baseline (schema._apply_baseline). Later versions are small, idempotent steps.
 _PERFORMANCE_COLUMNS_V2 = (
@@ -29,7 +29,23 @@ def _migrate_to_2(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE performances ADD COLUMN {name} {definition}")
 
 
-MIGRATIONS = {2: _migrate_to_2}
+def _migrate_to_3(conn: sqlite3.Connection) -> None:
+    """Drops the Google-era names: file columns, created_via default/rows and the external link setting."""
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='performances'").fetchone():
+        have = {row[1] for row in conn.execute("PRAGMA table_info(performances)")}
+        for old, new in (("drive_file_id", "track_version"), ("drive_file_name", "track_file")):
+            if old in have and new not in have:
+                conn.execute(f"ALTER TABLE performances RENAME COLUMN {old} TO {new}")
+        conn.execute("UPDATE performances SET created_via = 'signup' WHERE created_via = 'sheet'")
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='app_settings'").fetchone():
+        old_row = conn.execute("SELECT value FROM app_settings WHERE key = 'signup_sheet_url'").fetchone()
+        if old_row is not None:
+            conn.execute("INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES ('external_link_url', ?, datetime('now'))",
+                         (old_row[0],))
+            conn.execute("DELETE FROM app_settings WHERE key = 'signup_sheet_url'")
+
+
+MIGRATIONS = {2: _migrate_to_2, 3: _migrate_to_3}
 KNOWN_TABLES = {"performances", "sync_meta", "app_settings", "food_groups", "food_items",
                 "food_signups", "backup_log", "activity_logs", "participants"}
 

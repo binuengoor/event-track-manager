@@ -136,7 +136,7 @@ def _apply_baseline(conn: sqlite3.Connection):
         performance_status TEXT DEFAULT 'Upcoming',
         track_status TEXT DEFAULT 'Pending',
         duration TEXT,
-        drive_file_id TEXT,
+        drive_file_id TEXT,      -- v1 baseline names; migration 3 renames them to track_version / track_file
         drive_file_name TEXT,
         last_updated TEXT,
         row_index INTEGER DEFAULT 0,
@@ -148,7 +148,7 @@ def _apply_baseline(conn: sqlite3.Connection):
         guardian_phone TEXT DEFAULT '',
         partner_age_group TEXT DEFAULT '',
         partner_phone TEXT DEFAULT '',
-        created_via TEXT DEFAULT 'sheet',
+        created_via TEXT DEFAULT 'signup',
         media_type TEXT DEFAULT 'audio'
     )
     """)
@@ -161,7 +161,7 @@ def _apply_baseline(conn: sqlite3.Connection):
         ("guardian_phone", "TEXT DEFAULT ''"),
         ("partner_age_group", "TEXT DEFAULT ''"),
         ("partner_phone", "TEXT DEFAULT ''"),
-        ("created_via", "TEXT DEFAULT 'sheet'"),
+        ("created_via", "TEXT DEFAULT 'signup'"),
         ("participant_id", "TEXT DEFAULT ''"),
         ("media_type", "TEXT DEFAULT 'audio'"),
     ]:

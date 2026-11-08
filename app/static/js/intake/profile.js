@@ -10,7 +10,7 @@ async function handleRefreshClick() {
   }
 
   try {
-    const res = await fetch('/api/sync', { method: 'POST' });
+    const res = await fetch('/api/export-now', { method: 'POST' });
     if (res.ok) {
       const data = await res.json();
       updateIntakeSyncBadge(data.last_synced_at);

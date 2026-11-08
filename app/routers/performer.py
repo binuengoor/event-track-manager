@@ -70,7 +70,7 @@ def get_performer_profile(name: str):
             return names.partners(value) if names.active else value
 
         effective_perfs = [
-            {**{k: v for k, v in p.items() if k not in ("drive_file_name", "age_group", "partner_age_group", "extra_tags", "stage_notes")}, "drive_file_id": "available" if p.get("drive_file_id") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
+            {**{k: v for k, v in p.items() if k not in ("track_file", "age_group", "partner_age_group", "extra_tags", "stage_notes")}, "track_version": "available" if p.get("track_version") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
             for p in user_perfs
         ]
         # Other songs list for transparency

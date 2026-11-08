@@ -107,7 +107,7 @@ class BackupService:
             "enabled": bool(enabled),
             "is_backing_up": self._is_backing_up,
             "has_pending_trigger": self._pending_backup,
-            "backup_target_sheet": "signups.xlsx",
+            "backup_target_file": "signups.xlsx",
             "event_dir": settings.storage.event_dir,
             "last_backup": last_info,
             "history": history

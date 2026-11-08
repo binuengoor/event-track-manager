@@ -16,12 +16,12 @@ logger = logging.getLogger("readiness")
 
 OK, WARN, ERROR, INFO = "ok", "warn", "error", "info"
 DISK_WARN_GB, DISK_ERROR_GB = 2, 1   # spec 6.8
-_VERSION_SIZE_RE = re.compile(r"^v(\d+)-\d+$")  # drive_file_id written by event_service.file_version: v<size>-<mtime>
+_VERSION_SIZE_RE = re.compile(r"^v(\d+)-\d+$")  # track_version written by event_service.file_version: v<size>-<mtime>
 
 
 def expected_track_size(perf: Dict[str, Any]):
     """Size in bytes recorded when the track was stored, or None when not known."""
-    m = _VERSION_SIZE_RE.match(str(perf.get("drive_file_id") or ""))
+    m = _VERSION_SIZE_RE.match(str(perf.get("track_version") or ""))
     return int(m.group(1)) if m else None
 
 
@@ -98,7 +98,7 @@ class ReadinessService:
         """Every track the database says exists must exist in tracks/, at the size it was stored with."""
         missing, wrong_size = [], []
         for p in db_service.get_all_performances():
-            if not (p.get("drive_file_name") or p.get("drive_file_id")):
+            if not (p.get("track_file") or p.get("track_version")):
                 continue
             path = track_store.find(p["entry_id"])
             if not path:
@@ -163,7 +163,7 @@ class ReadinessService:
                           if no_song else "Every act has a song title.",
                           "Ask them to fill it in on the Performer Hub." if no_song else ""))
         if feature_enabled("track_upload_enabled"):
-            needs = [p for p in perfs if p.get("track_status") not in ("Uploaded", "Acoustic") and not p.get("drive_file_id")]
+            needs = [p for p in perfs if p.get("track_status") not in ("Uploaded", "Acoustic") and not p.get("track_version")]
             out.append(_check("tracks", "Backing tracks", WARN if needs else OK,
                               f"{len(needs)} of {len(perfs)} act(s) still need a track: " + ", ".join(p["performer_name"] for p in needs[:5]) + ("..." if len(needs) > 5 else "")
                               if needs else f"All {len(perfs)} acts have a track or are live/acoustic.",

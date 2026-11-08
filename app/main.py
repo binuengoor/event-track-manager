@@ -15,32 +15,6 @@ from app.events import register_default_listeners
 from app.services.event_manager import event_manager
 from app.services.event_service import event_service
 
-# Re-exports for backward compatibility
-from app.schemas import (
-    LoginRequest,
-    StatusUpdateRequest,
-    PerformanceNotesRequest,
-    validate_phone,
-    PerformanceSignupItem,
-    FoodSignupItem,
-    SignupRequest,
-    PerformanceUpdateRequest,
-    AdminParticipantUpdateRequest,
-    AddPerformanceRequest,
-    PerformerRenameRequest,
-    FoodClaimRequest,
-    FoodUpdateRequest,
-    FoodGroupCreateRequest,
-    FoodGroupUpdateRequest,
-    FoodGroupReorderRequest,
-    FoodItemCreateRequest,
-    FoodItemUpdateRequest,
-    FoodServingNoteRequest,
-    FoodToggleRequest,
-    SignupToggleRequest,
-    SequenceItem,
-    ReorderRequest,
-)
 from app.routers.auth import verify_admin_pin, register_auth_handlers
 from app.routers import (
     pages,

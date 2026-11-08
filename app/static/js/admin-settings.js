@@ -205,7 +205,7 @@ async function loadSettings() {
     setValue("setting-hero-tag-primary", adminSettings.hero_tag_primary || "Musical Evening");
     setValue("setting-hero-tag-status", adminSettings.hero_tag_status || "Stage Ready");
     setValue("setting-general-notes", adminSettings.general_notes || "");
-    setValue("setting-signup-sheet-url", adminSettings.signup_sheet_url);
+    setValue("setting-external-link-url", adminSettings.external_link_url);
 
     // Rules
     setValue("setting-max-perfs", adminSettings.max_performances_per_participant || 2);

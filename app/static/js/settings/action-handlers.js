@@ -69,7 +69,7 @@ function setupActionHandlers() {
       hero_tag_primary: document.getElementById("setting-hero-tag-primary") ? document.getElementById("setting-hero-tag-primary").value.trim() : "Musical Evening",
       hero_tag_status: document.getElementById("setting-hero-tag-status") ? document.getElementById("setting-hero-tag-status").value.trim() : "Stage Ready",
       general_notes: document.getElementById("setting-general-notes") ? document.getElementById("setting-general-notes").value.trim() : "",
-      signup_sheet_url: document.getElementById("setting-signup-sheet-url").value.trim()
+      external_link_url: document.getElementById("setting-external-link-url").value.trim()
     };
     await updateSettingsApi(payload, "Event Details saved successfully!");
   });
@@ -279,7 +279,7 @@ function setupActionHandlers() {
     btn.disabled = true;
     showToast("Exporting signups to the event folder...");
     try {
-      const res = await fetch("/api/sync", { method: "POST" });
+      const res = await fetch("/api/export-now", { method: "POST" });
       const data = await res.json();
       if (res.ok && data.status === "success") {
         showToast("Export complete: signups.xlsx, signups.csv and potluck.csv updated.");

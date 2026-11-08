@@ -13,7 +13,7 @@ router = APIRouter(tags=["event"])
 
 @router.get("/api/event-info")
 def get_event_info():
-    sheet_url = get_setting("signup_sheet_url") or settings.event.signup_sheet_url or ""
+    external_link_url = get_setting("external_link_url") or settings.event.external_link_url or ""
     payment_url = get_setting("payment_url") or settings.event.payment_url
     poster_url = get_setting("event_poster_url")
     if poster_url is None:
@@ -57,7 +57,8 @@ def get_event_info():
         "max_video_upload_mb": audio_workflow_service.upload_limit_mb(True),
         "max_upload_size_mb": audio_workflow_service.upload_limit_mb(False),
         "allowed_extensions": list(audio_workflow_service.ALLOWED_EXTENSIONS),
-        "sheet_url": sheet_url
+        "external_link_url": external_link_url,
+        "sheet_url": external_link_url  # pre-rename alias, kept for one release
     }
 
 

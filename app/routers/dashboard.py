@@ -22,7 +22,7 @@ def dashboard_performances():
     names = NamePrivacy(perfs)
     results = []
     for p in perfs:
-        has_track = bool(p.get("drive_file_id") or p.get("track_status") == "Uploaded")
+        has_track = bool(p.get("track_version") or p.get("track_status") == "Uploaded")
         results.append({
             "entry_id": p.get("entry_id"),
             "performer_name": names.name(p.get("performer_name")),

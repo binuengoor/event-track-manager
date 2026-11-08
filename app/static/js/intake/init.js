@@ -47,8 +47,8 @@ async function initEventInfo() {
         if (typeof setMediaType === 'function') setMediaType(only);
       }
 
-      if (data.sheet_url) {
-        sheetUrl = data.sheet_url;
+      if (data.external_link_url) {
+        externalLinkUrl = data.external_link_url;
       }
       if (data.payment_url) {
         const payLink = document.getElementById('payment-page-link');

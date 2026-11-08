@@ -18,7 +18,7 @@ def test_public_endpoints_redact_junior_names_and_storage_fields():
     })
     assert result.status_code == 200, result.text
     entry_id = result.json()['entry_ids'][0]
-    db_service.update_performance_field(entry_id, 'drive_file_name', 'Mira Narayan.mp3')
+    db_service.update_performance_field(entry_id, 'track_file', 'Mira Narayan.mp3')
     cue = client.post(f'/api/set-active/{entry_id}', headers={'X-Admin-PIN': settings.admin_pin})
     assert cue.status_code == 200
     group = db_service.add_food_group('Mains')
@@ -34,10 +34,10 @@ def test_public_endpoints_redact_junior_names_and_storage_fields():
         assert 'Mira Narayan' not in json.dumps(response.json()), path
     live = client.get('/api/live-status').json()['now_performing']
     assert live['performer_name'] == 'Mira N.'
-    assert not {'drive_file_name', 'age_group', 'extra_tags'} & live.keys()
+    assert not {'track_file', 'age_group', 'extra_tags'} & live.keys()
     for path in ['/api/performances', '/api/stage-queue']:
         row = next(p for p in client.get(path).json() if p['entry_id'] == entry_id)
-        assert not {'drive_file_name', 'age_group', 'partner_age_group', 'extra_tags'} & row.keys()
+        assert not {'track_file', 'age_group', 'partner_age_group', 'extra_tags'} & row.keys()
     profile = client.get('/api/performer/profile', params={'name': 'Mira Narayan'}).json()
     assert 'Mira Narayan' not in json.dumps(profile)
     assert profile['performer_name'] == 'Mira N.'
@@ -66,7 +66,7 @@ def test_track_metadata_and_legacy_file_id_do_not_reveal_name(monkeypatch):
     client = TestClient(app)
     entry_id = db_service.create_performance(performer_name='Mira Narayan', performance_type='Solo',
                                              song_title='Song', age_group='Junior', created_via='signup')
-    db_service.update_performance_field(entry_id, 'drive_file_id', 'Mira Narayan.mp3')
+    db_service.update_performance_field(entry_id, 'track_version', 'Mira Narayan.mp3')
     monkeypatch.setattr(audio_service, 'get_track_metadata', lambda _: {
         'exists': True, 'filename': 'Mira Narayan.mp3', 'media_type': 'audio', 'stream_url': '/api/stream/' + entry_id,
     })
@@ -78,7 +78,7 @@ def test_track_metadata_and_legacy_file_id_do_not_reveal_name(monkeypatch):
     assert admin.json()['filename'] == 'Mira Narayan.mp3'
     profile = client.get('/api/performer/profile', params={'name': 'Mira N.'})
     assert 'Mira Narayan' not in profile.text
-    assert profile.json()['performances'][0]['drive_file_id'] == 'available'
+    assert profile.json()['performances'][0]['track_version'] == 'available'
 
 
 def test_duet_partner_new_act_uses_partner_demographics():

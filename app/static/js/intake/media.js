@@ -99,7 +99,7 @@ function updateSubmitButtonText() {
   submitBtn.disabled = false;
   submitBtn.className = 'w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 transition disabled:opacity-50 disabled:cursor-not-allowed';
 
-  const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id;
+  const isReplacing = selectedEntry.track_status === 'Uploaded' || selectedEntry.track_version;
   const isVideo = currentMediaType === 'video';
 
   if (currentMethod === 'youtube') {
@@ -182,7 +182,7 @@ async function updateActiveTrackPreview(song) {
   const videoContainer = document.getElementById('preview-video-container');
   const videoPlayer = document.getElementById('preview-video-player');
 
-  if (song.track_status !== 'Uploaded' && !song.drive_file_id) {
+  if (song.track_status !== 'Uploaded' && !song.track_version) {
     existingCard.classList.add('hidden');
     if (previewWavesurfer) {
       try { previewWavesurfer.stop(); } catch (e) {}
@@ -251,7 +251,7 @@ function updateActiveTrackBadge() {
     badge.innerHTML = '<span class="text-rose-400 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> Title Missing</span>';
   } else if (selectedEntry.track_status === 'Acoustic') {
     badge.innerHTML = '<span class="text-blue-400 flex items-center gap-1"><i data-lucide="guitar" class="w-3.5 h-3.5"></i> Acoustic (No Track)</span>';
-  } else if (selectedEntry.track_status === 'Uploaded' || selectedEntry.drive_file_id) {
+  } else if (selectedEntry.track_status === 'Uploaded' || selectedEntry.track_version) {
     badge.innerHTML = '<span class="text-emerald-400 flex items-center gap-1"><i data-lucide="check" class="w-3.5 h-3.5"></i> Track on file</span>';
   } else {
     badge.innerHTML = '<span class="text-amber-400 flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> No track yet</span>';

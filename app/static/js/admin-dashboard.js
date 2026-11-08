@@ -38,7 +38,7 @@
   function trackBadge(perf) {
     const st = String((perf && perf.track_status) || '').toLowerCase();
     if (st === 'acoustic') return { cls: 'al-acoustic', label: 'No track needed', ready: true };
-    if (st === 'uploaded' || st === 'ready' || (perf && perf.drive_file_name && st !== 'pending')) return { cls: 'al-ready', label: 'Track ready', ready: true };
+    if (st === 'uploaded' || st === 'ready' || (perf && perf.track_file && st !== 'pending')) return { cls: 'al-ready', label: 'Track ready', ready: true };
     return { cls: 'al-wait', label: 'Waiting for track', ready: false };
   }
 

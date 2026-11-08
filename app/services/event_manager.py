@@ -25,7 +25,7 @@ ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,60}")
 # Settings that describe one particular event and are NOT carried over when creating a new one
 EVENT_SPECIFIC_KEYS = {
     "event_name", "event_subtitle", "event_date_time", "event_start_time", "event_venue", "event_time_range",
-    "event_poster_url", "general_notes", "event_id", "setup_completed", "signup_sheet_url", "venue", "time_range",
+    "event_poster_url", "general_notes", "event_id", "setup_completed", "external_link_url", "venue", "time_range",
 }
 
 
@@ -320,9 +320,9 @@ class EventManager:
 
         conn = sqlite3.connect(db_path, timeout=15)
         try:
-            conn.execute("""UPDATE performances SET drive_file_id = NULL, drive_file_name = NULL, duration = NULL,
+            conn.execute("""UPDATE performances SET track_version = NULL, track_file = NULL, duration = NULL,
                             track_status = CASE WHEN track_status = 'Acoustic' THEN 'Acoustic' ELSE 'Pending' END
-                            WHERE drive_file_id IS NOT NULL OR drive_file_name IS NOT NULL OR track_status = 'Uploaded'""")
+                            WHERE track_version IS NOT NULL OR track_file IS NOT NULL OR track_status = 'Uploaded'""")
             conn.commit()
         finally:
             conn.close()
@@ -345,7 +345,7 @@ def default_app_settings() -> Dict[str, Any]:
         "event_time_range": settings.event.time_range,
         "event_poster_url": settings.event.poster_url,
         "payment_url": settings.event.payment_url or "",
-        "signup_sheet_url": settings.event.signup_sheet_url or "",
+        "external_link_url": settings.event.external_link_url or "",
         "food_serving_note": settings.signup.food_serving_note,
         "max_performances_per_participant": settings.signup.max_performances_per_participant,
         "max_solo_per_participant": settings.signup.max_solo_per_participant,

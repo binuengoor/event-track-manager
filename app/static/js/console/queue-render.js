@@ -34,8 +34,8 @@ export function updateQueueStatsSummary() {
   const total = S.queue.length;
   const performed = S.queue.filter(q => q.performance_status === 'Performed' || q.track_status === 'Performed').length;
   const skipped = S.queue.filter(q => (q.performance_status === 'On Hold' || q.track_status === 'Skipped') && q.performance_status !== 'Performed' && q.track_status !== 'Performed').length;
-  const uploaded = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && (q.track_status === 'Uploaded' || Boolean(q.drive_file_id))).length;
-  const pending = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && q.track_status !== 'Uploaded' && !q.drive_file_id && q.track_status !== 'Acoustic' && (q.performance_type || '').toLowerCase() !== 'acoustic').length;
+  const uploaded = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && (q.track_status === 'Uploaded' || Boolean(q.track_version))).length;
+  const pending = S.queue.filter(q => (q.performance_status !== 'Performed' && q.track_status !== 'Performed') && (q.performance_status !== 'On Hold' && q.track_status !== 'Skipped') && q.track_status !== 'Uploaded' && !q.track_version && q.track_status !== 'Acoustic' && (q.performance_type || '').toLowerCase() !== 'acoustic').length;
 
   statsSummary.textContent = `${total} sequenced • ${uploaded} ready • ${skipped} on hold • ${pending} pending • ${performed} done`;
   countPill.textContent = `${performed}/${total} completed`;
@@ -109,7 +109,7 @@ export function renderQueueList() {
     const isDone = item.performance_status === 'Performed' || item.track_status === 'Performed';
     const isSkipped = !isDone && (item.performance_status === 'On Hold' || item.track_status === 'Skipped');
     const isAcoustic = !isDone && !isSkipped && (item.track_status === 'Acoustic' || (item.performance_type || '').toLowerCase().includes('acoustic'));
-    const isUploaded = !isDone && !isSkipped && (item.track_status === 'Uploaded' || Boolean(item.drive_file_id));
+    const isUploaded = !isDone && !isSkipped && (item.track_status === 'Uploaded' || Boolean(item.track_version));
 
     const row = document.createElement('div');
     row.id = `queue-row-${item.entry_id}`;
@@ -156,12 +156,12 @@ export function renderQueueList() {
     }).join(' ');
 
     const isCached = S.cachedVaultEntryIds.has(item.entry_id);
-    const cachedBadgeHtml = (isUploaded || item.drive_file_id)
+    const cachedBadgeHtml = (isUploaded || item.track_version)
       ? `<span class="vault-cached-tag ${isCached ? '' : 'hidden'} inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/30 bg-emerald-500/15 text-emerald-300 tracking-wide shrink-0" title="Audio cached in local Vault for offline playback"><i data-lucide="shield-check" class="w-3 h-3 text-emerald-400"></i><span>Cached</span></span>`
       : '';
 
     let cacheBtnHtml = '';
-    if (isUploaded || item.drive_file_id) {
+    if (isUploaded || item.track_version) {
       cacheBtnHtml = `
         <button class="btn-cache-single px-2.5 py-1.5 rounded-xl font-medium text-xs border transition flex items-center gap-1.5 ${
           isCached
@@ -225,10 +225,10 @@ export function renderQueueList() {
 
         <!-- Cue Track -->
         <button class="btn-cue-row px-2.5 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1 ${
-          isUploaded || item.drive_file_id || isAcoustic
+          isUploaded || item.track_version || isAcoustic
             ? (isCued ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700')
             : 'bg-slate-800/50 text-slate-600 cursor-not-allowed border border-slate-800'
-        }" ${isUploaded || item.drive_file_id || isAcoustic ? '' : 'disabled'} title="Load act into player view & stage display">
+        }" ${isUploaded || item.track_version || isAcoustic ? '' : 'disabled'} title="Load act into player view & stage display">
           <i data-lucide="${isCued ? (isAcoustic ? 'guitar' : 'disc') : (isAcoustic ? 'guitar' : 'disc-3')}" class="w-3.5 h-3.5 ${isCued && S.isPlaying ? 'animate-spin' : ''}"></i>
           <span>${isCued ? 'Cued' : 'Cue'}</span>
         </button>
@@ -288,7 +288,7 @@ export function renderQueueList() {
 
     row.addEventListener('click', (e) => {
       if (e.target.closest('button') || e.target.closest('a') || e.target.closest('input') || e.target.closest('.btn-edit-note')) return;
-      if (isUploaded || item.drive_file_id || isAcoustic) {
+      if (isUploaded || item.track_version || isAcoustic) {
         selectRow(item);
       }
     });
@@ -403,7 +403,7 @@ export async function saveReorderedSequence() {
         'Content-Type': 'application/json',
         ...getAuthHeaders()
       },
-      body: JSON.stringify({ items: payload, push_to_sheet: false })
+      body: JSON.stringify({ items: payload, save_files: false })
     });
 
     if (!res.ok) throw new Error('Failed to update stage queue');

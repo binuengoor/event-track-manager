@@ -125,7 +125,7 @@ def test_restore_previous_track(admin):
     assert res.json()["filename"] == f"{eid}_Maya_Song.mp3"
     assert open(old, "rb").read() == b"old-version"
     perf = db_service.get_performance(eid)
-    assert perf["drive_file_name"] == f"{eid}_Maya_Song.mp3" and perf["track_status"] == "Uploaded"
+    assert perf["track_file"] == f"{eid}_Maya_Song.mp3" and perf["track_status"] == "Uploaded"
     # the replaced (new) version is archived, not deleted
     assert any(open(os.path.join(track_store.archive_dir, n), "rb").read() == b"new-version-longer"
                for n in os.listdir(track_store.archive_dir))

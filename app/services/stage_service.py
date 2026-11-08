@@ -44,8 +44,8 @@ class StageService:
             return True
         # Backing track present in the event folder
         track_status = getattr(p, "track_status", None)
-        drive_file_id = getattr(p, "drive_file_id", None)
-        if track_status == "Uploaded" or bool(drive_file_id):
+        track_version = getattr(p, "track_version", None)
+        if track_status == "Uploaded" or bool(track_version):
             return True
         return False
 
