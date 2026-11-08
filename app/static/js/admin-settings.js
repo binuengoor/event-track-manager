@@ -356,10 +356,10 @@ async function loadSettings() {
     perfTypes = adminSettings.performance_types || ["Solo", "Duet", "Group"];
     renderPerformanceTypeChips();
 
-    ageGroups = adminSettings.age_groups || [
+    ageGroups = normalizeAgeGroups(adminSettings.age_groups || [
       { name: "Junior", requires_guardian: true },
       { name: "Senior", requires_guardian: false }
-    ];
+    ]);
     renderAgeGroupsTable();
 
     // Sign-Up & Food settings
@@ -429,16 +429,45 @@ window.removePerfType = function(idx) {
   renderPerformanceTypeChips();
 };
 
+function normalizeAgeGroups(groups) {
+  if (!Array.isArray(groups)) return [];
+  return groups.map((group) => {
+    const value = typeof group === "string" ? { name: group } : (group || {});
+    const name = typeof value.name === "string" ? value.name.trim() : "";
+    return {
+      name,
+      description: typeof value.description === "string" ? value.description : "",
+      requires_guardian: typeof value.requires_guardian === "boolean" ? value.requires_guardian : false
+    };
+  }).filter((group) => group.name);
+}
+
 function renderAgeGroupsTable() {
   const container = document.getElementById("age-groups-table-container");
   if (!container) return;
+  ageGroups = normalizeAgeGroups(ageGroups);
+  if (!container.ageGroupHandlersBound) {
+    const updateGroup = (event) => {
+      const input = event.target;
+      const index = Number(input.dataset && input.dataset.ageGroupIndex);
+      const field = input.dataset && input.dataset.ageGroupField;
+      if (!Number.isInteger(index) || !ageGroups[index] || !["name", "description", "requires_guardian"].includes(field)) return;
+      ageGroups[index][field] = field === "requires_guardian" ? Boolean(input.checked) : input.value;
+    };
+    container.addEventListener("input", updateGroup);
+    container.addEventListener("change", updateGroup);
+    container.ageGroupHandlersBound = true;
+  }
   container.innerHTML = ageGroups.map((ag, idx) => `
-    <div class="as-list-row">
-      <strong>${ag.name}</strong>
-      ${ag.requires_guardian
-        ? '<span class="as-badge warn">Guardian required</span>'
-        : '<span class="as-badge">Self-registration</span>'}
-      <button type="button" onclick="removeAgeGroup(${idx})" aria-label="Remove age group ${String(ag.name).replace(/"/g, '&quot;')}" class="as-btn-icon">
+    <div class="as-age-group-row">
+      <label class="as-age-group-field"><span class="as-label">Name</span>
+        <input type="text" class="as-input" data-age-group-index="${idx}" data-age-group-field="name" value="${escapeHtml(ag.name)}" aria-label="Age group ${escapeHtml(ag.name)} name">
+      </label>
+      <label class="as-age-group-field"><span class="as-label">Description</span>
+        <textarea class="as-textarea" rows="2" maxlength="200" data-age-group-index="${idx}" data-age-group-field="description" aria-label="Age group ${escapeHtml(ag.name)} description">${escapeHtml(ag.description)}</textarea>
+      </label>
+      <div class="as-age-group-guardian"><label class="as-checkline"><input type="checkbox" role="switch" data-age-group-index="${idx}" data-age-group-field="requires_guardian" aria-label="${escapeHtml(ag.name)} requires a guardian" ${ag.requires_guardian ? "checked" : ""}><span>Requires guardian</span></label></div>
+      <button type="button" onclick="removeAgeGroup(${idx})" aria-label="Remove age group ${escapeHtml(ag.name)}" class="as-btn-icon">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
     </div>

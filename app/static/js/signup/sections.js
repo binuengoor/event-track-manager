@@ -110,7 +110,7 @@ function renderPartnerAgeGroups(groups) {
   // Default to the group that does not need a guardian (an adult) when we can tell.
   const def = list.findIndex((g) => !g.requires_guardian);
   list.forEach((ag, idx) => {
-    const { label, input } = makeRadio("partner_age_group", ag.name, ag.name, ag.description || "", idx === (def < 0 ? 0 : def));
+    const { label, input } = makeRadio("partner_age_group", ag.name, ag.name, ag.description || ag.hint || "", idx === (def < 0 ? 0 : def));
     input.addEventListener("change", syncPartnerGuardian);
     box.appendChild(label);
   });

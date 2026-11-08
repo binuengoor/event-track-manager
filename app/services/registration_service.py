@@ -9,6 +9,7 @@ from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.privacy import NamePrivacy
 from app.utils.name_matcher import split_signer_names
+from app.utils.age_groups import normalize_age_groups
 from app.schemas import SignupRequest, PerformanceUpdateRequest, validate_phone
 
 logger = logging.getLogger("registration-service")
@@ -19,14 +20,7 @@ class RegistrationService:
 
     def get_signup_config(self) -> Dict[str, Any]:
         """Returns registration configuration, available food, and registered setlist for the public form."""
-        age_groups = get_setting("age_groups")
-        if isinstance(age_groups, str):
-            try:
-                age_groups = json.loads(age_groups)
-            except Exception:
-                age_groups = []
-        elif not age_groups:
-            age_groups = [ag.model_dump() for ag in settings.signup.age_groups]
+        age_groups = normalize_age_groups(get_setting("age_groups"), settings.signup.age_groups)
 
         perf_types = get_setting("performance_types")
         if isinstance(perf_types, str):
@@ -171,6 +165,22 @@ class RegistrationService:
         if not payload.performances:
             raise RegistrationError("At least one performance is required.")
 
+        age_groups = normalize_age_groups(get_setting("age_groups"), settings.signup.age_groups)
+        age_groups_by_name = {group["name"].casefold(): group for group in age_groups}
+        performer_age = (payload.age_group or "").strip()
+        if performer_age:
+            selected = age_groups_by_name.get(performer_age.casefold())
+            if selected is None:
+                raise RegistrationError(f"Unknown age group '{performer_age}'. Choose an age group from the current list.")
+            payload.age_group = selected["name"]
+        for performance in payload.performances:
+            partner_age = (performance.partner_age_group or "").strip()
+            if partner_age:
+                selected = age_groups_by_name.get(partner_age.casefold())
+                if selected is None:
+                    raise RegistrationError(f"Unknown partner age group '{partner_age}'. Choose an age group from the current list.")
+                performance.partner_age_group = selected["name"]
+
         # A shortened selection must not create a second person or change a
         # known junior into an adult to bypass guardian requirements.
         known_ages = set()
@@ -190,15 +200,6 @@ class RegistrationService:
                     raise RegistrationError("Duet and group performances are currently disabled for this event (Solo only).")
 
         # Guardian validation
-        age_groups = get_setting("age_groups")
-        if isinstance(age_groups, str):
-            try:
-                age_groups = json.loads(age_groups)
-            except Exception:
-                age_groups = []
-        elif not age_groups:
-            age_groups = [ag.model_dump() for ag in settings.signup.age_groups]
-
         selected_group_config = next((ag for ag in age_groups if (ag.get("name") if isinstance(ag, dict) else ag.name) == payload.age_group), None)
         requires_guardian = False
         if selected_group_config:

@@ -406,13 +406,19 @@
           </section>
 
           <section class="as-card" aria-labelledby="as-ru-age-h">
-            <div class="as-card-head"><h2 id="as-ru-age-h" class="as-card-title">Age groups</h2><span class="as-card-note">Name and guardian rule</span></div>
+            <div class="as-card-head"><h2 id="as-ru-age-h" class="as-card-title">Age groups</h2><span class="as-card-note">Name, description and guardian rule</span></div>
             <div id="age-groups-table-container" class="as-list"></div>
-            <div class="as-add-row">
-              <label for="new-ag-name" class="as-hidden-label">New age group name</label>
-              <input type="text" id="new-ag-name" placeholder="Age group name (e.g. Toddler)" class="as-input">
-              <label class="as-checkline"><input type="checkbox" id="new-ag-guardian"><span>Requires guardian</span></label>
-              <button type="button" id="add-ag-btn" class="as-btn">Add age group</button>
+            <div class="as-age-group-add">
+              <label class="as-age-group-field"><span class="as-label">Name</span>
+                <input type="text" id="new-ag-name" placeholder="Age group name (e.g. Toddler)" class="as-input">
+              </label>
+              <label class="as-age-group-field"><span class="as-label">Description</span>
+                <textarea id="new-ag-description" rows="2" maxlength="200" placeholder="Optional hint shown during sign-up" class="as-textarea"></textarea>
+              </label>
+              <div class="as-age-group-add-actions">
+                <label class="as-checkline"><input type="checkbox" id="new-ag-guardian"><span>Requires guardian</span></label>
+                <button type="button" id="add-ag-btn" class="as-btn">Add age group</button>
+              </div>
             </div>
           </section>
         </div>

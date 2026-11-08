@@ -96,6 +96,7 @@ class DownloaderConfig(BaseModel):
 
 class AgeGroupConfig(BaseModel):
     name: str
+    description: str = ""
     requires_guardian: bool = False
 
 class SignupConfig(BaseModel):

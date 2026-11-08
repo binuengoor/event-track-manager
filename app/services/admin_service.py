@@ -9,6 +9,7 @@ from app.exceptions import PerformanceNotFoundError
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.services import presets as preset_lib
+from app.utils.age_groups import normalize_age_groups
 
 logger = logging.getLogger("admin-service")
 
@@ -69,7 +70,9 @@ class AdminService:
             "max_video_upload_mb": 500,
         }
 
-        return {**defaults, **result}
+        merged = {**defaults, **result}
+        merged["age_groups"] = normalize_age_groups(merged.get("age_groups"), defaults["age_groups"])
+        return merged
 
     def list_presets(self) -> List[Dict[str, Any]]:
         """Preset catalog with a live preview of what each one would change right now."""
@@ -133,7 +136,8 @@ class AdminService:
         "max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20),
         "max_audio_upload_mb": (1, 2000), "max_video_upload_mb": (1, 5000),
     }
-    LIST_SETTINGS = {"performance_types", "age_groups", "console_extra_columns", "allowed_media"}
+    LIST_SETTINGS = {"performance_types", "console_extra_columns", "allowed_media"}
+    AGE_GROUP_DESCRIPTION_LIMIT = 200
     GALLERY_ORDER_LIMIT = 50
     STR_SETTINGS = {
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
@@ -154,6 +158,34 @@ class AdminService:
                         or not all(isinstance(name, str) and name and name == os.path.basename(name)
                                    for name in v)):
                     raise ValueError(f"Setting 'gallery_order' must be a list of up to {self.GALLERY_ORDER_LIMIT} filenames.")
+            elif k == "age_groups":
+                if not isinstance(v, list) or len(v) > 50:
+                    raise ValueError("Setting 'age_groups' must be a list (max 50 entries).")
+                normalized = []
+                seen_names = set()
+                for ag in v:
+                    if not isinstance(ag, dict) or not isinstance(ag.get("name"), str) or not ag["name"].strip():
+                        raise ValueError("Each age group needs a name.")
+                    name = ag["name"].strip()
+                    folded_name = name.casefold()
+                    if folded_name in seen_names:
+                        raise ValueError("Age group names must be unique, ignoring capitalization.")
+                    seen_names.add(folded_name)
+                    description = ag.get("description", "")
+                    if not isinstance(description, str):
+                        raise ValueError("Age group 'description' must be text.")
+                    description = description.strip()
+                    if len(description) > self.AGE_GROUP_DESCRIPTION_LIMIT:
+                        raise ValueError(f"Age group descriptions cannot exceed {self.AGE_GROUP_DESCRIPTION_LIMIT} characters.")
+                    requires_guardian = ag.get("requires_guardian", False)
+                    if not isinstance(requires_guardian, bool):
+                        raise ValueError("Age group 'requires_guardian' must be true or false.")
+                    normalized.append({
+                        "name": name,
+                        "description": description,
+                        "requires_guardian": requires_guardian,
+                    })
+                v = normalized
             elif k in self.BOOL_SETTINGS:
                 if isinstance(v, str) and v.strip().lower() in ("true", "false"):
                     v = v.strip().lower() == "true"
@@ -172,13 +204,7 @@ class AdminService:
             elif k in self.LIST_SETTINGS:
                 if not isinstance(v, list) or len(v) > 50:
                     raise ValueError(f"Setting '{k}' must be a list (max 50 entries).")
-                if k == "age_groups":
-                    for ag in v:
-                        if not isinstance(ag, dict) or not isinstance(ag.get("name"), str) or not ag["name"].strip():
-                            raise ValueError("Each age group needs a name.")
-                        if not isinstance(ag.get("requires_guardian", False), bool):
-                            raise ValueError("Age group 'requires_guardian' must be true or false.")
-                elif not all(isinstance(x, str) and x.strip() for x in v):
+                if not all(isinstance(x, str) and x.strip() for x in v):
                     raise ValueError(f"Setting '{k}' must be a list of non-empty text values.")
                 elif k == "allowed_media" and (not v or any(x not in ("audio", "video") for x in v)):
                     raise ValueError("Allowed track types must include audio, video, or both.")

@@ -174,6 +174,19 @@
 .as-list { display: flex; flex-direction: column; }
 .as-list-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; border-top: 1px solid var(--border-subtle); }
 .as-list-row:first-child { border-top: 0; }
+.as-age-group-row { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px 12px; align-items: end; min-height: 44px; padding: 12px 0; border-top: 1px solid var(--border-subtle); }
+.as-age-group-row:first-child { border-top: 0; }
+.as-age-group-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.as-age-group-field:first-child { grid-column: 1; }
+.as-age-group-field:nth-child(2) { grid-column: 1; }
+.as-age-group-row .as-input { min-height: 44px; height: 44px; }
+.as-age-group-row .as-textarea, .as-age-group-add .as-textarea { min-height: 64px; }
+.as-age-group-guardian { display: flex; grid-column: 1; align-items: center; min-height: 44px; }
+.as-age-group-guardian .as-checkline { min-height: 44px; margin: 0; }
+.as-age-group-row .as-btn-icon { grid-column: 2; grid-row: 3; }
+.as-age-group-add { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding-top: 8px; }
+.as-age-group-add-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.as-age-group-add-actions .as-checkline { min-height: 44px; margin: 0; }
 .as-list-row strong { font-size: 14px; color: var(--text-primary); min-width: 0; overflow-wrap: anywhere; }
 .as-list-row .as-badge { margin-right: auto; }
 .as-list-row .spacer { flex: 1; }

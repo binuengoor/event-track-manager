@@ -103,11 +103,13 @@ function setupActionHandlers() {
   // Add Age Group
   document.getElementById("add-ag-btn")?.addEventListener("click", () => {
     const nameInput = document.getElementById("new-ag-name");
+    const descriptionInput = document.getElementById("new-ag-description");
     const guardInput = document.getElementById("new-ag-guardian");
     const name = nameInput.value.trim();
     if (name) {
-      ageGroups.push({ name, requires_guardian: guardInput.checked });
+      ageGroups.push({ name, description: descriptionInput ? descriptionInput.value.trim() : "", requires_guardian: guardInput.checked });
       nameInput.value = "";
+      if (descriptionInput) descriptionInput.value = "";
       guardInput.checked = false;
       renderAgeGroupsTable();
     }
