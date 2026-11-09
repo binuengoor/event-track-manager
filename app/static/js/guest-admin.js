@@ -236,6 +236,20 @@
       choice('/console', 'console', 'Open Console', 'Run the show: cue tracks and play them from the sound desk.', true),
       choice('/admin', 'admin', 'Open Admin', 'Overview, lineup, people and potluck, setup and rules.', false),
       row, actions);
+
+    fetch('/api/auth/pin-status')
+      .then(function (res) { return res.ok ? res.json() : null; })
+      .then(function (data) {
+        if (data && data.is_default) {
+          var warn = el('div', 'gad-warning');
+          warn.setAttribute('role', 'alert');
+          warn.style.cssText = 'background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 8px;';
+          warn.append(icon('admin', 18), document.createTextNode('Default admin PIN is in use. Change it in Admin \u2192 Settings.'));
+          head.after(warn);
+        }
+      })
+      .catch(function () {});
+
     document.body.appendChild(page);
     document.body.style.overflow = 'hidden';
     layer = page;

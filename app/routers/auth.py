@@ -7,7 +7,7 @@ import threading
 from collections import deque
 from typing import Deque, Dict, Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse
 
 from app.config import settings
@@ -166,6 +166,11 @@ def verify_admin_pin(request: Request) -> bool:
 
 # Thin alias: app/routers/{audio,stage}.py (owned by other packages) still import this name.
 verify_operator_pin = verify_admin_pin
+
+
+@router.get("/api/auth/pin-status")
+def get_pin_status(_authorized: bool = Depends(verify_admin_pin)):
+    return {"is_default": settings.admin_pin == "2026"}
 
 
 @router.post("/api/auth/logout")

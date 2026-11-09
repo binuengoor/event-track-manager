@@ -82,7 +82,8 @@ A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, th
 | B5 | Done: real MP3 countdown runs and pauses; acoustic cues stay neutral. Console axe 0 serious/critical at both sizes, no small mobile targets (console is always dark). |
 | A6 | Done: event-scoped progress and draft resume/Finish verified; modal and progress banner axe clean at both sizes/themes and mobile progress visible. A broader overview scan reported unrelated shell/footer contrast findings; investigate in D. |
 | A7 | Done: optional event passcode setting, gate page (`/gate`), API verification (`/api/auth/passcode`), and `?t=` invite token bypass. Off by default with zero behavior change; when enabled, public APIs return 401 and guest pages redirect to gate while `/api/health`, `/live`, static assets, and admin access remain unaffected. |
-| A8–A9 | Not started; continue in section F order. |
+| A8 | Done: optional performer edit verification setting (`edit_verification_enabled`), API enforcement requiring name and last 4 phone digits (bypassed for admins), admin default PIN status endpoint (`GET /api/auth/pin-status`), chooser warning banner, and admin settings switch. |
+| A9 | Not started; next in section F order. |
 | A10 | Optional; not started. |
 | D | Partially performed: D2, D3, D4 and D6 checks are logged below; D1 is partially exercised as logged below. VoiceOver, iOS Safari, Firefox, real network-offline/reconnect and downloader-backed link extraction remain unverified. |
 

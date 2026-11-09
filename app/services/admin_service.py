@@ -51,6 +51,7 @@ class AdminService:
             "track_upload_enabled": getattr(settings.signup, "track_upload_enabled", True),
             "allow_duets": getattr(settings.signup, "allow_duets", True),
             "performer_edits_enabled": getattr(settings.signup, "performer_edits_enabled", True),
+            "edit_verification_enabled": getattr(settings.signup, "edit_verification_enabled", False),
             "live_display_enabled": getattr(settings.signup, "live_display_enabled", True),
             "dashboard_enabled": getattr(settings.signup, "dashboard_enabled", True),
             "payment_enabled": getattr(settings.signup, "payment_enabled", True),
@@ -175,7 +176,7 @@ class AdminService:
     BOOL_SETTINGS = {
         "setup_completed",
         "stage_performances_enabled", "signup_enabled", "food_signup_enabled", "track_upload_enabled",
-        "allow_duets", "performer_edits_enabled", "live_display_enabled", "dashboard_enabled",
+        "allow_duets", "performer_edits_enabled", "edit_verification_enabled", "live_display_enabled", "dashboard_enabled",
         "console_enabled", "payment_enabled", "backup_enabled", "shorten_junior_names",
     }
     INT_SETTINGS = {

@@ -85,6 +85,7 @@ function setupActionHandlers() {
       max_audio_upload_mb: parseInt(document.getElementById("setting-max-audio-mb").value, 10) || 200,
       max_video_upload_mb: parseInt(document.getElementById("setting-max-video-mb").value, 10) || 500,
       shorten_junior_names: document.getElementById("setting-shorten-junior-names").getAttribute("aria-checked") === "true",
+      edit_verification_enabled: document.getElementById("setting-edit-verification")?.getAttribute("aria-checked") === "true",
       performance_types: perfTypes,
       age_groups: ageGroups,
       allowed_media: (window.readAllowedMedia ? window.readAllowedMedia() : ["audio", "video"])

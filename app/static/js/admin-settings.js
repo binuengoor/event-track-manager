@@ -300,6 +300,10 @@ function setupTabs() {
     const el = ev.currentTarget;
     el.setAttribute("aria-checked", el.getAttribute("aria-checked") === "true" ? "false" : "true");
   });
+  document.getElementById("setting-edit-verification")?.addEventListener("click", (ev) => {
+    const el = ev.currentTarget;
+    el.setAttribute("aria-checked", el.getAttribute("aria-checked") === "true" ? "false" : "true");
+  });
 
   document.querySelectorAll("[data-goto]").forEach(el => el.addEventListener("click", () => showAdminTab(el.dataset.goto)));
   const initial = (location.hash || "").replace("#", "");
@@ -355,6 +359,7 @@ async function loadSettings() {
     setValue("setting-max-audio-mb", adminSettings.max_audio_upload_mb ?? 200);
     setValue("setting-max-video-mb", adminSettings.max_video_upload_mb ?? 500);
     setSwitch("setting-shorten-junior-names", adminSettings.shorten_junior_names !== false);
+    setSwitch("setting-edit-verification", !!adminSettings.edit_verification_enabled);
 
     perfTypes = adminSettings.performance_types || ["Solo", "Duet", "Group"];
     renderPerformanceTypeChips();

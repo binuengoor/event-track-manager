@@ -1,7 +1,8 @@
 import json
 import logging
+import re
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from app.config import settings, get_setting
 from app.features import feature_enabled, require_feature
@@ -9,6 +10,7 @@ from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.privacy import NamePrivacy
 from app.utils.name_matcher import split_signer_names
+from app.routers.auth import is_admin
 from app.schemas import (
     SignupRequest,
     PerformanceUpdateRequest,
@@ -112,12 +114,36 @@ def _validate_public_edit(payload: PerformanceUpdateRequest, old_perf: Dict[str,
 
 
 @router.put("/api/signup/performance/{entry_id}")
-def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest):
+def update_performance_song(entry_id: str, payload: PerformanceUpdateRequest, request: Request):
     require_feature("performer_edits_enabled", "Performer self-service editing is currently locked for this event.")
 
     old_perf = db_service.get_performance(entry_id)
     if not old_perf:
         raise HTTPException(status_code=404, detail=f"Performance entry {entry_id} not found")
+
+    edit_verification = get_setting("edit_verification_enabled", getattr(settings.signup, "edit_verification_enabled", False))
+    if edit_verification and not is_admin(request):
+        supplied_name = (payload.signer_name or payload.performer_name or "").strip()
+        supplied_phone = (payload.signer_phone or payload.phone_last4 or payload.contact_info or "").strip()
+        stored_name = (old_perf.get("performer_name") or "").strip()
+        stored_phone = (old_perf.get("contact_info") or old_perf.get("phone") or "").strip()
+
+        clean_n = lambda v: " ".join((v or "").split()).casefold()
+        digits = lambda v: re.sub(r"\D", "", v or "")
+
+        stored_digits = digits(stored_phone)
+        stored_last4 = stored_digits[-4:] if len(stored_digits) >= 4 else stored_digits
+        supplied_digits = digits(supplied_phone)
+
+        name_matches = bool(clean_n(supplied_name)) and clean_n(supplied_name) == clean_n(stored_name)
+        phone_matches = False
+        if len(supplied_digits) == 4 and stored_last4:
+            phone_matches = (supplied_digits == stored_last4)
+        elif len(supplied_digits) >= 4 and stored_digits:
+            phone_matches = supplied_digits.endswith(stored_last4) or (len(supplied_digits) >= 10 and supplied_digits[-10:] == stored_digits[-10:])
+
+        if not name_matches or not phone_matches:
+            raise HTTPException(status_code=403, detail="Name and phone do not match this performance. Contact an admin for help.")
     if payload.partner_name:
         names = NamePrivacy(db_service.get_all_performances())
         try:

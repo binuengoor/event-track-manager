@@ -109,6 +109,7 @@ class SignupConfig(BaseModel):
     track_upload_enabled: bool = True
     allow_duets: bool = True
     performer_edits_enabled: bool = True
+    edit_verification_enabled: bool = False
     live_display_enabled: bool = True
     dashboard_enabled: bool = True
     console_enabled: bool = True

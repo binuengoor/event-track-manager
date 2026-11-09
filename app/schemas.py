@@ -72,6 +72,10 @@ class PerformanceUpdateRequest(BaseModel):
     contact_info: Optional[str] = None
     is_acoustic: Optional[bool] = None
     track_status: Optional[str] = None
+    signer_name: Optional[str] = None
+    signer_phone: Optional[str] = None
+    performer_name: Optional[str] = None
+    phone_last4: Optional[str] = None
 
 
 class AdminParticipantUpdateRequest(BaseModel):

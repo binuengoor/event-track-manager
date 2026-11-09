@@ -518,7 +518,7 @@ they were changed to fit decisions already made. Appendix C lists what was adopt
 | D5 | Admin destinations | Five, grouped by job (Overview, Lineup, People and Potluck, Setup and Rules, System), replacing the 10 tabs and the earlier Setup/People/Food/Data/Events grouping. Event switcher lives in the rail header. | Proposed |
 | D6 | Console hotkeys | **Keep today's keys** (Space, arrows, `M` mute, `Down` next, `Enter` done). Add `F` for a 3-second fade out. | Proposed |
 | D7 | Reorder and Save Order | Add a **reorder lock** (on by default during the show) and **auto-run Save Order** a few seconds after the last drop. The order itself already saves instantly; only file names and exports wait for Save Order. | Proposed |
-| D8 | Guest edit safety | Optional switch `guest_edit_verification` (default off): after sign-up the device gets a signed cookie; other devices must enter the last 4 digits of the sign-up phone, or the admin PIN. Login-free stays the default. | Proposed (Q1) |
+| D8 | Guest edit safety | Optional switch `edit_verification_enabled` (default off): performers must confirm registered name and phone last 4 to update song titles or stage notes from the public hub; admin requests bypass verification. Shipped default admin PIN warning exposed via `GET /api/auth/pin-status`. | Implemented (Package A8) |
 
 ### 6.3 Target module layout
 

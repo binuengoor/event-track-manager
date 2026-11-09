@@ -86,6 +86,39 @@ function setupEditModalEvents() {
 
       if (!res.ok) {
         const err = await res.json();
+        if (res.status === 403 && (err.detail || '').includes('Name and phone do not match')) {
+          const phoneLast4 = prompt('Edit verification is enabled. Enter the last 4 digits of your registered phone number:');
+          if (phoneLast4) {
+            const retryRes = await fetch(`/api/signup/performance/${entryId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                song_title: songTitle,
+                performance_type: typeChanged ? perfType : undefined,
+                partner_name: typeChanged || (perfType === 'Duet' && partnerChanged) || (perfType === 'Group' && groupChanged)
+                  ? (perfType === 'Duet' ? partnerName : (perfType === 'Group' ? groupMembers : '')) : undefined,
+                partner_phone: perfType === 'Duet' && partnerPhone ? partnerPhone : undefined,
+                group_members: perfType === 'Group' ? groupMembers : '',
+                movie_name: movieName,
+                stage_notes: clearStageNotes ? '' : (stageNotes || undefined),
+                youtube_url: ytUrl,
+                track_status: isAcousticChecked ? 'Acoustic' : (selectedEntry && selectedEntry.track_status === 'Acoustic' ? 'Pending' : undefined),
+                signer_name: selectedPerformer || '',
+                signer_phone: phoneLast4.trim()
+              })
+            });
+            if (retryRes.ok) {
+              hideModal();
+              await loadPerformances();
+              if (selectedPerformer) {
+                handlePerformerSelected(selectedPerformer);
+              }
+              return;
+            }
+            const retryErr = await retryRes.json();
+            throw new Error(retryErr.detail || 'Verification failed');
+          }
+        }
         throw new Error(err.detail || 'Could not update performance');
       }
 
