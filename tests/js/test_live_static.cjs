@@ -19,6 +19,9 @@ test('live: no age badges, stage notes or phones are rendered', () => {
   assert.doesNotMatch(liveSrc, /stage_notes|stage-notes/);
   assert.doesNotMatch(liveSrc, /phone/i);
 });
+test('live: sanitized acoustic flag is consumed by the venue screen', () => {
+  assert.match(read('js/live/live-view.js'), /L\.isAcousticAct\(np\)/);
+});
 test('live: uses etm-live channel, wake lock, refresh without POST, signup QR with aria-label', () => {
   assert.match(liveSrc, /etm-live/);
   assert.match(read('js/live/wake-lock-lite.js'), /visibilitychange/);

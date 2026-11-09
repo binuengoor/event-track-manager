@@ -49,6 +49,11 @@
     return b ? `${a} & ${b}` : a;
   }
 
+  // Acoustic status is sent to public screens as a boolean so raw track status stays private.
+  function isAcousticAct(item) {
+    return Boolean(item && (item.is_acoustic === true || item.track_status === 'Acoustic' || /acoustic/i.test(item.performance_type || '')));
+  }
+
   // Long names must wrap on a TV, never truncate. Returned classes are defined in live.html.
   const WRAP_CLASS = 'tv-wrap';
   const CLAMP_CLASS = 'tv-clamp2';
@@ -82,6 +87,6 @@
     return 'standby';
   }
 
-  const api = { ANNOUNCEMENT_MAX, DISCONNECT_MS, cleanAnnouncement, selectState, applyBroadcast, actName, nameClasses, WRAP_CLASS, CLAMP_CLASS, seqLabel, countdownParts, isConnected, monitorMode };
+  const api = { ANNOUNCEMENT_MAX, DISCONNECT_MS, cleanAnnouncement, selectState, applyBroadcast, actName, isAcousticAct, nameClasses, WRAP_CLASS, CLAMP_CLASS, seqLabel, countdownParts, isConnected, monitorMode };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.EtmLive = api;
 })(typeof self !== 'undefined' ? self : this);

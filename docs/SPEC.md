@@ -640,6 +640,8 @@ empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the 
 
 Admin Lineup also supports adding and deleting acts, replacing tracks, matching incoming files to acts, and saving the running order. Deletion archives the track; entry IDs are not reused. These actions require Admin authentication.
 
+Uploads report format, duration, loudness and gain checks. Loudness analysis runs asynchronously; unavailable values remain pending. My entry shows the checks and a Live band badge for acoustic acts. Public stage data exposes a derived acoustic flag without track status.
+
 The live screen shows configured doors-open text before the event and a QR for an optional post-event HTTP(S) link when the show has ended. The live start time reflects the current saved event setting.
 
 Age groups have editable names, descriptions and guardian requirements. Signup displays the descriptions and validates supplied age-group names against the configured list. Older entries without descriptions use an empty description.

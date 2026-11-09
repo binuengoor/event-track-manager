@@ -75,7 +75,8 @@ A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, th
 | A2 | Implemented and browser-audited: 0 serious/critical axe issues at both sizes and themes, 0 mobile targets under 44 px. Shared `GALLERY_DIR` with event switching permits reads but blocks gallery changes to protect shared files. |
 | A3 | Done: inline age-group editing, signup descriptions, legacy normalization and validation of configured names. Rules and signup axe: 0 serious/critical at both sizes and themes; no small mobile targets. |
 | A4 | Done: doors-open text and post-event QR, plus saved start-time fix. Admin and Live axe 0 serious/critical at both sizes and themes; no small mobile targets. |
-| A5–A9, B1–B3, B5 | Not started; continue in section F order. |
+| A5 | Done: real WAV upload verified duration, format, LUFS and gain; My Entry and Live axe 0 serious/critical at both sizes/themes and no small mobile targets. Acoustic entries show a Live band badge without a track check. |
+| A6–A9, B1–B3, B5 | Not started; continue in section F order. |
 | A10 | Optional; not started. |
 | D | Not performed; no Lighthouse or screen-reader results. |
 

@@ -1,6 +1,17 @@
 // File/link validation, upload and submit.
 // Classic script: shares globals with the other intake files (see load order in the page).
 
+let trackCheckRefreshToken = 0;
+
+function beginTrackUpload() {
+  trackCheckRefreshToken += 1;
+  return trackCheckRefreshToken;
+}
+
+function invalidateTrackCheckRefresh() {
+  trackCheckRefreshToken += 1;
+}
+
 function fileExt(name) {
   const m = /\.([A-Za-z0-9]+)$/.exec(name || '');
   return m ? m[1].toLowerCase() : '';
@@ -89,8 +100,43 @@ function sendUpload(formData, onProgress) {
   });
 }
 
+function renderTrackChecks(checks) {
+  if (!checks || typeof checks !== 'object') return '';
+  const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+  const duration = finite(checks.duration_s)
+    ? (checks.duration_s >= 60
+      ? `${Math.floor(checks.duration_s / 60)}:${String(Math.floor(checks.duration_s % 60)).padStart(2, '0')}`
+      : `${Math.round(checks.duration_s)} sec`)
+    : 'Not available';
+  const format = checks.format_ok === false ? 'Format needs attention' : checks.format_ok === true ? 'Format accepted' : 'Format check unavailable';
+  const loudness = finite(checks.loudness_lufs) ? `${checks.loudness_lufs.toFixed(1)} LUFS` : 'Not available yet; check again shortly';
+  const gain = finite(checks.gain_db) ? `${checks.gain_db > 0 ? '+' : ''}${checks.gain_db.toFixed(1)} dB` : 'Pending';
+  const heading = checks.format_ok === false
+    ? 'Pre-check needs attention'
+    : checks.format_ok === true ? 'Pre-check passed' : 'Pre-check incomplete';
+  return `<section class="me-precheck" aria-label="Track pre-check results">
+    <strong>${heading}</strong>
+    <ul><li>Duration: ${duration}</li><li>${format}</li><li>Loudness: ${loudness}</li><li>Suggested gain: ${gain}</li></ul>
+  </section>`;
+}
+
+async function refreshTrackChecksOnce(entryId, performerName, token, details) {
+  if (!entryId || !performerName || token !== trackCheckRefreshToken || !details) return;
+  try {
+    const response = await fetch(`/api/performer/profile?name=${encodeURIComponent(performerName)}`);
+    if (!response.ok) return;
+    const profile = await response.json();
+    if (token !== trackCheckRefreshToken || details !== document.getElementById('success-details')) return;
+    const act = (profile.performances || []).find((item) => item.entry_id === entryId);
+    if (!act || !act.checks) return;
+    const previous = details?.querySelector('.me-precheck');
+    if (previous) previous.outerHTML = renderTrackChecks(act.checks);
+  } catch (_) { /* The upload response remains useful if the one refresh fails. */ }
+}
+
 async function handleFormSubmit(e) {
   e.preventDefault();
+  const uploadToken = beginTrackUpload();
   hideError();
 
   if (!selectedEntry) {
@@ -225,13 +271,21 @@ async function handleFormSubmit(e) {
       const detailsBox = document.getElementById('success-details');
       const kind = result.media_type ? String(result.media_type).toLowerCase() : (isVideo ? 'video' : 'audio');
       document.getElementById('success-title').textContent = result.duration ? `Ready. ${result.duration}, ${kind}` : 'Track uploaded';
-      document.getElementById('success-summary').textContent = `${result.filename || 'Your track'} passed the checks. The sound team has it.`;
+      document.getElementById('success-summary').textContent = result.checks?.format_ok === false
+        ? `${result.filename || 'Your track'} was saved, but its format needs attention.`
+        : `${result.filename || 'Your track'} was saved for the sound team.`;
       detailsBox.innerHTML = `
         <p><strong>Performer:</strong> ${escapeHtml(result.performer_name)}</p>
         <p><strong>Song:</strong> ${escapeHtml(result.song_title)}</p>
         <p><strong>Track file:</strong> <code>${escapeHtml(result.filename)}</code></p>
+        ${renderTrackChecks(result.checks)}
       `;
       successCard.classList.remove('hidden');
+      if (result.checks && (result.checks.loudness_lufs == null || result.checks.gain_db == null)) {
+        const uploadedEntryId = selectedEntry?.entry_id;
+        const uploadedName = selectedPerformer;
+        setTimeout(() => refreshTrackChecksOnce(uploadedEntryId, uploadedName, uploadToken, detailsBox), 1800);
+      }
       if (window.lucide) lucide.createIcons();
       loadPerformances();
     }, 400);

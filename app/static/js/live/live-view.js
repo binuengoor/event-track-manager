@@ -187,7 +187,7 @@
     const nowCard = $('now-performing-card');
     const songEl = $('now-song-title');
     if (np) {
-      const acoustic = np.track_status === 'Acoustic' || /acoustic/i.test(np.performance_type || '');
+      const acoustic = L.isAcousticAct(np);
       const song = np.song_title || '';
       $('now-acoustic-badge').classList.toggle('hidden', !acoustic);
       $('now-seq-badge').textContent = pad2(np.sequence_order || 0);

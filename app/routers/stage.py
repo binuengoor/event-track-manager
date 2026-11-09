@@ -54,6 +54,9 @@ LIVE_ENTRY_LISTS = ("up_next", "upcoming", "performed", "on_hold")
 def _redact_entry(row: Dict[str, Any], names: NamePrivacy) -> Dict[str, Any]:
     """Public view of one schedule row: shortened junior names, no age group, track status or stage notes."""
     out = {k: v for k, v in row.items() if k not in PUBLIC_HIDDEN_ENTRY_KEYS}
+    # A safe presentation flag for the guest Live band pill; raw track_status
+    # remains private on the public stage payload.
+    out["is_acoustic"] = row.get("track_status") == "Acoustic"
     out["performer_name"] = names.name(row.get("performer_name"))
     if "partner_name" in out:
         out["partner_name"] = names.partners(row.get("partner_name"))

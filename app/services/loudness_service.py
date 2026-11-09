@@ -78,19 +78,28 @@ class LoudnessService:
     def facts_path(self) -> str:
         return os.path.join(settings.storage.event_dir, FACTS_FILENAME)
 
-    def _load(self) -> Dict[str, dict]:
+    @staticmethod
+    def _event_dir_for_track(path: str) -> str:
+        parent = os.path.dirname(os.path.abspath(path))
+        if os.path.basename(parent).lower() == "tracks":
+            return os.path.dirname(parent)
+        return settings.storage.event_dir
+
+    def _load(self, facts_path: Optional[str] = None) -> Dict[str, dict]:
         try:
-            with open(self.facts_path, "r", encoding="utf-8") as f:
+            with open(facts_path or self.facts_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             return data if isinstance(data, dict) else {}
         except (OSError, ValueError):
             return {}
 
-    def _store(self, facts: Dict[str, dict]) -> None:
-        tmp = self.facts_path + ".part"
+    def _store(self, facts: Dict[str, dict], facts_path: Optional[str] = None) -> None:
+        target = facts_path or self.facts_path
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        tmp = target + ".part"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(facts, f, indent=1, sort_keys=True)
-        os.replace(tmp, self.facts_path)
+        os.replace(tmp, target)
 
     @staticmethod
     def _signature(path: str) -> Dict[str, int]:
@@ -99,7 +108,8 @@ class LoudnessService:
 
     def cached(self, entry_id: str, path: str) -> Optional[dict]:
         """The stored facts if they still describe the file at ``path``; otherwise None (never measures)."""
-        rec = self._load().get(entry_id)
+        facts_path = os.path.join(self._event_dir_for_track(path), FACTS_FILENAME)
+        rec = self._load(facts_path).get(entry_id)
         if not rec:
             return None
         try:
@@ -110,14 +120,23 @@ class LoudnessService:
             return None
         return rec
 
-    def measure_and_store(self, entry_id: str, path: str) -> Optional[dict]:
+    def measure_and_store(self, entry_id: str, path: str, facts_path: Optional[str] = None) -> Optional[dict]:
         """Measures ``path`` now (blocking) and stores the result. Returns the record or None on failure."""
+        try:
+            source_signature = self._signature(path)
+        except OSError:
+            return None
         measured = measure_file(path)
         if not measured:
             return None
+        try:
+            if self._signature(path) != source_signature:
+                return None
+        except OSError:
+            return None
         rec = {
             "file": os.path.basename(path),
-            **self._signature(path),
+            **source_signature,
             "loudness_lufs": round(measured["lufs"], 1),
             "true_peak_db": round(measured["true_peak"], 1),
             "gain_db": compute_gain_db(measured["lufs"], measured["true_peak"]),
@@ -125,9 +144,20 @@ class LoudnessService:
             "checked_at": int(time.time()),
         }
         with self._lock:
-            facts = self._load()
+            target = facts_path or os.path.join(self._event_dir_for_track(path), FACTS_FILENAME)
+            try:
+                if self._signature(path) != source_signature:
+                    return None
+            except OSError:
+                return None
+            facts = self._load(target)
+            previous = facts.get(entry_id) or {}
+            if previous.get("size") == rec["size"] and previous.get("mtime_ns") == rec["mtime_ns"]:
+                for key in ("duration_s", "format_ok"):
+                    if key in previous:
+                        rec[key] = previous[key]
             facts[entry_id] = rec
-            self._store(facts)
+            self._store(facts, target)
         return rec
 
     def gain_db(self, entry_id: str, path: str) -> Optional[float]:
@@ -136,22 +166,51 @@ class LoudnessService:
 
     def schedule(self, entry_id: str, path: str) -> bool:
         """Measures in a background thread (deduplicated per entry); the upload response never waits for it."""
+        facts_path = os.path.join(self._event_dir_for_track(path), FACTS_FILENAME)
+        work_key = (facts_path, entry_id)
+        try:
+            scheduled_signature = self._signature(path)
+        except OSError:
+            return False
         with self._lock:
-            if entry_id in self._inflight:
+            if work_key in self._inflight:
                 return False
-            self._inflight.add(entry_id)
+            self._inflight.add(work_key)
 
         def run():
             try:
-                self.measure_and_store(entry_id, path)
+                self.measure_and_store(entry_id, path, facts_path=facts_path)
             except Exception as ex:  # a failed measurement must never break an upload
                 logger.warning("Loudness measurement failed for %s: %s", entry_id, ex)
             finally:
+                changed = False
+                try:
+                    changed = self._signature(path) != scheduled_signature
+                except OSError:
+                    pass
                 with self._lock:
-                    self._inflight.discard(entry_id)
+                    self._inflight.discard(work_key)
+                # If this file was replaced during measurement, the old result
+                # was discarded. Queue a fresh measurement for the installed file.
+                if changed:
+                    self.schedule(entry_id, path)
 
         threading.Thread(target=run, name=f"loudness-{entry_id}", daemon=True).start()
         return True
+
+    def record_verification(self, entry_id: str, path: str, duration_s: float) -> Optional[dict]:
+        """Persist upload verification so My Entry can refresh while loudness runs asynchronously."""
+        try:
+            sig = self._signature(path)
+        except OSError:
+            return None
+        facts_path = os.path.join(self._event_dir_for_track(path), FACTS_FILENAME)
+        with self._lock:
+            facts = self._load(facts_path)
+            rec = {**sig, "duration_s": round(float(duration_s), 3), "format_ok": True}
+            facts[entry_id] = rec
+            self._store(facts, facts_path)
+        return rec
 
 
 loudness_service = LoudnessService()

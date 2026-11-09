@@ -1,6 +1,16 @@
 // Refresh, sync badge, performer profile lookup.
 // Classic script: shares globals with the other intake files (see load order in the page).
 
+function isAcousticAct(song) {
+  return Boolean(song && (song.track_status === 'Acoustic' || song.is_acoustic === true));
+}
+
+function renderActPrecheck(song) {
+  return song && !isAcousticAct(song) && song.checks && typeof renderTrackChecks === 'function'
+    ? renderTrackChecks(song.checks)
+    : '';
+}
+
 async function handleRefreshClick() {
   const btn = document.getElementById('refresh-data-btn');
   if (btn) {
@@ -57,6 +67,7 @@ function formatTimeAgo(isoString) {
 }
 
 async function handlePerformerSelected(name) {
+  if (typeof invalidateTrackCheckRefresh === 'function') invalidateTrackCheckRefresh();
   if (name) { try { localStorage.setItem(NAME_KEY, name); } catch (_) { /* private mode */ } }
   const songSection = document.getElementById('song-selection-section');
   const uploadSection = document.getElementById('upload-methods-section');
@@ -166,8 +177,10 @@ async function handlePerformerSelected(name) {
           ${song.movie_name ? `<span class="me-act-movie">${escapeHtml(song.movie_name)}</span>` : ''}
         </span>
       </label>
+      ${renderActPrecheck(song)}
       <div class="me-act-side">
         <span class="me-status" data-kind="${statusKind}">${statusLabel}</span>
+        ${isAcousticAct(song) ? '<span class="me-badge me-live-band-pill">Live band</span>' : ''}
         ${(window.performerProfileData && window.performerProfileData.edits_enabled === false)
           ? `<span class="me-locked" title="Edits are currently locked"><i data-lucide="lock" class="w-4 h-4"></i><span>Locked</span></span>`
           : `<button type="button" class="edit-song-btn me-pill-btn" title="Edit song details">

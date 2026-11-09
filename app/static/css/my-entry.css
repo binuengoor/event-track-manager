@@ -122,6 +122,10 @@ a.me-chip:hover { background: var(--bg-surface-2); }
 .me-alert .me-alert-title { color: inherit; }
 .me-details { font-size: 13px; color: var(--text-primary); }
 .me-details p { margin: 0 0 2px; }
+.me-precheck { margin-top: 12px; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--bg-surface-1); }
+.me-precheck > strong { color: var(--text-primary); }
+.me-precheck ul { display: grid; gap: 4px; margin: 8px 0 0; padding-left: 20px; color: var(--text-secondary); }
+.me-live-band-pill { color: var(--status-playing-fg); background: var(--status-playing-bg); border-color: transparent; }
 .me-warnbox { padding: 10px 12px; border-radius: var(--radius-md); background: var(--status-cued-bg); color: var(--status-cued-fg); font-size: 13px; line-height: 1.45; }
 .me-warnbox strong { color: var(--text-primary); }
 .me-warnbox-title { display: block; font-weight: 700; margin-bottom: 4px; }

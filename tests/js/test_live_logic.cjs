@@ -62,6 +62,10 @@ test('actName and name wrapping helper', () => {
   assert.match(L.nameClasses(true), /tv-clamp2/);
   assert.equal(L.nameClasses(false), 'tv-wrap');
 });
+test('sanitized live payload acoustic flag activates the band indicator', () => {
+  assert.equal(L.isAcousticAct({ is_acoustic: true }), true);
+  assert.equal(L.isAcousticAct({ is_acoustic: false, performance_type: 'Solo' }), false);
+});
 test('seqLabel and countdown parts', () => {
   assert.equal(L.seqLabel({ sequence_order: 7 }), '#07');
   assert.equal(L.seqLabel(null), '#00');

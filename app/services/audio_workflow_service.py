@@ -29,6 +29,14 @@ from app.services.loudness_service import loudness_service
 logger = logging.getLogger("audio-workflow-service")
 
 
+class _VerifiedDuration(str):
+    """Display-compatible duration carrying precise ffprobe seconds for API checks."""
+    def __new__(cls, display: str, duration_s: float):
+        value = str.__new__(cls, display)
+        value.duration_s = duration_s
+        return value
+
+
 class AudioWorkflowService:
     """Orchestrates track ingestion, validation, transcoding, and external synchronization."""
 
@@ -243,6 +251,12 @@ class AudioWorkflowService:
 
         # 2. Audio/Video Verification
         duration_str = self._verify_audio(cache_path)
+        duration_s = getattr(duration_str, "duration_s", None)
+        if duration_s is None:
+            try:
+                duration_s = float(sum(int(part) * (60 ** i) for i, part in enumerate(reversed(str(duration_str).split(":")))))
+            except (TypeError, ValueError):
+                duration_s = 0.0
 
         # 3. Store in the event folder (previous version is archived) and update the database
         try:
@@ -253,7 +267,9 @@ class AudioWorkflowService:
             logger.error("Failed to store track for %s: %s", entry_id, e)
             raise ExternalServiceError("Failed to save the track in the event folder")
 
+        loudness_service.record_verification(entry_id, stored_path, duration_s)
         loudness_service.schedule(entry_id, stored_path)
+        loudness = loudness_service.cached(entry_id, stored_path) or {}
 
         backup_service.trigger_backup()
         try:
@@ -291,6 +307,12 @@ class AudioWorkflowService:
             "filename": canonical_filename,
             "media_type": track_type_label,
             "duration": duration_str,
+            "checks": {
+                "duration_s": round(float(duration_s), 3),
+                "loudness_lufs": loudness.get("loudness_lufs"),
+                "gain_db": loudness.get("gain_db"),
+                "format_ok": True,
+            },
             "message": f"Successfully uploaded and queued '{canonical_filename}' for playback."
         }
 
@@ -339,8 +361,13 @@ class AudioWorkflowService:
 
     def _verify_audio(self, cache_path: str) -> str:
         """Verifies that the generated audio/video file is playable and returns its duration as mm:ss."""
+        display, duration_s = self._verify_audio_details(cache_path)
+        return _VerifiedDuration(display, duration_s)
+
+    def _verify_audio_details(self, cache_path: str) -> tuple[str, float]:
+        """Verify playable media and return display duration plus precise seconds."""
         try:
-            self._ffprobe_duration(cache_path)
+            probed_duration = self._ffprobe_duration(cache_path)
         except InvalidAudioError:
             self._discard(cache_path)
             raise
@@ -359,7 +386,8 @@ class AudioWorkflowService:
                 raise InvalidAudioError("Unplayable audio file: Audio duration is 0 seconds or corrupted.")
 
             sec = int(length)
-            return f"{sec // 60:02d}:{sec % 60:02d}"
+            duration_s = float(probed_duration if probed_duration and probed_duration > 0 else length)
+            return f"{sec // 60:02d}:{sec % 60:02d}", duration_s
         except InvalidAudioError:
             raise
         except Exception as e:

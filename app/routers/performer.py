@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException
 
@@ -7,6 +8,8 @@ from app.features import feature_enabled
 from app.config import settings, get_setting
 from app.services.db_service import db_service, is_placeholder_song_title
 from app.services.backup_service import backup_service
+from app.services.audio_service import audio_service
+from app.services.loudness_service import loudness_service
 from app.privacy import strip_private, NamePrivacy
 from app.utils.name_matcher import split_signer_names
 from app.schemas import (
@@ -18,6 +21,30 @@ from app.schemas import (
 logger = logging.getLogger("performer-router")
 
 router = APIRouter(tags=["performer"])
+
+
+def _public_track_checks(performance: dict) -> dict:
+    """Return only safe, file-independent pre-check facts for the guest profile."""
+    entry_id = performance.get("entry_id")
+    path = audio_service.get_track_path(entry_id) if entry_id else None
+    facts = loudness_service.cached(entry_id, path) if path and os.path.isfile(path) else None
+    duration_s = facts.get("duration_s") if facts else None
+    if duration_s is None:
+        parts = str(performance.get("duration") or "").split(":")
+        if 1 < len(parts) <= 3:
+            try:
+                total = 0
+                for part in parts:
+                    total = total * 60 + int(part)
+                duration_s = float(total)
+            except ValueError:
+                duration_s = None
+    return {
+        "duration_s": duration_s,
+        "loudness_lufs": facts.get("loudness_lufs") if facts else None,
+        "gain_db": facts.get("gain_db") if facts else None,
+        "format_ok": facts.get("format_ok") if facts else None,
+    }
 
 
 @router.get("/api/performer/profile")
@@ -70,7 +97,7 @@ def get_performer_profile(name: str):
             return names.partners(value) if names.active else value
 
         effective_perfs = [
-            {**{k: v for k, v in p.items() if k not in ("track_file", "age_group", "partner_age_group", "extra_tags", "stage_notes")}, "track_version": "available" if p.get("track_version") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name"))}
+            {**{k: v for k, v in p.items() if k not in ("track_file", "age_group", "partner_age_group", "extra_tags", "stage_notes")}, "track_version": "available" if p.get("track_version") else None, "performer_name": shown(p.get("performer_name")), "partner_name": shown_partners(p.get("partner_name")), "is_acoustic": p.get("track_status") == "Acoustic", "checks": _public_track_checks(p)}
             for p in user_perfs
         ]
         # Other songs list for transparency
