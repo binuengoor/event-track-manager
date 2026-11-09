@@ -34,6 +34,11 @@
 
   <!-- Lyrics -->
   <div id="lyrics-panel" class="layer hidden" aria-live="polite">
+    <div id="lyrics-timed" class="hidden">
+      <div id="lyrics-prev" class="lyrics-line lyrics-dim"></div>
+      <div id="lyrics-current" class="lyrics-line lyrics-bold"></div>
+      <div id="lyrics-next" class="lyrics-line lyrics-dim"></div>
+    </div>
     <pre id="lyrics-text" class="wrap"></pre>
   </div>
 
@@ -65,6 +70,7 @@
 
   <script src="/static/js/live/live-logic.js"></script>
   <script src="/static/js/live/wake-lock-lite.js"></script>
+  <script src="/static/js/stage-lyrics.js"></script>
   <script src="/static/js/stage-monitor.js"></script>
 </body>
 </html>

@@ -23,6 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const announcementEl = $('announcement');
   const lyricsPanel = $('lyrics-panel');
   const lyricsText = $('lyrics-text');
+  const lyricsTimed = $('lyrics-timed');
+  const lyricsPrev = $('lyrics-prev');
+  const lyricsCurrent = $('lyrics-current');
+  const lyricsNext = $('lyrics-next');
   const disconnectedEl = $('disconnected');
   const blackOverlay = $('black-overlay');
   const blackCorner = $('black-corner');
@@ -31,8 +35,10 @@ document.addEventListener('DOMContentLoaded', () => {
   stageVideo.muted = true;
   stageVideo.volume = 0;
 
-  const view = { entryId: null, mediaType: null, streamUrl: null, fadeBlack: false, lyrics: '', performer: '' };
+  const Lyrics = window.EtmLyrics;
+  const view = { entryId: null, mediaType: null, streamUrl: null, fadeBlack: false, lyrics: '', performer: '', timedLines: null };
   let lastSyncTime = Date.now();
+  let lastCurrentTime = 0;
   let connected = false;
 
   function formatTime(seconds) {
@@ -40,6 +46,37 @@ document.addEventListener('DOMContentLoaded', () => {
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m}:${s < 10 ? '0' : ''}${s}`;
+  }
+
+  function renderLyrics(currentTime) {
+    if (view.timedLines && view.timedLines.length > 0 && Lyrics) {
+      if (lyricsTimed) lyricsTimed.classList.remove('hidden');
+      if (lyricsText) lyricsText.classList.add('hidden');
+      const lines = Lyrics.selectLyricsDisplay(view.timedLines, currentTime || 0);
+      if (lyricsPrev) lyricsPrev.textContent = lines.prev;
+      if (lyricsCurrent) lyricsCurrent.textContent = lines.current;
+      if (lyricsNext) lyricsNext.textContent = lines.next;
+    } else {
+      if (lyricsTimed) lyricsTimed.classList.add('hidden');
+      if (lyricsText) {
+        lyricsText.classList.remove('hidden');
+        lyricsText.textContent = view.lyrics;
+      }
+    }
+  }
+
+  function setLyrics(text, lines) {
+    view.lyrics = String(text == null ? '' : text);
+    if (lines && Array.isArray(lines) && lines.length > 0) {
+      view.timedLines = lines;
+    } else if (Lyrics) {
+      const parsed = Lyrics.parseLrcClient(view.lyrics);
+      view.timedLines = parsed.isTimed ? parsed.lines : null;
+    } else {
+      view.timedLines = null;
+    }
+    renderLyrics(lastCurrentTime);
+    renderMode();
   }
 
   // Render the mutually exclusive layers from the pure mode selector.
@@ -96,9 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
       case 'ANNOUNCEMENT': setAnnouncement(data.text); break;
       case 'FADE_BLACK': view.fadeBlack = Boolean(data.on); renderMode(); break;
       case 'LYRICS':
-        view.lyrics = String(data.text == null ? '' : data.text);
-        lyricsText.textContent = view.lyrics;
-        renderMode();
+        setLyrics(data.text, data.lines);
         break;
     }
   }
@@ -131,12 +166,32 @@ document.addEventListener('DOMContentLoaded', () => {
       standbyBadge.textContent = 'Now on stage';
       stageActType.textContent = data.mediaType === 'acoustic' ? 'Acoustic / live instruments' : 'Audio track playing';
     }
-    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    if (data.currentTime !== undefined) {
+      lastCurrentTime = data.currentTime;
+      timeDisplay.textContent = formatTime(data.currentTime);
+      if (view.timedLines) renderLyrics(lastCurrentTime);
+    }
+
+    if (data.entryId) {
+      fetch(`/api/lyrics/${data.entryId}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(lyricsData => {
+          if (lyricsData && lyricsData.has_lyrics && view.entryId === data.entryId && !view.lyrics) {
+            setLyrics(lyricsData.raw, lyricsData.lines);
+          }
+        })
+        .catch(() => {});
+    }
+
     renderMode();
   }
 
   function handlePlay(data) {
-    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    if (data.currentTime !== undefined) {
+      lastCurrentTime = data.currentTime;
+      timeDisplay.textContent = formatTime(data.currentTime);
+      if (view.timedLines) renderLyrics(lastCurrentTime);
+    }
     if (view.mediaType === 'video') {
       if (typeof data.currentTime === 'number' && Math.abs(stageVideo.currentTime - data.currentTime) > 0.3) {
         stageVideo.currentTime = data.currentTime;
@@ -146,7 +201,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handlePause(data) {
-    if (data.currentTime !== undefined) timeDisplay.textContent = formatTime(data.currentTime);
+    if (data.currentTime !== undefined) {
+      lastCurrentTime = data.currentTime;
+      timeDisplay.textContent = formatTime(data.currentTime);
+      if (view.timedLines) renderLyrics(lastCurrentTime);
+    }
     if (view.mediaType === 'video') {
       stageVideo.pause();
       if (typeof data.currentTime === 'number' && Math.abs(stageVideo.currentTime - data.currentTime) > 0.2) {
@@ -157,7 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function handleSeek(data) {
     if (typeof data.currentTime === 'number') {
+      lastCurrentTime = data.currentTime;
       timeDisplay.textContent = formatTime(data.currentTime);
+      if (view.timedLines) renderLyrics(lastCurrentTime);
       if (view.mediaType === 'video') stageVideo.currentTime = data.currentTime;
     }
   }
@@ -165,7 +226,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function handleSync(data) {
     if (!view.entryId && data.entryId) { handleCue(data); return; }
     if (typeof data.currentTime === 'number') {
+      lastCurrentTime = data.currentTime;
       timeDisplay.textContent = formatTime(data.currentTime);
+      if (view.timedLines) renderLyrics(lastCurrentTime);
       if (view.mediaType === 'video') {
         if (Math.abs(stageVideo.currentTime - data.currentTime) > 0.4) stageVideo.currentTime = data.currentTime;
         if (data.isPlaying && stageVideo.paused) stageVideo.play().catch(() => {});
@@ -179,6 +242,10 @@ document.addEventListener('DOMContentLoaded', () => {
     view.mediaType = null;
     view.streamUrl = null;
     view.performer = '';
+    view.lyrics = '';
+    view.timedLines = null;
+    lastCurrentTime = 0;
+    renderLyrics(0);
     stageVideo.pause();
     stageVideo.removeAttribute('src');
     stageVideo.load();

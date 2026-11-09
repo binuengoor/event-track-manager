@@ -519,6 +519,7 @@ they were changed to fit decisions already made. Appendix C lists what was adopt
 | D6 | Console hotkeys | **Keep today's keys** (Space, arrows, `M` mute, `Down` next, `Enter` done). Add `F` for a 3-second fade out. | Proposed |
 | D7 | Reorder and Save Order | Add a **reorder lock** (on by default during the show) and **auto-run Save Order** a few seconds after the last drop. The order itself already saves instantly; only file names and exports wait for Save Order. | Proposed |
 | D8 | Guest edit safety | Optional switch `edit_verification_enabled` (default off): performers must confirm registered name and phone last 4 to update song titles or stage notes from the public hub; admin requests bypass verification. Shipped default admin PIN warning exposed via `GET /api/auth/pin-status`. | Implemented (Package A8) |
+| D9 | Timed lyrics (.lrc) | Optional `.lrc` upload per act saved alongside tracks; stage monitor highlights current line bold with dim previous/next; falls back to untimed block. | Implemented (Package A9) |
 
 ### 6.3 Target module layout
 

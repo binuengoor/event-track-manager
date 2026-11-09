@@ -49,6 +49,7 @@ const SHELL_URLS = [
   '/static/js/console/output-device.js',
   '/static/js/live/live-logic.js',
   '/static/js/live/wake-lock-lite.js',
+  '/static/js/stage-lyrics.js',
   '/static/js/stage-monitor.js',
   '/static/js/nav.js',
   '/static/js/utils.js',

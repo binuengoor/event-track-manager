@@ -1,6 +1,6 @@
 import logging
 from typing import Any, Optional
-from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile
+from fastapi import APIRouter, Body, HTTPException, Depends, File, UploadFile, Request
 from fastapi.responses import FileResponse
 
 from app.services.admin_service import admin_service
@@ -9,6 +9,7 @@ from app.services.readiness_service import readiness_service
 from app.services.db_service import db_service
 from app.services.export_service import export_service, SnapshotError
 from app.services import lineup_service
+from app.services.lyrics_service import lyrics_service
 from app.services.media_asset_service import (
     MediaAssetError, MediaAssetEventChangedError, MediaAssetSharedGalleryError,
     MediaAssetTooLargeError, media_asset_service,
@@ -312,3 +313,49 @@ async def match_admin_act_track(entry_id: str, payload: dict = Body(...), _autho
             raise HTTPException(status_code=404, detail="Incoming file not found.") from ex
         except lineup_service.LineupActionError as ex:
             raise HTTPException(status_code=400, detail=str(ex))
+
+
+@router.get("/api/lyrics/{entry_id}")
+async def get_act_lyrics(entry_id: str):
+    return lyrics_service.get_lyrics(entry_id)
+
+
+@router.post("/api/admin/acts/{entry_id}/lyrics")
+async def save_admin_act_lyrics(
+    entry_id: str,
+    request: Request,
+    _authorized: bool = Depends(verify_admin_pin)
+):
+    content_type = request.headers.get("content-type", "")
+    content = ""
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if uploaded_file and hasattr(uploaded_file, "read"):
+            raw = await uploaded_file.read()
+            content = raw.decode("utf-8", errors="replace")
+        elif "lyrics" in form:
+            content = str(form["lyrics"])
+    else:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                content = body.get("lyrics", "")
+            elif isinstance(body, str):
+                content = body
+        except Exception:
+            raw = await request.body()
+            content = raw.decode("utf-8", errors="replace")
+
+    if not content:
+        raise HTTPException(status_code=400, detail="Lyrics content or file required.")
+
+    data = lyrics_service.save_lyrics(entry_id, content)
+    return {"status": "success", **data}
+
+
+@router.delete("/api/admin/acts/{entry_id}/lyrics")
+async def delete_admin_act_lyrics(entry_id: str, _authorized: bool = Depends(verify_admin_pin)):
+    lyrics_service.delete_lyrics(entry_id)
+    return {"status": "success", "message": f"Lyrics removed for {entry_id}"}
+

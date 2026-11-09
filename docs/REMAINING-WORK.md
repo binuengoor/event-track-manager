@@ -83,8 +83,8 @@ A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, th
 | A6 | Done: event-scoped progress and draft resume/Finish verified; modal and progress banner axe clean at both sizes/themes and mobile progress visible. A broader overview scan reported unrelated shell/footer contrast findings; investigate in D. |
 | A7 | Done: optional event passcode setting, gate page (`/gate`), API verification (`/api/auth/passcode`), and `?t=` invite token bypass. Off by default with zero behavior change; when enabled, public APIs return 401 and guest pages redirect to gate while `/api/health`, `/live`, static assets, and admin access remain unaffected. |
 | A8 | Done: optional performer edit verification setting (`edit_verification_enabled`), API enforcement requiring name and last 4 phone digits (bypassed for admins), admin default PIN status endpoint (`GET /api/auth/pin-status`), chooser warning banner, and admin settings switch. |
-| A9 | Not started; next in section F order. |
-| A10 | Optional; not started. |
+| A9 | Done: LRC format parser (`parse_lrc` backend and `parseLrcClient` client), storage in `tracks_dir` with `.lrc` extension, admin endpoints (`POST /api/admin/acts/{entry_id}/lyrics`, `DELETE /api/admin/acts/{entry_id}/lyrics`) and public endpoint (`GET /api/lyrics/{entry_id}`), and stage confidence monitor timed display (current line bold, previous/next dim, fallback to untimed block). |
+| A10 | Optional; skipped per spec (low-value pass-through facade refactor). |
 | D | Partially performed: D2, D3, D4 and D6 checks are logged below; D1 is partially exercised as logged below. VoiceOver, iOS Safari, Firefox, real network-offline/reconnect and downloader-backed link extraction remain unverified. |
 
 Browser test isolation finding: setting only `EVENTS_DIR` is insufficient on a fresh event: startup copies the legacy database and tracks from `CACHE_DIR`. Set `EVENT_DIR`, `CACHE_DIR`, `TRACKS_DIR`, and `GALLERY_DIR` to fresh scratch paths when testing. The first scratch instance copied legacy data into `/private/tmp/etm-browser-data`; originals were left in place. Do not delete that copy without the owner's permission.
