@@ -25,7 +25,7 @@ ID_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]{0,60}")
 # Settings that describe one particular event and are NOT carried over when creating a new one
 EVENT_SPECIFIC_KEYS = {
     "event_name", "event_subtitle", "event_date_time", "event_start_time", "event_venue", "event_time_range",
-    "event_poster_url", "gallery_order", "general_notes", "event_id", "setup_completed", "external_link_url",
+    "event_poster_url", "gallery_order", "general_notes", "event_id", "setup_completed", "wizard_step", "wizard_draft", "external_link_url",
     "doors_open_time", "post_event_link_url", "venue", "time_range",
 }
 
@@ -196,6 +196,7 @@ class EventManager:
                 "event_name": name, "event_subtitle": subtitle or "", "event_start_time": start_time or "",
                 "event_date_time": start_time or "", "event_venue": venue or "", "event_time_range": "",
                 "event_poster_url": "", "general_notes": "", "event_id": event_id, "setup_completed": False,
+                "wizard_step": 1, "wizard_draft": {"preset": "musical_night", "basics": {}, "food": "", "rules": {}},
                 "gallery_order": [],
                 "doors_open_time": "", "post_event_link_url": "",
             }
@@ -348,6 +349,8 @@ def default_app_settings() -> Dict[str, Any]:
         "event_time_range": settings.event.time_range,
         "event_poster_url": settings.event.poster_url,
         "gallery_order": [],
+        "wizard_step": 1,
+        "wizard_draft": {"preset": "musical_night", "basics": {}, "food": "", "rules": {}},
         "doors_open_time": settings.event.doors_open_time or "",
         "post_event_link_url": settings.event.post_event_link_url or "",
         "payment_url": settings.event.payment_url or "",

@@ -11,6 +11,15 @@ def test_load_default_config():
     assert cfg.storage.gallery_dir == os.path.join(cfg.storage.event_dir, "gallery")
     expected_upload_mb = int(os.getenv("MAX_UPLOAD_SIZE_MB", 100))
     assert cfg.storage.max_upload_size_mb == expected_upload_mb
+    assert cfg.wizard_step == 1
+    assert cfg.wizard_draft == {"preset": "musical_night", "basics": {}, "food": "", "rules": {}}
+
+
+def test_wizard_config_defaults_are_available_to_runtime_fallback(monkeypatch):
+    from app import config
+    monkeypatch.setattr("app.repositories.settings_repo.SettingsRepository.get_setting", lambda self, key: None)
+    assert config.get_setting("wizard_step") == 1
+    assert config.get_setting("wizard_draft") == {"preset": "musical_night", "basics": {}, "food": "", "rules": {}}
 
 def test_pin_override(monkeypatch):
     monkeypatch.setenv("ADMIN_PIN", "9999")

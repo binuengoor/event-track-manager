@@ -104,7 +104,10 @@ def list_food_templates(_authorized: bool = Depends(verify_admin_pin)):
 @router.post("/api/admin/food-items/bulk")
 def bulk_add_food_items(body: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
     try:
-        return admin_service.bulk_add_food(str(body.get("text", "")), str(body.get("default_group") or "Potluck"))
+        from app.services.event_service import event_service
+        with event_service._lock:
+            admin_service._check_expected_event(body.get("expected_event_id"))
+            return admin_service.bulk_add_food(str(body.get("text", "")), str(body.get("default_group") or "Potluck"))
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
 
@@ -113,7 +116,7 @@ def bulk_add_food_items(body: dict = Body(...), _authorized: bool = Depends(veri
 def apply_preset(body: dict = Body(...), _authorized: bool = Depends(verify_admin_pin)):
     preset = body.get("preset", "")
     try:
-        return admin_service.apply_preset(preset)
+        return admin_service.apply_preset(preset, body.get("expected_event_id"))
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))
 
@@ -121,8 +124,9 @@ def apply_preset(body: dict = Body(...), _authorized: bool = Depends(verify_admi
 @router.put("/api/admin/settings")
 def update_admin_settings(payload: Any = Body(...), _authorized: bool = Depends(verify_admin_pin)):
     items = payload.get("settings", payload) if isinstance(payload, dict) else {}
+    expected_event_id = payload.get("expected_event_id") if isinstance(payload, dict) else None
     try:
-        count = admin_service.update_settings(items)
+        count = admin_service.update_settings(items, expected_event_id)
         return {"status": "success", "updated_count": count}
     except ValueError as ex:
         raise HTTPException(status_code=400, detail=str(ex))

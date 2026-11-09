@@ -139,6 +139,68 @@
 
   // ------------------------------------------------------------------ setup wizard
   const wiz = { step: 0, preset: 'musical_night', basics: {}, food: '', rules: {}, steps: [] };
+  const WIZARD_STEP = { type: 1, basics: 2, food: 3, rules: 4, done: 5 };
+  let wizardSaveQueue = Promise.resolve();
+  let wizardSaveTimer = null;
+  let wizardSaveVersion = 0;
+  let wizardSaveErrorShown = false;
+  let wizardEventId = null;
+
+  function wizardStepNumber() { return WIZARD_STEP[wiz.steps[wiz.step]] || 1; }
+  function progressText(step) {
+    const safeStep = Math.max(1, Math.min(5, Number(step) || 1));
+    return `Step ${safeStep} of 5, ${safeStep * 20}%`;
+  }
+
+  function syncWizardOverview() {
+    const banner = document.getElementById('overview-wizard-banner');
+    const progress = document.getElementById('overview-wizard-progress');
+    const s = (typeof adminSettings !== 'undefined' && adminSettings) || {};
+    const step = Number(s.wizard_step);
+    const d = s.wizard_draft;
+    const hasDraft = d && typeof d === 'object' && (
+      d.preset !== 'musical_night' || Object.keys(d.basics || {}).length > 0 || Boolean(d.food) ||
+      Object.keys(d.rules || {}).length > 0 || Number(s.wizard_step) !== 1
+    );
+    const show = s.setup_completed !== true && hasDraft && Number.isInteger(step) && step >= 1 && step <= 5;
+    if (banner) banner.classList.toggle('hidden', !show);
+    if (progress) progress.textContent = show ? `Saved at ${progressText(step)}.` : '';
+  }
+
+  function wizardDraft() {
+    return { preset: wiz.preset, basics: { ...wiz.basics }, food: String(wiz.food || ''), rules: { ...wiz.rules } };
+  }
+
+  function persistWizardState() {
+    if (wizardSaveTimer !== null) { clearTimeout(wizardSaveTimer); wizardSaveTimer = null; }
+    const version = ++wizardSaveVersion;
+    const eventId = wizardEventId;
+    const settings = { wizard_step: wizardStepNumber(), wizard_draft: wizardDraft() };
+    wizardSaveQueue = wizardSaveQueue.catch(() => false).then(async () => {
+      if (!eventId || eventId !== wizardEventId) return false;
+      try {
+        await api('/api/admin/settings', jsonOpts('PUT', { settings, expected_event_id: eventId }));
+        if (version === wizardSaveVersion) {
+          adminSettings = { ...((typeof adminSettings !== 'undefined' && adminSettings) || {}), ...settings };
+          wizardSaveErrorShown = false;
+          syncWizardOverview();
+        }
+        return true;
+      } catch (e) {
+        if (version === wizardSaveVersion && !wizardSaveErrorShown) {
+          wizardSaveErrorShown = true;
+          showToast(`Setup progress was not saved: ${e.message}`, true);
+        }
+        return false;
+      }
+    });
+    return wizardSaveQueue;
+  }
+
+  function scheduleWizardSave() {
+    if (wizardSaveTimer !== null) clearTimeout(wizardSaveTimer);
+    wizardSaveTimer = setTimeout(() => { wizardSaveTimer = null; persistWizardState(); }, 400);
+  }
 
   function wizardSteps() {
     const p = presets.find((x) => x.id === wiz.preset);
@@ -174,7 +236,7 @@
       const line = i > 0 ? `<li class="as-step-line ${i <= wiz.step ? 'done' : ''}" aria-hidden="true"></li>` : '';
       return `${line}<li class="as-step ${state}" ${state === 'current' ? 'aria-current="step"' : ''}><span class="as-step-dot">${state === 'done' ? CHECK : i + 1}</span><span class="as-step-label">${STEP_LABEL[k]}${state === 'done' ? '<span class="as-hidden-label"> (done)</span>' : ''}</span></li>`;
     }).join('');
-    document.getElementById('wizard-sub').textContent = `Setup wizard \u00b7 Step ${wiz.step + 1} of ${wiz.steps.length}`;
+    document.getElementById('wizard-sub').textContent = `Setup wizard \u00b7 ${progressText(wizardStepNumber())}`;
     document.getElementById('wizard-back').classList.toggle('invisible', wiz.step === 0);
     const next = document.getElementById('wizard-next');
     const following = wiz.steps[wiz.step + 1];
@@ -188,7 +250,7 @@
           <span class="as-type-top"><span class="as-type-icon">${ICON(p.icon)}</span><span class="as-type-name">${esc(p.name)}</span></span>
           <span class="as-type-tag">${esc(p.tagline)}</span></button>`).join('')}</div>`;
       body.querySelectorAll('.wiz-type').forEach((b) => b.addEventListener('click', () => {
-        wiz.preset = b.dataset.id; renderWizard();
+        wiz.preset = b.dataset.id; renderWizard(); persistWizardState();
         document.querySelector(`#wizard-body [data-id="${wiz.preset}"]`)?.focus();
       }));
     } else if (kind === 'basics') {
@@ -260,13 +322,16 @@
     const btn = document.getElementById('wizard-next');
     btn.disabled = true;
     try {
-      await api('/api/admin/apply-preset', jsonOpts('POST', { preset: wiz.preset }));
-      const settingsPayload = { setup_completed: true };
+      const progressSaved = await persistWizardState();
+      if (!progressSaved) throw new Error('Setup progress could not be saved. Try again before finishing.');
+      await api('/api/admin/apply-preset', jsonOpts('POST', { preset: wiz.preset, expected_event_id: wizardEventId }));
+      const settingsPayload = { setup_completed: true, wizard_step: 5, wizard_draft: wizardDraft() };
       Object.entries(wiz.basics).forEach(([k, v]) => { if (v) settingsPayload[k] = v; });
       if (wiz.rules.max_performances_per_participant != null) Object.assign(settingsPayload, wiz.rules);
-      await api('/api/admin/settings', jsonOpts('PUT', { settings: settingsPayload }));
-      if ((wiz.food || '').trim()) await api('/api/admin/food-items/bulk', jsonOpts('POST', { text: wiz.food }));
-      closeWizard();
+      if ((wiz.food || '').trim()) await api('/api/admin/food-items/bulk', jsonOpts('POST', { text: wiz.food, expected_event_id: wizardEventId }));
+      await api('/api/admin/settings', jsonOpts('PUT', { settings: settingsPayload, expected_event_id: wizardEventId }));
+      adminSettings = { ...((typeof adminSettings !== 'undefined' && adminSettings) || {}), ...settingsPayload };
+      closeWizard(false);
       showToast('Event set up. Share /signup with participants.');
       if (typeof loadAllAdminData === 'function') await loadAllAdminData();
     } catch (e) {
@@ -277,15 +342,37 @@
   }
 
   function openWizard() {
-    wiz.step = 0;
+    const s = (typeof adminSettings !== 'undefined' && adminSettings) || {};
+    wizardEventId = s.active_event_id || null;
+    const draft = s.setup_completed === true ? null : s.wizard_draft;
+    if (draft && typeof draft === 'object') {
+      const knownPreset = presets.some((p) => p.id === draft.preset && !['freeze', 'rehearsal'].includes(p.id));
+      wiz.preset = knownPreset ? draft.preset : 'musical_night';
+      wiz.basics = draft.basics && typeof draft.basics === 'object' ? { ...draft.basics } : {};
+      wiz.food = typeof draft.food === 'string' ? draft.food : '';
+      wiz.rules = draft.rules && typeof draft.rules === 'object' ? { ...draft.rules } : {};
+    } else {
+      wiz.preset = 'musical_night'; wiz.basics = {}; wiz.food = ''; wiz.rules = {};
+    }
+    wiz.steps = wizardSteps();
+    const requestedStep = Math.max(1, Math.min(5, Number(s.wizard_step) || 1));
+    let idx = wiz.steps.findIndex((step) => WIZARD_STEP[step] === requestedStep);
+    if (idx < 0) idx = wiz.steps.reduce((last, step, i) => WIZARD_STEP[step] <= requestedStep ? i : last, 0);
+    wiz.step = draft ? idx : 0;
     document.getElementById('setup-wizard').classList.remove('hidden');
     renderWizard();
+    persistWizardState();
     focusWizardTitle();
   }
   function focusWizardTitle() { document.getElementById('wizard-title')?.focus(); }
-  function closeWizard() {
+  function closeWizard(save = true) {
+    if (save) {
+      try { collectStep(); } catch (e) { /* Current controls may not be mounted during boot. */ }
+      persistWizardState();
+    }
     document.getElementById('setup-wizard').classList.add('hidden');
     try { sessionStorage.setItem('wizard_dismissed', '1'); } catch (e) { /* ignore */ }
+    syncWizardOverview();
   }
 
   function bindWizard() {
@@ -293,6 +380,11 @@
     document.getElementById('overview-wizard-resume')?.addEventListener('click', openWizard);
     document.getElementById('wizard-close')?.addEventListener('click', closeWizard);
     document.getElementById('wizard-skip')?.addEventListener('click', closeWizard);
+    document.addEventListener('etm:settings-loaded', syncWizardOverview);
+    document.getElementById('wizard-body')?.addEventListener('input', () => {
+      collectStep();
+      scheduleWizardSave();
+    });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !document.getElementById('setup-wizard')?.classList.contains('hidden')) closeWizard();
     });
@@ -307,12 +399,13 @@
       inp.value = Math.min(max, Math.max(min, v + Number(b.dataset.step)));
       inp.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    document.getElementById('wizard-back')?.addEventListener('click', () => { collectStep(); wiz.step = Math.max(0, wiz.step - 1); renderWizard(); focusWizardTitle(); });
+    document.getElementById('wizard-back')?.addEventListener('click', () => { collectStep(); wiz.step = Math.max(0, wiz.step - 1); renderWizard(); persistWizardState(); focusWizardTitle(); });
     document.getElementById('wizard-next')?.addEventListener('click', async () => {
       collectStep();
       if (wiz.steps[wiz.step] === 'done') { await finishWizard(); return; }
       wiz.step = Math.min(wiz.steps.length - 1, wiz.step + 1);
       renderWizard();
+      persistWizardState();
       focusWizardTitle();
     });
   }
@@ -392,6 +485,7 @@
     if (!window.__readinessTimer) window.__readinessTimer = setInterval(loadReadiness, 60000);
     syncAllowedMediaUI();
     await loadPresets();
+    syncWizardOverview();
     await initFoodQuickAdd();
     await maybeAutoOpenWizard();
   }

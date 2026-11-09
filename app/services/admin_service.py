@@ -64,6 +64,8 @@ class AdminService:
             "backup_enabled": settings.backup.enabled,
             "allowed_media": ["audio", "video"],
             "setup_completed": False,
+            "wizard_step": 1,
+            "wizard_draft": {"preset": "musical_night", "basics": {}, "food": "", "rules": {}},
             "active_preset": "",
             "stage_performances_enabled": getattr(settings.signup, "stage_performances_enabled", True),
             "console_enabled": getattr(settings.signup, "console_enabled", True),
@@ -74,6 +76,7 @@ class AdminService:
         }
 
         merged = {**defaults, **result}
+        merged["active_event_id"] = settings.event.id
         merged["age_groups"] = normalize_age_groups(merged.get("age_groups"), defaults["age_groups"])
         return merged
 
@@ -88,12 +91,18 @@ class AdminService:
             for p in preset_lib.PRESET_CATALOG
         ]
 
-    def apply_preset(self, preset_name: str) -> Dict[str, Any]:
+    def apply_preset(self, preset_name: str, expected_event_id: Optional[str] = None) -> Dict[str, Any]:
         """Applies a named preset: feature flags plus sign-up rules. Never deletes data."""
         preset = preset_name.strip().lower()
         if preset not in preset_lib.PRESETS_BY_ID:
             raise ValueError(f"Unknown preset '{preset}'. Valid: {list(preset_lib.PRESETS_BY_ID.keys())}")
 
+        from app.services.event_service import event_service
+        with event_service._lock:
+            self._check_expected_event(expected_event_id)
+            return self._apply_preset_locked(preset)
+
+    def _apply_preset_locked(self, preset: str) -> Dict[str, Any]:
         before = self.get_settings()
         changes = preset_lib.diff_against(preset, before)
         values = self._validate_settings(preset_lib.preset_settings(preset))
@@ -111,8 +120,14 @@ class AdminService:
         )
         return {"status": "success", "preset": preset, "applied_flags": values, "changes": changes}
 
-    def update_settings(self, items: Dict[str, Any]) -> int:
-        """Validates and updates custom settings."""
+    @staticmethod
+    def _check_expected_event(expected_event_id: Optional[str]) -> None:
+        if expected_event_id is not None and expected_event_id != settings.event.id:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=409, detail="The active event changed. Reload before saving.")
+
+    def update_settings(self, items: Dict[str, Any], expected_event_id: Optional[str] = None) -> int:
+        """Validates and updates custom settings; wizard state is committed as one event-scoped transaction."""
         if "header_brand_title" in items and isinstance(items["header_brand_title"], str) and len(items["header_brand_title"].strip()) > 35:
             raise ValueError("Header Brand Title cannot exceed 35 characters.")
         if "header_brand_subtitle" in items and isinstance(items["header_brand_subtitle"], str) and len(items["header_brand_subtitle"].strip()) > 45:
@@ -123,11 +138,38 @@ class AdminService:
             raise ValueError("Event Subtitle cannot exceed 80 characters.")
 
         cleaned = self._validate_settings(items)
-        for k, v in cleaned.items():
-            db_service.set_app_setting(k, v)
+        has_wizard_progress = bool({"wizard_step", "wizard_draft"} & set(cleaned))
+        if has_wizard_progress and not expected_event_id:
+            raise ValueError("Wizard progress saves require expected_event_id.")
+        if cleaned.get("setup_completed") is True:
+            cleaned["wizard_step"] = 1
+            cleaned["wizard_draft"] = {"preset": "musical_night", "basics": {}, "food": "", "rules": {}}
 
+        from app.services.event_service import event_service
+        if has_wizard_progress or expected_event_id is not None or cleaned.get("setup_completed") is True:
+            with event_service._lock:
+                self._check_expected_event(expected_event_id)
+                self._write_settings_transaction(cleaned)
+        else:
+            for key, value in cleaned.items():
+                db_service.set_app_setting(key, value)
         backup_service.trigger_backup()
         return len(cleaned)
+
+    @staticmethod
+    def _write_settings_transaction(values: Dict[str, Any]) -> None:
+        conn = db_service._get_connection()
+        try:
+            conn.execute("BEGIN")
+            for key, value in values.items():
+                conn.execute("""INSERT INTO app_settings (key, value, updated_at)
+                    VALUES (?, ?, datetime('now'))
+                    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=datetime('now')""",
+                    (key, json.dumps(value)))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
     BOOL_SETTINGS = {
         "setup_completed",
@@ -138,6 +180,7 @@ class AdminService:
     INT_SETTINGS = {
         "max_performances_per_participant": (1, 20), "max_solo_per_participant": (0, 20),
         "max_audio_upload_mb": (1, 2000), "max_video_upload_mb": (1, 5000),
+        "wizard_step": (1, 5),
     }
     LIST_SETTINGS = {"performance_types", "console_extra_columns", "allowed_media"}
     AGE_GROUP_DESCRIPTION_LIMIT = 200
@@ -149,6 +192,12 @@ class AdminService:
         "doors_open_time", "post_event_link_url",
         "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset", "announcement",
     }
+    WIZARD_BASICS_LIMITS = {
+        "event_name": 60, "event_subtitle": 80, "event_start_time": 100,
+        "event_time_range": 100, "event_venue": 200,
+    }
+    WIZARD_RULE_KEYS = {"max_performances_per_participant", "max_solo_per_participant", "allowed_media"}
+    WIZARD_DRAFT_LIMIT = 20_000
 
     def _validate_settings(self, items: Dict[str, Any]) -> Dict[str, Any]:
         """Rejects unknown keys and wrong types so a bad value can never break signup or live pages."""
@@ -157,7 +206,32 @@ class AdminService:
         cleaned: Dict[str, Any] = {}
         items = {("external_link_url" if k == "signup_sheet_url" else k): v for k, v in items.items()}  # pre-rename alias
         for k, v in items.items():
-            if k == "gallery_order":
+            if k == "wizard_draft":
+                if not isinstance(v, dict) or set(v) != {"preset", "basics", "food", "rules"}:
+                    raise ValueError("Setting 'wizard_draft' must contain preset, basics, food, and rules.")
+                if (not isinstance(v["preset"], str) or v["preset"] not in preset_lib.PRESETS_BY_ID
+                        or v["preset"] in ("freeze", "rehearsal")):
+                    raise ValueError("Wizard draft preset is invalid.")
+                basics = v["basics"]
+                if not isinstance(basics, dict) or set(basics) - set(self.WIZARD_BASICS_LIMITS):
+                    raise ValueError("Wizard draft basics contains an unknown field.")
+                clean_basics = {}
+                for key, value in basics.items():
+                    if not isinstance(value, str) or len(value) > self.WIZARD_BASICS_LIMITS[key]:
+                        raise ValueError(f"Wizard draft '{key}' must be text within its length limit.")
+                    clean_basics[key] = value
+                food = v["food"]
+                if not isinstance(food, str) or len(food) > self.WIZARD_DRAFT_LIMIT:
+                    raise ValueError(f"Wizard draft food must be text (max {self.WIZARD_DRAFT_LIMIT} characters).")
+                rules = v["rules"]
+                if not isinstance(rules, dict) or set(rules) - self.WIZARD_RULE_KEYS:
+                    raise ValueError("Wizard draft rules contains an unknown field.")
+                clean_rules = self._validate_settings(rules)
+                if ("max_performances_per_participant" in clean_rules and "max_solo_per_participant" in clean_rules
+                        and clean_rules["max_solo_per_participant"] > clean_rules["max_performances_per_participant"]):
+                    raise ValueError("Wizard draft solo limit cannot exceed the total performance limit.")
+                v = {"preset": v["preset"], "basics": clean_basics, "food": food, "rules": clean_rules}
+            elif k == "gallery_order":
                 if (not isinstance(v, list) or len(v) > self.GALLERY_ORDER_LIMIT
                         or not all(isinstance(name, str) and name and name == os.path.basename(name)
                                    for name in v)):

@@ -80,7 +80,8 @@ A1, B4, A2, A3, A4, A5, B1, B3, B2, B5, A6, then D (verification) with fixes, th
 | B3 | Implemented: nested potluck items and group reorder. Keyboard reorder and scripted browser drop persist; physical pointer drop still needs a manual check because BrowserOS did not dispatch a drop event. |
 | B2 | Done: preset radio group with roving focus and arrow-key navigation. Browser keyboard checks passed; axe 0 serious/critical at both sizes/themes, no small mobile targets. |
 | B5 | Done: real MP3 countdown runs and pauses; acoustic cues stay neutral. Console axe 0 serious/critical at both sizes, no small mobile targets (console is always dark). |
-| A6–A9 | Not started; continue in section F order. |
+| A6 | Done: event-scoped progress and draft resume/Finish verified; modal and progress banner axe clean at both sizes/themes and mobile progress visible. A broader overview scan reported unrelated shell/footer contrast findings; investigate in D. |
+| A7–A9 | Not started; continue in section F order. |
 | A10 | Optional; not started. |
 | D | Not performed; no Lighthouse or screen-reader results. |
 

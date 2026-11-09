@@ -141,6 +141,11 @@ class AppConfig(BaseModel):
     live_order_by: str = "readiness,sequence"
     audio_bitrate: str = "320k"
     entry_id_prefix: str = "PK"
+    # Event-scoped resume state falls back to these defaults when no DB setting exists.
+    wizard_step: int = 1
+    wizard_draft: Dict[str, Any] = Field(default_factory=lambda: {
+        "preset": "musical_night", "basics": {}, "food": "", "rules": {},
+    })
 
     admin_pin: str = "2026"
     # Deprecated compatibility field; console access uses ADMIN_PIN only.

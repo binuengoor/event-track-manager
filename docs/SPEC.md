@@ -640,6 +640,8 @@ empty state, PIN pad dialog (`inputmode="numeric"`), readiness banner. Plus the 
 
 Admin Lineup also supports adding and deleting acts, replacing tracks, matching incoming files to acts, and saving the running order. Deletion archives the track; entry IDs are not reused. These actions require Admin authentication.
 
+The setup wizard stores its canonical five-step progress and event-scoped draft so it can resume after reload. Wizard saves and finish actions check the event that opened the wizard.
+
 The console player shows elapsed, total and remaining time; acoustic cues show a neutral remaining-time value.
 
 Event preset cards use radio-group semantics and support arrow-key selection.

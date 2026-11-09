@@ -183,7 +183,8 @@
 /* phone: the wizard banner is one compact row (board: single 52 px "Resume setup wizard" action) */
 @media (max-width: 767px) {
   .admin-banner { flex-wrap: nowrap; padding: .625rem .875rem; gap: .625rem; border-radius: .875rem; }
-  .admin-banner p { display: none; }
+  .admin-banner p:not(.admin-banner-progress) { display: none; }
+  .admin-banner .admin-banner-progress { display: block; }
   .admin-banner .admin-btn { height: 48px; min-height: 48px; padding: 0 .875rem; white-space: normal; text-align: center; line-height: 1.2; }
 }
 .admin-dest[aria-expanded="true"] { color: var(--accent-text); background: var(--ad-accent-tint); font-weight: 600; }
