@@ -215,9 +215,9 @@ body:has(.guest-header:not(.is-staff-page)) {
 }
 
 /* A friendlier display face for the event name and page titles (system fonts, nothing to download). */
-.guest-brand span:first-child,
+.guest-brand-text span:first-child,
 body:has(.guest-header:not(.is-staff-page)) h1 { font-family: var(--font-display); letter-spacing: 0; }
-.guest-brand span:first-child { font-size: 1.125rem; }
+.guest-brand-text span:first-child { font-size: 1.125rem; }
 .me-title, .sch-title, .lv-now-title, .lv-prestart-name, .lv-off-title, .gad-title, .gad-chooser h2 { font-family: var(--font-display); letter-spacing: 0; }
 .lv-now-title { font-weight: 600; }
 

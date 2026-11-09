@@ -42,6 +42,7 @@ _APPEARANCE = ('<details class="guest-appearance"><summary>Appearance</summary>'
                '<label>Accent <select id="appearance-accent"><option value="coral">Coral</option>'
                '<option value="blue">Blue</option><option value="green">Green</option>'
                '<option value="purple">Purple</option></select></label></div></details>')
+_MARK = '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'
 _HEADER = re.compile(r'<header\b[^>]*>.*?</header>', re.S)
 _EXTRA = re.compile(r'<!--header-extra-->(.*?)<!--/header-extra-->', re.S)
 
@@ -94,8 +95,9 @@ def render_guest_navigation(html: str, path: str, *, staff: bool = False, staff_
     extras = ''.join(_EXTRA.findall(found.group(0)))
     classes = 'guest-header' + (' is-staff-page' if staff_page else '')
     header = (f'<header class="{classes}"><a href="/" class="guest-brand" title="Home">'
-              f'<span id="{title_id}">Event Track Manager</span>'
-              f'<span id="{subtitle_id}">Musical Night</span></a>{shell}'
+              f'<span class="guest-brand-mark" aria-hidden="true">{_svg(_MARK, 20, 2)}</span>'
+              f'<span class="guest-brand-text"><span id="{title_id}">Event Track Manager</span>'
+              f'<span id="{subtitle_id}">Musical Night</span></span></a>{shell}'
               f'{extras}<div class="guest-header-end">{staff_nav}{_APPEARANCE if appearance else ""}</div></header>')
     if keep_page_header:
         own = re.sub(r'<nav\b[^>]*>.*?</nav>', '', found.group(0), count=1, flags=re.S)

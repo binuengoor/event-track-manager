@@ -25,8 +25,8 @@ body.live-page .guest-header .chip { font-size: 16px; text-shadow: none; }
 @media (display-mode: fullscreen) {
   body.live-page .guest-navigation, body.live-page .staff-navigation, body.live-page .guest-appearance { display: none; }
   body.live-page .guest-header { background: transparent; border-bottom: 0; }
-  body.live-page .guest-brand { flex-direction: row; align-items: baseline; gap: 16px; font-size: 24px; }
-  body.live-page .guest-brand span + span { font-size: 24px; }
+  body.live-page .guest-brand-text { flex-direction: row; align-items: baseline; gap: 16px; font-size: 24px; }
+  body.live-page .guest-brand-text span + span { font-size: 24px; }
   body.live-page .guest-header .chip { font-size: 24px; }
 }
 .gn-link {
@@ -224,9 +224,11 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
 
 /* Shared guest header and device-local appearance controls. */
 .guest-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 20px; min-height: 72px; padding: 8px max(20px, calc((100vw - 1280px) / 2)); box-sizing: border-box; background: var(--bg-surface-1); border-bottom: 1px solid var(--border-subtle); }
-.guest-brand { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 120px; color: var(--text-primary); font-weight: 700; text-decoration: none; }
-.guest-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.guest-brand span + span { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.guest-brand { display: flex; flex-direction: row; align-items: center; gap: 12px; flex: 1 1 auto; min-width: 150px; color: var(--text-primary); font-weight: 700; text-decoration: none; }
+.guest-brand-text { display: flex; flex-direction: column; min-width: 0; }
+.guest-brand-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: var(--accent-primary); color: var(--accent-on); box-shadow: 0 6px 16px rgb(242 128 90 / .25); }
+.guest-brand-text span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guest-brand-text span + span { color: var(--accent-text); font-size: 12px; font-weight: 500; }
 .guest-appearance { position: relative; flex: none; }
 .guest-appearance summary { cursor: pointer; padding: 10px; color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 999px; font-size: 14px; }
 .guest-appearance-panel { position: absolute; right: 0; top: calc(100% + 8px); display: grid; gap: 12px; min-width: 180px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-elevated); box-shadow: var(--shadow-2); }
@@ -241,13 +243,16 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
   body.live-page .guest-header .chip { font-size: 14px; }
 }
 @media (min-width: 768px) and (max-width: 960px) {
-  .guest-brand { min-width: 96px; }
+  .guest-brand { min-width: 110px; }
+  .guest-brand-mark { display: none; }
   .staff-navigation .gn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .staff-navigation .gn-link { padding: 0 10px; }
 }
 @media (max-width: 767px) {
   .guest-header { min-height: 64px; padding: 8px 16px; gap: 8px; }
-  .guest-brand { flex: 1 1 0; min-width: 0; }
+  .guest-brand { flex: 1 1 0; min-width: 0; gap: 8px; }
+  .guest-brand-mark { width: 32px; height: 32px; border-radius: 10px; }
+  .guest-header:has(.staff-navigation) .guest-brand-mark { display: none; }
 }
 /* Live on phones and tablets: the status line gets its own row under the event name. */
 @media (max-width: 960px) {

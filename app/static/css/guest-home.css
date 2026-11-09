@@ -237,3 +237,26 @@ html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .gh-reel.is-marquee .gh-reel-track, .gh-status[data-state="live"] .gh-status-dot { animation: none; }
 }
+
+/* ------------------------------------------------------------ production-style layout
+   One centred column in a single soft card: big poster first, then the title, then date, venue and actions,
+   then the organizer's notes with warm section headings. Fewer boxes inside boxes. */
+.gh-main {
+  max-width: 980px; margin: 20px auto 32px; padding: 20px; border-radius: 28px;
+  background: color-mix(in srgb, var(--bg-surface-1) 88%, transparent); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-2);
+}
+@media (min-width: 900px) {
+  .gh-main { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 24px; }
+  .gh-side { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+}
+@media (max-width: 899px) { .gh-main { width: auto; margin: 12px; padding: 14px; border-radius: 22px; } }
+.gh-hero { gap: 16px; }
+.gh-poster-img { max-height: min(62vh, 560px); }
+.gh-hero[data-poster="img"] .gh-poster { border-radius: 20px; overflow: hidden; border: 0; }
+.gh-hero[data-poster="img"] .gh-title h1 { color: var(--text-primary); }
+.gh-hero[data-poster="img"] .gh-subtitle { color: var(--accent-text); font-weight: 600; font-size: 15px; }
+.gh-notes { padding: 18px 4px 0; border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; background: none; }
+.gh-notes-body { font-size: 15px; }
+.gh-notes-body h1, .gh-notes-body h2, .gh-notes-body h3, .gh-notes-body h4 { color: var(--status-cued-fg); font-family: var(--font-display); }
+.gh-notes-body strong { color: var(--text-primary); }
+.gh-notes-body li { margin: 4px 0; }
