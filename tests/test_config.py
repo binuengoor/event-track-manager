@@ -5,6 +5,7 @@ from app.config import load_config
 def test_load_default_config():
     cfg = load_config()
     assert cfg.event.id is not None
+    assert cfg.event.event_passcode == ""
     # Everything lives in one event folder: database, exports, tracks, backups, gallery
     assert cfg.storage.event_dir.endswith(cfg.event.id)
     assert cfg.storage.tracks_dir == os.path.join(cfg.storage.event_dir, "tracks")

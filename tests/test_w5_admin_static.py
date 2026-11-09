@@ -61,8 +61,9 @@ def test_new_settings_fields_present_and_saved():
     assert 'id="setting-max-audio-mb"' in HTML and 'id="setting-max-video-mb"' in HTML
     assert 'role="switch" id="setting-shorten-junior-names"' in HTML
     assert "Anika M." in HTML and "full names" in HTML
-    for key in ("max_audio_upload_mb", "max_video_upload_mb", "shorten_junior_names"):
+    for key in ("max_audio_upload_mb", "max_video_upload_mb", "shorten_junior_names", "event_passcode"):
         assert key in JS
+    assert 'id="setting-event-passcode"' in HTML
     assert 'id="setting-announcement"' not in HTML  # announcement is console-only
 
 

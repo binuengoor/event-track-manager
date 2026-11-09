@@ -43,6 +43,7 @@ class AdminService:
             "event_poster_url": settings.event.poster_url,
             "doors_open_time": settings.event.doors_open_time or "",
             "post_event_link_url": settings.event.post_event_link_url or "",
+            "event_passcode": getattr(settings.event, "event_passcode", "") or "",
             "payment_url": settings.event.payment_url or "",
             "external_link_url": settings.event.external_link_url or "",
             "signup_enabled": getattr(settings.signup, "signup_enabled", True),
@@ -189,7 +190,7 @@ class AdminService:
         "header_brand_title", "header_brand_subtitle", "event_name", "event_subtitle", "event_date_time",
         "event_start_time", "event_venue", "event_time_range", "general_notes", "hero_tag_primary",
         "hero_tag_status", "event_poster_url", "payment_url", "external_link_url", "food_serving_note",
-        "doors_open_time", "post_event_link_url",
+        "doors_open_time", "post_event_link_url", "event_passcode",
         "entry_id_prefix", "live_order_by", "event_id", "venue", "time_range", "active_preset", "announcement",
     }
     WIZARD_BASICS_LIMITS = {
@@ -301,6 +302,10 @@ class AdminService:
                     v = v.strip()
                     if len(v) > 100:
                         raise ValueError("Doors open time cannot exceed 100 characters.")
+                if k == "event_passcode":
+                    v = v.strip()
+                    if len(v) > 100:
+                        raise ValueError("Event passcode cannot exceed 100 characters.")
                 if k == "post_event_link_url":
                     v = v.strip()
                     if len(v) > 2048:

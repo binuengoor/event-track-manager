@@ -80,6 +80,7 @@ class EventConfig(BaseModel):
     external_link_url: Optional[str] = None
     doors_open_time: Optional[str] = ""
     post_event_link_url: Optional[str] = ""
+    event_passcode: Optional[str] = ""
 
 class StorageConfig(BaseModel):
     # The event folder is the single place everything lives:
@@ -198,6 +199,9 @@ def load_config() -> AppConfig:
         config.event.payment_url = os.getenv("EVENT_PAYMENT_URL")
     elif os.getenv("PAYMENT_URL"):
         config.event.payment_url = os.getenv("PAYMENT_URL")
+
+    if os.getenv("EVENT_PASSCODE"):
+        config.event.event_passcode = os.getenv("EVENT_PASSCODE")
 
     # EVENT_SIGNUP_SHEET_URL and SIGNUP_SHEET_URL are the pre-rename names, still read for one release.
     for env_name in ("EVENT_EXTERNAL_LINK_URL", "EXTERNAL_LINK_URL", "EVENT_SIGNUP_SHEET_URL", "SIGNUP_SHEET_URL"):

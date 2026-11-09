@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <script src="/static/js/theme.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0B0D10">
+  <meta name="view-transition" content="same-origin">
+  <title>Event Passcode - Event Track Manager</title>
+  <script src="/static/js/icons.js" defer></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="stylesheet" href="/static/css/app.css?v=1">
+  <link rel="stylesheet" href="/static/css/a11y.css">
+  <link rel="stylesheet" href="/static/css/tokens.css">
+  <link rel="stylesheet" href="/static/css/theme.css">
+  <link rel="stylesheet" href="/static/css/console.css">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-4">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main id="main-content" class="w-full max-w-md mx-auto">
+    <div class="c-login__card">
+      <div class="c-login__head">
+        <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-500/20 text-orange-400 flex items-center justify-center border border-orange-500/30 shadow-lg">
+          <i data-lucide="key-round" class="w-7 h-7"></i>
+        </div>
+        <h1 class="c-login__title">Event Passcode</h1>
+        <p class="c-login__sub">This event requires a passcode to view and participate.</p>
+      </div>
+
+      <div id="gate-error" class="c-login__error hidden" role="alert"></div>
+
+      <form id="gate-form" method="POST" action="/gate" class="c-login__form">
+        <input type="hidden" id="next" name="next" value="/">
+        <div>
+          <label for="passcode" class="sr-only">Passcode</label>
+          <input
+            type="password"
+            id="passcode"
+            name="passcode"
+            required
+            autofocus
+            placeholder="Enter passcode"
+            autocomplete="current-password"
+            class="c-login__input"
+            style="letter-spacing: normal; font-size: 18px; min-height: 48px; padding: 0 16px;"
+          >
+        </div>
+        <button type="submit" id="gate-submit-btn" class="c-btn c-btn--primary c-btn--lg" style="width: 100%;">
+          <span>Enter Event</span>
+          <i data-lucide="arrow-right"></i>
+        </button>
+      </form>
+    </div>
+  </main>
+  <script>
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      if (next && next.startsWith('/') && !next.startsWith('//')) {
+        document.getElementById('next').value = next;
+      }
+      if (params.get('error') === 'invalid') {
+        const err = document.getElementById('gate-error');
+        err.textContent = 'Incorrect passcode. Please try again.';
+        err.classList.remove('hidden');
+      }
+    })();
+  </script>
+</body>
+</html>

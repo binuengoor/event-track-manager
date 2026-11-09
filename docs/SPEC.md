@@ -658,6 +658,8 @@ Age groups have editable names, descriptions and guardian requirements. Signup d
 
 Admin Event Details supports poster and sponsor uploads with content-signature checks. Images are limited to 20 MiB and videos to 100 MiB. Gallery order is event-specific; the gallery supports images and MP4/WebM videos, and posters support images and MP4. When a shared GALLERY_DIR is configured for a switchable installation, gallery changes are disabled to prevent cross-event edits.
 
+An optional event passcode protects guest pages and public APIs behind a gate page (/gate) or invite token (?t=passcode). It is disabled by default; when enabled, health endpoints, static assets, live display screens, and admin/console routes remain ungated.
+
 ### 6.9 Console and live upgrades
 
 | Upgrade | Detail | Provenance |

@@ -64,6 +64,7 @@ function setupActionHandlers() {
       event_time_range: document.getElementById("setting-event-time-range").value.trim(),
       doors_open_time: document.getElementById("setting-doors-open-time") ? document.getElementById("setting-doors-open-time").value.trim() : "",
       post_event_link_url: document.getElementById("setting-post-event-link-url") ? document.getElementById("setting-post-event-link-url").value.trim() : "",
+      event_passcode: document.getElementById("setting-event-passcode") ? document.getElementById("setting-event-passcode").value.trim() : "",
       event_venue: document.getElementById("setting-event-venue").value.trim(),
       event_poster_url: document.getElementById("setting-event-poster-url").value.trim(),
       entry_id_prefix: document.getElementById("setting-entry-id-prefix").value.trim(),

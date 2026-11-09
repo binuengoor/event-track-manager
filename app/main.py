@@ -3,9 +3,9 @@ import logging
 import asyncio
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, JSONResponse
 
 from app.config import settings
 from app.services.db_service import db_service
@@ -172,9 +172,65 @@ async def revalidate_static_assets(request, call_next):
     return response
 
 
+from app.routers import (
+    pages, auth, event, signup, food, performer, dashboard, admin, stage, audio, data, events, passcode
+)
+from app.routers.auth import is_admin
+from app.routers.passcode import get_current_passcode
+
+PASSCODE_EXEMPT_EXACT = {"/robots.txt", "/favicon.ico", "/api/health", "/gate", "/live"}
+PASSCODE_EXEMPT_PREFIXES = (
+    "/static/", "/data/", "/event-media/",
+    "/api/live-status", "/api/live-stream",
+    "/admin", "/console", "/api/admin/", "/api/auth/",
+)
+
+
+@app.middleware("http")
+async def event_passcode_guard(request: Request, call_next):
+    passcode_val = get_current_passcode()
+    if not passcode_val:
+        return await call_next(request)
+
+    path = request.url.path
+    if path in PASSCODE_EXEMPT_EXACT or any(path.startswith(prefix) for prefix in PASSCODE_EXEMPT_PREFIXES):
+        return await call_next(request)
+
+    if is_admin(request):
+        return await call_next(request)
+
+    query_t = request.query_params.get("t") or request.query_params.get("passcode")
+    if query_t and query_t.strip() == passcode_val:
+        response = await call_next(request)
+        response.set_cookie(
+            key="etm_passcode",
+            value=passcode_val,
+            path="/",
+            samesite="lax",
+            max_age=86400 * 30,
+        )
+        return response
+
+    cookie_val = request.cookies.get("etm_passcode")
+    if cookie_val and cookie_val.strip() == passcode_val:
+        return await call_next(request)
+
+    if path.startswith("/api/"):
+        return JSONResponse(status_code=401, content={"detail": "Event passcode required"})
+
+    next_url = path
+    if request.url.query:
+        params = [p for p in request.url.query.split("&") if p and not p.startswith("t=") and not p.startswith("passcode=")]
+        if params:
+            next_url += f"?{'&'.join(params)}"
+    from urllib.parse import quote
+    return RedirectResponse(url=f"/gate?next={quote(next_url)}", status_code=303)
+
+
 # Register Modular Routers
 register_auth_handlers(app)
 app.include_router(pages.router)
+app.include_router(passcode.router)
 app.include_router(auth.router)
 app.include_router(event.router)
 app.include_router(signup.router)
