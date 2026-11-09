@@ -14,7 +14,7 @@ body { margin: 0; height: 100vh; width: 100vw; overflow: hidden; user-select: no
 #standby-card { z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px; gap: 14px; }
 .badge { display: inline-flex; align-items: center; padding: 0; background: none; border: 0; color: var(--status-playing-fg); font-weight: 700; text-transform: uppercase; letter-spacing: .14em; font-size: 28px; }
 #stage-performer-name { margin: 0; font-size: clamp(48px, 9.4vw, 120px); font-weight: 700; letter-spacing: -.03em; line-height: 1; max-width: 92vw; color: var(--text-primary); }
-#stage-song-title { margin: 0; font-size: clamp(32px, 4.1vw, 52px); font-weight: 400; color: #D1D5DB; max-width: 92vw; }
+#stage-song-title { margin: 0; font-size: clamp(32px, 4.1vw, 52px); font-weight: 400; color: #E0D6C8; max-width: 92vw; }
 #stage-act-type { display: inline-block; margin-top: 10px; padding: 0; background: none; border: 0; color: var(--text-secondary); font-weight: 400; font-size: 28px; }
 #standby-card[data-state="standby"] .badge { color: var(--text-muted); letter-spacing: .16em; }
 #standby-card[data-state="standby"] #stage-performer-name { font-size: clamp(48px, 7.2vw, 92px); color: var(--text-secondary); }

@@ -10,7 +10,7 @@ html[data-theme="dark"], html[data-theme="dark"] body { background-color: var(--
   --gh-tint: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-surface-1));
   --gh-shadow: 0 8px 24px rgb(0 0 0 / .4);
   --gh-btn-shadow: 0 6px 16px rgb(0 0 0 / .4);
-  --gh-edge: var(--gad-edge, #6B7385);
+  --gh-edge: var(--gad-edge, #7D6E60);
   --gh-c1: #C84B31; --gh-c2: #E8A33D; --gh-c3: #0D7A5F; --gh-c4: #3B4A9E;   /* the four hues of the poster mark */
   position: relative;
   min-height: 100vh;

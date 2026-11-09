@@ -2,7 +2,7 @@
    One server-rendered set of links: bottom tab bar on phones, inline links in the header from 768 px up.
    Colours come from tokens.css; the few extra shades the boards use are defined here with the board value as fallback. */
 :root {
-  --gad-edge: #6B7385;                                   /* control borders: 3:1 on the dark surface */
+  --gad-edge: #7D6E60;                                   /* control borders: 3:1 on the dark surface */
   --gad-icon-bg: color-mix(in srgb, var(--accent-primary) 20%, var(--bg-surface-1));
   --gad-scrim: rgb(0 0 0 / .7);
 }

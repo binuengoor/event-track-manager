@@ -52,7 +52,7 @@ html[data-theme="dark"] body.console {
 .c-btn--icon-text.is-pending { animation: c-pulse 1.6s var(--ease) infinite; }
 .c-iconbtn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: var(--radius-md); background: var(--bg-elevated); color: var(--text-primary); }
 .c-iconbtn:hover { background: var(--border-strong); }
-.c-link { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 8px; font-size: 13px; font-weight: 600; color: #D1D5DB; text-decoration: none; border-radius: 10px; }
+.c-link { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 8px; font-size: 13px; font-weight: 600; color: #E0D6C8; text-decoration: none; border-radius: 10px; }
 .c-link:hover { color: var(--text-primary); }
 .c-link svg.lucide { width: 12px; height: 12px; }
 
@@ -149,8 +149,8 @@ button.c-chip:hover { filter: brightness(1.2); }
 .c-row.is-done .c-row__tag { color: var(--text-muted); }
 .c-row.is-cued { background: var(--status-playing-bg); border-color: var(--status-playing-fg); }
 .c-row.is-cued .c-row__num { color: var(--status-playing-fg); }
-.c-row.is-cued .c-row__who { color: #D1D5DB; }
-.c-row.is-cued .c-row__dur { color: #D1D5DB; }
+.c-row.is-cued .c-row__who { color: #E0D6C8; }
+.c-row.is-cued .c-row__dur { color: #E0D6C8; }
 .c-row.is-cued .c-row__tag { color: var(--status-playing-fg); background: var(--bg-canvas); }
 .c-row.is-deck { border-color: var(--status-cued-fg); }
 .c-row.is-deck .c-row__num { color: var(--status-cued-fg); }
@@ -206,7 +206,7 @@ button.c-chip:hover { filter: brightness(1.2); }
 .c-offline { flex: none; margin: 8px 12px 12px; padding: 12px 16px; background: var(--bg-surface-1); border: 1px solid var(--status-cued-fg); border-radius: var(--radius-lg); display: flex; flex-direction: column; gap: 8px; }
 .c-offline__head { display: flex; justify-content: space-between; gap: 8px; margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--status-cued-fg); }
 .c-offline__when { font-weight: 600; letter-spacing: 0; text-transform: none; }
-.c-offline__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #D1D5DB; }
+.c-offline__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #E0D6C8; }
 .c-offline__list li { display: flex; gap: 10px; }
 .c-offline__num { width: 22px; font-family: var(--font-mono); color: var(--status-cued-fg); }
 

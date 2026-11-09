@@ -184,3 +184,42 @@ body { font-family: var(--font-sans); font-size-adjust: none; }
 input, select, textarea, button { font-family: inherit; }
 .font-mono, code, kbd, samp, #now-seq-badge, .seq, .gf-act-num, .gf-entry-id, .admin-total strong, .al-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .gf-input, .gf-select, input[type="text"], input[type="tel"], input[type="search"], input[type="email"], textarea, select { font-size: max(16px, 1em); }
+
+
+/* ------------------------------------------------------------------ warm and calm
+   Dark theme: pages still written with Tailwind's blue-grey "slate" classes follow the warm tokens too. */
+html:not([data-theme="light"]) body.bg-slate-950, html:not([data-theme="light"]) .bg-black { background-color: var(--bg-canvas); }
+html:not([data-theme="light"]) .bg-slate-950, html:not([data-theme="light"]) [class*="bg-slate-950/"] { background-color: var(--bg-canvas); }
+html:not([data-theme="light"]) .bg-slate-900, html:not([data-theme="light"]) [class*="bg-slate-900/"] { background-color: var(--bg-surface-1); }
+html:not([data-theme="light"]) .bg-slate-800, html:not([data-theme="light"]) [class*="bg-slate-800/"] { background-color: var(--bg-surface-2); }
+html:not([data-theme="light"]) .bg-slate-700, html:not([data-theme="light"]) [class*="bg-slate-700/"] { background-color: var(--bg-elevated); }
+html:not([data-theme="light"]) .bg-slate-600 { background-color: var(--border-strong); }
+html:not([data-theme="light"]) [class*="hover:bg-slate-7"]:hover, html:not([data-theme="light"]) [class*="hover:bg-slate-8"]:hover { background-color: var(--bg-elevated); }
+html:not([data-theme="light"]) .from-slate-900, html:not([data-theme="light"]) .via-slate-900, html:not([data-theme="light"]) [class*="via-slate-900/"] { --tw-gradient-from: var(--bg-surface-1); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, transparent); }
+html:not([data-theme="light"]) [class*="to-slate-900"] { --tw-gradient-to: var(--bg-surface-1); }
+html:not([data-theme="light"]) [class*="border-slate-7"], html:not([data-theme="light"]) [class*="border-slate-8"] { border-color: var(--border-subtle); }
+html:not([data-theme="light"]) [class*="border-slate-6"] { border-color: var(--border-strong); }
+html:not([data-theme="light"]) [class*="divide-slate-"] > :not([hidden]) ~ :not([hidden]) { border-color: var(--border-subtle); }
+html:not([data-theme="light"]) .text-white, html:not([data-theme="light"]) .text-slate-100, html:not([data-theme="light"]) .text-slate-200 { color: var(--text-primary); }
+html:not([data-theme="light"]) .text-slate-300, html:not([data-theme="light"]) .text-slate-400 { color: var(--text-secondary); }
+html:not([data-theme="light"]) .bg-orange-600.text-white, html:not([data-theme="light"]) .bg-orange-500.text-white, html:not([data-theme="light"]) .from-orange-600.text-white, html:not([data-theme="light"]) .from-orange-500.text-white { color: var(--accent-on); }
+
+/* One still, warm glow behind guest pages and Live (replaces the moving aurora). Admin and Console stay plain. */
+body:has(.guest-header:not(.is-staff-page)) {
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(60% 46% at 12% 0%, var(--glow-a), transparent 70%),
+    radial-gradient(48% 40% at 92% 6%, var(--glow-b), transparent 70%),
+    radial-gradient(80% 50% at 50% 108%, var(--glow-c), transparent 72%);
+  background-attachment: fixed;
+}
+
+/* A friendlier display face for the event name and page titles (system fonts, nothing to download). */
+.guest-brand span:first-child,
+body:has(.guest-header:not(.is-staff-page)) h1 { font-family: var(--font-display); letter-spacing: 0; }
+.guest-brand span:first-child { font-size: 1.125rem; }
+.me-title, .sch-title, .lv-now-title, .lv-prestart-name, .lv-off-title, .gad-title, .gad-chooser h2 { font-family: var(--font-display); letter-spacing: 0; }
+.lv-now-title { font-weight: 600; }
+
+/* Fewer loud blocks: "on stage now" in the schedule is a quiet card with a green edge, not a solid green slab. */
+.sch-act.is-now { background: var(--bg-surface-2); border-color: var(--border-subtle); box-shadow: inset 4px 0 0 var(--status-playing-fg); }
