@@ -62,7 +62,7 @@ function buildPayload() {
       is_acoustic: $("acoustic").checked,
     });
   }
-  if (choice !== "perform" && food) {
+  if (dishEnabled() && food) {
     payload.food_signup = { item_id: food.value, dish_description: $("dish-description").value.trim() };
   }
   return payload;

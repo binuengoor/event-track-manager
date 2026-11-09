@@ -2,9 +2,9 @@
 // Classic script: shares globals with the other signup files (see load order in the page).
 
 // Guest sign-up: one progressive form (About you -> Your act -> Dish), then a "what next" card.
-// Choices: Perform / Bring a dish / Both. Backend: POST /api/signup (registration_type performer | food_only | both).
+// Choices: Perform / Bring a dish. Backend: POST /api/signup (registration_type performer | food_only | both).
 const NAME_KEY = "etm_guest_name";
-const STEP_LABELS = { about: "About you", act: "Your song", dish: "A dish (optional)" };
+const STEP_LABELS = { about: "About you", act: "Your song", dish: "Your dish" };
 const STEP_SEQUENCE = { perform: ["about", "act"], dish: ["about", "dish"], both: ["about", "act", "dish"] };
 
 const state = {

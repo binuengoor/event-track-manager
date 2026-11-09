@@ -52,7 +52,7 @@ function applyAvailability() {
   $("signup-closed-banner").hidden = !closed;
   $("signup-form").hidden = closed;
 
-  const choices = { perform: perform, dish: dish, both: perform && dish };
+  const choices = { perform: perform, dish: dish };
   Object.entries(choices).forEach(([k, on]) => {
     $(`choice-${k}-label`).hidden = !on;
     const input = document.querySelector(`input[name="signup_choice"][value="${k}"]`);
@@ -78,7 +78,7 @@ function applyAvailability() {
     desc.textContent = "Choose a dish to share at the potluck. One sign-up per family is enough.";
   } else {
     title.textContent = "Sign up";
-    desc.textContent = "Perform on stage, bring a dish, or both. It takes about a minute.";
+    desc.textContent = "Performers bring a dish to the potluck. You can also sign up just to bring a dish.";
   }
   state.baseTitle = title.textContent;
   // Links on the closed card only show when the matching page is in the site navigation.
@@ -91,7 +91,7 @@ function applyAvailability() {
 // Dish-only sign-ups are one page (name, phone, dish); every other choice is a stepper.
 function singlePage() { return state.choice === "dish"; }
 
-function steps() { return STEP_SEQUENCE[state.choice] || STEP_SEQUENCE.perform; }
+function steps() { return state.choice === "perform" && dishEnabled() ? STEP_SEQUENCE.both : (STEP_SEQUENCE[state.choice] || STEP_SEQUENCE.perform); }
 
 function setChoice(value) {
   state.choice = value;
@@ -129,8 +129,8 @@ function showStep() {
   const current = seq[state.step];
   $("step-status").textContent = single ? "" : `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[current]}`;
   const onDish = single || current === "dish";
-  $("skip-dish-btn").hidden = !(state.choice === "both" && current === "dish");
-  $("add-song-btn").hidden = !(single && performEnabled());
+  $("skip-dish-btn").hidden = true;
+  $("add-song-btn").hidden = true;
   if (onDish) renderFoodGroups();
   renderStepper();
   hideFormError();

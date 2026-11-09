@@ -63,6 +63,18 @@ def render_guest_navigation(html: str, path: str) -> str:
     if count != 1:
         raise ValueError('Guest template has no recognizable header navigation')
     if path != '/live':
+        header = (f'<header class="guest-header"><a href="/" class="guest-brand">'
+                  f'<span id="nav-event-title">Event Track Manager</span>'
+                  f'<span id="nav-event-subtitle">Musical Night</span></a>{shell}'
+                  f'<details class="guest-appearance"><summary>Appearance</summary>'
+                  f'<div class="guest-appearance-panel"><label>Mode <select id="appearance-mode">'
+                  f'<option value="system">System</option><option value="light">Light</option>'
+                  f'<option value="dark">Dark</option></select></label>'
+                  f'<label>Accent <select id="appearance-accent"><option value="coral">Coral</option>'
+                  f'<option value="blue">Blue</option><option value="green">Green</option>'
+                  f'<option value="purple">Purple</option></select></label></div></details></header>')
+        result = re.sub(r'<header\b[^>]*>.*?</header>', lambda _: header, result, count=1, flags=re.S)
+    if path != '/live':
         result = result.replace('</body>', '<footer class="guest-admin-link"><a href="/admin">Admin sign-in</a></footer></body>', 1)
     result = result.replace('</head>', '<link rel="stylesheet" href="/static/css/guest-navigation.css"></head>', 1)
     if path != '/live':

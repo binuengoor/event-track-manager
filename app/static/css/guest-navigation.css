@@ -203,3 +203,21 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
 /* Chooser: Sign out and Close sit side by side */
 .gad-actions { display: flex; gap: .75rem; }
 .gad-actions .gad-btn { flex: 1; }
+
+/* Shared guest header and device-local appearance controls. */
+.guest-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 20px; min-height: 72px; padding: 8px max(20px, calc((100vw - 1152px) / 2)); box-sizing: border-box; background: var(--bg-surface-1); border-bottom: 1px solid var(--border-subtle); }
+.guest-brand { display: flex; flex-direction: column; flex: 1 1 180px; min-width: 0; color: var(--text-primary); font-weight: 700; text-decoration: none; }
+.guest-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guest-brand span + span { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
+.guest-appearance { position: relative; flex: none; }
+.guest-appearance summary { cursor: pointer; padding: 10px; color: var(--text-primary); border: 1px solid var(--border-strong); border-radius: 999px; font-size: 14px; }
+.guest-appearance-panel { position: absolute; right: 0; top: calc(100% + 8px); display: grid; gap: 12px; min-width: 180px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-elevated); box-shadow: var(--shadow-2); }
+.guest-appearance-panel label { display: grid; gap: 4px; color: var(--text-primary); font-size: 14px; }
+.guest-appearance-panel select { padding: 8px; color: var(--text-primary); background: var(--bg-surface-1); border: 1px solid var(--border-strong); border-radius: 8px; }
+@media (max-width: 767px) { .guest-header { min-height: 64px; padding: 8px 16px; } }
+html[data-accent="blue"][data-theme="dark"] { --accent-primary: #60a5fa; --accent-on: #07182d; --accent-text: #93c5fd; }
+html[data-accent="blue"][data-theme="light"] { --accent-primary: #1d4ed8; --accent-on: #fff; --accent-text: #1d4ed8; }
+html[data-accent="green"][data-theme="dark"] { --accent-primary: #34d399; --accent-on: #052b20; --accent-text: #6ee7b7; }
+html[data-accent="green"][data-theme="light"] { --accent-primary: #047857; --accent-on: #fff; --accent-text: #047857; }
+html[data-accent="purple"][data-theme="dark"] { --accent-primary: #c4b5fd; --accent-on: #201039; --accent-text: #c4b5fd; }
+html[data-accent="purple"][data-theme="light"] { --accent-primary: #6d28d9; --accent-on: #fff; --accent-text: #6d28d9; }

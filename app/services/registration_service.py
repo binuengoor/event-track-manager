@@ -153,9 +153,6 @@ class RegistrationService:
                 "message": "Thank you! Your potluck food contribution has been registered."
             }
 
-        if reg_type == "both" and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
-            raise RegistrationError("Choose a dish or switch off the dish part.")
-
         # 2. Stage performance validation
         if not perf_signup_enabled:
             raise RegistrationError(
@@ -302,6 +299,23 @@ class RegistrationService:
                             f"A valid 10-digit phone number is required for partner '{p_name}' since they are not registered."
                         )
 
+        if food_signup_enabled and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
+            raise RegistrationError("Please select a potluck dish to register a performance.")
+
+        # Claim the dish before creating performances so an unavailable slot cannot produce a dishless registration.
+        food_signup_id = None
+        if food_signup_enabled and payload.food_signup and payload.food_signup.item_id:
+            try:
+                food_signup_id = db_service.claim_food_item(
+                    item_id=payload.food_signup.item_id,
+                    signer_name=clean_name,
+                    dish_description=payload.food_signup.dish_description or "",
+                    signer_phone=contact_phone
+                )
+            except ValueError as ex:
+                raise FoodItemUnavailableError(str(ex))
+
+
         # 3. Create performances
         created_ids = []
         for p in payload.performances:
@@ -337,19 +351,6 @@ class RegistrationService:
                 created_via="signup_portal"
             )
             created_ids.append(entry_id)
-
-        # 4. Handle food contribution if selected
-        food_signup_id = None
-        if food_signup_enabled and payload.food_signup and payload.food_signup.item_id:
-            try:
-                food_signup_id = db_service.claim_food_item(
-                    item_id=payload.food_signup.item_id,
-                    signer_name=clean_name,
-                    dish_description=payload.food_signup.dish_description or "",
-                    signer_phone=contact_phone
-                )
-            except ValueError as ex:
-                logger.warning("Food claim warning during signup: %s", ex)
 
         backup_service.trigger_backup()
 
