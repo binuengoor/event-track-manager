@@ -1,11 +1,10 @@
-/* Admin sign-in for guest pages: PIN dialog (boards GAdminPin / GAdminPinLockout) and the "where to?" chooser (GAdminChooser).
+/* Admin sign-in for guest pages: PIN dialog with a plain typed field (lockout as on board GAdminPinLockout) and the "where to?" chooser (GAdminChooser).
  * Opens from any element with [data-admin-signin] and from the footer "Admin sign-in" link, which stays a plain link to /admin
  * when scripts are off. Signs in with POST /api/auth/login (same cookie the admin and console pages use). */
 (function () {
   'use strict';
 
   var MAX_DIGITS = 10;
-  var MIN_DOTS = 4;
   var NS = 'http://www.w3.org/2000/svg';
   var ICON = {
     lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -80,7 +79,6 @@
   function openPin(trigger) {
     if (layer) return;
     returnFocus = trigger || document.activeElement;
-    var pin = '';
     var locked = false;
     var busy = false;
 
@@ -93,7 +91,7 @@
     var head = el('div', 'gad-head');
     var lock = el('span', 'gad-lock'); lock.appendChild(icon('lock', 22));
     var title = el('h2', 'gad-title', 'Admin sign-in'); title.id = 'gad-title';
-    head.append(lock, title, el('p', 'gad-sub', 'Enter the 4-digit Admin PIN'));
+    head.append(lock, title);
 
     var banner = el('div', 'gad-alert'); banner.hidden = true; banner.setAttribute('role', 'status'); banner.setAttribute('aria-live', 'off');
     var bannerBody = el('div');
@@ -102,64 +100,44 @@
     bannerBody.append(bannerMsg, bannerTime);
     banner.append(icon('warn', 20), bannerBody);
 
-    var dots = el('div', 'gad-dots'); dots.setAttribute('role', 'img');
-    var error = el('p', 'gad-error'); error.setAttribute('role', 'alert');
-
-    var pad = el('div', 'gad-pad');
-    var keys = [];
-    function key(label, text, cls) {
-      var b = el('button', 'gad-key' + (cls ? ' ' + cls : ''), text);
-      b.type = 'button'; b.setAttribute('aria-label', label);
-      keys.push(b);
-      return b;
-    }
-    '123456789'.split('').forEach(function (d) { var b = key(d, d); b.addEventListener('click', function () { add(d); }); pad.appendChild(b); });
-    var spacer = el('span'); spacer.setAttribute('aria-hidden', 'true'); pad.appendChild(spacer);
-    var zero = key('0', '0'); zero.addEventListener('click', function () { add('0'); }); pad.appendChild(zero);
-    var del = key('Delete last digit', '', 'alt'); del.appendChild(icon('back', 26)); del.addEventListener('click', back); pad.appendChild(del);
-
-    var submit = el('button', 'gad-btn primary', 'Sign in'); submit.type = 'button';
-    var hint = el('p', 'gad-hint', 'Tap Sign in after entering all 4 digits.');
+    // A plain field: type the PIN on your own keyboard, press Enter.
+    var form = el('form', 'gad-form'); form.noValidate = true;
+    var label = el('label', 'gad-label', 'Admin PIN'); label.htmlFor = 'gad-pin';
+    var input = el('input', 'gad-input');
+    input.id = 'gad-pin'; input.type = 'password'; input.inputMode = 'numeric'; input.maxLength = MAX_DIGITS;
+    input.autocomplete = 'off'; input.setAttribute('aria-describedby', 'gad-error');
+    label.appendChild(input);
+    var error = el('p', 'gad-error'); error.id = 'gad-error'; error.setAttribute('role', 'alert');
+    var submit = el('button', 'gad-btn primary', 'Sign in'); submit.type = 'submit';
+    form.append(label, error, submit);
     var cancel = el('button', 'gad-btn quiet', 'Cancel'); cancel.type = 'button';
     cancel.addEventListener('click', close);
-    submit.addEventListener('click', send);
+    form.addEventListener('submit', function (e) { e.preventDefault(); send(); });
+    input.addEventListener('input', function () {
+      input.value = input.value.replace(/\D/g, '');
+      error.textContent = '';
+      paint();
+    });
 
-    dlg.append(head, banner, dots, error, pad, submit, hint, cancel);
+    dlg.append(head, banner, form, cancel);
     scrim.appendChild(dlg);
     document.body.appendChild(scrim);
     document.body.style.overflow = 'hidden';
     document.documentElement.setAttribute('data-gad-open', '');
     layer = scrim;
     paint();
-    keys[0].focus();
+    input.focus();
 
-    trap(dlg, function (e) {
-      if (e.key === 'Escape') { e.preventDefault(); close(); return; }
-      if (locked || busy) return;
-      if (/^\d$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault(); add(e.key);
-        // Typists: move off the keypad so Enter submits instead of pressing the focused key.
-        if (e.target.classList && e.target.classList.contains('gad-key') && !submit.disabled) submit.focus();
-      }
-      else if (e.key === 'Backspace') { e.preventDefault(); back(); }
-      else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') { e.preventDefault(); send(); }
-    });
+    trap(dlg, function (e) { if (e.key === 'Escape') { e.preventDefault(); close(); } });
 
     function paint() {
-      var n = Math.max(MIN_DOTS, pin.length);
-      dots.textContent = '';
-      for (var i = 0; i < n; i++) dots.appendChild(el('span', i < pin.length ? 'on' : ''));
-      dots.setAttribute('aria-label', pin.length + ' of ' + n + ' digits entered');
-      submit.disabled = locked || busy || pin.length === 0;
-      hint.hidden = locked;
+      input.disabled = locked || busy;
+      submit.disabled = locked || busy || !input.value;
       submit.hidden = locked;
-      keys.forEach(function (k) { k.disabled = locked; k.setAttribute('aria-disabled', locked ? 'true' : 'false'); });
     }
-    function add(d) { if (locked || busy || pin.length >= MAX_DIGITS) return; error.textContent = ''; pin += d; paint(); }
-    function back() { if (locked || busy) return; pin = pin.slice(0, -1); error.textContent = ''; paint(); }
 
     function lockout(seconds) {
-      locked = true; pin = ''; error.textContent = '';
+      locked = true; input.value = ''; error.textContent = '';
       var end = Date.now() + seconds * 1000;
       var mins = Math.max(1, Math.ceil(seconds / 60));
       bannerMsg.textContent = 'Too many tries. Wait ' + mins + ' minute' + (mins === 1 ? '' : 's') + ' and try again.';
@@ -170,7 +148,7 @@
         bannerTime.textContent = '';
         bannerTime.append('Try again in ', Object.assign(el('b'), { textContent: fmt(left) }));
         if (left <= 0) {
-          clearInterval(timer); timer = null; locked = false; banner.hidden = true; paint(); keys[0].focus();
+          clearInterval(timer); timer = null; locked = false; banner.hidden = true; paint(); input.focus();
         }
       }
       tick();
@@ -179,6 +157,7 @@
     }
 
     async function send() {
+      var pin = input.value;
       if (locked || busy || !pin) return;
       busy = true; error.textContent = ''; submit.textContent = 'Signing in...'; paint();
       try {
@@ -192,10 +171,10 @@
         try { data = await res.json(); } catch (e) { /* no body */ }
         busy = false; submit.textContent = 'Sign in';
         if (res.status === 429) { lockout(Number(data.retry_after) || Number(res.headers.get('Retry-After')) || 300); return; }
-        pin = '';
+        input.value = '';
         error.textContent = "That PIN didn't match. Try again.";
-        dots.classList.remove('shake'); void dots.offsetWidth; dots.classList.add('shake');
-        paint(); keys[0].focus();
+        input.classList.remove('shake'); void input.offsetWidth; input.classList.add('shake');
+        paint(); input.focus();
       } catch (e) {
         busy = false; submit.textContent = 'Sign in';
         error.textContent = "Can't reach the server. Check your connection and try again.";
@@ -223,12 +202,13 @@
     [['/live', 'live', 'Live screen'], ['/console/stage-monitor', 'monitor', 'Stage monitor']].forEach(function (x) {
       var a = el('a', 'gad-mini'); a.href = x[0]; a.append(icon(x[1], 18), document.createTextNode(x[2])); row.appendChild(a);
     });
-    var done = el('button', 'gad-btn gad-close', 'Close'); done.type = 'button'; done.addEventListener('click', close);
+    // Reload on close and sign-out so the page header gains (or drops) the Console and Admin links.
+    var done = el('button', 'gad-btn gad-close', 'Close'); done.type = 'button'; done.addEventListener('click', function () { location.reload(); });
     var out = el('button', 'gad-btn gad-signout', 'Sign out'); out.type = 'button';
     out.addEventListener('click', function () {
       fetch('/api/auth/logout', { method: 'POST' }).catch(function () {}).then(function () {
         try { localStorage.removeItem('paattukoottam_pin'); } catch (e) {}
-        close();
+        location.reload();
       });
     });
     var actions = el('div', 'gad-actions'); actions.append(out, done);

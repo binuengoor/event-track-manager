@@ -45,15 +45,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateNetworkStatusDisplay();
   updateVaultStatusDisplay();
 
-  if (S.userAdminPin) {
-    await testAuthAndLoad();
-  } else {
-    showAuthModal();
-  }
+  // Always ask the server: someone who signed in on another page already has the sign-in cookie.
+  await testAuthAndLoad();
 
   // Periodic background sync every 45s (only if online and sequence is not dirty)
   S.autoSyncInterval = setInterval(() => {
-    if (navigator.onLine && S.userAdminPin && !S.isSequenceDirty && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
+    if (navigator.onLine && (S.userAdminPin || S.signedIn) && !S.isSequenceDirty && !document.getElementById('auth-modal').classList.contains('hidden') === false) {
       loadQueue(true); // silent background sync
       syncOfflineActions();
     }

@@ -14,9 +14,21 @@ html[data-theme="light"] {
 
 /* ---------------------------------------------------------------- navigation */
 .guest-navigation { display: flex; align-items: center; gap: .25rem; }
-/* Live is a full-screen venue display except on phones. Use a stable page class because
-   live-view.js changes data-mode as the show moves between states. */
-body.live-page .guest-navigation { display: none; }
+/* Staff links (Console, Admin): shown to signed-in admins on every page, always in the header. */
+.staff-navigation { display: flex; align-items: center; gap: .25rem; padding-left: .5rem; border-left: 1px solid var(--border-subtle); }
+.guest-header-end { display: flex; align-items: center; gap: 12px; flex: none; }
+/* Live keeps the same header as every other page. On the venue screen (browser in full screen, F11)
+   only the event name and status remain. Use a stable page class because live-view.js changes data-mode. */
+/* No backdrop blur here: it would trap the phone tab bar (position: fixed) inside the header. */
+body.live-page .guest-header { position: relative; z-index: 20; flex: none; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.live-page .guest-header .chip { font-size: 16px; text-shadow: none; }
+@media (display-mode: fullscreen) {
+  body.live-page .guest-navigation, body.live-page .staff-navigation, body.live-page .guest-appearance { display: none; }
+  body.live-page .guest-header { background: transparent; border-bottom: 0; }
+  body.live-page .guest-brand { flex-direction: row; align-items: baseline; gap: 16px; font-size: 24px; }
+  body.live-page .guest-brand span + span { font-size: 24px; }
+  body.live-page .guest-header .chip { font-size: 24px; }
+}
 .gn-link {
   position: relative;
   display: inline-flex;
@@ -66,7 +78,22 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
     background: var(--bg-surface-1);
     border-top: 1px solid var(--border-subtle);
   }
-  body.live-page .guest-navigation { display: grid; }
+  /* Admin and console keep their own bottom controls, so there the links scroll in a second header row. */
+  body:has(.guest-header.is-staff-page) { padding-bottom: 0; }
+  .guest-header.is-staff-page { flex-wrap: wrap; row-gap: 0; }
+  .is-staff-page .guest-navigation {
+    position: static; order: 3; flex: 0 0 100%; display: flex; gap: 2px; padding: 0; border-top: 0;
+    background: transparent; overflow-x: auto; scrollbar-width: none;
+  }
+  .is-staff-page .guest-navigation .gn-link { flex-direction: row; gap: 6px; min-height: 44px; padding: 0 10px; font-size: 13px; }
+  .is-staff-page .guest-navigation .gn-link svg { width: 18px; height: 18px; }
+  .is-staff-page .gn-plus { width: 24px; height: 24px; margin-top: 0; box-shadow: none; }
+  .is-staff-page .gn-dot { position: static; }
+  .staff-navigation { padding-left: 0; border-left: 0; gap: 0; }
+  .staff-navigation .gn-link { flex-direction: row; min-height: 44px; padding: 0 8px; font-size: 13px; color: var(--text-secondary); }
+  .staff-navigation .gn-link svg { display: none; }
+  .guest-header-end { gap: 4px; }
+  .guest-appearance summary { padding: 8px 10px; font-size: 13px; }
   .gn-link {
     flex-direction: column;
     gap: 3px;
@@ -123,25 +150,17 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
 }
 .gad-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
 .gad-sub { margin: 0; font-size: 14px; color: var(--text-secondary); }
-.gad-dots { display: flex; justify-content: center; gap: 16px; padding: 6px 0; }
-.gad-dots span {
-  width: 18px; height: 18px; box-sizing: border-box; border-radius: var(--radius-full);
-  border: 2px solid var(--gad-edge); background: transparent;
+.gad-form { display: flex; flex-direction: column; gap: 14px; }
+.gad-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.gad-input {
+  width: 100%; box-sizing: border-box; min-height: 52px; padding: 0 14px; margin-top: 6px;
+  border: 1px solid var(--gad-edge); border-radius: 12px; background: var(--bg-canvas); color: var(--text-primary);
+  font: 600 20px var(--font-mono); letter-spacing: .2em; text-align: center;
 }
-.gad-dots span.on { border-color: var(--text-primary); background: var(--text-primary); }
-.gad-dots.shake { animation: gad-shake .3s; }
+.gad-input:disabled { opacity: .5; }
+.gad-input.shake { animation: gad-shake .3s; }
 @keyframes gad-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
-.gad-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.gad-key {
-  height: 56px; min-width: 44px; border-radius: 14px;
-  border: 1px solid var(--gad-edge); background: var(--bg-surface-1); color: var(--text-primary);
-  font: 600 24px var(--font-mono); cursor: pointer;
-}
-.gad-key:hover { background: var(--bg-surface-2); }
-.gad-key:active { transform: scale(.97); }
-.gad-key.alt { background: var(--bg-surface-2); display: flex; align-items: center; justify-content: center; }
-.gad-key:disabled { opacity: .4; cursor: not-allowed; transform: none; background: var(--bg-surface-1); }
-.gad-key:focus-visible, .gad-btn:focus-visible, .gad-choice:focus-visible, .gad-mini:focus-visible {
+.gad-input:focus-visible, .gad-btn:focus-visible, .gad-choice:focus-visible, .gad-mini:focus-visible {
   outline: 3px solid var(--focus-ring); outline-offset: 2px;
 }
 .gad-btn {
@@ -153,7 +172,6 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
 .gad-btn.primary { background: var(--accent-primary); color: var(--accent-on); }
 .gad-btn.primary:disabled { opacity: .5; cursor: not-allowed; }
 .gad-btn.quiet { min-height: 44px; }
-.gad-hint { margin: -6px 0 0; font-size: 12px; color: var(--text-muted); text-align: center; }
 .gad-alert[hidden] { display: none; }
 .gad-alert {
   display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px;
@@ -198,15 +216,15 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
   .gad-chooser { justify-content: center; }
   .gad-chooser .gad-close { margin-top: 0; }
 }
-@media (prefers-reduced-motion: reduce) { .gad-dots.shake { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .gad-input.shake { animation: none; } }
 
 /* Chooser: Sign out and Close sit side by side */
 .gad-actions { display: flex; gap: .75rem; }
 .gad-actions .gad-btn { flex: 1; }
 
 /* Shared guest header and device-local appearance controls. */
-.guest-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 20px; min-height: 72px; padding: 8px max(20px, calc((100vw - 1152px) / 2)); box-sizing: border-box; background: var(--bg-surface-1); border-bottom: 1px solid var(--border-subtle); }
-.guest-brand { display: flex; flex-direction: column; flex: 1 1 180px; min-width: 0; color: var(--text-primary); font-weight: 700; text-decoration: none; }
+.guest-header { position: sticky; top: 0; z-index: 40; display: flex; align-items: center; gap: 20px; min-height: 72px; padding: 8px max(20px, calc((100vw - 1280px) / 2)); box-sizing: border-box; background: var(--bg-surface-1); border-bottom: 1px solid var(--border-subtle); }
+.guest-brand { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 120px; color: var(--text-primary); font-weight: 700; text-decoration: none; }
 .guest-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .guest-brand span + span { color: var(--text-secondary); font-size: 12px; font-weight: 500; }
 .guest-appearance { position: relative; flex: none; }
@@ -214,7 +232,29 @@ html[data-event-state="ended"] .gn-plus { background: var(--bg-surface-2); color
 .guest-appearance-panel { position: absolute; right: 0; top: calc(100% + 8px); display: grid; gap: 12px; min-width: 180px; padding: 16px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--bg-elevated); box-shadow: var(--shadow-2); }
 .guest-appearance-panel label { display: grid; gap: 4px; color: var(--text-primary); font-size: 14px; }
 .guest-appearance-panel select { padding: 8px; color: var(--text-primary); background: var(--bg-surface-1); border: 1px solid var(--border-strong); border-radius: 8px; }
-@media (max-width: 767px) { .guest-header { min-height: 64px; padding: 8px 16px; } }
+/* Tablets and small laptops: drop the link icons, then the staff labels, so the one row always fits. */
+@media (min-width: 768px) and (max-width: 1180px) {
+  .guest-header { gap: 12px; }
+  .guest-navigation { gap: 0; }
+  .guest-navigation .gn-link { padding: 0 10px; }
+  .guest-navigation .gn-link > svg { display: none; }
+  body.live-page .guest-header .chip { font-size: 14px; }
+}
+@media (min-width: 768px) and (max-width: 960px) {
+  .guest-brand { min-width: 96px; }
+  .staff-navigation .gn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .staff-navigation .gn-link { padding: 0 10px; }
+}
+@media (max-width: 767px) {
+  .guest-header { min-height: 64px; padding: 8px 16px; gap: 8px; }
+  .guest-brand { flex: 1 1 0; min-width: 0; }
+}
+/* Live on phones and tablets: the status line gets its own row under the event name. */
+@media (max-width: 960px) {
+  body.live-page .guest-header { flex-wrap: wrap; row-gap: 2px; }
+  body.live-page .guest-brand { flex: 1 1 0; min-width: 96px; }
+  body.live-page .guest-header .chip { order: 9; flex: 0 0 100%; font-size: 14px; padding-bottom: 4px; }
+}
 html[data-accent="blue"][data-theme="dark"] { --accent-primary: #60a5fa; --accent-on: #07182d; --accent-text: #93c5fd; }
 html[data-accent="blue"][data-theme="light"] { --accent-primary: #1d4ed8; --accent-on: #fff; --accent-text: #1d4ed8; }
 html[data-accent="green"][data-theme="dark"] { --accent-primary: #34d399; --accent-on: #052b20; --accent-text: #6ee7b7; }

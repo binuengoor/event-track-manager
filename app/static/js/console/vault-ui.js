@@ -163,7 +163,7 @@ export async function renderVaultSheet() {
 // Auto-cache from the manifest. onlyId limits the run to one act (retry). A missing
 // manifest (404) leaves the manual "Cache all" flow in charge.
 export async function autoVaultSync(onlyId = null) {
-  if (vaultSyncRunning || !S.userAdminPin || !navigator.onLine) return;
+  if (vaultSyncRunning || !(S.userAdminPin || S.signedIn) || !navigator.onLine) return;
   S.vaultManifest = await fetchManifest(fetch, getAuthHeaders) || S.vaultManifest;
   if (S.vaultManifest) trackGains.update(S.vaultManifest.tracks);
   if (!S.vaultManifest) { await updateVaultStatusDisplay(); return; }
@@ -201,7 +201,7 @@ export async function autoVaultSync(onlyId = null) {
 }
 
 export async function cacheAllTracksOffline() {
-  if (S.userAdminPin && navigator.onLine) {
+  if ((S.userAdminPin || S.signedIn) && navigator.onLine) {
     const manifest = await fetchManifest(fetch, getAuthHeaders);
     if (manifest) {
       S.vaultManifest = manifest;

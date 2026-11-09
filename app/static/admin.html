@@ -60,11 +60,11 @@
     </div>
   </div>
 
-  <!-- Header -->
+  <!-- Console toolbar. The server puts the shared site header above it (app/guest_navigation.py). -->
   <header class="c-header">
     <div class="c-header__id">
       <h1 class="c-header__title">Sound console</h1>
-      <span class="c-header__event"><span id="admin-event-title"></span><span id="admin-event-subtitle"></span></span>
+      <span class="c-header__event" hidden><span id="admin-event-title"></span><span id="admin-event-subtitle"></span></span>
     </div>
     <div class="c-header__tools" id="console-subheader">
       <!-- Vault chip: opens the vault sheet -->
@@ -81,7 +81,6 @@
         <span class="c-dot" id="network-dot"></span>
         <span id="network-status-text">Online</span>
       </div>
-      <a href="/admin" class="c-link" aria-label="Admin menu">Admin <i data-lucide="chevron-down"></i></a>
       <button id="open-screens-btn" type="button" class="c-btn c-btn--sm" title="Announcement, fade to black, lyrics and the stage monitor">
         <i data-lucide="tv"></i><span>Screens</span>
       </button>

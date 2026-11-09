@@ -13,6 +13,7 @@ export const S = {
   isPlaying: false,
   isMuted: false,
   userAdminPin: localStorage.getItem('paattukoottam_pin') || '',
+  signedIn: false,  // true once the server accepts us: by the saved PIN or by the sign-in cookie from any other page
   searchQuery: '',
   autoSyncInterval: null,
   isSequenceDirty: false,

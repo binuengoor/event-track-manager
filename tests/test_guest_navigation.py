@@ -79,25 +79,67 @@ def test_old_guest_routes_permanently_redirect(old, new):
     assert response.headers['location'] == new
 
 
-def test_live_navigation_is_reserved_for_phones():
+def test_live_has_the_same_header_as_every_other_page():
+    """Live used to hide its links on desktop, so there was no way back to Home."""
     with TestClient(app) as client:
         response = client.get('/live')
     assert response.status_code == 200
-    shell = response.text.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
+    header = response.text.split('<header class="guest-header"', 1)[1].split('</header>', 1)[0]
+    shell = header.split('<nav aria-label="Main"', 1)[1].split('</nav>', 1)[0]
     assert 'href="/live" aria-current="page"' in shell
+    assert 'href="/"' in shell
+    assert 'class="guest-brand"' in header and 'id="live-event-title"' in header
+    assert 'id="live-badge"' in header          # the status chip moves into the shared header
+    assert response.text.count('<header') == 1
     assert 'class="live-page"' in response.text
-    assert 'href="/static/css/guest-navigation.css"' in response.text
     assert 'guest-admin-link' not in response.text
 
 
-def test_live_navigation_css_hides_it_except_on_phones():
+def test_live_navigation_hides_only_on_the_full_screen_venue_display():
     from pathlib import Path
 
     css = Path(__file__).parents[1] / 'app' / 'static' / 'css' / 'guest-navigation.css'
     rules = css.read_text()
-    assert 'body.live-page .guest-navigation { display: none; }' in rules
-    assert '@media (max-width: 767px)' in rules
-    assert 'body.live-page .guest-navigation { display: grid; }' in rules
+    plain, full = rules.split('@media (display-mode: fullscreen)', 1)
+    assert 'body.live-page .guest-navigation { display: none; }' not in plain
+    assert 'body.live-page .guest-navigation' in full.split('@media', 1)[0]
+
+
+@pytest.mark.parametrize('path', ['/admin', '/console'])
+def test_staff_pages_use_the_shared_header_with_a_way_home(path):
+    with TestClient(app) as client:
+        html = client.get(path).text
+    header = html.split('<header class="guest-header', 1)[1].split('</header>', 1)[0]
+    assert 'href="/" class="guest-brand"' in header
+    for href in ('/', '/schedule', '/signup', '/my-entry', '/live'):
+        assert f'<a href="{href}"' in header, href
+    staff = header.split('<nav aria-label="Staff"', 1)[1].split('</nav>', 1)[0]
+    assert f'href="{path}" aria-current="page"' in staff
+    assert 'href="/console"' in staff and 'href="/admin"' in staff
+    assert html.count('<header') == 1
+    assert '/static/js/nav.js' not in html
+
+
+@pytest.mark.parametrize('path', ['/', '/signup', '/my-entry', '/schedule', '/live'])
+def test_signed_in_admin_sees_console_and_admin_links_on_guest_pages(path):
+    from app.config import settings
+
+    with TestClient(app) as client:
+        assert client.post('/api/auth/login', json={'pin': settings.admin_pin}).status_code == 200
+        html = client.get(path).text
+    staff = html.split('<nav aria-label="Staff"', 1)[1].split('</nav>', 1)[0]
+    assert 'href="/console"' in staff and 'href="/admin"' in staff
+
+
+def test_admin_sign_in_is_a_typed_field_not_an_on_screen_keypad():
+    from pathlib import Path
+
+    static = Path(__file__).parents[1] / 'app' / 'static'
+    js = (static / 'js' / 'guest-admin.js').read_text()
+    css = (static / 'css' / 'guest-navigation.css').read_text()
+    assert "input.type = 'password'" in js and "inputMode = 'numeric'" in js
+    for gone in ('gad-pad', 'gad-key', 'gad-dots'):
+        assert gone not in js and gone not in css, gone
 
 
 def test_single_destination_has_no_navigation_bar():

@@ -81,6 +81,7 @@ export function setupAuth() {
       }
 
       S.userAdminPin = pin;
+      S.signedIn = true;
       localStorage.setItem('paattukoottam_pin', pin);
       hideAuthModal();
       await loadQueue();
@@ -115,6 +116,7 @@ export async function testAuthAndLoad() {
         errorMsg.classList.remove('hidden');
       }
     } else {
+      S.signedIn = true;
       hideAuthModal();
       await loadQueue();
     }

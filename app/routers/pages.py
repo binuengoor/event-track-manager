@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.config import settings, get_setting
 from app.guest_navigation import render_guest_navigation
+from app.routers.auth import is_admin
 
 router = APIRouter(tags=["pages"])
 
@@ -15,13 +16,13 @@ STATIC_DIR = os.path.join(BASE_DIR, "static")
 
 
 @router.get("/", response_class=HTMLResponse)
-async def serve_landing_page():
+async def serve_landing_page(request: Request):
     landing_path = os.path.join(STATIC_DIR, "landing.html")
     if not os.path.isfile(landing_path):
         landing_path = os.path.join(STATIC_DIR, "index.html")
     with open(landing_path, "r", encoding="utf-8") as f:
         html = f.read()
-    html = render_guest_navigation(_brand(html), "/")
+    html = _brand(render_guest_navigation(html, "/", staff=is_admin(request)))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
@@ -30,7 +31,7 @@ async def serve_landing_page():
 
 
 @router.get("/signup", response_class=HTMLResponse)
-async def serve_signup_page():
+async def serve_signup_page(request: Request):
     signup_path = os.path.join(STATIC_DIR, "signup.html")
     with open(signup_path, "r", encoding="utf-8") as f:
         html = f.read()
@@ -38,14 +39,14 @@ async def serve_signup_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/signup.js', f'/static/js/signup.js?v={version}')
 
-    html = render_guest_navigation(_brand(html), "/signup")
+    html = _brand(render_guest_navigation(html, "/signup", staff=is_admin(request)))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
 @router.get("/my-entry", response_class=HTMLResponse)
-async def serve_performer_page():
+async def serve_performer_page(request: Request):
     index_path = os.path.join(STATIC_DIR, "index.html")
     with open(index_path, "r", encoding="utf-8") as f:
         html = f.read()
@@ -53,7 +54,7 @@ async def serve_performer_page():
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
 
-    html = render_guest_navigation(_brand(html), "/my-entry")
+    html = _brand(render_guest_navigation(html, "/my-entry", staff=is_admin(request)))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
@@ -99,24 +100,25 @@ async def redirect_intake_to_performer(request: Request):
 
 
 @router.get("/schedule", response_class=HTMLResponse)
-async def serve_dashboard_page():
+async def serve_dashboard_page(request: Request):
     dash_path = os.path.join(STATIC_DIR, "dashboard.html")
     with open(dash_path, "r", encoding="utf-8") as f:
         html = f.read()
-    html = render_guest_navigation(_brand(html), "/schedule")
+    html = _brand(render_guest_navigation(html, "/schedule", staff=is_admin(request)))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 
 @router.get("/admin", response_class=HTMLResponse)
-async def serve_admin_settings_page():
+async def serve_admin_settings_page(request: Request):
     admin_settings_path = os.path.join(STATIC_DIR, "admin-settings.html")
     with open(admin_settings_path, "r", encoding="utf-8") as f:
         html = f.read()
 
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/admin-settings.js', f'/static/js/admin-settings.js?v={version}')
+    html = _brand(render_guest_navigation(html, "/admin", staff=True, staff_page=True))
 
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -129,13 +131,16 @@ async def redirect_settings_to_admin():
 
 
 @router.get("/console", response_class=HTMLResponse)
-async def serve_console_page():
+async def serve_console_page(request: Request):
     admin_path = os.path.join(STATIC_DIR, "admin.html")
     with open(admin_path, "r", encoding="utf-8") as f:
         html = f.read()
 
     version = int(datetime.now(timezone.utc).timestamp())
     html = html.replace('/static/js/admin.js', f'/static/js/admin.js?v={version}')
+    # The console is always dark (stage use), so it has no Appearance control; its own header stays as the toolbar row.
+    html = _brand(render_guest_navigation(html, "/console", staff=True, staff_page=True,
+                                   keep_page_header=True, appearance=False))
 
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
@@ -166,12 +171,14 @@ async def redirect_stage_monitor():
 
 
 @router.get("/live", response_class=HTMLResponse)
-async def serve_live_page():
+async def serve_live_page(request: Request):
     live_path = os.path.join(STATIC_DIR, "live.html")
     with open(live_path, "r", encoding="utf-8") as f:
         html = f.read()
 
-    html = render_guest_navigation(html, "/live")
+    # Live is always dark (venue screen), so like the console it has no Appearance control.
+    html = _brand(render_guest_navigation(html, "/live", staff=is_admin(request), appearance=False,
+                                          title_id="live-event-title", subtitle_id="live-event-subtitle"))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
