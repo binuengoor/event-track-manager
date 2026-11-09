@@ -401,3 +401,7 @@ button.c-chip:hover { filter: brightness(1.2); }
   .c-dot--pulse, .c-pulse, .c-spin, .c-btn--icon-text.is-pending { animation: none; }
   .c-toast, .c-meter__fill, .c-row { transition: none; }
 }
+@media (max-width: 999px) {
+  .c-header__tools { flex: 1 1 100%; min-width: 0; }
+  .c-header__tools > * { max-width: 100%; }
+}
