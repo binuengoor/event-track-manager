@@ -2,7 +2,7 @@ import { S, hooks, trackGains, transport } from "./state.js";
 import { FADE_MS, createFader, createGainStage } from "./fade.js";
 import { applySink, listOutputs, rememberSink, rememberedSink, sinkSupported } from "./output-device.js";
 import { broadcastStageMonitor } from "./stage-sync.js";
-import { escapeHtml, formatTime, showToast } from "./util.js";
+import { escapeHtml, showToast, updatePlayerTimeReadouts } from "./util.js";
 
 export function syncConsolePreviewVideo(play) {
   const previewVid = document.getElementById('console-preview-video');
@@ -74,7 +74,7 @@ export function initWaveSurfer() {
     });
 
     S.wavesurfer.on('timeupdate', (currentTime) => {
-      document.getElementById('player-current-time').textContent = formatTime(currentTime);
+      if (!updatePlayerTimeReadouts(currentTime, S.wavesurfer.getDuration(), S.currentCuedItem)) return;
       const previewVid = document.getElementById('console-preview-video');
       if (previewVid && !previewVid.paused && Math.abs(previewVid.currentTime - currentTime) > 0.3) {
         previewVid.currentTime = currentTime;
@@ -87,7 +87,7 @@ export function initWaveSurfer() {
     });
 
     S.wavesurfer.on('ready', (duration) => {
-      document.getElementById('player-duration').textContent = formatTime(duration);
+      if (!updatePlayerTimeReadouts(S.wavesurfer.getCurrentTime(), duration, S.currentCuedItem, true)) return;
       document.getElementById('waveform-placeholder').classList.add('hidden');
       updateTransportUi();
       broadcastStageMonitor('CUE');

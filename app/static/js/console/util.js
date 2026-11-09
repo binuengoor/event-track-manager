@@ -49,6 +49,33 @@ export function formatTime(seconds) {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 }
 
+export function formatRemainingTime(currentTime, duration) {
+  if (!Number.isFinite(duration) || duration <= 0) return '--:--';
+  const current = Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0;
+  const seconds = Math.max(0, Math.ceil(duration - current));
+  const minutesText = String(Math.floor(seconds / 60)).padStart(2, '0');
+  const secondsText = String(seconds % 60).padStart(2, '0');
+  return `-${minutesText}:${secondsText}`;
+}
+
+export function updatePlayerRemainingTime(currentTime, duration) {
+  const readout = document.getElementById('player-remaining-time');
+  if (readout) readout.textContent = formatRemainingTime(currentTime, duration);
+}
+
+export function updatePlayerTimeReadouts(currentTime, duration, item, includeDuration = false) {
+  const acoustic = item && (item.track_status === 'Acoustic' || item.is_acoustic === true || /acoustic/i.test(item.performance_type || ''));
+  if (!item || acoustic) return false;
+  const current = document.getElementById('player-current-time');
+  if (current) current.textContent = formatTime(currentTime);
+  if (includeDuration) {
+    const total = document.getElementById('player-duration');
+    if (total) total.textContent = formatTime(duration);
+  }
+  updatePlayerRemainingTime(currentTime, duration);
+  return true;
+}
+
 export function escapeHtml(str) {
   if (!str) return '';
   return String(str).replace(/[&<>"']/g, (m) => ({

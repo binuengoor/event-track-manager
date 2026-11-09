@@ -188,6 +188,7 @@ export function cueTrack(item, autoPlay = false, isRestoration = false) {
       }
       document.getElementById('player-current-time').textContent = 'Live';
       document.getElementById('player-duration').textContent = 'Stage';
+      document.getElementById('player-remaining-time').textContent = '--:--';
     } else {
       if (placeholder) {
         placeholder.textContent = 'Loading audio waveform...';

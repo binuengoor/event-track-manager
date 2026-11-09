@@ -123,6 +123,8 @@ export function resetPlayerBar() {
 
   document.getElementById('player-current-time').textContent = '0:00';
   document.getElementById('player-duration').textContent = '0:00';
+  const remainingTime = document.getElementById('player-remaining-time');
+  if (remainingTime) remainingTime.textContent = '--:--';
   if (placeholder) {
     placeholder.textContent = 'Waveform visualizer ready';
     placeholder.classList.remove('hidden');

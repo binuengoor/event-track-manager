@@ -256,7 +256,8 @@ button.c-chip:hover { filter: brightness(1.2); }
   background: var(--bg-surface-1); color: var(--text-primary); font-size: 13px; font-weight: 600; text-decoration: none;
 }
 .c-sbtn:hover:not(:disabled):not(.is-disabled) { background: var(--bg-elevated); }
-.c-sbtn:disabled, .c-sbtn.is-disabled { opacity: .4; pointer-events: none; }
+.c-sbtn:disabled { opacity: .4; pointer-events: none; }
+.c-sbtn.is-disabled { opacity: 1; pointer-events: none; cursor: not-allowed; color: var(--text-secondary); background: var(--bg-surface-2); }
 .c-sbtn--warn { color: var(--status-cued-fg); }
 .c-sbtn--warn.is-on { background: var(--status-cued-bg); border-color: var(--status-cued-fg); }
 .c-sbtn--bad { color: var(--status-danger-fg); }

@@ -83,6 +83,17 @@ def test_no_hard_coded_brand_text_in_pages_or_scripts():
     assert not offenders, offenders
 
 
+def test_disabled_console_secondary_control_uses_accessible_token_contrast():
+    console = (STATIC / "css" / "console.css").read_text()
+    match = re.search(r"\.c-sbtn\.is-disabled\s*\{([^}]+)\}", console)
+    assert match, "console disabled control rule is missing"
+    rule = match.group(1)
+    assert re.search(r"color:\s*var\(--text-secondary\)", rule), rule
+    assert re.search(r"background:\s*var\(--bg-surface-2\)", rule), rule
+    assert not re.search(r"opacity:\s*(?:0?\.\d+)", rule), "translucency dims disabled text below its token contrast"
+    assert ratio(DARK["text-secondary"], DARK["bg-surface-2"]) >= 4.5
+
+
 def test_theme_script_resolves_system_light_dark():
     js = (STATIC / "js" / "theme.js").read_text()
     assert "prefers-color-scheme: light" in js and "etm-theme" in js and "data-theme" in js
