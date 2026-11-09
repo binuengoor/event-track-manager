@@ -104,6 +104,7 @@
     show('countdown-card', mode === 'prestart');
     show('doors-open-pill', mode === 'prestart' && Boolean(String(data.doors_open_time || '').trim()));
     show('post-event-qr-wrap', mode === 'ended' && Boolean(postEventQrUrl));
+    show('signup-qr-wrap', data.signups_open === true);  // no sign-up QR once registration is closed
     show('now-performing-card', mode === 'live');
     const label = $('section-status-text');
     if (label) label.textContent = mode === 'prestart' ? 'Stage Countdown' : 'Now on Stage';

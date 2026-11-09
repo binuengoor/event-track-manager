@@ -180,6 +180,11 @@ export function renderQueueList() {
         <span class="c-row__tag">${tagText}</span>
       </div>
       <div class="c-row__actions">
+        <div class="c-row__sheethead" aria-hidden="true">
+          <span class="c-row__sheetsong">${escapeHtml(item.song_title)}${durationInfo}</span>
+          <span class="c-row__sheetwho">${escapeHtml(performerText)}${isVideo ? ' · Video' : ''}</span>
+          <span class="c-row__tag">${tagText}</span>
+        </div>
         ${extraTagsPills}
         ${noteHtml}
         ${cacheBtnHtml}

@@ -31,7 +31,7 @@ main:has(#signup-done:not([hidden])) #signup-banner { display: none; }
 .su-head h1 { margin: 0; font-size: 24px; line-height: 30px; letter-spacing: -.01em; font-weight: 700; color: var(--text-primary); }
 
 #signup-form { display: flex; flex-direction: column; flex: 1; }
-#signup-form.is-single .gf-stepper, #signup-form.is-single .gf-step-status { display: none; }
+/* Both paths show the progress bar, so the page does not jump when you switch between Perform and Bring a dish. */
 .gf-stepper { gap: 6px; margin: 8px 0 0; }
 .gf-stepper li { height: 4px; border-radius: 2px; background: var(--border-subtle); }
 .gf-step-status { margin: 4px 0 14px; font-size: 13px; font-weight: 400; color: var(--text-muted); }
@@ -66,9 +66,8 @@ body.signup-page .gf-form-error { margin: 0 0 12px; border-radius: 14px; }
 
 /* ------------------------------------------------------------------ segmented choices (I want to / Type) */
 body.signup-page .gf-choices, body.signup-page #perf-type.gf-radio-row {
-  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg-surface-2);
+  display: grid; grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: var(--bg-surface-2);
 }
-body.signup-page #perf-type.gf-radio-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 body.signup-page .gf-choice, body.signup-page #perf-type .gf-radio {
   flex: initial; flex-direction: row; gap: 0; min-height: 44px; padding: 0 8px; border: 1px solid transparent; border-radius: 9px;
   background: transparent; color: var(--text-secondary); font-size: 14px; font-weight: 500;

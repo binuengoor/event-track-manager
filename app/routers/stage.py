@@ -88,6 +88,8 @@ def get_live_status(request: Request):
     status["event_name"] = get_setting("event_name", status.get("event_name"))
     status["event_subtitle"] = get_setting("event_subtitle", status.get("event_subtitle"))
     status["live_display_enabled"] = feature_enabled("live_display_enabled")
+    # The venue screen shows the sign-up QR code only while guests can still sign up.
+    status["signups_open"] = feature_enabled("signup_enabled") or feature_enabled("food_signup_enabled")
     if not status["live_display_enabled"]:
         for key in ("now_performing",):
             status[key] = None

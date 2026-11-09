@@ -44,7 +44,7 @@ body[data-mode="off"] #live-badge, body[data-mode="off"] .lv-subtitle { display:
 .lv-eyebrow-accent { color: var(--accent-text); letter-spacing: .12em; }
 
 /* Now on stage: the song leads, then the performer, then type and film */
-.lv-now { background: color-mix(in srgb, var(--status-playing-bg) 86%, transparent); border: 1px solid rgb(52 211 153 / .25); }
+.lv-now { background: rgb(19 22 27 / .72); border: 1px solid rgb(255 255 255 / .14); }
 .lv-now .lv-eyebrow { color: var(--status-playing-fg); }
 .lv-now-title { font-size: clamp(56px, 6.875vw, 132px); font-weight: 700; letter-spacing: -.03em; line-height: 1.02; color: #fff; text-shadow: 0 2px 24px rgb(0 0 0 / .65); }
 .lv-now > * { flex-shrink: 0; }
@@ -137,6 +137,8 @@ body[data-mode="off"] #announcement { display: none; }
 /* Footer: sign-up QR, URL, sync state, clock, refresh */
 .lv-foot { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; min-height: 60px; padding: 0 32px; color: var(--lv-soft); font-size: 24px; }
 .qr-wrap { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.qr-wrap.hidden { display: none; }
+body:has(.qr-wrap.hidden) .lv-foot { justify-content: flex-end; min-height: 60px; }
 #signup-qr { width: 56px; height: 56px; border-radius: 4px; overflow: hidden; background: #fff; flex: 0 0 auto; }
 #signup-qr svg { display: block; width: 100%; height: 100%; }
 .lv-qr-text { display: flex; flex-direction: column; min-width: 0; }

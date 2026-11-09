@@ -127,7 +127,7 @@ function showStep() {
     ? "Submit"
     : (nextKey === "act" ? "Continue to your song" : "Continue to dish");
   const current = seq[state.step];
-  $("step-status").textContent = single ? "" : `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[current]}`;
+  $("step-status").textContent = single ? "Step 1 of 1 · You and your dish" : `Step ${state.step + 1} of ${seq.length} · ${STEP_LABELS[current]}`;
   const onDish = single || current === "dish";
   $("skip-dish-btn").hidden = true;
   $("add-song-btn").hidden = true;

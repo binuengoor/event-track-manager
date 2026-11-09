@@ -179,3 +179,28 @@ def test_guest_pages_have_no_staff_links_except_the_footer_sign_in(path):
     for legacy in ('Performer Hub', 'Transparency Dashboard', 'href="/dashboard"', 'href="/performer"',
                    'href="/upload"', 'href="/intake"', 'Staff'):
         assert legacy not in html, legacy
+
+
+def test_live_status_says_whether_sign_ups_are_open_so_the_venue_screen_can_drop_the_qr_code():
+    with TestClient(app) as client:
+        assert client.get('/api/live-status').json()['signups_open'] is True
+        db_service.set_app_setting('signup_enabled', False)
+        db_service.set_app_setting('food_signup_enabled', False)
+        assert client.get('/api/live-status').json()['signups_open'] is False
+
+
+def test_live_sign_up_qr_starts_hidden_and_follows_the_sign_up_state():
+    from pathlib import Path
+
+    static = Path(__file__).parents[1] / 'app' / 'static'
+    assert 'id="signup-qr-wrap" class="qr-wrap hidden"' in (static / 'live.html').read_text()
+    assert "show('signup-qr-wrap', data.signups_open === true)" in (static / 'js' / 'live' / 'live-view.js').read_text()
+
+
+def test_sign_up_shows_progress_on_both_paths_and_console_sheet_names_the_act():
+    from pathlib import Path
+
+    static = Path(__file__).parents[1] / 'app' / 'static'
+    assert 'is-single .gf-stepper' not in (static / 'css' / 'signup.css').read_text()
+    assert 'repeat(3, minmax(0, 1fr))' not in (static / 'css' / 'signup.css').read_text()
+    assert 'c-row__sheethead' in (static / 'js' / 'console' / 'queue-render.js').read_text()
