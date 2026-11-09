@@ -49,20 +49,35 @@
     const grid = document.getElementById('preset-grid');
     if (!grid) return;
     const active = (typeof adminSettings !== 'undefined' && adminSettings && adminSettings.active_preset) || '';
-    grid.innerHTML = presets.map((p) => `
-      <button type="button" class="preset-card as-type-card" aria-pressed="${selectedPreset === p.id}" data-preset="${esc(p.id)}">
+    grid.innerHTML = presets.map((p, index) => `
+      <button type="button" role="radio" class="preset-card as-type-card" aria-checked="${selectedPreset === p.id}" tabindex="${selectedPreset === p.id || (!selectedPreset && index === 0) ? '0' : '-1'}" data-preset="${esc(p.id)}">
         <span class="as-type-top"><span class="as-type-icon">${ICON(p.icon)}</span><span class="as-type-name">${esc(p.name)}</span>${active === p.id ? '<span class="as-badge accent">Current</span>' : ''}</span>
         <span class="as-type-tag">${esc(p.tagline)}</span>
       </button>`).join('');
     if (window.lucide) lucide.createIcons();
-    grid.querySelectorAll('.preset-card').forEach((btn) => btn.addEventListener('click', () => {
-      selectedPreset = btn.dataset.preset;
+    const selectPreset = (presetId) => {
+      selectedPreset = presetId;
       renderPresets();
       renderPreview();
-      const again = grid.querySelector(`[data-preset="${selectedPreset}"]`);
+      const again = Array.from(grid.querySelectorAll('.preset-card')).find((card) => card.dataset.preset === selectedPreset);
       if (again) again.focus();
       document.getElementById('preset-preview')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    }));
+    };
+    grid.querySelectorAll('.preset-card').forEach((btn) => {
+      btn.addEventListener('click', () => selectPreset(btn.dataset.preset));
+      btn.addEventListener('keydown', (event) => {
+        const cards = Array.from(grid.querySelectorAll('.preset-card'));
+        const current = cards.indexOf(btn);
+        let next = current;
+        if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = (current + 1) % cards.length;
+        else if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = (current - 1 + cards.length) % cards.length;
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = cards.length - 1;
+        else return;
+        event.preventDefault();
+        selectPreset(cards[next].dataset.preset);
+      });
+    });
   }
 
   function renderPreview() {
