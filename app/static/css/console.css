@@ -182,7 +182,7 @@ button.c-chip:hover { filter: brightness(1.2); }
 .c-act svg.lucide { width: 14px; height: 14px; }
 @media (hover: hover) and (pointer: fine) {
   .c-row__actions {
-    position: absolute; right: 8px; top: calc(100% - 6px); z-index: 5; padding: 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%); z-index: 5; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-md);
     background: var(--bg-elevated); box-shadow: var(--shadow-2); opacity: 0; pointer-events: none; max-width: calc(100% - 16px);
   }
   .c-row:hover .c-row__actions, .c-row:focus-within .c-row__actions { opacity: 1; pointer-events: auto; }
