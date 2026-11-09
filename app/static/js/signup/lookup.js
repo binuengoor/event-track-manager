@@ -1,14 +1,41 @@
 // Food groups, name lookup, profile prefill, song duplicate warning.
 // Classic script: shares globals with the other signup files (see load order in the page).
 
+let selectedFoodCategoryId = "all";
+
 function renderFoodGroups() {
   const container = $("food-groups-container");
+  const filterContainer = $("food-category-filters");
   const c = state.config;
   if (!container || !c) return;
   const selected = document.querySelector('input[name="food_item_id"]:checked')?.value || "";
   const me = $("performer-name").value.trim().toLowerCase();
   const groups = c.food_groups || [];
   const items = c.food_items || [];
+  const groupsWithItems = groups.filter(group => items.some(item => item.group_id === group.group_id));
+  if (!groupsWithItems.some(group => group.group_id === selectedFoodCategoryId)) selectedFoodCategoryId = "all";
+  if (filterContainer) {
+    filterContainer.innerHTML = "";
+    filterContainer.hidden = groupsWithItems.length < 2;
+    if (groupsWithItems.length >= 2) {
+      [{group_id: "all", name: "All"}, ...groupsWithItems].forEach(group => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "su-food-filter";
+        button.dataset.groupId = String(group.group_id);
+        button.textContent = group.name;
+        button.setAttribute("aria-pressed", String(group.group_id === selectedFoodCategoryId));
+        button.addEventListener("click", () => {
+          selectedFoodCategoryId = group.group_id;
+          renderFoodGroups();
+          const replacement = Array.from(filterContainer.children)
+            .find(candidate => candidate.dataset.groupId === String(group.group_id));
+          replacement?.focus();
+        });
+        filterContainer.appendChild(button);
+      });
+    }
+  }
   container.innerHTML = "";
   let open = 0;
 
@@ -17,6 +44,7 @@ function renderFoodGroups() {
     if (!groupItems.length) return;
     const wrap = document.createElement("div");
     wrap.className = "gf-dish-group";
+    wrap.hidden = selectedFoodCategoryId !== "all" && group.group_id !== selectedFoodCategoryId;
     const h = document.createElement("h3");
     const gName = document.createElement("span");
     gName.textContent = group.name;
@@ -70,7 +98,16 @@ function renderFoodGroups() {
     p.textContent = "No dishes are listed yet. Check back soon.";
     container.appendChild(p);
   }
-  $("selected-food-box").hidden = !document.querySelector('input[name="food_item_id"]:checked');
+  const selectedInput = document.querySelector('input[name="food_item_id"]:checked');
+  $("selected-food-box").hidden = !selectedInput;
+  const selectionNote = $("food-filter-selection-note");
+  if (selectionNote) {
+    const selectedItem = items.find(item => item.item_id === selected);
+    const selectedGroup = selectedItem && groups.find(group => group.group_id === selectedItem.group_id);
+    const filteredOut = selectedGroup && selectedFoodCategoryId !== "all" && selectedGroup.group_id !== selectedFoodCategoryId;
+    selectionNote.hidden = !filteredOut;
+    selectionNote.textContent = filteredOut ? `Selected: ${selectedItem.name} (${selectedGroup.name}). It remains selected.` : "";
+  }
 }
 
 // ---------------------------------------------------------------------------------------------- name lookup

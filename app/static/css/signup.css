@@ -133,6 +133,10 @@ body.signup-page .gf-actions .gf-btn-primary { flex: none; width: 100%; height: 
 
 /* ------------------------------------------------------------------ dish cards */
 .su-dish-intro { margin: 0 0 8px; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+.su-food-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
+.su-food-filter { min-height: 44px; padding: 0 14px; border: 1px solid var(--su-line); border-radius: 999px; background: var(--bg-surface-1); color: var(--text-secondary); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.su-food-filter[aria-pressed="true"] { border-color: var(--accent-primary); background: var(--su-tint); color: var(--text-primary); }
+.su-food-filter:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
 body.signup-page .gf-dish-group { margin-top: 14px; }
 body.signup-page .gf-dish-group h3 { display: flex; justify-content: flex-start; gap: 6px; margin: 0 0 8px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
 body.signup-page .gf-dish-group h3 span + span::before { content: "\00B7\00A0"; }

@@ -236,10 +236,12 @@
         <p class="gf-muted su-dish-intro"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
         <fieldset class="gf-fieldset" aria-describedby="err-food">
           <legend class="gf-label">Open dish slots</legend>
+          <div id="food-category-filters" class="su-food-filters" role="group" aria-label="Filter dishes by category" hidden></div>
           <div id="food-groups-container"></div>
           <p id="err-food" class="gf-error" role="alert" aria-live="polite" hidden></p>
         </fieldset>
         <div id="selected-food-box" class="gf-field" hidden>
+          <p id="food-filter-selection-note" class="gf-note" hidden></p>
           <label for="dish-description" class="gf-label">Note for organizers (optional)</label>
           <input type="text" id="dish-description" class="gf-input" placeholder="e.g. Mild spice. Contains cashews.">
         </div>
