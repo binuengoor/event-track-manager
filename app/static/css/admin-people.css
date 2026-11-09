@@ -163,6 +163,14 @@
 .ap-listrow strong { font-size: .875rem; font-weight: 700; color: var(--text-primary); }
 .ap-listrow small { display: block; font-size: .75rem; color: var(--text-secondary); }
 .ap-listrow .acts { display: flex; flex: none; align-items: center; gap: .15rem; }
+.ap-food-drag-handle { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; min-height: 44px; color: var(--text-muted); cursor: grab; touch-action: none; }
+.ap-food-drag-handle:active { cursor: grabbing; }
+.ap-food-group-section { overflow: hidden; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--bg-surface-1); }
+.ap-food-group-section + .ap-food-group-section { margin-top: .75rem; }
+.ap-food-group-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .75rem 1rem; border-bottom: 1px solid var(--border-subtle); background: var(--bg-surface-2); }
+.ap-food-group-heading h4 { min-width: 0; margin: 0; color: var(--text-primary); font-size: .875rem; font-weight: 700; }
+.ap-food-group-heading span { flex: none; color: var(--text-secondary); font-size: .75rem; }
+.ap-food-group-items { display: grid; gap: .5rem; padding: .5rem; }
 .ap-slot-main { min-width: 0; }
 .ap-slot-top { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
 .ap-slot-note { margin: .25rem 0 0; font-size: .75rem; color: var(--text-secondary); }

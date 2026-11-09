@@ -5,6 +5,7 @@ async function loadFoodGroups() {
     foodGroups = await res.json();
     renderFoodGroupsList();
     populateGroupDropdowns();
+    renderFoodItemsList();
   } catch (e) {
     console.error("Food groups error:", e);
   }
@@ -13,6 +14,7 @@ async function loadFoodGroups() {
 function renderFoodGroupsList() {
   const list = document.getElementById("admin-food-groups-list");
   if (!list) return;
+  setupFoodGroupDragReorder();
 
   if (foodGroups.length === 0) {
     list.innerHTML = `<div class="ap-empty">
@@ -26,7 +28,7 @@ function renderFoodGroupsList() {
   }
 
   list.innerHTML = foodGroups.map((g, idx) => `
-    <div class="ap-listrow">
+    <div class="ap-listrow" data-food-group-row data-group-id="${escapeHtml(g.group_id)}">
       <div class="lead">
         <span class="ix">${idx + 1}</span>
         <div>
@@ -35,18 +37,79 @@ function renderFoodGroupsList() {
         </div>
       </div>
       <div class="acts">
-        <button type="button" onclick="moveGroup(${idx}, -1)" class="ap-iconbtn" ${idx === 0 ? 'disabled' : ''} title="Move up" aria-label="Move ${escapeHtml(g.name)} up"><i data-lucide="arrow-up"></i></button>
-        <button type="button" onclick="moveGroup(${idx}, 1)" class="ap-iconbtn" ${idx === foodGroups.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move ${escapeHtml(g.name)} down"><i data-lucide="arrow-down"></i></button>
-        <button type="button" onclick="renameGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="ap-iconbtn" title="Rename" aria-label="Rename ${escapeHtml(g.name)}"><i data-lucide="edit-3"></i></button>
-        <button type="button" onclick="deleteGroup('${g.group_id}', '${escapeQuotes(g.name)}')" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(g.name)}"><i data-lucide="trash-2"></i></button>
+        <span class="ap-food-drag-handle" draggable="true" data-food-group-drag data-group-id="${escapeHtml(g.group_id)}" aria-hidden="true" title="Drag to reorder"><i data-lucide="grip-vertical"></i></span>
+        <button type="button" data-food-group-action="move" data-group-index="${idx}" data-direction="-1" class="ap-iconbtn" ${idx === 0 ? 'disabled' : ''} title="Move up" aria-label="Move ${escapeHtml(g.name)} up"><i data-lucide="arrow-up"></i></button>
+        <button type="button" data-food-group-action="move" data-group-index="${idx}" data-direction="1" class="ap-iconbtn" ${idx === foodGroups.length - 1 ? 'disabled' : ''} title="Move down" aria-label="Move ${escapeHtml(g.name)} down"><i data-lucide="arrow-down"></i></button>
+        <button type="button" data-food-group-action="rename" data-group-id="${escapeHtml(g.group_id)}" data-group-name="${escapeHtml(g.name)}" class="ap-iconbtn" title="Rename" aria-label="Rename ${escapeHtml(g.name)}"><i data-lucide="edit-3"></i></button>
+        <button type="button" data-food-group-action="delete" data-group-id="${escapeHtml(g.group_id)}" data-group-name="${escapeHtml(g.name)}" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(g.name)}"><i data-lucide="trash-2"></i></button>
       </div>
     </div>
   `).join("");
   if (window.lucide) lucide.createIcons();
 }
 
-function escapeQuotes(str) {
-  return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+function setupFoodGroupDragReorder() {
+  const list = document.getElementById("admin-food-groups-list");
+  if (!list || list.dataset.foodDragBound) return;
+  list.dataset.foodDragBound = "true";
+  let draggedGroupId = "";
+
+  list.addEventListener("dragstart", (event) => {
+    const handle = event.target.closest?.("[data-food-group-drag]");
+    if (!handle) return;
+    draggedGroupId = String(handle.dataset.groupId || "");
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedGroupId);
+    }
+  });
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-food-group-action]");
+    if (!button) return;
+    const action = button.dataset.foodGroupAction;
+    if (action === "move") window.moveGroup?.(Number(button.dataset.groupIndex), Number(button.dataset.direction));
+    else if (action === "rename") window.renameGroup?.(button.dataset.groupId, button.dataset.groupName);
+    else if (action === "delete") window.deleteGroup?.(button.dataset.groupId, button.dataset.groupName);
+  });
+  list.addEventListener("dragover", (event) => {
+    if (event.target.closest?.("[data-food-group-row]") && draggedGroupId) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    }
+  });
+  list.addEventListener("drop", async (event) => {
+    const row = event.target.closest?.("[data-food-group-row]");
+    if (!row) return;
+    event.preventDefault();
+    const fromId = draggedGroupId || String(event.dataTransfer?.getData("text/plain") || "");
+    const toId = String(row.dataset.groupId || "");
+    draggedGroupId = "";
+    const from = foodGroups.findIndex(group => String(group.group_id) === fromId);
+    const to = foodGroups.findIndex(group => String(group.group_id) === toId);
+    if (from < 0 || to < 0 || from === to) return;
+
+    const reordered = foodGroups.slice();
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(to, 0, moved);
+    try {
+      const response = await fetch("/api/admin/food-groups/reorder", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ordered_ids: reordered.map(group => group.group_id)}),
+      });
+      if (!response.ok) {
+        showToast("Group reorder failed. The previous order was restored.", true);
+        return;
+      }
+      foodGroups = reordered;
+      renderFoodGroupsList();
+      populateGroupDropdowns();
+      renderFoodItemsList();
+    } catch (error) {
+      showToast("Group reorder failed. The previous order was restored.", true);
+    }
+  });
+  list.addEventListener("dragend", () => { draggedGroupId = ""; });
 }
 
 function populateGroupDropdowns() {
@@ -56,12 +119,12 @@ function populateGroupDropdowns() {
   if (filterSelect) {
     const currentVal = filterSelect.value;
     filterSelect.innerHTML = `<option value="">All Groups (${foodGroups.length})</option>` +
-      foodGroups.map(g => `<option value="${g.group_id}">${g.name}</option>`).join("");
+      foodGroups.map(g => `<option value="${escapeHtml(g.group_id)}">${escapeHtml(g.name)}</option>`).join("");
     if (currentVal) filterSelect.value = currentVal;
   }
 
   if (modalSelect) {
-    modalSelect.innerHTML = foodGroups.map(g => `<option value="${g.group_id}">${g.name}</option>`).join("");
+    modalSelect.innerHTML = foodGroups.map(g => `<option value="${escapeHtml(g.group_id)}">${escapeHtml(g.name)}</option>`).join("");
   }
 }
 
@@ -80,33 +143,62 @@ function renderFoodItemsList() {
   const list = document.getElementById("admin-food-items-list");
   const filterId = document.getElementById("filter-group-select")?.value;
   if (!list) return;
+  setupFoodItemActions();
 
-  const filtered = filterId ? foodItems.filter(i => i.group_id === filterId) : foodItems;
+  const filtered = filterId ? foodItems.filter(i => String(i.group_id) === String(filterId)) : foodItems;
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="ap-empty-inline">No dish slots in this selection.</div>`;
     return;
   }
 
-  list.innerHTML = filtered.map(item => `
-    <div class="ap-listrow">
-      <div class="ap-slot-main">
-        <div class="ap-slot-top">
-          <strong>${escapeHtml(item.name)}</strong>
-          <span class="ap-chip ap-chip-muted">${escapeHtml(item.group_name)}</span>
-          ${item.is_taken ? '<span class="ap-chip ap-chip-ok">Claimed</span>' : '<span class="ap-chip ap-chip-warn">Open</span>'}
-        </div>
-        ${item.is_taken
-          ? `<p class="ap-slot-note">Taken by <b>${escapeHtml(item.signer_name)}</b> ${item.signer_phone ? `<span class="ap-mono">(${escapeHtml(item.signer_phone)})</span> ` : ''}${item.dish_description ? `: ${escapeHtml(item.dish_description)}` : ''}</p>`
-          : '<p class="ap-slot-note">No one has claimed this yet.</p>'}
+  const groupsWithItems = foodGroups.map(group => ({
+    group,
+    items: filtered.filter(item => String(item.group_id) === String(group.group_id)),
+  })).filter(entry => entry.items.length);
+  list.innerHTML = groupsWithItems.map(({group, items}) => `
+    <section class="ap-food-group-section" data-food-items-group="${escapeHtml(group.group_id)}" aria-labelledby="admin-food-heading-${escapeHtml(group.group_id)}">
+      <div class="ap-food-group-heading">
+        <h4 id="admin-food-heading-${escapeHtml(group.group_id)}">${escapeHtml(group.name)}</h4>
+        <span>${items.filter(item => !item.is_taken).length} open of ${items.length}</span>
       </div>
-      <div class="acts">
-        <button type="button" onclick="openAdminFoodModal('${item.item_id}')" class="ap-iconbtn" title="Edit slot and claim" aria-label="Edit ${escapeHtml(item.name)}"><i data-lucide="edit-3"></i></button>
-        <button type="button" onclick="deleteItem('${item.item_id}', '${escapeQuotes(item.name)}', ${item.is_taken})" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(item.name)}"><i data-lucide="trash-2"></i></button>
+      <div class="ap-food-group-items">
+        ${items.map(item => `
+          <div class="ap-listrow">
+            <div class="ap-slot-main">
+              <div class="ap-slot-top">
+                <strong>${escapeHtml(item.name)}</strong>
+                ${item.is_taken ? '<span class="ap-chip ap-chip-ok">Claimed</span>' : '<span class="ap-chip ap-chip-warn">Open</span>'}
+              </div>
+              ${item.is_taken
+                ? `<p class="ap-slot-note">Taken by <b>${escapeHtml(item.signer_name)}</b> ${item.signer_phone ? `<span class="ap-mono">(${escapeHtml(item.signer_phone)})</span> ` : ''}${item.dish_description ? `: ${escapeHtml(item.dish_description)}` : ''}</p>`
+                : '<p class="ap-slot-note">No one has claimed this yet.</p>'}
+            </div>
+            <div class="acts">
+              <button type="button" data-food-item-action="edit" data-item-id="${escapeHtml(item.item_id)}" class="ap-iconbtn" title="Edit slot and claim" aria-label="Edit ${escapeHtml(item.name)}"><i data-lucide="edit-3"></i></button>
+              <button type="button" data-food-item-action="delete" data-item-id="${escapeHtml(item.item_id)}" data-item-name="${escapeHtml(item.name)}" data-is-taken="${Boolean(item.is_taken)}" class="ap-iconbtn ap-iconbtn-danger" title="Delete" aria-label="Delete ${escapeHtml(item.name)}"><i data-lucide="trash-2"></i></button>
+            </div>
+          </div>
+        `).join("")}
       </div>
-    </div>
+    </section>
   `).join("");
   if (window.lucide) lucide.createIcons();
+}
+
+function setupFoodItemActions() {
+  const list = document.getElementById("admin-food-items-list");
+  if (!list || list.dataset.foodActionsBound) return;
+  list.dataset.foodActionsBound = "true";
+  list.addEventListener("click", (event) => {
+    const button = event.target.closest?.("[data-food-item-action]");
+    if (!button) return;
+    if (button.dataset.foodItemAction === "edit") {
+      window.openAdminFoodModal?.(button.dataset.itemId);
+    } else if (button.dataset.foodItemAction === "delete") {
+      window.deleteItem?.(button.dataset.itemId, button.dataset.itemName, button.dataset.isTaken === "true");
+    }
+  });
 }
 
 window.openAdminFoodModal = function(itemId) {
