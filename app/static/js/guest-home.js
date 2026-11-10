@@ -324,7 +324,16 @@
     await Promise.all(loads);
 
     var toggle = $('sponsors-toggle');
-    if (track.scrollWidth > reel.clientWidth + 4 && !reduceMotion) {
+    if (images.length && !reduceMotion) {
+      // Repeat the items if needed so the track comfortably spans the viewport.
+      while (track.children.length < 30 && track.scrollWidth <= reel.clientWidth + 20) {
+        images.forEach(function (url) {
+          var li = document.createElement('li');
+          var media = createMediaElement(url);
+          li.appendChild(media);
+          track.appendChild(li);
+        });
+      }
       // Seamless loop: a second, hidden copy follows the first.
       var half = track.scrollWidth;
       Array.prototype.slice.call(track.children).forEach(function (li) {

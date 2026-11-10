@@ -168,13 +168,14 @@
     if (!data) return;
     renderAnnouncement();
 
-    const title = data.header_brand_title || 'Event';
+    const clean = window.cleanEventName || (v => v);
+    const title = clean(data.header_brand_title || 'Event');
     $('live-event-title').textContent = title;
     document.title = `Live Stage Program - ${title}`;
-    $('live-event-subtitle').textContent = data.header_brand_subtitle || data.event_subtitle || 'Musical Night';
+    $('live-event-subtitle').textContent = clean(data.header_brand_subtitle || data.event_subtitle || 'Musical Night');
     $('ended-event').textContent = title;
-    $('prestart-event-name').textContent = data.event_name || '';
-    $('prestart-event-sub').textContent = data.event_subtitle || '';
+    $('prestart-event-name').textContent = clean(data.event_name || '');
+    $('prestart-event-sub').textContent = clean(data.event_subtitle || '');
     renderEventDetails(data);
     if (data.event_start_time_iso) {
       const parsed = new Date(data.event_start_time_iso);
@@ -288,9 +289,14 @@
         const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
         if (!reduced && media.play) { const playback = media.play(); if (playback && playback.catch) playback.catch(() => {}); }
       };
-    } else media.onload = () => { media.style.opacity = '1'; };
+    } else {
+      media.onload = () => { media.style.opacity = '1'; };
+    }
     media.onerror = () => { media.style.opacity = '0'; };
     media.src = url;
+    if (!isVideo && media.complete && media.naturalWidth > 0) {
+      media.style.opacity = '1';
+    }
   }
 
   function showSlide(i) {
