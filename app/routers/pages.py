@@ -61,11 +61,37 @@ async def serve_performer_page(request: Request):
 
 
 def _brand(html: str) -> str:
-    """Replace the template placeholder brand with the event's own (escaped) header text."""
+    """Replace the template placeholder brand with the event's own (escaped) header text and social metadata."""
     title = escape(str(get_setting("header_brand_title") or getattr(settings.event, "header_brand_title", "") or "Event"))
     subtitle = escape(str(get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "") or ""))
+    event_name = escape(str(get_setting("event_name") or getattr(settings.event, "name", "") or title))
+    event_subtitle = escape(str(get_setting("event_subtitle") or getattr(settings.event, "subtitle", "") or subtitle or "An Evening of Music, Melodies & Togetherness"))
+    poster = str(get_setting("event_poster_url") or getattr(settings.event, "poster_url", "") or "/event-media/poster.jpg")
+    if poster.startswith("/"):
+        full_poster = f"https://eventmanager.extonmalayali.org{poster}"
+    else:
+        full_poster = poster
+
+    html = html.replace("<title>Event</title>", f"<title>{event_name}</title>")
     html = html.replace("Event Track Manager", title)
-    return html.replace(">Musical Night<", f">{subtitle}<")
+    html = html.replace(">Musical Night<", f">{subtitle}<")
+
+    og_tags = (
+        f'  <meta property="og:type" content="website">\n'
+        f'  <meta property="og:title" content="{event_name}">\n'
+        f'  <meta property="og:description" content="{event_subtitle}">\n'
+        f'  <meta property="og:image" content="{full_poster}">\n'
+        f'  <meta property="og:image:secure_url" content="{full_poster}">\n'
+        f'  <meta property="og:site_name" content="{title}">\n'
+        f'  <meta name="twitter:card" content="summary_large_image">\n'
+        f'  <meta name="twitter:title" content="{event_name}">\n'
+        f'  <meta name="twitter:description" content="{event_subtitle}">\n'
+        f'  <meta name="twitter:image" content="{full_poster}">\n'
+    )
+    if "</head>" in html and 'property="og:title"' not in html:
+        html = html.replace("</head>", f"{og_tags}</head>", 1)
+
+    return html
 
 
 def _redirect_with_query(path: str, request: Request, status_code: int = 301):

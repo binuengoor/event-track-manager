@@ -5,17 +5,11 @@ event:
   name: Paattukoottam Sing & Serenade
   subtitle: "Musical Night \u2022 November 21, 2026"
   start_time: 11-21-2026 05:00PM
-  poster_url: /data/paattukoottam_animated.gif
+  poster_url: /event-media/poster.jpg
   venue: Scouting Hall, Exton (1 Scouting Way, Exton, PA 19341, USA)
   time_range: 5:00 PM - 9:00 PM EST
   payment_url: https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026
-  general_notes: "**Hello EMA Music Fam \u2014 Our Next Sing & Serenade is here!**\n\
-    \n- **Date & Time:** Saturday, November 21, 2026 \u2022 5:00 PM \u2013 9:00 PM\
-    \ EST\n- **Venue:** Scouting Hall, Exton (1 Scouting Way, Exton, PA 19341)\n-\
-    \ **Performances:** Up to 2 songs per participant (both can be solo)\n- **Potluck:**\
-    \ Community dinner with appetizers, curries, biryanis, breads, and desserts\n\
-    - **Cover Charge:** $10 entry for singers ([Pay on Zeffy](https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026);\
-    \ audience entry is free; set tip to $0)"
+  general_notes: "### 🎵 Event Overview\n- **Date:** Saturday, November 21, 2026\n- **Time:** 5:00 PM – 9:00 PM EST *(Tea & Snacks: 5:00 PM – 6:00 PM • Stage performances start at 6:00 PM)*\n- **Venue:** Boy Scouts of America Chester County Council (1 Scouting Way, Exton, PA 19341)\n- **Admission:** Free audience entry for families and music lovers!\n\n---\n\n### 🎤 Singer Registration & Guidelines\n- **Performance Limit:** Up to **2 performances** per registered participant. Both performances can be solo if desired.\n- **Allowed Categories:** Solo, Duet, or Instrumental performance.\n- **Age Groups:** Junior (Under 15) and Adult (15 & Above). Duets may combine Junior and Adult singers.\n- **Sign-Up Fee:** **$10 per performer** via [Zeffy Ticketing](https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026). *(Zeffy is 100% free for nonprofits — you can set the optional platform contribution to $0 at checkout).*\n- **Karaoke & Backing Tracks:** Please upload your karaoke audio track (MP3/M4A/WAV) in advance right here in this app. Please also keep an offline backup on your phone or USB drive just in case.\n- **Timeliness:** Please arrive at least 30 minutes before start time (by 4:30 PM) for check-in and stage readiness. EMA provides stage microphones, sound system, and audio engineering.\n\n---\n\n### 🍲 Community Potluck\n- This is a community potluck evening — every family and attendee is warmly encouraged to contribute a dish!\n- Check out the **Food Board** above to see what is needed and sign up for appetizers, main dishes, curries, breads, or desserts.\n- **Tea & Snacks:** 5:00 PM – 6:00 PM.\n- **Venue Policy:** Alcohol is strictly prohibited on the premises.\n\n---\n\n### 📞 Contact & Inquiries\n- **Email:** [paattukoottam@extonmalayali.org](mailto:paattukoottam@extonmalayali.org)\n- **Instagram:** [@ema.paattukoottam](https://www.instagram.com/ema.paattukoottam)\n- **Coordinator:** Bijoy (+1 267-902-2462)"
 storage:
   cache_dir: /data/cache
   max_upload_size_mb: 100
