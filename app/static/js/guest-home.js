@@ -21,7 +21,7 @@
     var media = document.createElement(isVideoUrl(url) ? 'video' : 'img');
     if (media.tagName.toLowerCase() === 'video') {
       media.muted = true; media.loop = true; media.playsInline = true; media.autoplay = false; media.preload = 'metadata';
-      media.setAttribute('aria-label', 'Sponsor video');
+      media.setAttribute('aria-label', 'Highlight video');
     } else {
       media.alt = altFromUrl(url); media.loading = 'lazy'; media.decoding = 'async';
     }
@@ -291,7 +291,7 @@
   // ---------------------------------------------------------------- sponsor reel
   function altFromUrl(url) {
     var file = decodeURIComponent(String(url).split('/').pop() || '').replace(/\.[a-z0-9]+$/i, '');
-    return file.replace(/[-_]+/g, ' ').trim() || 'Sponsor';
+    return file.replace(/[-_]+/g, ' ').trim() || 'Highlight';
   }
 
   async function loadSponsors() {

@@ -218,7 +218,7 @@ html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
 
 /* ------------------------------------------------------------ sponsor reel */
 .gh-sponsors { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.gh-sponsors-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gh-sponsors-head { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
 .gh-reel { overflow-x: auto; border-radius: 14px; scrollbar-width: thin; }
 .gh-reel:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 3px; }
 .gh-reel.is-marquee {
