@@ -101,7 +101,7 @@ body[data-mode="off"] #live-badge, body[data-mode="off"] .lv-subtitle { display:
 /* Sponsor gallery + lineup column */
 .lv-aside { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 16px; }
 .lv-gallery { flex: 0 0 auto; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column; background: rgb(30 25 21 / .72); border: 1px solid rgb(247 240 230 / .08); }
-.lv-gallery-frame { height: clamp(150px, 26vh, 300px); margin: 12px 12px 0; border-radius: 12px; background: #000; display: flex; align-items: center; justify-content: center; }
+.lv-gallery-frame { height: clamp(200px, 32vh, 360px); margin: 12px 12px 0; border-radius: 16px; background: #000; display: flex; align-items: center; justify-content: center; }
 #carousel-img, #carousel-video { max-width: 94%; max-height: 94%; object-fit: contain; border-radius: 8px; transition: opacity .5s; opacity: 0; }
 .lv-gallery-foot { display: flex; justify-content: center; align-items: center; gap: 12px; padding: 12px 18px; color: var(--lv-soft); }
 .lv-dots { display: flex; gap: 8px; }
@@ -214,9 +214,9 @@ body[data-mode="off"] .lv-foot-right { display: none; }
   .next-card .tag { font-size: .875rem; }
   .next-card .nm { font-size: 1.375rem; }
   .next-card .sg { font-size: .9375rem; }
-  .lv-gallery { border-radius: 14px; }
-  .lv-gallery-frame { height: 96px; }
-  .lv-gallery-foot { padding: 8px 14px; font-size: .875rem; }
+  .lv-gallery { border-radius: 16px; }
+  .lv-gallery-frame { height: clamp(160px, 28vh, 240px); }
+  .lv-gallery-foot { padding: 10px 14px; font-size: .875rem; }
   .lv-upcoming { background: none; border: 0; border-radius: 0; overflow: visible; }
   .lv-upcoming-head { padding: 0 0 8px; }
   .lv-label { font-size: .875rem; }

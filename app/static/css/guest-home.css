@@ -225,12 +225,22 @@ html[data-theme="light"] .gh-backdrop aurora-background { display: none; }
   overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
 }
-.gh-reel-track { display: flex; gap: 10px; width: max-content; margin: 0; padding: 2px 0; list-style: none; }
+.gh-reel-track { display: flex; gap: 14px; width: max-content; margin: 0; padding: 4px 0; list-style: none; }
 .gh-reel-track li {
-  flex: 0 0 150px; height: 60px; display: flex; align-items: center; justify-content: center;
-  border-radius: 14px; background: #fff; border: 1px solid var(--border-subtle);
+  flex: 0 0 220px; height: 110px; display: flex; align-items: center; justify-content: center;
+  border-radius: 18px; background: #fff; border: 1px solid var(--border-subtle);
+  padding: 8px 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
-.gh-reel-track img, .gh-reel-track video { max-width: 88%; max-height: 44px; object-fit: contain; }
+.gh-reel-track img, .gh-reel-track video { max-width: 90%; max-height: 88px; object-fit: contain; }
+@media (max-width: 640px) {
+  .gh-reel-track { gap: 10px; }
+  .gh-reel-track li {
+    flex: 0 0 180px; height: 96px; border-radius: 16px; padding: 6px 12px;
+  }
+  .gh-reel-track img, .gh-reel-track video {
+    max-width: 92%; max-height: 78px;
+  }
+}
 .gh-reel.is-marquee .gh-reel-track { animation: gh-reel var(--reel-time, 30s) linear infinite; }
 .gh-reel.is-marquee:hover .gh-reel-track, .gh-reel.is-paused .gh-reel-track { animation-play-state: paused; }
 @keyframes gh-reel { to { transform: translateX(var(--reel-shift, -50%)); } }
