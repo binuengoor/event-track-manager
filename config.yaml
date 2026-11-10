@@ -1,108 +1,97 @@
-# EMA Paattukoottam Event & Track Manager Configuration
 event:
-  id: "paattukoottam-2026"
-  header_brand_title: "EMA Paattukoottam"
-  header_brand_subtitle: "Musical Night"
-  name: "✨🎤✨ Paattukoottam ✨🎶✨ Sing & Serenade ✨🎶✨"
-  subtitle: "Musical Night • September 19, 2026"
-  start_time: "09-19-2026 05:00PM"
-  poster_url: "/data/paattukoottam_animated.gif"   # file lives in the event folder
-  venue: "1 Scouting Wy, Exton, PA 19341, USA"
-  time_range: "5:00 PM - 9:00 PM EDT"
-
+  id: paattukoottam-2026
+  header_brand_title: EMA Paattukoottam
+  header_brand_subtitle: Musical Night
+  name: "\u2728\U0001F3A4\u2728 Paattukoottam \u2728\U0001F3B6\u2728 Sing & Serenade\
+    \ \u2728\U0001F3B6\u2728"
+  subtitle: "Musical Night \u2022 November 21, 2026"
+  start_time: 11-21-2026 05:00PM
+  poster_url: /data/paattukoottam_animated.gif
+  venue: Scouting Hall, Exton (1 Scouting Way, Exton, PA 19341, USA)
+  time_range: 5:00 PM - 9:00 PM EST
+  payment_url: https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026
 storage:
-  # Everything for an event lives in <events_dir>/<event id>/ (database, signups.xlsx, tracks/, backups/).
-  # Set EVENTS_DIR / EVENT_DIR in the environment to relocate it. cache_dir is disposable scratch space.
-  cache_dir: "/data/cache"
+  cache_dir: /data/cache
   max_upload_size_mb: 100
-
 downloader:
-  service_url: "http://downloader:8001"
+  service_url: http://downloader:8001
   timeout_seconds: 120
-
 signup:
   food_signup_enabled: true
-  food_serving_note: "Half-Tray or Above (15+ servings)"
+  food_serving_note: Half-Tray or Above (15+ servings)
   max_performances_per_participant: 2
-  max_solo_per_participant: 1
+  max_solo_per_participant: 2
   performance_types:
-    - "Solo"
-    - "Duet"
-    - "Group"
+  - Solo
+  - Duet
+  - Group
   age_groups:
-    - name: "Junior"
-      requires_guardian: true
-    - name: "Senior"
-      requires_guardian: false
-
+  - name: Junior
+    requires_guardian: true
+  - name: Senior
+    requires_guardian: false
 backup:
-  enabled: true          # writes signups.xlsx/csv + database snapshots into the event folder
+  enabled: true
   keep_snapshots: 30
   debounce_seconds: 10
-
 food_items_seed:
-  - name: "Veg Appetizer 1"
-    group: "Appetizers"
-  - name: "Veg Appetizer 2"
-    group: "Appetizers"
-  - name: "Veg Appetizer 3"
-    group: "Appetizers"
-  - name: "Non-Veg Appetizer 1"
-    group: "Appetizers"
-  - name: "Non-Veg Appetizer 2"
-    group: "Appetizers"
-  - name: "Non-Veg Appetizer 3"
-    group: "Appetizers"
-  - name: "Non-Veg Appetizer 4"
-    group: "Appetizers"
-
-  - name: "Veg Fried Rice"
-    group: "Rice & Main"
-  - name: "Non-Veg Fried Rice"
-    group: "Rice & Main"
-  - name: "Veg Biryani"
-    group: "Rice & Main"
-  - name: "Chicken Biryani"
-    group: "Rice & Main"
-  - name: "Jeera Rice"
-    group: "Rice & Main"
-  - name: "White Rice"
-    group: "Rice & Main"
-  - name: "Noodles"
-    group: "Rice & Main"
-  - name: "Pulao"
-    group: "Rice & Main"
-
-  - name: "Paneer Butter Masala"
-    group: "Curries"
-  - name: "Mixed Veg Curry"
-    group: "Curries"
-  - name: "Dal Makhani"
-    group: "Curries"
-  - name: "Chicken Curry 1"
-    group: "Curries"
-  - name: "Chicken Curry 2"
-    group: "Curries"
-  - name: "Mutton Curry"
-    group: "Curries"
-  - name: "Fish Curry"
-    group: "Curries"
-
-  - name: "Naan / Roti 1"
-    group: "Breads & Sides"
-  - name: "Naan / Roti 2"
-    group: "Breads & Sides"
-  - name: "Salad / Raita"
-    group: "Breads & Sides"
-  - name: "Pickle & Papad"
-    group: "Breads & Sides"
-
-  - name: "Gulab Jamun"
-    group: "Desserts"
-  - name: "Payasam"
-    group: "Desserts"
-  - name: "Cake / Pastries"
-    group: "Desserts"
-  - name: "Ice Cream / Fruit Salad"
-    group: "Desserts"
-
+- name: Veg Appetizer 1
+  group: Appetizers
+- name: Veg Appetizer 2
+  group: Appetizers
+- name: Veg Appetizer 3
+  group: Appetizers
+- name: Non-Veg Appetizer 1
+  group: Appetizers
+- name: Non-Veg Appetizer 2
+  group: Appetizers
+- name: Non-Veg Appetizer 3
+  group: Appetizers
+- name: Non-Veg Appetizer 4
+  group: Appetizers
+- name: Veg Fried Rice
+  group: Rice & Main
+- name: Non-Veg Fried Rice
+  group: Rice & Main
+- name: Veg Biryani
+  group: Rice & Main
+- name: Chicken Biryani
+  group: Rice & Main
+- name: Jeera Rice
+  group: Rice & Main
+- name: White Rice
+  group: Rice & Main
+- name: Noodles
+  group: Rice & Main
+- name: Pulao
+  group: Rice & Main
+- name: Paneer Butter Masala
+  group: Curries
+- name: Mixed Veg Curry
+  group: Curries
+- name: Dal Makhani
+  group: Curries
+- name: Chicken Curry 1
+  group: Curries
+- name: Chicken Curry 2
+  group: Curries
+- name: Mutton Curry
+  group: Curries
+- name: Fish Curry
+  group: Curries
+- name: Naan / Roti 1
+  group: Breads & Sides
+- name: Naan / Roti 2
+  group: Breads & Sides
+- name: Salad / Raita
+  group: Breads & Sides
+- name: Pickle & Papad
+  group: Breads & Sides
+- name: Gulab Jamun
+  group: Desserts
+- name: Payasam
+  group: Desserts
+- name: Cake / Pastries
+  group: Desserts
+- name: Ice Cream / Fruit Salad
+  group: Desserts
