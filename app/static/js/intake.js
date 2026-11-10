@@ -28,7 +28,15 @@ let maxPerformancesPerParticipant = 2;
 let maxSoloPerParticipant = 1;
 
 async function initIntake() {
-  await Promise.all([initEventInfo(), loadPerformances(), loadFoodCatalog()]);
+  if (typeof initEventInfo !== 'function' || typeof setupEventListeners !== 'function' || typeof setupAddPerformanceModal !== 'function') {
+    setTimeout(initIntake, 15);
+    return;
+  }
+  try {
+    await Promise.all([initEventInfo(), loadPerformances(), loadFoodCatalog()]);
+  } catch (err) {
+    console.error("Intake init error:", err);
+  }
   setupEventListeners();
   setupAddPerformanceModal();
   handleUrlQueryParams();
@@ -37,8 +45,14 @@ async function initIntake() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initIntake);
 } else {
-  initIntake();
+  setTimeout(initIntake, 10);
 }
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    initIntake();
+  }
+});
 
 function handleUrlQueryParams() {
   const params = new URLSearchParams(window.location.search);
