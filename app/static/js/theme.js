@@ -1,7 +1,7 @@
 // Guest and admin theme: follows the OS (prefers-color-scheme) unless the person chose one.
 // Loaded in <head> before first paint to avoid a flash. Console, monitor and /live never load this file.
 (function () {
-  var KEY = 'etm-theme', ACCENT_KEY = 'etm-accent';
+  var KEY = 'etm-theme';
   var root = document.documentElement;
   var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
 
@@ -20,25 +20,17 @@
     if (cs) cs.setAttribute('content', 'light dark');
     return c;
   }
-  function applyAccent() {
-    var value = 'coral';
-    try { value = localStorage.getItem(ACCENT_KEY) || value; } catch (e) {}
-    if (['coral', 'blue', 'green', 'purple'].indexOf(value) < 0) value = 'coral';
-    root.setAttribute('data-accent', value);
-    return value;
-  }
   apply();
-  applyAccent();
-  document.addEventListener('DOMContentLoaded', function () {
-    var mode = document.getElementById('appearance-mode');
-    var accent = document.getElementById('appearance-accent');
-    if (mode) { mode.value = choice(); mode.addEventListener('change', function () { window.etmTheme.set(mode.value); }); }
-    if (accent) { accent.value = applyAccent(); accent.addEventListener('change', function () {
-      try { localStorage.setItem(ACCENT_KEY, accent.value); } catch (e) {} applyAccent();
-    }); }
-  });
+  // The colour belongs to the active event, not this visitor's browser.
+  fetch('/api/event-info', { cache: 'no-store' }).then(function (response) {
+    if (!response.ok) throw new Error('Event settings unavailable');
+    return response.json();
+  }).then(function (event) {
+    var value = event.theme_accent;
+    root.setAttribute('data-accent', ['coral', 'blue', 'green', 'purple'].indexOf(value) >= 0 ? value : 'coral');
+  }).catch(function () { root.setAttribute('data-accent', 'coral'); });
   if (mq && mq.addEventListener) mq.addEventListener('change', apply);
-  window.addEventListener('storage', function (e) { if (e.key === KEY) apply(); if (e.key === ACCENT_KEY) applyAccent(); });
+  window.addEventListener('storage', function (e) { if (e.key === KEY) apply(); });
 
   // Cycles system -> light -> dark -> system. Returns the new choice.
   window.etmTheme = {

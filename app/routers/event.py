@@ -35,6 +35,7 @@ def get_event_info():
 
     return {
         "event_id": get_setting("event_id") or settings.event.id,
+        "theme_accent": get_setting("theme_accent", "coral"),
         "header_brand_title": header_brand_title,
         "header_brand_subtitle": header_brand_subtitle,
         "event_name": event_name,

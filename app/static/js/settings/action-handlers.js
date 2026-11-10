@@ -56,6 +56,7 @@ function setupActionHandlers() {
     }
 
     const payload = {
+      theme_accent: document.getElementById("setting-theme-accent").value,
       header_brand_title: headerTitleVal || "Event",
       header_brand_subtitle: headerSubVal || "Musical Night",
       event_name: titleVal,

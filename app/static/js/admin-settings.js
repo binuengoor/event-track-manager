@@ -330,6 +330,7 @@ async function loadSettings() {
     adminSettings = await res.json();
 
     // Event details
+    setValue("setting-theme-accent", adminSettings.theme_accent || "coral");
     setValue("setting-header-brand-title", adminSettings.header_brand_title || "");
     setValue("setting-header-brand-subtitle", adminSettings.header_brand_subtitle || "Musical Night");
     const navTitle = document.getElementById("nav-event-title");

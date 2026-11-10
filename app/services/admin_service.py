@@ -31,6 +31,7 @@ class AdminService:
         defaults = {
             "header_brand_title": getattr(settings.event, "header_brand_title", "") or "Event",
             "header_brand_subtitle": getattr(settings.event, "header_brand_subtitle", "Musical Night"),
+            "theme_accent": "coral",
             "event_name": settings.event.name,
             "event_subtitle": settings.event.subtitle,
             "event_date_time": settings.event.start_time,
@@ -233,6 +234,9 @@ class AdminService:
                         and clean_rules["max_solo_per_participant"] > clean_rules["max_performances_per_participant"]):
                     raise ValueError("Wizard draft solo limit cannot exceed the total performance limit.")
                 v = {"preset": v["preset"], "basics": clean_basics, "food": food, "rules": clean_rules}
+            elif k == "theme_accent":
+                if v not in ("coral", "blue", "green", "purple"):
+                    raise ValueError("Choose a valid theme colour.")
             elif k == "gallery_order":
                 if (not isinstance(v, list) or len(v) > self.GALLERY_ORDER_LIMIT
                         or not all(isinstance(name, str) and name and name == os.path.basename(name)
