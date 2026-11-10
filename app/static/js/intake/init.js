@@ -73,16 +73,15 @@ async function initEventInfo() {
       }
       setMediaType(currentMediaType);
 
-      // Fetch last sync timestamp
-      try {
-        const liveRes = await fetch('/api/live-status');
-        if (liveRes.ok) {
-          const liveData = await liveRes.json();
-          updateIntakeSyncBadge(liveData.last_synced_at);
-        }
-      } catch (e) {
-        console.warn('Could not fetch live sync status:', e);
-      }
+      // Fetch last sync timestamp in the background (non-blocking)
+      fetch('/api/live-status')
+        .then(r => r.ok ? r.json() : null)
+        .then(liveData => {
+          if (liveData && typeof updateIntakeSyncBadge === 'function') {
+            updateIntakeSyncBadge(liveData.last_synced_at);
+          }
+        })
+        .catch(() => {});
     }
   } catch (e) {
     console.warn('Could not load event info:', e);
@@ -93,16 +92,16 @@ async function loadPerformances() {
   const badge = document.getElementById('performer-count-badge');
   try {
     let sortedPerformers = [];
-    try {
-      const namesRes = await fetch('/api/performer/names');
-      if (namesRes.ok) {
-        sortedPerformers = await namesRes.json();
-      }
-    } catch (e) {}
+    const [namesRes, perfsRes] = await Promise.all([
+      fetch('/api/performer/names').catch(() => null),
+      fetch('/api/performances').catch(() => null)
+    ]);
 
-    const res = await fetch('/api/performances');
-    if (res.ok) {
-      performances = await res.json();
+    if (namesRes && namesRes.ok) {
+      try { sortedPerformers = await namesRes.json(); } catch (_) {}
+    }
+    if (perfsRes && perfsRes.ok) {
+      performances = await perfsRes.json();
     } else if (!sortedPerformers.length) {
       throw new Error('Failed to load sign-ups');
     }

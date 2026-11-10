@@ -52,7 +52,8 @@ async def serve_performer_page(request: Request):
         html = f.read()
 
     version = int(datetime.now(timezone.utc).timestamp())
-    html = html.replace('/static/js/intake.js', f'/static/js/intake.js?v={version}')
+    html = re.sub(r'/static/js/intake(?:\/[a-zA-Z0-9_-]+)?\.js(?:\?[^\s"\'<>]*)?', lambda m: f"{m.group(0).split('?')[0]}?v={version}", html)
+    html = re.sub(r'/static/css/my-entry\.css(?:\?[^\s"\'<>]*)?', f'/static/css/my-entry.css?v={version}', html)
 
     html = _brand(render_guest_navigation(html, "/my-entry", staff=is_admin(request)))
     response = HTMLResponse(content=html)
@@ -129,6 +130,11 @@ async def serve_dashboard_page(request: Request):
     dash_path = os.path.join(STATIC_DIR, "dashboard.html")
     with open(dash_path, "r", encoding="utf-8") as f:
         html = f.read()
+
+    version = int(datetime.now(timezone.utc).timestamp())
+    html = re.sub(r'/static/js/dashboard\.js(?:\?[^\s"\'<>]*)?', f'/static/js/dashboard.js?v={version}', html)
+    html = re.sub(r'/static/css/schedule\.css(?:\?[^\s"\'<>]*)?', f'/static/css/schedule.css?v={version}', html)
+
     html = _brand(render_guest_navigation(html, "/schedule", staff=is_admin(request)))
     response = HTMLResponse(content=html)
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

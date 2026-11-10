@@ -27,14 +27,18 @@ let pendingDeepLinkFoodItem = null;
 let maxPerformancesPerParticipant = 2;
 let maxSoloPerParticipant = 1;
 
-document.addEventListener('DOMContentLoaded', async () => {
-  await initEventInfo();
-  await loadPerformances();
-  await loadFoodCatalog();
+async function initIntake() {
+  await Promise.all([initEventInfo(), loadPerformances(), loadFoodCatalog()]);
   setupEventListeners();
   setupAddPerformanceModal();
   handleUrlQueryParams();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initIntake);
+} else {
+  initIntake();
+}
 
 function handleUrlQueryParams() {
   const params = new URLSearchParams(window.location.search);
