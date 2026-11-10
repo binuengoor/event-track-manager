@@ -9,6 +9,13 @@ event:
   venue: Scouting Hall, Exton (1 Scouting Way, Exton, PA 19341, USA)
   time_range: 5:00 PM - 9:00 PM EST
   payment_url: https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026
+  general_notes: "**Hello EMA Music Fam \u2014 Our Next Sing & Serenade is here!**\n\
+    \n- **Date & Time:** Saturday, November 21, 2026 \u2022 5:00 PM \u2013 9:00 PM\
+    \ EST\n- **Venue:** Scouting Hall, Exton (1 Scouting Way, Exton, PA 19341)\n-\
+    \ **Performances:** Up to 2 songs per participant (both can be solo)\n- **Potluck:**\
+    \ Community dinner with appetizers, curries, biryanis, breads, and desserts\n\
+    - **Cover Charge:** $10 entry for singers ([Pay on Zeffy](https://www.zeffy.com/en-US/ticketing/paattukoottam-sing-and-serenade-november-21--2026);\
+    \ audience entry is free; set tip to $0)"
 storage:
   cache_dir: /data/cache
   max_upload_size_mb: 100

@@ -101,6 +101,15 @@
       closed = true;
     }
     show('signup-closed-note', closed && !ended);
+    var payBtn = $('card-payment');
+    if (payBtn) {
+      if (flags.paymentUrl && flags.paymentOn && !ended) {
+        payBtn.setAttribute('href', flags.paymentUrl);
+        show('card-payment', true);
+      } else {
+        show('card-payment', false);
+      }
+    }
     show('card-schedule', ended && flags.dashboard !== false);
     setText('card-schedule-title', potluck ? 'See the food board' : 'See the Schedule');
   }
@@ -166,6 +175,8 @@
       food: info.food_signup_enabled,
       dashboard: info.dashboard_enabled,
       live: info.live_display_enabled,
+      paymentUrl: info.payment_url,
+      paymentOn: info.payment_enabled !== false,
     };
     document.body.setAttribute('data-mode', flags.stage === false ? 'potluck' : 'stage');
 
