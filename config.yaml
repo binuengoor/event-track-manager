@@ -53,45 +53,45 @@ food_items_seed:
   group: Rice & Main
 - name: Non-Veg Fried Rice
   group: Rice & Main
-- name: Veg Biryani
+- name: Veg Pulav
   group: Rice & Main
-- name: Chicken Biryani
+- name: Non-Veg Pulav
   group: Rice & Main
-- name: Jeera Rice
+- name: Veg Biriyani
   group: Rice & Main
-- name: White Rice
+- name: Non-Veg Biriyani
   group: Rice & Main
-- name: Noodles
+- name: Curd Rice
   group: Rice & Main
-- name: Pulao
+- name: Variety Rice (Lemon/Ghee/Tomato/Jeera)
   group: Rice & Main
-- name: Paneer Butter Masala
+- name: Pasta Item
+  group: Rice & Main
+- name: Veg Curry 1
   group: Curries
-- name: Mixed Veg Curry
+- name: Veg Curry 2
   group: Curries
-- name: Dal Makhani
+- name: Veg Curry 3
   group: Curries
-- name: Chicken Curry 1
+- name: Egg Curry
   group: Curries
-- name: Chicken Curry 2
+- name: Non-Veg Curry 1
   group: Curries
-- name: Mutton Curry
+- name: Non-Veg Curry 2
   group: Curries
-- name: Fish Curry
+- name: Non-Veg Curry 3
   group: Curries
-- name: Naan / Roti 1
+- name: Chappati/Roti/Naan 1
   group: Breads & Sides
-- name: Naan / Roti 2
+- name: Chappati/Roti/Naan 2
   group: Breads & Sides
-- name: Salad / Raita
+- name: Chappati/Roti/Naan 3
   group: Breads & Sides
-- name: Pickle & Papad
-  group: Breads & Sides
-- name: Gulab Jamun
+- name: Dessert 1
   group: Desserts
-- name: Payasam
+- name: Dessert 2
   group: Desserts
-- name: Cake / Pastries
+- name: Dessert 3
   group: Desserts
-- name: Ice Cream / Fruit Salad
+- name: Dessert 4
   group: Desserts

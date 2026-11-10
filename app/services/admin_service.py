@@ -336,7 +336,7 @@ class AdminService:
 
     # ------------------------------------------------------------------ potluck catalog helpers
     FOOD_TEMPLATES = {
-        "indian": "Appetizers:\nVeg Appetizer x3\nNon-Veg Appetizer x3\nRice & Main:\nVeg Biryani\nChicken Biryani\nJeera Rice\nNoodles\nCurries:\nPaneer Curry x2\nChicken Curry x2\nDal\nBreads & Sides:\nNaan / Roti x2\nSalad / Raita\nDesserts:\nGulab Jamun\nPayasam\nCake / Pastries",
+        "indian": "Appetizers:\nVeg Appetizer x3\nNon-Veg Appetizer x4\nRice & Main:\nVeg Fried Rice\nNon-Veg Fried Rice\nVeg Pulav\nNon-Veg Pulav\nVeg Biriyani\nNon-Veg Biriyani\nCurd Rice\nVariety Rice (Lemon/Ghee/Tomato/Jeera)\nPasta Item\nCurries:\nVeg Curry x3\nEgg Curry\nNon-Veg Curry x3\nBreads & Sides:\nChappati/Roti/Naan x3\nDesserts:\nDessert x4",
         "bbq": "Mains:\nBurgers\nHot Dogs\nGrilled Chicken\nVeggie Skewers\nSides:\nPotato Salad\nCole Slaw\nCorn on the Cob\nBaked Beans\nChips & Dip\nDesserts:\nPie\nBrownies\nWatermelon\nDrinks & Extras:\nLemonade\nIce x2\nPlates & Cutlery",
         "thanksgiving": "Mains:\nTurkey\nHam\nVegetarian Main\nSides:\nMashed Potatoes\nStuffing\nGreen Beans\nCranberry Sauce\nDinner Rolls x2\nSalad\nDesserts:\nPumpkin Pie\nApple Pie\nDrinks:\nCider\nSparkling Water",
         "simple": "Mains x4\nSides x4\nDesserts x3\nDrinks x2",
