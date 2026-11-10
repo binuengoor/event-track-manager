@@ -66,11 +66,7 @@ def _brand(html: str) -> str:
     subtitle = escape(str(get_setting("header_brand_subtitle") or getattr(settings.event, "header_brand_subtitle", "") or ""))
     event_name = escape(str(get_setting("event_name") or getattr(settings.event, "name", "") or title))
     event_subtitle = escape(str(get_setting("event_subtitle") or getattr(settings.event, "subtitle", "") or subtitle or "An Evening of Music, Melodies & Togetherness"))
-    poster = str(get_setting("event_poster_url") or getattr(settings.event, "poster_url", "") or "/event-media/poster.jpg")
-    if poster.startswith("/"):
-        full_poster = f"https://eventmanager.extonmalayali.org{poster}"
-    else:
-        full_poster = poster
+    social_image = "https://eventmanager.extonmalayali.org/static/images/poster.jpg"
 
     html = html.replace("<title>Event</title>", f"<title>{event_name}</title>")
     html = html.replace("Event Track Manager", title)
@@ -80,13 +76,16 @@ def _brand(html: str) -> str:
         f'  <meta property="og:type" content="website">\n'
         f'  <meta property="og:title" content="{event_name}">\n'
         f'  <meta property="og:description" content="{event_subtitle}">\n'
-        f'  <meta property="og:image" content="{full_poster}">\n'
-        f'  <meta property="og:image:secure_url" content="{full_poster}">\n'
+        f'  <meta property="og:image" content="{social_image}">\n'
+        f'  <meta property="og:image:secure_url" content="{social_image}">\n'
+        f'  <meta property="og:image:type" content="image/jpeg">\n'
+        f'  <meta property="og:image:width" content="1024">\n'
+        f'  <meta property="og:image:height" content="571">\n'
         f'  <meta property="og:site_name" content="{title}">\n'
         f'  <meta name="twitter:card" content="summary_large_image">\n'
         f'  <meta name="twitter:title" content="{event_name}">\n'
         f'  <meta name="twitter:description" content="{event_subtitle}">\n'
-        f'  <meta name="twitter:image" content="{full_poster}">\n'
+        f'  <meta name="twitter:image" content="{social_image}">\n'
     )
     if "</head>" in html and 'property="og:title"' not in html:
         html = html.replace("</head>", f"{og_tags}</head>", 1)
