@@ -215,7 +215,7 @@ body[data-mode="off"] .lv-foot-right { display: none; }
   .next-card .nm { font-size: 1.375rem; }
   .next-card .sg { font-size: .9375rem; }
   .lv-gallery { border-radius: 16px; }
-  .lv-gallery-frame { width: calc(100% - 24px); max-width: 280px; aspect-ratio: 1 / 1; height: auto; }
+  .lv-gallery-frame { width: calc(100% - 24px) !important; max-width: 340px !important; aspect-ratio: 1 / 1 !important; height: auto !important; margin: 12px auto 0 !important; }
   .lv-gallery-foot { padding: 10px 14px; font-size: .875rem; }
   .lv-upcoming { background: none; border: 0; border-radius: 0; overflow: visible; }
   .lv-upcoming-head { padding: 0 0 8px; }

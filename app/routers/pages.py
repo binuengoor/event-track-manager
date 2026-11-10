@@ -201,6 +201,10 @@ async def serve_live_page(request: Request):
     with open(live_path, "r", encoding="utf-8") as f:
         html = f.read()
 
+    version = int(datetime.now(timezone.utc).timestamp())
+    html = html.replace('/static/css/live.css?v=2', f'/static/css/live.css?v={version}')
+    html = html.replace('/static/css/live.css', f'/static/css/live.css?v={version}')
+
     # Live is always dark (venue screen), so like the console it has no Appearance control.
     html = _brand(render_guest_navigation(html, "/live", staff=is_admin(request), appearance=False,
                                           title_id="live-event-title", subtitle_id="live-event-subtitle"))
