@@ -185,6 +185,7 @@ def test_payment_toggle_and_event_info(admin_client, client):
     assert data2["payment_enabled"] is True
     assert data2["payment_url"] == "https://paypal.me/test"
 
+@pytest.mark.potluck
 def test_potluck_preset_signup_flow(admin_client, client):
     # 1. Apply Potluck Preset
     res = admin_client.post("/api/admin/apply-preset", json={"preset": "potluck"})

@@ -52,6 +52,7 @@ def test_admin_activity_logs_api(client):
     assert isinstance(data, list)
     assert any(item["performer_name"] == name for item in data)
 
+@pytest.mark.potluck
 def test_potluck_only_signup_creates_activity_log(client):
     uid = uuid.uuid4().hex[:6]
     signer_name = f"Binish George Test {uid}"

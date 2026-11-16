@@ -229,16 +229,18 @@ def test_status_patch_rejects_unknown_values(client, admin):
         assert admin.patch(f"/api/status/{a}", json={"status": good}).status_code == 200
 
 
+@pytest.mark.potluck
 def test_both_registration_requires_a_dish(client):
     res = client.post("/api/signup", json={
         "performer_name": "Dish Dodger", "contact_info": PHONE, "age_group": "Senior", "registration_type": "both",
         "performances": [{"performance_type": "Solo", "song_title": "S"}],
         "food_signup": {"item_id": "", "dish_description": ""}})
     assert res.status_code == 400
-    assert res.json()["detail"] == "Choose a dish or switch off the dish part."
+    assert res.json()["detail"] == "Please select a potluck dish to register a performance."
     assert db_service.get_all_performances() == []
 
 
+@pytest.mark.potluck
 def test_food_registration_without_dish_does_not_ask_for_a_performance(client):
     res = client.post("/api/signup", json={
         "performer_name": "Only Food", "contact_info": PHONE, "registration_type": "food", "performances": []})

@@ -66,9 +66,9 @@ def test_nav_js_says_admin_not_staff():
 # ---------------------------------------------------------------------------------------- sign-up
 def test_signup_offers_perform_dish_both_with_stepper_and_inline_errors():
     html = read(STATIC / 'signup.html')
-    for value in ('perform', 'dish', 'both'):
+    for value in ('perform', 'dish'):   # performers bring a dish as part of the performer flow; there is no separate 'both' choice
         assert f'name="signup_choice" value="{value}"' in html
-    for label in ('Perform', 'Bring a dish', 'Both'):
+    for label in ('Perform', 'Bring a dish'):
         assert f'<span>{label}</span>' in html
     assert 'id="stepper"' in html and 'id="step-status"' in html
     errors = re.findall(r'<p id="err-[a-z-]+"[^>]*>', html)

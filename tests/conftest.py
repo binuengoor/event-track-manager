@@ -39,3 +39,20 @@ def isolate_test_db(tmp_path, monkeypatch):
     yield
     
     db_service.db_manager.close_all()
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "potluck: test exercises the potluck dish requirement in sign-up (sign-up needs a dish)")
+
+
+@pytest.fixture(autouse=True)
+def potluck_dish_not_required_by_default(request, monkeypatch):
+    """Performer sign-up requires a potluck dish, which most tests do not care about.
+
+    Unrelated tests sign up without a dish; tests about the dish rule opt back in with @pytest.mark.potluck."""
+    if request.node.get_closest_marker("potluck"):
+        return
+    import app.services.registration_service as registration
+    real = registration.feature_enabled
+    monkeypatch.setattr(registration, "feature_enabled",
+                        lambda name, *a, **kw: False if name == "food_signup_enabled" else real(name, *a, **kw))

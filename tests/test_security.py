@@ -56,6 +56,7 @@ def test_admin_still_sees_phones_in_stage_queue(client, admin):
     assert PHONE in admin.get("/api/admin/participants").text
 
 
+@pytest.mark.potluck
 def test_food_signup_phone_is_not_public(client, admin):
     gid = admin.post("/api/admin/food-groups", json={"name": "Sec Group"}).json()["group_id"]
     iid = admin.post("/api/admin/food-items", json={"name": "Sec Item", "group_id": gid}).json()["item_id"]

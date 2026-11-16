@@ -253,6 +253,7 @@ def test_signup_duet_custom_partner_phone_mandatory(client):
     assert p["partner_name"] == partner
     assert p["partner_phone"] == "(555) 321-7654"
 
+@pytest.mark.potluck
 def test_signup_food_only_attendee_success(client):
     import uuid
     # 1. Create a food group and item for testing
@@ -304,6 +305,7 @@ def test_signup_food_only_attendee_success(client):
     db_service.delete_food_item(item_id, force=True)
     db_service.delete_food_group(group_id)
 
+@pytest.mark.potluck
 def test_signup_food_only_attendee_requires_food_item(client):
     import uuid
     attendee_name = f"Attendee No Food {uuid.uuid4().hex[:6]}"
@@ -318,6 +320,7 @@ def test_signup_food_only_attendee_requires_food_item(client):
     assert res.status_code == 400
     assert "potluck dish" in res.json()["detail"].lower()
 
+@pytest.mark.potluck
 def test_signup_food_only_attendee_requires_valid_phone(client):
     import uuid
     group_id = db_service.add_food_group(f"Phone Group {uuid.uuid4().hex[:6]}")
@@ -361,6 +364,7 @@ def _signup(name, performances, item=None, phone='6105550177'):
     return TestClient(app).post('/api/signup', json=body)
 
 
+@pytest.mark.potluck
 def test_one_signup_can_register_every_allowed_song_with_a_single_dish():
     settings_set('max_performances_per_participant', 2)
     settings_set('max_solo_per_participant', 2)
@@ -374,6 +378,7 @@ def test_one_signup_can_register_every_allowed_song_with_a_single_dish():
     assert sum(1 for p in db_service.get_all_performances() if p['performer_name'] == 'Many Songs') == 2
 
 
+@pytest.mark.potluck
 def test_signup_over_the_song_limit_is_refused():
     settings_set('max_performances_per_participant', 2)
     settings_set('max_solo_per_participant', 3)
@@ -382,6 +387,7 @@ def test_signup_over_the_song_limit_is_refused():
     assert 'Maximum allowed is 2' in response.json()['detail']
 
 
+@pytest.mark.potluck
 def test_signing_up_again_points_to_my_entry_and_never_asks_for_a_second_dish():
     settings_set('max_performances_per_participant', 2)
     item = _dish()
@@ -392,6 +398,7 @@ def test_signing_up_again_points_to_my_entry_and_never_asks_for_a_second_dish():
     assert 'dish' not in again.json()['detail'].lower()
 
 
+@pytest.mark.potluck
 def test_someone_who_already_brought_a_dish_can_sign_up_to_perform_without_another():
     item = _dish()
     food = TestClient(app).post('/api/signup/food', json={'item_id': item, 'signer_name': 'Dish First', 'signer_phone': '6105550188'})
