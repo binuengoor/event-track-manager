@@ -195,3 +195,7 @@ body.signup-page .gf-next .gf-btn small { font-size: 13px; line-height: 1.35; fo
   body.signup-page #main-content { padding-top: 24px; }
   body.signup-page .gf-actions { margin-left: 0; margin-right: 0; padding-left: 0; padding-right: 0; }
 }
+
+.su-added-list { list-style: none; margin: 0 0 .75rem; padding: 0; display: grid; gap: .5rem; }
+.su-added-list li { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .6rem .8rem; border: 1px solid var(--gf-line, #d9d2c3); border-radius: .6rem; }
+.su-added-list button { background: none; border: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }

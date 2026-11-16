@@ -4,7 +4,7 @@ from typing import Dict, Any, List, Optional
 
 from app.features import feature_enabled
 from app.config import settings, get_setting
-from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
+from app.exceptions import AlreadyRegisteredError, RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.privacy import NamePrivacy
@@ -218,12 +218,20 @@ class RegistrationService:
             if not contact_phone or not validate_phone(contact_phone):
                 raise RegistrationError("A valid 10-digit phone number is required.")
 
+        # Someone who already has a performance signs up once; further songs go through My Entry
+        # (or are all added in the first sign-up).
+        max_perf = int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant))
+        if any((row.get("performer_name") or "").strip().casefold() == clean_name.casefold() for row in roster):
+            raise AlreadyRegisteredError(
+                f"{privacy.name(clean_name)} is already signed up. You do not need to sign up again: open My Entry "
+                f"to add another performance (up to {max_perf} in total) or to change your details."
+            )
+
         # Quota limits
         existing_counts = db_service.count_performances_for_performer(clean_name)
         req_total = len(payload.performances)
         req_solo = sum(1 for p in payload.performances if "solo" in (p.performance_type or "").lower())
 
-        max_perf = int(get_setting("max_performances_per_participant", settings.signup.max_performances_per_participant))
         if existing_counts["total"] + req_total > max_perf:
             raise PerformerLimitReachedError(
                 f"Registration exceeds limit. Maximum allowed is {max_perf} performance(s) per participant (currently registered: {existing_counts['total']})."
@@ -299,12 +307,15 @@ class RegistrationService:
                             f"A valid 10-digit phone number is required for partner '{p_name}' since they are not registered."
                         )
 
-        if food_signup_enabled and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
+        already_has_dish = any(clean_name.casefold() == name.casefold()
+                               for item in db_service.get_all_food_items_with_signups()
+                               for name in split_signer_names(item.get("signer_name")))
+        if food_signup_enabled and not already_has_dish and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
             raise RegistrationError("Please select a potluck dish to register a performance.")
 
         # Claim the dish before creating performances so an unavailable slot cannot produce a dishless registration.
         food_signup_id = None
-        if food_signup_enabled and payload.food_signup and payload.food_signup.item_id:
+        if food_signup_enabled and not already_has_dish and payload.food_signup and payload.food_signup.item_id:
             try:
                 food_signup_id = db_service.claim_food_item(
                     item_id=payload.food_signup.item_id,

@@ -23,7 +23,7 @@ router = APIRouter(tags=["signup"])
 
 
 from app.services.registration_service import registration_service
-from app.exceptions import RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
+from app.exceptions import AlreadyRegisteredError, RegistrationError, PerformerLimitReachedError, FoodItemUnavailableError
 
 
 @router.get("/api/signup/config")
@@ -36,6 +36,8 @@ def register_participant(payload: SignupRequest):
     try:
         return registration_service.register_participant(payload)
     except FoodItemUnavailableError as ex:
+        raise HTTPException(status_code=409, detail=str(ex))
+    except AlreadyRegisteredError as ex:
         raise HTTPException(status_code=409, detail=str(ex))
     except (RegistrationError, PerformerLimitReachedError) as ex:
         raise HTTPException(status_code=400, detail=str(ex))

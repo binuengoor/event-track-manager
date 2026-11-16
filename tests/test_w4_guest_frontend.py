@@ -84,7 +84,7 @@ def test_signup_js_uses_registered_entries_and_partner_wording():
     src = read(JS / 'signup.js')
     assert 'registered_entries' in src
     assert 'registered_performers' in src          # fallback when the field is absent
-    assert 'No, new act' in src and 'Edit ${id}' in src
+    assert 'Open My Entry' in src and 'No, new act' not in src   # an existing performer is sent to My Entry, not through sign-up again
     html = read(STATIC / 'signup.html')
     assert 'Yes, same person' in html and 'No, someone else' in html
     assert 'Same person?' in src
@@ -95,7 +95,7 @@ def test_signup_js_uses_registered_entries_and_partner_wording():
 
 def test_signup_done_card_has_three_actions_and_event_name_from_config():
     html = read(STATIC / 'signup.html')
-    assert 'Upload track now' in html and 'Add another act' in html and 'Add a dish' in html
+    assert 'Upload track now' in html and 'Add another song later' in html and 'Add a dish' in html
     src = read(JS / 'signup.js')
     assert 'config.event_name' in src or 'c.event_name' in src
     assert '/my-entry?name=' in src

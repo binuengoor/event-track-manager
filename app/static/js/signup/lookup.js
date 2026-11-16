@@ -122,34 +122,21 @@ function updateNameLookup() {
   if (raw.length < 3) { box.hidden = true; return; }
   const exact = findEntry(raw);
 
-  if (exact && state.nameDecision !== key) {
+  if (exact && exact.ids.length && state.choice !== "dish") {
     const ids = exact.ids;
     const n = ids.length;
     const detail = n === 0 ? "" : n === 1
       ? ` with one act (${ids[0]}${exact.titles[0] ? ", " + exact.titles[0] : ""})`
       : ` with ${n} acts (${ids.join(", ")})`;
-    text.textContent = `${exact.name} is already signed up${detail}.`;
-    const targets = ids.length ? ids : [""];
-    targets.forEach((id) => {
+    text.textContent = `${exact.name} is already signed up${detail}. No need to sign up again: open My Entry to add another song or change details.`;
+    [ids[0]].forEach((id) => {
       const a = document.createElement("a");
       a.className = "gf-btn gf-btn-small gf-btn-primary";
       a.href = `/my-entry?name=${encodeURIComponent(exact.name)}`;
-      a.textContent = id ? `Edit ${id}` : "Edit my entry";
+      a.textContent = "Open My Entry";
       actions.appendChild(a);
     });
-    const no = document.createElement("button");
-    no.type = "button";
-    no.className = "gf-btn gf-btn-small";
-    no.textContent = "No, new act";
-    no.addEventListener("click", () => {
-      state.nameDecision = key;
-      box.hidden = true;
-      prefillFromProfile(exact.name);
-      $("contact-info").focus();
-    });
-    actions.appendChild(no);
     box.hidden = false;
-    prefillFromProfile(exact.name);
     return;
   }
 

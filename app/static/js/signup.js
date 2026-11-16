@@ -13,8 +13,8 @@ const state = {
   step: 0,
   ageGroup: null,
   entries: [],            // normalised registered entries: {name, ids[], titles[]}
-  nameDecision: "",       // lower-case name for which the user chose "No, new act"
   profileChecked: "",     // lower-case name already looked up for phone pre-fill
+  acts: [],               // songs already added in this sign-up (the form always holds the current one)
   partnerSame: null,      // true / false / null (not answered or no match)
   lastResult: null,
 };

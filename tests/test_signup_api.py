@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 from app.services.db_service import db_service
+from app.services.admin_service import admin_service
 
 @pytest.fixture
 def client():
@@ -340,3 +341,60 @@ def test_signup_food_only_attendee_requires_valid_phone(client):
     # Clean up
     db_service.delete_food_item(item_id, force=True)
     db_service.delete_food_group(group_id)
+
+
+# ------------------------------------------------------------------ several songs in one sign-up
+def settings_set(key, value):
+    admin_service.update_settings({key: value})
+
+
+def _dish():
+    group = db_service.add_food_group('Mains')
+    return db_service.add_food_item('Rice', group)
+
+
+def _signup(name, performances, item=None, phone='6105550177'):
+    body = {'performer_name': name, 'contact_info': phone, 'age_group': 'Senior', 'performances': performances}
+    if item:
+        body['food_signup'] = {'item_id': item}
+        body['registration_type'] = 'both'
+    return TestClient(app).post('/api/signup', json=body)
+
+
+def test_one_signup_can_register_every_allowed_song_with_a_single_dish():
+    settings_set('max_performances_per_participant', 2)
+    settings_set('max_solo_per_participant', 2)
+    item = _dish()
+    response = _signup('Many Songs', [
+        {'performance_type': 'Solo', 'song_title': 'First'},
+        {'performance_type': 'Solo', 'song_title': 'Second'},
+    ], item=item)
+    assert response.status_code == 200, response.text
+    assert len(response.json()['entry_ids']) == 2
+    assert sum(1 for p in db_service.get_all_performances() if p['performer_name'] == 'Many Songs') == 2
+
+
+def test_signup_over_the_song_limit_is_refused():
+    settings_set('max_performances_per_participant', 2)
+    settings_set('max_solo_per_participant', 3)
+    response = _signup('Too Many', [{'performance_type': 'Solo', 'song_title': str(i)} for i in range(3)], item=_dish())
+    assert response.status_code == 400
+    assert 'Maximum allowed is 2' in response.json()['detail']
+
+
+def test_signing_up_again_points_to_my_entry_and_never_asks_for_a_second_dish():
+    settings_set('max_performances_per_participant', 2)
+    item = _dish()
+    assert _signup('Repeat Singer', [{'performance_type': 'Solo', 'song_title': 'One'}], item=item).status_code == 200
+    again = _signup('Repeat Singer', [{'performance_type': 'Solo', 'song_title': 'Two'}])   # no dish this time
+    assert again.status_code == 409
+    assert 'already signed up' in again.json()['detail'] and 'My Entry' in again.json()['detail']
+    assert 'dish' not in again.json()['detail'].lower()
+
+
+def test_someone_who_already_brought_a_dish_can_sign_up_to_perform_without_another():
+    item = _dish()
+    food = TestClient(app).post('/api/signup/food', json={'item_id': item, 'signer_name': 'Dish First', 'signer_phone': '6105550188'})
+    assert food.status_code == 200, food.text
+    response = _signup('Dish First', [{'performance_type': 'Solo', 'song_title': 'Later'}], phone='6105550188')
+    assert response.status_code == 200, response.text

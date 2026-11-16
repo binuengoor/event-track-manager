@@ -39,9 +39,14 @@ function normalizeEntries(c) {
   return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// Public names of juniors end with the parent's first name, e.g. "Mira Narayan (Rekha)"; a typed full name still matches.
+function baseName(name) { return String(name || "").replace(/\s*\([^)]*\)\s*$/, "").trim().toLowerCase(); }
+
 function findEntry(name) {
   const key = String(name || "").trim().toLowerCase();
-  return key ? state.entries.find((e) => e.name.toLowerCase() === key) : null;
+  if (!key) return null;
+  return state.entries.find((e) => e.name.toLowerCase() === key)
+    || state.entries.find((e) => baseName(e.name) === baseName(key)) || null;
 }
 
 // ---------------------------------------------------------------------------------------------- availability and steps
@@ -133,6 +138,7 @@ function showStep() {
   $("add-song-btn").hidden = true;
   if (onDish) renderFoodGroups();
   renderStepper();
+  renderAddedActs();
   hideFormError();
   syncBarNotes();
   refreshErrorSummary();

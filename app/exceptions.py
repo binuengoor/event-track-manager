@@ -68,6 +68,11 @@ class RegistrationError(DomainException):
     pass
 
 
+class AlreadyRegisteredError(RegistrationError):
+    """Raised when someone who already has a performance tries to sign up as a performer again."""
+    pass
+
+
 class PerformerLimitReachedError(RegistrationError):
     """Raised when a performer exceeds solo or total performance limits."""
     pass

@@ -10,24 +10,19 @@ def _junior(name='Mira Narayan'):
         performance_type='Duet', partner_name='Adult Singer', partner_age_group='Senior', song_title='Duet')
 
 
-def test_signup_short_alias_uses_existing_person_and_privacy():
+def test_signup_by_display_name_of_existing_person_points_to_my_entry():
     client = TestClient(app)
     _junior()
-    response = client.post('/api/signup', json={
-        'performer_name': 'Mira Narayan (Rekha)', 'age_group': 'Junior', 'contact_info': '6105550102',
-        'guardian_name': 'Rekha Narayan', 'guardian_phone': '6105550102',
-        'performances': [{'performance_type': 'Solo', 'song_title': 'Song'}],
-    })
-    assert response.status_code == 200, response.text
-    assert response.json()['performer_name'] == 'Mira Narayan (Rekha)'
-    assert 'Rekha Narayan' not in response.text
-    assert db_service.get_performance(response.json()['entry_ids'][0])['performer_name'] == 'Mira Narayan'
-    again = client.post('/api/signup', json={
-        'performer_name': 'Mira Narayan (Rekha)', 'age_group': 'Junior', 'contact_info': '6105550102',
-        'guardian_name': 'Rekha Narayan', 'guardian_phone': '6105550102',
-        'performances': [{'performance_type': 'Solo', 'song_title': 'Extra'}],
-    })
-    assert again.status_code == 400
+    for typed in ('Mira Narayan (Rekha)', 'Mira Narayan'):
+        response = client.post('/api/signup', json={
+            'performer_name': typed, 'age_group': 'Junior', 'contact_info': '6105550102',
+            'guardian_name': 'Rekha Narayan', 'guardian_phone': '6105550102',
+            'performances': [{'performance_type': 'Solo', 'song_title': 'Song'}],
+        })
+        assert response.status_code == 409, response.text
+        assert 'already signed up' in response.json()['detail'] and 'My Entry' in response.json()['detail']
+        assert 'Rekha Narayan' not in response.text
+    assert len(db_service.get_all_performances()) == 1
 
 
 def test_signup_alias_rejects_age_mismatch_and_keeps_namesakes_apart():

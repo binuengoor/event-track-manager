@@ -28,6 +28,100 @@ async function handleSubmit(e) {
   await submitSignup();
 }
 
+// The act currently shown in the form.
+function readCurrentAct() {
+  const t = currentType();
+  const partner = $("partner-name").value.trim();
+  const isDuet = t.toLowerCase() === "duet";
+  const needsPartnerPhone = isDuet && (!findEntry(partner) || state.partnerSame === false);
+  return {
+    performance_type: t,
+    partner_name: partner || null,
+    partner_same_person: isDuet && findEntry(partner) ? state.partnerSame : null,
+    partner_age_group: needsPartnerPhone ? (document.querySelector('input[name="partner_age_group"]:checked')?.value || null) : null,
+    partner_phone: needsPartnerPhone ? $("partner-phone").value.trim() : "",
+    partner_guardian_name: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-name").value.trim() : "",
+    partner_guardian_phone: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-phone").value.trim() : "",
+    song_title: $("song-title").value.trim(),
+    movie_name: $("movie-name").value.trim(),
+    stage_notes: $("stage-notes").value.trim(),
+    is_acoustic: $("acoustic").checked,
+  };
+}
+
+// After "Add another song" the form is empty again; an untouched empty form is not sent as an extra song.
+function currentActIsBlank() {
+  const a = readCurrentAct();
+  return !a.song_title && !a.movie_name && !a.stage_notes && !a.partner_name && !a.is_acoustic
+    && a.performance_type.toLowerCase() === (performanceTypes()[0] || "Solo").toLowerCase();
+}
+
+function allActs() {
+  return state.acts.length && currentActIsBlank() ? [...state.acts] : [...state.acts, readCurrentAct()];
+}
+
+function maxSongs() { return parseInt((state.config || {}).max_performances_per_participant, 10) || 2; }
+function maxSolos() {
+  const v = parseInt((state.config || {}).max_solo_per_participant, 10);
+  return Number.isNaN(v) ? 1 : v;
+}
+function soloCount(list) { return list.filter((a) => (a.performance_type || "").toLowerCase() === "solo").length; }
+
+function resetActFields() {
+  ["song-title", "movie-name", "stage-notes", "partner-name", "partner-phone"].forEach((id) => { $(id).value = ""; });
+  $("acoustic").checked = false;
+  $("song-dup-box").hidden = true;
+  state.partnerSame = null;
+  const firstType = document.querySelector('input[name="perf_type"]');
+  if (firstType) firstType.checked = true;
+  syncPartnerUI();
+}
+
+// Songs added so far (chips with Remove) and the "Add another song" button with its limit note.
+function renderAddedActs() {
+  const list = $("added-acts-list");
+  list.innerHTML = "";
+  state.acts.forEach((act, i) => {
+    const li = document.createElement("li");
+    const label = document.createElement("span");
+    label.textContent = `${i + 1}. ${act.song_title || "Song to be decided"} (${act.performance_type.toLowerCase()}${act.partner_name ? " with " + act.partner_name : ""})`;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.textContent = "Remove";
+    rm.setAttribute("aria-label", `Remove song ${i + 1}`);
+    rm.addEventListener("click", () => { state.acts.splice(i, 1); renderAddedActs(); });
+    li.append(label, rm);
+    list.appendChild(li);
+  });
+  $("added-acts").hidden = !state.acts.length;
+  const btn = $("add-another-song-btn");
+  const note = $("add-another-song-note");
+  const queued = state.acts.length + 1;            // added songs plus the one in the form
+  const wantsAct = state.choice !== "dish" && performEnabled();
+  const room = queued < maxSongs();
+  btn.hidden = !(wantsAct && room);
+  note.hidden = !wantsAct;
+  note.textContent = room
+    ? `You can sign up for up to ${maxSongs()} songs. Add them all now, or add more later in My Entry.`
+    : `That is the most songs allowed per person (${maxSongs()}).`;
+}
+
+// Saves the song in the form to the list and clears the form for the next one.
+function addAnotherSong() {
+  if (!VALIDATORS.act()) return;
+  const act = readCurrentAct();
+  if (state.acts.length + 1 >= maxSongs()) return;
+  state.acts.push(act);
+  resetActFields();
+  // Out of solo slots: start the next song on a duet or group instead of a solo.
+  if (soloCount(state.acts) >= maxSolos()) {
+    const other = Array.from(document.querySelectorAll('input[name="perf_type"]')).find((r) => r.value.toLowerCase() !== "solo");
+    if (other) { other.checked = true; syncPartnerUI(); }
+  }
+  renderAddedActs();
+  $("song-title").focus();
+}
+
 function buildPayload() {
   const choice = state.choice;
   const name = $("performer-name").value.trim();
@@ -42,25 +136,7 @@ function buildPayload() {
     performances: [],
     food_signup: null,
   };
-  if (choice !== "dish") {
-    const t = currentType();
-    const partner = $("partner-name").value.trim();
-    const isDuet = t.toLowerCase() === "duet";
-    const needsPartnerPhone = isDuet && (!findEntry(partner) || state.partnerSame === false);
-    payload.performances.push({
-      performance_type: t,
-      partner_name: partner || null,
-      partner_same_person: isDuet && findEntry(partner) ? state.partnerSame : null,
-      partner_age_group: needsPartnerPhone ? (document.querySelector('input[name="partner_age_group"]:checked')?.value || null) : null,
-      partner_phone: needsPartnerPhone ? $("partner-phone").value.trim() : "",
-      partner_guardian_name: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-name").value.trim() : "",
-      partner_guardian_phone: needsPartnerPhone && partnerNeedsGuardian() ? $("partner-guardian-phone").value.trim() : "",
-      song_title: $("song-title").value.trim(),
-      movie_name: $("movie-name").value.trim(),
-      stage_notes: $("stage-notes").value.trim(),
-      is_acoustic: $("acoustic").checked,
-    });
-  }
+  if (choice !== "dish") payload.performances = allActs();
   if (dishEnabled() && food) {
     payload.food_signup = { item_id: food.value, dish_description: $("dish-description").value.trim() };
   }
@@ -116,7 +192,7 @@ function showDone(response, request) {
   const c = state.config || {};
   const name = response.performer_name || request.performer_name;
   const ids = response.entry_ids || [];
-  const act = request.performances[0];
+  const acts = request.performances || [];
   const hasDish = Boolean(response.food_signup_id || request.food_signup);
 
   $("signup-form").hidden = true;
@@ -134,23 +210,24 @@ function showDone(response, request) {
   });
 
   const parts = [];
-  if (act) parts.push(`${act.song_title ? act.song_title + ", " : ""}${act.performance_type.toLowerCase()}`);
+  acts.forEach((act) => parts.push(`${act.song_title ? act.song_title + ", " : ""}${act.performance_type.toLowerCase()}`));
   if (hasDish) parts.push(state.lastResult?.dishName ? `dish: ${state.lastResult.dishName}` : "your dish is on the food board");
   const editsLocked = c.performer_edits_enabled === false;
   const tail = ids.length && !editsLocked ? " Keep this entry id; you can edit from My entry." : "";
   $("done-message").textContent = `Thank you, ${name}! You are signed up for ${eventLabel()}.${parts.length ? " " + parts.join("; ") + "." : ""}${tail}`;
 
   const upload = $("done-upload");
-  const wantsTrack = Boolean(act) && !act.is_acoustic;
+  const wantsTrack = acts.some((act) => !act.is_acoustic);
   const canUpload = wantsTrack && c.track_upload_enabled !== false;
   upload.hidden = !canUpload;
   $("done-uploads-closed").hidden = !(wantsTrack && c.track_upload_enabled === false);
   $("done-edits-locked").hidden = !editsLocked;
   upload.href = `/my-entry?name=${encodeURIComponent(name)}`;
 
-  const canAddAct = performEnabled();
+  const canAddAct = performEnabled() && acts.length && ids.length < maxSongs();
   $("done-add-act").hidden = !canAddAct;
-  $("done-add-act-title").textContent = act ? "Add another act" : "Add an act";
+  $("done-add-act").href = `/my-entry?name=${encodeURIComponent(name)}`;
+  state.acts = [];
   $("done-add-dish").hidden = !(dishEnabled() && !hasDish);
 
   const pay = $("done-payment");
@@ -166,16 +243,11 @@ function showDone(response, request) {
 
 // Reset the form for another act or a dish. Name, phone, age group and guardian stay.
 async function restartForm(choice) {
-  ["song-title", "movie-name", "stage-notes", "partner-name", "partner-phone", "dish-description"].forEach((id) => { $(id).value = ""; });
-  $("acoustic").checked = false;
-  $("song-dup-box").hidden = true;
+  resetActFields();
+  $("dish-description").value = "";
   document.querySelectorAll('input[name="food_item_id"]').forEach((r) => { r.checked = false; });
-  state.partnerSame = null;
-  state.nameDecision = $("performer-name").value.trim().toLowerCase();
+  state.acts = [];
   $("name-lookup-box").hidden = true;
-  const firstType = document.querySelector('input[name="perf_type"]');
-  if (firstType) firstType.checked = true;
-  syncPartnerUI();
 
   $("signup-done").hidden = true;
   $("signup-form").hidden = false;

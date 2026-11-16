@@ -24,6 +24,7 @@ function setupAddPerformanceModal() {
     const allowDuets = !window.performerProfileData || window.performerProfileData.allow_duets !== false;
     const duetOption = typeSelect.querySelector('option[value="Duet"]');
     const groupOption = typeSelect.querySelector('option[value="Group"]');
+    const soloOption = typeSelect.querySelector('option[value="Solo"]');
     if (duetOption) duetOption.disabled = !allowDuets;
     if (groupOption) groupOption.disabled = !allowDuets;
 

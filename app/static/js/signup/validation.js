@@ -67,6 +67,7 @@ const VALIDATORS = {
 
     setErr("performer-name", ""); setErr("contact-info", ""); setErr("guardian-name", ""); setErr("guardian-phone", ""); setErr("age-group", "");
     if (!name) fail("performer-name", "Please enter your name.");
+    else if (wantsAct && findEntry(name)?.ids.length) fail("performer-name", "You are already signed up. Open My Entry to add another song.");
     if (wantsAct && !state.ageGroup && (state.config?.age_groups || []).length) fail("age-group", "Choose an age group.");
 
     if (isJunior()) {
@@ -182,6 +183,6 @@ function bindEvents() {
   $("skip-dish-btn").addEventListener("click", skipDish);
   $("add-song-btn").addEventListener("click", () => { setChoice("both"); window.scrollTo({ top: 0 }); });
 
-  $("done-add-act").addEventListener("click", () => restartForm("perform"));
+  $("add-another-song-btn").addEventListener("click", addAnotherSong);
   $("done-add-dish").addEventListener("click", () => restartForm("dish"));
 }
