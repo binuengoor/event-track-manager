@@ -52,7 +52,6 @@ def test_public_name_helper():
     assert public_name("Anika Menon", "junior", shorten_juniors=False, guardian_first="Priya") == "Anika Menon"
     assert public_name("Anika Menon", "junior", shorten_juniors=False) == "Anika Menon"
     assert public_name("Ravi Kumar", "Senior") == "Ravi Kumar"
-    assert public_name("Ravi Kumar", "Senior", adult_opt_in=True) == "Ravi K."
     assert public_name("Anika", "Junior") == "Anika"
 
 

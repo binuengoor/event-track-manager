@@ -689,7 +689,7 @@ An optional event passcode protects guest pages and public APIs behind a gate pa
 | Restore previous track | Admin can restore a file from `tracks/_archive/` with one click (today it is manual). | from external plan, adapted |
 | Search engines | Send `X-Robots-Tag: noindex, nofollow, noarchive` on every response and serve `/robots.txt` with `Disallow: /` (not present today, verified). | from external plan |
 | Event passcode (optional) | A shared word or a token in the invite link before guest pages show anything, for public deployments. Alternatives outside the app (a Cloudflare access rule) exist. | from external plan, adapted (Q18) |
-| Minor display names | Optional per-act checkbox "show first name and last initial on public screens"; full name stays in admin and console. | from external plan (Q18) |
+| Minor display names | Juniors show full name plus the parent's first name in brackets; adults show their full name. No opt-out checkbox. | from external plan (Q18) |
 | Dietary tags and tent cards | Chips (vegetarian, vegan, halal, nuts, gluten-free, dairy-free, spicy) per dish, and a print stylesheet for 8 table cards per sheet. Backlog, needs a schema column. | from external plan (backlog) |
 
 ### 6.11 Roadmap

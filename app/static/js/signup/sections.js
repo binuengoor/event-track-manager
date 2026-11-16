@@ -54,8 +54,6 @@ function updateGuardian() {
     setErr("guardian-name", "");
     setErr("guardian-phone", "");
   }
-  const adultBox = $("adult-privacy-box");
-  if (adultBox) adultBox.hidden = show;
   $("junior-privacy-note").hidden = !show;
   if (!show) $("use-guardian-phone").checked = true;
   syncGuardianPhone();

@@ -345,7 +345,6 @@ class RegistrationService:
                 age_group=payload.age_group,
                 guardian_name=guardian_name if requires_guardian else "",
                 guardian_phone=guardian_phone if requires_guardian else "",
-                public_first_name_only=bool(payload.public_first_name_only),
                 stage_notes=notes,
                 track_status=track_status,
                 created_via="signup_portal"

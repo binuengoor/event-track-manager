@@ -262,10 +262,6 @@ def add_performer_performance(payload: AddPerformanceRequest):
         age_group=age_group,
         guardian_name=guardian_name,
         guardian_phone=guardian_phone,
-        public_first_name_only=any(
-            p.get("public_first_name_only") and (p.get("performer_name") or "").strip().casefold() == clean_name.casefold()
-            for p in user_perfs
-        ),
         stage_notes=payload.stage_notes.strip() if payload.stage_notes else "",
         track_status=track_status,
         created_via="performer_hub"

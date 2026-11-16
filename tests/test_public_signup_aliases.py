@@ -188,23 +188,3 @@ def test_suggestions_include_partner_and_food_only_without_private_details():
     assert 'Mira Narayan (Rekha)' in names and 'Food Guest' in names
     assert 'Rekha Narayan' not in str(config) and '6105550102' not in str(config)
     assert 'Food Guest' not in config['registered_performers']
-
-
-def test_adult_signup_with_first_name_only_opt_in():
-    client = TestClient(app)
-    response = client.post('/api/signup', json={
-        'performer_name': 'Deepak Joseph',
-        'age_group': 'Senior',
-        'contact_info': '6105550999',
-        'public_first_name_only': True,
-        'performances': [{'performance_type': 'Solo', 'song_title': 'Solo Melody'}],
-    })
-    assert response.status_code == 200
-    entry_id = response.json()['entry_ids'][0]
-    perf = db_service.get_performance(entry_id)
-    assert perf['public_first_name_only'] == 1
-    # Check that public performances endpoint displays shortened name
-    pub_res = client.get('/api/performances')
-    assert pub_res.status_code == 200
-    assert 'Deepak J.' in [p['performer_name'] for p in pub_res.json()]
-    assert 'Deepak Joseph' not in pub_res.text

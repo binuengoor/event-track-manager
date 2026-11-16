@@ -110,11 +110,6 @@
     return Math.round((target - base) / 86400000);
   }
 
-  function publicName(name) {
-    const parts = String(name || '').trim().split(/\s+/);
-    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0] || '';
-  }
-
   function renderAddActTypes() {
     const select = el('lineup-add-type');
     const types = settings().performance_types;
@@ -297,12 +292,11 @@
         const b = trackBadge(p);
         const playing = p.performance_status === 'On Stage';
         const who = p.performer_name + (p.partner_name ? ` & ${p.partner_name}` : '');
-        const sub = p.public_first_name_only ? `Public: ${publicName(p.performer_name)}` : '';
         const media = p.media_type ? String(p.media_type).charAt(0).toUpperCase() + String(p.media_type).slice(1) : '-';
         return `<div role="row" class="ad-tr ${playing ? 'play' : b.ready ? '' : 'need'}" data-entry="${esc(p.entry_id)}">
           <span role="cell" data-c="n" class="mono">${esc(p.sequence_order == null ? '-' : String(p.sequence_order).padStart(2, '0'))}</span>
           <span role="cell" data-c="id" class="mono">${esc(p.entry_id)}</span>
-          <span role="cell" data-c="who" class="who"><b title="${esc(who)}">${esc(who)}</b>${sub ? `<small>${esc(sub)}</small>` : ''}</span>
+          <span role="cell" data-c="who" class="who"><b title="${esc(who)}">${esc(who)}</b></span>
           <span role="cell" data-c="song" class="song">${esc(p.song_title || 'No song title yet')}</span>
           <span role="cell" data-c="type" class="dim">${esc(p.performance_type || '')}</span>
           <span role="cell" data-c="track"><span class="ad-pill ${playing ? 'accent' : b.cls}">${playing ? 'Now playing' : esc(b.label)}</span></span>

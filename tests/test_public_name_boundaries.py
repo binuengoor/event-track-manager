@@ -129,17 +129,3 @@ def test_partner_legacy_backfill_guardian_is_not_trusted():
     assert response.status_code == 400
     assert 'guardian details are missing' in response.json()['detail']
     assert all(p['performer_name'] != 'Mira Narayan' for p in db_service.get_all_performances())
-
-
-def test_adult_privacy_preference_survives_added_act():
-    client = TestClient(app)
-    db_service.create_performance(performer_name='Asha Nair', age_group='Senior',
-        performance_type='Duet', partner_name='Other Singer', partner_age_group='Senior',
-        song_title='Duet', public_first_name_only=True)
-    response = client.post('/api/performer/performances', json={
-        'performer_name': 'Asha N.', 'performance_type': 'Solo', 'song_title': 'New song',
-    })
-    assert response.status_code == 200, response.text
-    act = db_service.get_performance(response.json()['entry_id'])
-    assert act['public_first_name_only']
-    assert 'Asha Nair' not in client.get('/api/performances').text

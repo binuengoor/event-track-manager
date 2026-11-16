@@ -101,7 +101,6 @@ body.signup-page .gf-radio small { font-size: 13px; font-weight: 400; color: var
 .su-check input { flex: 0 0 24px; width: 24px; height: 24px; margin: 0; accent-color: var(--accent-primary); }
 .su-check small { display: block; margin-top: 2px; font-size: 13px; color: var(--text-muted); }
 .su-check small:empty { display: none; }
-#adult-privacy-box { margin: 0 0 12px; }
 .su-info { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border: 1px solid var(--border-subtle); border-radius: 14px; background: var(--bg-surface-2); }
 .su-info svg { flex: 0 0 20px; margin-top: 1px; color: var(--accent-text); }
 .su-info strong { display: block; font-size: 14px; font-weight: 600; color: var(--text-primary); }

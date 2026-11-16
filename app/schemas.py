@@ -52,7 +52,6 @@ class SignupRequest(BaseModel):
     age_group: Optional[str] = ""
     guardian_name: Optional[str] = ""
     guardian_phone: Optional[str] = ""
-    public_first_name_only: Optional[bool] = False
     registration_type: Optional[str] = "performer"
     performances: List[PerformanceSignupItem] = []
     food_signup: Optional[FoodSignupItem] = None

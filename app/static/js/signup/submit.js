@@ -38,7 +38,6 @@ function buildPayload() {
     age_group: choice === "dish" ? "" : (document.querySelector('input[name="age_group"]:checked')?.value || ""),
     guardian_name: isJunior() ? $("guardian-name").value.trim() : "",
     guardian_phone: isJunior() ? $("guardian-phone").value.trim() : "",
-    public_first_name_only: !isJunior() && Boolean($("public-first-name-only")?.checked),
     registration_type: choice === "dish" ? "food_only" : choice === "both" ? "both" : "performer",
     performances: [],
     food_signup: null,
