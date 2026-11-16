@@ -188,3 +188,20 @@ def test_rendered_guest_pages_use_the_configured_brand_not_a_hard_coded_one():
     assert 'Spring &lt;Gala&gt;' in html
     assert 'EMA Paattukoottam' not in html
     assert 'Spring <Gala>' not in html
+
+
+def test_signup_page_busts_the_cache_of_every_signup_script():
+    """Returning visitors must not mix the new page with 4-hour-cached old scripts."""
+    from fastapi.testclient import TestClient
+    from app.main import app
+    html = TestClient(app).get('/signup').text
+    for name in ('signup.js', 'signup/steps.js', 'signup/sections.js', 'signup/lookup.js', 'signup/validation.js', 'signup/submit.js'):
+        assert re.search(rf'/static/js/{re.escape(name)}\?v=\d+', html), name
+    assert re.search(r'/static/css/signup\.css\?v=\d+', html)
+
+
+def test_signup_has_a_visible_add_another_song_button_with_limits():
+    html = read(STATIC / 'signup.html')
+    assert 'id="add-another-song-btn" class="gf-btn su-add-song"' in html
+    src = read(JS / 'signup/submit.js')
+    assert 'maxSongs()' in src and 'maxSolos()' in src and 'soloRadio.disabled' in src

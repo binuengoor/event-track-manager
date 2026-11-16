@@ -52,8 +52,7 @@ function readCurrentAct() {
 // After "Add another song" the form is empty again; an untouched empty form is not sent as an extra song.
 function currentActIsBlank() {
   const a = readCurrentAct();
-  return !a.song_title && !a.movie_name && !a.stage_notes && !a.partner_name && !a.is_acoustic
-    && a.performance_type.toLowerCase() === (performanceTypes()[0] || "Solo").toLowerCase();
+  return !a.song_title && !a.movie_name && !a.stage_notes && !a.partner_name && !a.is_acoustic;
 }
 
 function allActs() {
@@ -94,16 +93,32 @@ function renderAddedActs() {
     list.appendChild(li);
   });
   $("added-acts").hidden = !state.acts.length;
+  $("added-acts-title").textContent = `Songs added so far. You are now adding song ${state.acts.length + 1} of ${maxSongs()}.`;
   const btn = $("add-another-song-btn");
   const note = $("add-another-song-note");
   const queued = state.acts.length + 1;            // added songs plus the one in the form
   const wantsAct = state.choice !== "dish" && performEnabled();
-  const room = queued < maxSongs();
+  // Event limits: total songs and solos. Solo is greyed out once the added songs use up the solo allowance.
+  const soloFull = soloCount(state.acts) >= maxSolos();
+  const soloRadio = Array.from(document.querySelectorAll('input[name="perf_type"]')).find((r) => r.value.toLowerCase() === "solo");
+  if (soloRadio) {
+    soloRadio.disabled = soloFull;
+    soloRadio.closest("label")?.classList.toggle("is-disabled", soloFull);
+    if (soloFull && soloRadio.checked) {
+      const other = Array.from(document.querySelectorAll('input[name="perf_type"]')).find((r) => r !== soloRadio);
+      if (other) { other.checked = true; syncPartnerUI(); }
+    }
+  }
+  const othersAllowed = performanceTypes().some((t) => t.toLowerCase() !== "solo");
+  const nextSolos = soloCount([...state.acts, readCurrentAct()]);
+  const room = queued < maxSongs() && (nextSolos < maxSolos() || othersAllowed);
   btn.hidden = !(wantsAct && room);
+  $("add-another-song-label").textContent = `Add another song (you have ${queued} of ${maxSongs()})`;
   note.hidden = !wantsAct;
+  const soloNote = maxSolos() < maxSongs() ? ` (at most ${maxSolos()} solo)` : "";
   note.textContent = room
-    ? `You can sign up for up to ${maxSongs()} songs. Add them all now, or add more later in My Entry.`
-    : `That is the most songs allowed per person (${maxSongs()}).`;
+    ? `You can sign up for up to ${maxSongs()} songs${soloNote}. Add them all now, or add more later in My Entry.`
+    : `This is song ${queued} of ${maxSongs()}, the most allowed per person${soloNote}.`;
 }
 
 // Saves the song in the form to the list and clears the form for the next one.
@@ -113,11 +128,6 @@ function addAnotherSong() {
   if (state.acts.length + 1 >= maxSongs()) return;
   state.acts.push(act);
   resetActFields();
-  // Out of solo slots: start the next song on a duet or group instead of a solo.
-  if (soloCount(state.acts) >= maxSolos()) {
-    const other = Array.from(document.querySelectorAll('input[name="perf_type"]')).find((r) => r.value.toLowerCase() !== "solo");
-    if (other) { other.checked = true; syncPartnerUI(); }
-  }
   renderAddedActs();
   $("song-title").focus();
 }

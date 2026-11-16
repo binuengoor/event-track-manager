@@ -147,6 +147,11 @@
       <!-- STEP: YOUR ACT -->
       <section id="step-act" data-step="act" class="gf-card" aria-labelledby="step-act-title" hidden>
         <h2 id="step-act-title" class="gf-title">Your song</h2>
+        <div id="added-acts" class="gf-field" hidden>
+          <p id="added-acts-title" class="gf-label">Songs added so far</p>
+          <ul id="added-acts-list" class="su-added-list"></ul>
+        </div>
+
 
         <div class="gf-field">
           <label for="song-title" class="gf-label">Song title</label>
@@ -215,12 +220,8 @@
             <small>Tick this and you will not be asked for a track.</small></span>
         </label>
 
-        <div id="added-acts" class="gf-field" hidden>
-          <p class="gf-label">Songs added so far</p>
-          <ul id="added-acts-list" class="su-added-list"></ul>
-        </div>
-        <button type="button" id="add-another-song-btn" class="su-link-btn" hidden>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Add another song
+        <button type="button" id="add-another-song-btn" class="gf-btn su-add-song" hidden>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span id="add-another-song-label">Add another song</span>
         </button>
         <p id="add-another-song-note" class="su-hint-block" hidden></p>
       </section>

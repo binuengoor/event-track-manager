@@ -37,7 +37,8 @@ async def serve_signup_page(request: Request):
         html = f.read()
 
     version = int(datetime.now(timezone.utc).timestamp())
-    html = html.replace('/static/js/signup.js', f'/static/js/signup.js?v={version}')
+    html = re.sub(r'/static/js/signup(?:\/[a-zA-Z0-9_-]+)?\.js(?:\?[^\s"\'<>]*)?', lambda m: f"{m.group(0).split('?')[0]}?v={version}", html)
+    html = re.sub(r'/static/css/signup\.css(?:\?[^\s"\'<>]*)?', f'/static/css/signup.css?v={version}', html)
 
     html = _brand(render_guest_navigation(html, "/signup", staff=is_admin(request)))
     response = HTMLResponse(content=html)

@@ -94,7 +94,7 @@ function renderPerformanceTypes(types) {
   box.innerHTML = "";
   types.forEach((t, i) => {
     const { label, input } = makeRadio("perf_type", t, t, "", i === 0);
-    input.addEventListener("change", syncPartnerUI);
+    input.addEventListener("change", () => { syncPartnerUI(); renderAddedActs(); });
     box.appendChild(label);
   });
   $("perf-type-wrap").hidden = types.length <= 1;
