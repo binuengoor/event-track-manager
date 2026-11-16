@@ -47,7 +47,9 @@ def _senior(client, name="Ravi Kumar", song="Senior Song"):
 
 # ------------------------------------------------------------------ contract 1
 def test_public_name_helper():
-    assert public_name("Anika Menon", "Junior") == "Anika M."
+    assert public_name("Anika Menon", "Junior") == "Anika Menon"
+    assert public_name("Anika Menon", "Junior", guardian_first="Priya") == "Anika Menon (Priya)"
+    assert public_name("Anika Menon", "junior", shorten_juniors=False, guardian_first="Priya") == "Anika Menon"
     assert public_name("Anika Menon", "junior", shorten_juniors=False) == "Anika Menon"
     assert public_name("Ravi Kumar", "Senior") == "Ravi Kumar"
     assert public_name("Ravi Kumar", "Senior", adult_opt_in=True) == "Ravi K."
@@ -66,20 +68,21 @@ def test_every_public_emitter_shortens_junior_names_but_admin_keeps_full(client,
     for url in ("/api/dashboard/performances", "/api/live-status", "/api/performances", "/api/stage-queue",
                 "/api/performer/names", "/api/signup/config"):
         text = dumped(client.get(url))
-        assert "Anika Menon" not in text and "Kiran Nair" not in text, url
-        assert "Anika M." in text and "Kiran N." in text, url
+        assert "Parent Menon" not in text, url  # only the parent's first name is public
+        assert "Anika Menon (Parent)" in text and "Kiran Nair (Parent)" in text, url
     # other_songs in a profile lookup of somebody else
     prof = client.get("/api/performer/profile", params={"name": "Ravi Kumar"})
-    assert "Anika Menon" not in prof.text and "Anika M." in prof.text
-    # admin keeps full names
-    assert "Anika Menon" in admin.get("/api/performances").text
-    assert "Anika Menon" in admin.get("/api/stage-queue").text
+    assert "Parent Menon" not in prof.text and "Anika Menon (Parent)" in prof.text
+    # admin keeps the full guardian name
+    assert "Parent Menon" in admin.get("/api/performances").text
+    assert "Parent Menon" in admin.get("/api/stage-queue").text
 
 
 def test_shortening_can_be_switched_off(client, admin):
     _junior(client)
     assert admin.put("/api/admin/settings", json={"settings": {"shorten_junior_names": False}}).status_code == 200
-    assert "Anika Menon" in client.get("/api/dashboard/performances").text
+    text = client.get("/api/dashboard/performances").text
+    assert "Anika Menon" in text and "Anika Menon (Parent)" not in text
     assert admin.get("/api/admin/settings").json()["shorten_junior_names"] is False
 
 
@@ -92,10 +95,10 @@ def test_shorten_setting_default_true_and_validated(admin):
 def test_signup_config_registered_entries_have_short_name_and_entry_id_no_phones(client):
     jid = _junior(client)
     data = client.get("/api/signup/config").json()
-    assert {"name": "Anika M.", "entry_id": jid} in data["registered_entries"]
-    assert "Anika M." in data["registered_performers"]
+    assert {"name": "Anika Menon (Parent)", "entry_id": jid} in data["registered_entries"]
+    assert "Anika Menon (Parent)" in data["registered_performers"]
     assert PHONE not in json.dumps(data)
-    assert any(s["performer_name"] == "Anika M." for s in data["existing_songs"])
+    assert any(s["performer_name"] == "Anika Menon (Parent)" for s in data["existing_songs"])
 
 
 # ------------------------------------------------------------------ contract 3

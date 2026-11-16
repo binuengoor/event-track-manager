@@ -79,16 +79,16 @@ function syncGuardianPhone() {
   $("use-guardian-phone-value").hidden = !gp;
 }
 
-// "Anika Menon" -> "Anika M."
-function publicShortName(name) {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return "";
-  return parts.length === 1 ? parts[0] : `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.`;
+// "Anika Menon" + guardian "Priya Menon" -> "Anika Menon (Priya)"
+function publicJuniorName(name, guardian) {
+  const full = String(name || "").trim().replace(/\s+/g, " ");
+  const parent = String(guardian || "").trim().split(/\s+/).filter(Boolean)[0] || "";
+  return full && parent ? `${full} (${parent})` : full;
 }
 
 function updateJuniorPrivacy() {
-  const short = publicShortName($("performer-name").value);
-  $("junior-privacy-title").textContent = short ? `Shown publicly as ${short}` : "Shown publicly with first name and last initial";
+  const shown = publicJuniorName($("performer-name").value, $("guardian-name").value);
+  $("junior-privacy-title").textContent = shown ? `Shown publicly as ${shown}` : "Shown publicly with full name and parent's first name";
 }
 
 function renderPerformanceTypes(types) {

@@ -31,34 +31,33 @@ def test_public_endpoints_redact_junior_names_and_storage_fields():
                  '/api/dashboard/food', '/api/signup/config']:
         response = client.get(path)
         assert response.status_code == 200, path
-        assert 'Mira Narayan' not in json.dumps(response.json()), path
+        assert 'Parent Narayan' not in json.dumps(response.json()), path  # only the parent's first name is public
     live = client.get('/api/live-status').json()['now_performing']
-    assert live['performer_name'] == 'Mira N.'
+    assert live['performer_name'] == 'Mira Narayan (Parent)'
     assert not {'track_file', 'age_group', 'extra_tags'} & live.keys()
     for path in ['/api/performances', '/api/stage-queue']:
         row = next(p for p in client.get(path).json() if p['entry_id'] == entry_id)
         assert not {'track_file', 'age_group', 'partner_age_group', 'extra_tags'} & row.keys()
     profile = client.get('/api/performer/profile', params={'name': 'Mira Narayan'}).json()
-    assert 'Mira Narayan' not in json.dumps(profile)
-    assert profile['performer_name'] == 'Mira N.'
+    assert profile['performer_name'] == 'Mira Narayan (Parent)'
+    assert 'Parent Narayan' not in json.dumps(profile)
     assert profile['food_signup']['signup_id'] == signup.json()['signup_id']
 
 
-def test_short_display_name_resolves_to_profile_without_exposing_full_name():
+def test_same_first_name_and_last_initial_are_told_apart_by_parent():
     client = TestClient(app)
-    for name in ('Mira Narayan', 'Mira Nair'):
-        db_service.create_performance(performer_name=name, performance_type='Solo',
-                                      song_title='Song', age_group='Junior', created_via='signup')
-    ambiguous = client.get('/api/performer/profile', params={'name': 'Mira N.'})
-    assert ambiguous.status_code == 409
-    assert 'Mira Narayan' not in ambiguous.text and 'Mira Nair' not in ambiguous.text
-    db_service.create_performance(performer_name='Leela Thomas', performance_type='Solo',
-                                  song_title='Other', age_group='Junior', created_via='signup')
-    response = client.get('/api/performer/profile', params={'name': 'Leela T.'})
-    assert response.status_code == 200
-    assert len(response.json()['performances']) == 1
-    assert 'Leela Thomas' not in response.text
-    assert not {'age_group', 'partner_age_group', 'extra_tags'} & response.json()['performances'][0].keys()
+    for name, parent in (('Mira Narayan', 'Rekha Narayan'), ('Mira Nair', 'Sunil Nair')):
+        db_service.create_performance(performer_name=name, performance_type='Solo', song_title='Song',
+                                      age_group='Junior', guardian_name=parent, created_via='signup')
+    names = client.get('/api/performer/names').json()
+    assert 'Mira Narayan (Rekha)' in names and 'Mira Nair (Sunil)' in names
+    for display, full in (('Mira Narayan (Rekha)', 'Mira Narayan'), ('Mira Nair (Sunil)', 'Mira Nair')):
+        response = client.get('/api/performer/profile', params={'name': display})
+        assert response.status_code == 200, response.text
+        assert response.json()['performer_name'] == display
+        assert len(response.json()['performances']) == 1
+        assert not {'age_group', 'partner_age_group', 'extra_tags'} & response.json()['performances'][0].keys()
+    assert 'Rekha Narayan' not in response.text and 'Sunil Nair' not in response.text
 
 
 def test_track_metadata_and_legacy_file_id_do_not_reveal_name(monkeypatch):
@@ -72,12 +71,12 @@ def test_track_metadata_and_legacy_file_id_do_not_reveal_name(monkeypatch):
     })
     meta = client.get('/api/track-info/' + entry_id)
     assert meta.status_code == 200
-    assert meta.json()['performer_name'] == 'Mira N.'
-    assert 'Mira Narayan' not in meta.text
+    assert meta.json()['performer_name'] == 'Mira Narayan'
+    assert 'Mira Narayan.mp3' not in meta.text  # the file name itself stays hidden
     admin = client.get('/api/track-info/' + entry_id, headers={'X-Admin-PIN': settings.admin_pin})
     assert admin.json()['filename'] == 'Mira Narayan.mp3'
-    profile = client.get('/api/performer/profile', params={'name': 'Mira N.'})
-    assert 'Mira Narayan' not in profile.text
+    profile = client.get('/api/performer/profile', params={'name': 'Mira Narayan'})
+    assert 'Mira Narayan.mp3' not in profile.text
     assert profile.json()['performances'][0]['track_version'] == 'available'
 
 
@@ -90,7 +89,7 @@ def test_duet_partner_new_act_uses_partner_demographics():
         partner_guardian_name='Rekha Narayan', partner_guardian_phone='6105550102',
     )
     response = client.post('/api/performer/performances', json={
-        'performer_name': 'Mira N.', 'performance_type': 'Solo', 'song_title': 'New song',
+        'performer_name': 'Mira Narayan (Rekha)', 'performance_type': 'Solo', 'song_title': 'New song',
     })
     assert response.status_code == 200, response.text
     act = db_service.get_performance(response.json()['entry_id'])
@@ -99,7 +98,7 @@ def test_duet_partner_new_act_uses_partner_demographics():
     assert act['guardian_name'] == 'Rekha Narayan'
     assert act['guardian_phone'] == '6105550102'
     assert act['contact_info'] == '6105550102'
-    assert 'Mira Narayan' not in client.get('/api/performances').text
+    assert 'Rekha Narayan' not in client.get('/api/performances').text
 
 
 def test_partner_with_missing_age_never_inherits_primary_age(monkeypatch):
@@ -125,7 +124,7 @@ def test_partner_legacy_backfill_guardian_is_not_trusted():
     db_service.participant_repo.update_participant(participant['participant_id'],
         guardian_name='Wrong Guardian', guardian_phone='6105550100')
     response = client.post('/api/performer/performances', json={
-        'performer_name': 'Mira N.', 'performance_type': 'Solo', 'song_title': 'New song',
+        'performer_name': 'Mira Narayan', 'performance_type': 'Solo', 'song_title': 'New song',
     })
     assert response.status_code == 400
     assert 'guardian details are missing' in response.json()['detail']

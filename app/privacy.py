@@ -66,19 +66,28 @@ def redact_phones(text: str) -> str:
 _PARTNER_SPLIT_RE = re.compile(r"\s*(?:&|,|\band\b)\s*", re.IGNORECASE)
 
 
-def public_name(name: str, age_group: Optional[str], adult_opt_in: bool = False, shorten_juniors: bool = True) -> str:
-    """Public display name. Juniors become 'First L.' when shortening is on; adults only when they opted in."""
+def guardian_first_name(guardian_name: Optional[str]) -> str:
+    parts = (guardian_name or "").split()
+    return parts[0] if parts else ""
+
+
+def public_name(name: str, age_group: Optional[str], adult_opt_in: bool = False, shorten_juniors: bool = True,
+                guardian_first: str = "") -> str:
+    """Public display name.
+
+    Juniors show their full name plus the parent's first name, 'First Last (Parent)', so siblings or
+    namesakes can be told apart; the parent's name is only added when the junior switch is on and one is on file.
+    Adults only get the short 'First L.' form when they opted in."""
     clean = (name or "").strip()
     if not clean:
         return name or ""
     is_junior = (age_group or "").strip().lower() == "junior"
-    if not ((is_junior and shorten_juniors) or adult_opt_in):
-        return clean
-    parts = clean.split()
-    if len(parts) < 2:
-        return clean
-    initial = parts[-1][0].upper()
-    return f"{parts[0]} {initial}."
+    if adult_opt_in and not is_junior:
+        parts = clean.split()
+        return f"{parts[0]} {parts[-1][0].upper()}." if len(parts) > 1 else clean
+    if is_junior and shorten_juniors and guardian_first:
+        return f"{clean} ({guardian_first})"
+    return clean
 
 
 def shorten_juniors_enabled() -> bool:
@@ -97,6 +106,7 @@ class NamePrivacy:
         self._junior: set = set()
         self._opted_in: set = set()   # adults who chose "show only my first name"; honoured even if the junior switch is off
         self._roster = {}
+        self._guardian: Dict[str, str] = {}   # junior name (lowercase) -> parent's first name
         for p in performances:
             for value in [p.get("performer_name"), *_PARTNER_SPLIT_RE.split(p.get("partner_name") or "")]:
                 if value and value.strip():
@@ -105,11 +115,15 @@ class NamePrivacy:
             if p.get("public_first_name_only") and p.get("performer_name"):
                 self._opted_in.add(p["performer_name"].strip().lower())
             if (p.get("age_group") or "").strip().lower() == "junior" and p.get("performer_name"):
-                self._junior.add(p["performer_name"].strip().lower())
+                key = p["performer_name"].strip().lower()
+                self._junior.add(key)
+                if guardian_first_name(p.get("guardian_name")):
+                    self._guardian.setdefault(key, guardian_first_name(p.get("guardian_name")))
             if (p.get("partner_age_group") or "").strip().lower() == "junior" and p.get("partner_name"):
-                for n in _PARTNER_SPLIT_RE.split(p["partner_name"]):
-                    if n.strip():
-                        self._junior.add(n.strip().lower())
+                partner_names = [n.strip().lower() for n in _PARTNER_SPLIT_RE.split(p["partner_name"]) if n.strip()]
+                self._junior.update(partner_names)
+                if len(partner_names) == 1 and guardian_first_name(p.get("partner_guardian_name")):
+                    self._guardian.setdefault(partner_names[0], guardian_first_name(p.get("partner_guardian_name")))
 
     def name(self, value: Optional[str]) -> Optional[str]:
         if not value:
@@ -118,7 +132,8 @@ class NamePrivacy:
         if not self.enabled and key not in self._opted_in:
             return value
         return public_name(value, "Junior" if key in self._junior else None,
-                           adult_opt_in=key in self._opted_in, shorten_juniors=self.enabled)
+                           adult_opt_in=key in self._opted_in, shorten_juniors=self.enabled,
+                           guardian_first=self._guardian.get(key, ""))
 
     @property
     def active(self) -> bool:

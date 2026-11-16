@@ -141,7 +141,7 @@ function bindEvents() {
     updateNameLookup();
   });
   $("contact-info").addEventListener("input", () => { setErr("contact-info", ""); $("phone-note").hidden = true; });
-  $("guardian-name").addEventListener("input", () => setErr("guardian-name", ""));
+  $("guardian-name").addEventListener("input", () => { setErr("guardian-name", ""); updateJuniorPrivacy(); });
   $("guardian-phone").addEventListener("input", () => { setErr("guardian-phone", ""); syncGuardianPhone(); });
   $("use-guardian-phone").addEventListener("change", syncGuardianPhone);
 
