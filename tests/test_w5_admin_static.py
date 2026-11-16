@@ -60,7 +60,7 @@ def test_two_clicks_rule_each_tab_is_one_destination_plus_one_subtab():
 def test_new_settings_fields_present_and_saved():
     assert 'id="setting-max-audio-mb"' in HTML and 'id="setting-max-video-mb"' in HTML
     assert 'role="switch" id="setting-shorten-junior-names"' in HTML
-    assert "Anika M." in HTML and "full names" in HTML
+    assert "Anika Menon (Priya)" in HTML and "parent's first name" in HTML
     for key in ("max_audio_upload_mb", "max_video_upload_mb", "shorten_junior_names", "event_passcode"):
         assert key in JS
     assert 'id="setting-event-passcode"' in HTML
