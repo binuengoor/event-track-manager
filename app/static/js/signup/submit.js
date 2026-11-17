@@ -15,6 +15,9 @@ async function handleSubmit(e) {
     return;
   }
   if (!VALIDATORS[key]()) return;
+  if (key === "about" && typeof checkFamilyDishMatch === "function") {
+    checkFamilyDishMatch();
+  }
   if (state.step < seq.length - 1) {
     state.step += 1;
     showStep();
@@ -147,7 +150,19 @@ function buildPayload() {
     food_signup: null,
   };
   if (choice !== "dish") payload.performances = allActs();
-  if (dishEnabled() && food) {
+  if (dishEnabled() && state.useFamilyDish) {
+    const sel = $("family-dish-select");
+    const itemId = sel ? sel.value.trim() : "";
+    if (itemId) {
+      const autoMatched = Boolean(state.familyDish && state.familyDish.autoMatched && state.familyDish.item_id === itemId);
+      payload.food_signup = {
+        item_id: itemId,
+        dish_description: "",
+        share_existing: true,
+        family_phone_last4: autoMatched ? "" : ($("family-dish-last4")?.value || "").replace(/\D/g, ""),
+      };
+    }
+  } else if (dishEnabled() && food) {
     payload.food_signup = { item_id: food.value, dish_description: $("dish-description").value.trim() };
   }
   return payload;
@@ -181,7 +196,11 @@ async function submitSignup() {
     let data = {};
     try { data = await res.json(); } catch (_) { /* non-JSON error body */ }
     if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Sign-up did not go through. Please try again.");
-    state.lastResult = { response: data, request: payload, dishName: document.querySelector('input[name="food_item_id"]:checked')?.dataset.name || "" };
+    const selOpt = state.useFamilyDish && $("family-dish-select") ? $("family-dish-select").options[$("family-dish-select").selectedIndex] : null;
+    const dishName = state.useFamilyDish
+      ? (selOpt?.dataset.name || state.familyDish?.item_name || "")
+      : (document.querySelector('input[name="food_item_id"]:checked')?.dataset.name || "");
+    state.lastResult = { response: data, request: payload, dishName };
     try { localStorage.setItem(NAME_KEY, payload.performer_name); } catch (_) { /* private mode */ }
     showDone(data, payload);
   } catch (err) {
@@ -239,6 +258,15 @@ function showDone(response, request) {
   $("done-add-act").href = `/my-entry?name=${encodeURIComponent(name)}`;
   state.acts = [];
   $("done-add-dish").hidden = !(dishEnabled() && !hasDish);
+  const familyBtn = $("done-add-family");
+  if (familyBtn) familyBtn.hidden = !performEnabled();
+  state.lastDishForFamily = request.food_signup
+    ? {
+        item_id: request.food_signup.item_id,
+        item_name: state.lastResult?.dishName || "",
+        signer_name: name,
+      }
+    : null;
 
   const pay = $("done-payment");
   if (c.payment_url && c.payment_enabled !== false) {
@@ -264,6 +292,34 @@ async function restartForm(choice) {
   setChoice(choice);
   await refreshConfig();
   goToStep(choice === "dish" ? "dish" : "act");
+  window.scrollTo({ top: 0 });
+}
+
+// Reset performer-specific fields for another family member while keeping phone, guardian, and family dish.
+async function restartForFamilyMember() {
+  $("performer-name").value = "";
+  setErr("performer-name", "");
+  $("name-lookup-box").hidden = true;
+  resetActFields();
+  $("dish-description").value = "";
+  if ($("family-dish-last4")) $("family-dish-last4").value = "";
+  document.querySelectorAll('input[name="food_item_id"]').forEach((r) => { r.checked = false; });
+  state.acts = [];
+
+  if (state.lastDishForFamily && state.lastDishForFamily.item_id) {
+    state.familyDish = { ...state.lastDishForFamily, autoMatched: true, fromDoneCarryover: true };
+    state.useFamilyDish = true;
+  } else {
+    state.familyDish = null;
+    state.useFamilyDish = false;
+  }
+
+  $("signup-done").hidden = true;
+  $("signup-form").hidden = false;
+  setChoice("perform");
+  await refreshConfig();
+  goToStep("about");
+  $("performer-name").focus();
   window.scrollTo({ top: 0 });
 }
 

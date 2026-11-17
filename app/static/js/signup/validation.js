@@ -120,6 +120,26 @@ const VALIDATORS = {
 
   dish() {
     setErr("food", "");
+    setErr("family-dish", "");
+    if (state.useFamilyDish) {
+      const sel = $("family-dish-select");
+      const itemId = sel ? sel.value.trim() : "";
+      if (!itemId) {
+        setErr("family-dish", "Select your family's claimed dish.");
+        sel?.focus();
+        return false;
+      }
+      const isAutoMatched = Boolean(state.familyDish && state.familyDish.autoMatched && state.familyDish.item_id === itemId);
+      if (!isAutoMatched) {
+        const last4 = ($("family-dish-last4")?.value || "").replace(/\D/g, "");
+        if (last4.length !== 4) {
+          setErr("family-dish", "Enter the last 4 digits of the phone number used for that dish.");
+          $("family-dish-last4")?.focus();
+          return false;
+        }
+      }
+      return true;
+    }
     if (!document.querySelector('input[name="food_item_id"]:checked')) {
       setErr("food", "Pick an open dish to continue.");
       return false;
@@ -185,4 +205,41 @@ function bindEvents() {
 
   $("add-another-song-btn").addEventListener("click", addAnotherSong);
   $("done-add-dish").addEventListener("click", () => restartForm("dish"));
+  $("done-add-family")?.addEventListener("click", restartForFamilyMember);
+
+  $("family-dish-toggle-btn")?.addEventListener("click", () => {
+    state.useFamilyDish = true;
+    setErr("food", "");
+    setErr("family-dish", "");
+    renderFamilyDishUI();
+    syncBarNotes();
+  });
+  $("family-dish-cancel-btn")?.addEventListener("click", () => {
+    state.useFamilyDish = false;
+    setErr("family-dish", "");
+    renderFamilyDishUI();
+    syncBarNotes();
+  });
+  $("family-dish-use-btn")?.addEventListener("click", () => {
+    state.useFamilyDish = true;
+    if (state.familyDish?.item_id && $("family-dish-select")) {
+      $("family-dish-select").value = state.familyDish.item_id;
+    }
+    setErr("food", "");
+    setErr("family-dish", "");
+    renderFamilyDishUI();
+    syncBarNotes();
+  });
+  $("family-dish-change-btn")?.addEventListener("click", () => {
+    state.useFamilyDish = false;
+    setErr("family-dish", "");
+    renderFamilyDishUI();
+    syncBarNotes();
+  });
+  $("family-dish-select")?.addEventListener("change", () => {
+    setErr("family-dish", "");
+    renderFamilyDishUI();
+    syncBarNotes();
+  });
+  $("family-dish-last4")?.addEventListener("input", () => setErr("family-dish", ""));
 }

@@ -150,10 +150,45 @@ function syncBarNotes() {
   const onAct = !singlePage() && seq[state.step] === "act";
   const onDish = singlePage() || seq[state.step] === "dish";
   $("upload-hint").hidden = !onAct || $("acoustic").checked;
-  const picked = document.querySelector('input[name="food_item_id"]:checked');
   const note = $("dish-selected-note");
+  if (onDish && state.useFamilyDish) {
+    const sel = $("family-dish-select");
+    const opt = sel && sel.options[sel.selectedIndex];
+    const dishName = opt?.dataset.name || state.familyDish?.item_name || "";
+    note.hidden = !dishName;
+    if (dishName) note.textContent = `Sharing family dish: ${dishName}.`;
+    return;
+  }
+  const picked = document.querySelector('input[name="food_item_id"]:checked');
   note.hidden = !(onDish && picked);
   if (picked) note.textContent = `${picked.dataset.name || "Your dish"} selected. You can change it later in My entry.`;
+}
+
+async function checkFamilyDishMatch() {
+  if (!dishEnabled() || state.choice === "dish") return;
+  try {
+    const res = await fetch("/api/signup/family-dish-check", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        guardian_name: isJunior() ? $("guardian-name").value.trim() : "",
+        guardian_phone: isJunior() ? $("guardian-phone").value.trim() : "",
+        contact_info: $("contact-info").value.trim(),
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.matched_dish) {
+      state.familyDish = { ...data.matched_dish, autoMatched: true };
+      if (!document.querySelector('input[name="food_item_id"]:checked')) {
+        state.useFamilyDish = true;
+      }
+      if (typeof renderFamilyDishUI === "function") renderFamilyDishUI();
+      syncBarNotes();
+    } else if (state.familyDish?.autoMatched && !state.familyDish?.fromDoneCarryover) {
+      state.familyDish = null;
+    }
+  } catch (_) { /* best-effort check; manual option remains available */ }
 }
 
 function renderStepper() {

@@ -197,5 +197,115 @@ def test_duet_performers_food_isolation(client):
     assert prof_b_final["food_signup"]["dish_description"] == "Mixed Veg Curry"
 
 
+@pytest.mark.potluck
+def test_family_dish_check_and_junior_share(client):
+    uid = uuid.uuid4().hex[:6]
+    parent = f"Priya Nair {uid}"
+    child = f"Anika Nair {uid}"
+    parent_phone = "6105554321"
+
+    group_id = db_service.add_food_group(f"Family Group {uid}")
+    item_id = db_service.add_food_item(f"Samosa {uid}", group_id)
+
+    # Parent signs up as Senior + claims a dish
+    res_parent = client.post("/api/signup", json={
+        "performer_name": parent,
+        "contact_info": parent_phone,
+        "age_group": "Senior",
+        "registration_type": "both",
+        "performances": [{"performance_type": "Solo", "song_title": f"Parent Song {uid}", "is_acoustic": True}],
+        "food_signup": {"item_id": item_id, "dish_description": "Samosa"},
+    })
+    assert res_parent.status_code == 200, res_parent.text
+
+    # Family dish check matches by guardian phone and never leaks phone digits
+    chk_phone = client.post("/api/signup/family-dish-check", json={
+        "guardian_name": "Someone Else",
+        "guardian_phone": parent_phone,
+        "contact_info": "",
+    })
+    assert chk_phone.status_code == 200
+    matched = chk_phone.json()["matched_dish"]
+    assert matched is not None
+    assert matched["item_id"] == item_id
+    assert "4321" not in str(matched)
+    assert "610555" not in str(matched)
+
+    # Family dish check also matches by guardian name alone
+    chk_name = client.post("/api/signup/family-dish-check", json={
+        "guardian_name": parent,
+        "guardian_phone": "6105550000",
+        "contact_info": "",
+    })
+    assert chk_name.status_code == 200
+    assert chk_name.json()["matched_dish"]["item_id"] == item_id
+
+    # Junior signs up sharing parent's dish (no last4 needed when guardian matches)
+    res_child = client.post("/api/signup", json={
+        "performer_name": child,
+        "contact_info": parent_phone,
+        "age_group": "Junior",
+        "guardian_name": parent,
+        "guardian_phone": parent_phone,
+        "registration_type": "both",
+        "performances": [{"performance_type": "Solo", "song_title": f"Child Song {uid}", "is_acoustic": True}],
+        "food_signup": {"item_id": item_id, "share_existing": True},
+    })
+    assert res_child.status_code == 200, res_child.text
+
+    items_after = db_service.get_all_food_items_with_signups()
+    shared = next(it for it in items_after if it["item_id"] == item_id)
+    assert parent in shared["signer_name"]
+    assert child in shared["signer_name"]
+
+
+@pytest.mark.potluck
+def test_adult_share_existing_dish_requires_valid_last4(client):
+    uid = uuid.uuid4().hex[:6]
+    spouse_a = f"Arun Menon {uid}"
+    spouse_b = f"Meera Menon {uid}"
+
+    group_id = db_service.add_food_group(f"Adult Family Group {uid}")
+    item_id = db_service.add_food_item(f"Biryani {uid}", group_id)
+
+    res_a = client.post("/api/signup", json={
+        "performer_name": spouse_a,
+        "contact_info": "6105559876",
+        "age_group": "Senior",
+        "registration_type": "both",
+        "performances": [{"performance_type": "Solo", "song_title": f"Song A {uid}", "is_acoustic": True}],
+        "food_signup": {"item_id": item_id, "dish_description": "Biryani"},
+    })
+    assert res_a.status_code == 200, res_a.text
+
+    # Wrong last 4 digits must be rejected
+    res_bad = client.post("/api/signup", json={
+        "performer_name": spouse_b,
+        "contact_info": "6105551111",
+        "age_group": "Senior",
+        "registration_type": "both",
+        "performances": [{"performance_type": "Solo", "song_title": f"Song B {uid}", "is_acoustic": True}],
+        "food_signup": {"item_id": item_id, "share_existing": True, "family_phone_last4": "0000"},
+    })
+    assert res_bad.status_code == 400
+
+    # Correct last 4 digits links Spouse B onto the same dish
+    res_ok = client.post("/api/signup", json={
+        "performer_name": spouse_b,
+        "contact_info": "6105551111",
+        "age_group": "Senior",
+        "registration_type": "both",
+        "performances": [{"performance_type": "Solo", "song_title": f"Song B {uid}", "is_acoustic": True}],
+        "food_signup": {"item_id": item_id, "share_existing": True, "family_phone_last4": "9876"},
+    })
+    assert res_ok.status_code == 200, res_ok.text
+
+    items_after = db_service.get_all_food_items_with_signups()
+    shared = next(it for it in items_after if it["item_id"] == item_id)
+    assert spouse_a in shared["signer_name"]
+    assert spouse_b in shared["signer_name"]
+
+
+
 
 

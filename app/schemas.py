@@ -3,12 +3,17 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
+def normalize_phone_digits(phone: Optional[str]) -> str:
+    """Returns the last 10 digits of a phone number, or empty string if fewer than 10."""
+    if not phone:
+        return ""
+    digits = re.sub(r"\D", "", str(phone))
+    return digits[-10:] if len(digits) >= 10 else ""
+
+
 def validate_phone(phone: Optional[str]) -> bool:
     """Validates that a phone number contains at least 10 digits."""
-    if not phone:
-        return False
-    digits = re.sub(r"\D", "", str(phone))
-    return len(digits) >= 10
+    return bool(normalize_phone_digits(phone))
 
 
 class LoginRequest(BaseModel):
@@ -44,6 +49,14 @@ class PerformanceSignupItem(BaseModel):
 class FoodSignupItem(BaseModel):
     item_id: str
     dish_description: Optional[str] = ""
+    share_existing: bool = False
+    family_phone_last4: Optional[str] = ""
+
+
+class FamilyDishCheckRequest(BaseModel):
+    guardian_name: Optional[str] = ""
+    guardian_phone: Optional[str] = ""
+    contact_info: Optional[str] = ""
 
 
 class SignupRequest(BaseModel):

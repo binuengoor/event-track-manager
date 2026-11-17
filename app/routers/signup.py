@@ -14,6 +14,7 @@ from app.routers.auth import is_admin
 from app.schemas import (
     SignupRequest,
     PerformanceUpdateRequest,
+    FamilyDishCheckRequest,
     validate_phone,
 )
 
@@ -29,6 +30,11 @@ from app.exceptions import AlreadyRegisteredError, RegistrationError, PerformerL
 @router.get("/api/signup/config")
 def get_signup_config():
     return registration_service.get_signup_config()
+
+
+@router.post("/api/signup/family-dish-check")
+def check_family_dish(payload: FamilyDishCheckRequest):
+    return registration_service.check_family_dish(payload)
 
 
 @router.post("/api/signup")

@@ -99,7 +99,7 @@ function renderFoodGroups() {
     container.appendChild(p);
   }
   const selectedInput = document.querySelector('input[name="food_item_id"]:checked');
-  $("selected-food-box").hidden = !selectedInput;
+  $("selected-food-box").hidden = !selectedInput || Boolean(state.useFamilyDish);
   const selectionNote = $("food-filter-selection-note");
   if (selectionNote) {
     const selectedItem = items.find(item => item.item_id === selected);
@@ -108,6 +108,70 @@ function renderFoodGroups() {
     selectionNote.hidden = !filteredOut;
     selectionNote.textContent = filteredOut ? `Selected: ${selectedItem.name} (${selectedGroup.name}). It remains selected.` : "";
   }
+  renderFamilyDishUI();
+}
+
+function renderFamilyDishUI() {
+  const c = state.config || {};
+  const groups = c.food_groups || [];
+  const items = c.food_items || [];
+  const groupNames = Object.fromEntries(groups.map(g => [g.group_id, g.name]));
+  const takenItems = items.filter(it => it.is_taken);
+
+  const banner = $("family-dish-banner");
+  const toggleBtn = $("family-dish-toggle-btn");
+  const box = $("family-dish-box");
+  const select = $("family-dish-select");
+  const last4Box = $("family-dish-last4-box");
+  const openFieldset = $("food-open-fieldset");
+  const openIntro = $("food-open-intro");
+  if (!select || !box || !toggleBtn || !banner) return;
+
+  const prevVal = select.value;
+  select.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = takenItems.length ? "-- Select a claimed dish --" : "No claimed dishes yet";
+  select.appendChild(placeholder);
+
+  takenItems.forEach(item => {
+    const opt = document.createElement("option");
+    opt.value = item.item_id;
+    const grp = groupNames[item.group_id] || "Dish";
+    const signerLabel = item.signer_name ? " — " + item.signer_name : "";
+    opt.textContent = `[${grp}] ${item.name}${signerLabel}`;
+    opt.dataset.name = item.name;
+    select.appendChild(opt);
+  });
+
+  const matchedId = state.familyDish?.item_id || "";
+  if (matchedId && takenItems.some(it => it.item_id === matchedId)) {
+    select.value = matchedId;
+  } else if (prevVal && takenItems.some(it => it.item_id === prevVal)) {
+    select.value = prevVal;
+  }
+
+  const hasMatched = Boolean(state.familyDish && state.familyDish.autoMatched && takenItems.some(it => it.item_id === state.familyDish.item_id));
+  if (hasMatched) {
+    const d = state.familyDish;
+    const who = d.signer_name || "Your family";
+    $("family-dish-banner-text").textContent = `${who} already signed up for ${d.item_name}. Use your family's dish, or pick a different dish below.`;
+    banner.hidden = false;
+    $("family-dish-use-btn").hidden = Boolean(state.useFamilyDish);
+    $("family-dish-change-btn").hidden = !state.useFamilyDish;
+  } else {
+    banner.hidden = true;
+  }
+
+  const usingFamily = Boolean(state.useFamilyDish) && takenItems.length > 0;
+  if (openFieldset) openFieldset.hidden = usingFamily;
+  if (openIntro) openIntro.hidden = usingFamily;
+  if ($("selected-food-box") && usingFamily) $("selected-food-box").hidden = true;
+  box.hidden = !usingFamily;
+  toggleBtn.hidden = usingFamily || !takenItems.length || state.choice === "dish";
+
+  const isAutoMatchedSelection = hasMatched && select.value === state.familyDish.item_id;
+  if (last4Box) last4Box.hidden = !usingFamily || isAutoMatchedSelection;
 }
 
 // ---------------------------------------------------------------------------------------------- name lookup

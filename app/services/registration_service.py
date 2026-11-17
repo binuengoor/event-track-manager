@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from typing import Dict, Any, List, Optional
 
 from app.features import feature_enabled
@@ -8,9 +9,9 @@ from app.exceptions import AlreadyRegisteredError, RegistrationError, PerformerL
 from app.services.db_service import db_service
 from app.services.backup_service import backup_service
 from app.privacy import NamePrivacy
-from app.utils.name_matcher import split_signer_names
+from app.utils.name_matcher import names_match, split_signer_names
 from app.utils.age_groups import normalize_age_groups
-from app.schemas import SignupRequest, PerformanceUpdateRequest, validate_phone
+from app.schemas import SignupRequest, PerformanceUpdateRequest, FamilyDishCheckRequest, validate_phone, normalize_phone_digits
 
 logger = logging.getLogger("registration-service")
 
@@ -83,6 +84,54 @@ class RegistrationService:
             "registered_performers": registered_names,
             "registered_entries": registered_entries,
             "existing_songs": existing_songs
+        }
+
+    def _find_family_food_item(
+        self,
+        guardian_name: str = "",
+        phones: Optional[List[str]] = None,
+        all_items: Optional[List[Dict[str, Any]]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Finds an already-claimed dish matching any provided 10-digit phone or guardian name."""
+        items = all_items if all_items is not None else db_service.get_all_food_items_with_signups()
+        phone_set = {normalize_phone_digits(p) for p in (phones or []) if normalize_phone_digits(p)}
+        clean_guardian = (guardian_name or "").strip()
+
+        if phone_set:
+            for item in items:
+                if item.get("is_taken") and normalize_phone_digits(item.get("signer_phone")) in phone_set:
+                    return item
+
+        if clean_guardian:
+            for item in items:
+                if item.get("is_taken") and any(
+                    names_match(clean_guardian, signer)
+                    for signer in split_signer_names(item.get("signer_name"))
+                ):
+                    return item
+        return None
+
+    def check_family_dish(self, payload: FamilyDishCheckRequest) -> Dict[str, Any]:
+        """Checks whether a guardian name or phone already has a claimed potluck dish."""
+        if not feature_enabled("food_signup_enabled"):
+            return {"matched_dish": None}
+        all_items = db_service.get_all_food_items_with_signups()
+        match = self._find_family_food_item(
+            guardian_name=payload.guardian_name or "",
+            phones=[payload.guardian_phone or "", payload.contact_info or ""],
+            all_items=all_items,
+        )
+        if not match:
+            return {"matched_dish": None}
+        privacy = NamePrivacy(db_service.get_all_performances())
+        safe_item = privacy.food_items([match])[0]
+        return {
+            "matched_dish": {
+                "item_id": match["item_id"],
+                "item_name": match.get("name", ""),
+                "group_name": match.get("group_name", ""),
+                "signer_name": safe_item.get("signer_name", ""),
+            }
         }
 
     def register_participant(self, payload: SignupRequest) -> Dict[str, Any]:
@@ -307,24 +356,52 @@ class RegistrationService:
                             f"A valid 10-digit phone number is required for partner '{p_name}' since they are not registered."
                         )
 
+        food_items = db_service.get_all_food_items_with_signups()
         already_has_dish = any(clean_name.casefold() == name.casefold()
-                               for item in db_service.get_all_food_items_with_signups()
+                               for item in food_items
                                for name in split_signer_names(item.get("signer_name")))
         if food_signup_enabled and not already_has_dish and not (payload.food_signup and (payload.food_signup.item_id or "").strip()):
             raise RegistrationError("Please select a potluck dish to register a performance.")
 
-        # Claim the dish before creating performances so an unavailable slot cannot produce a dishless registration.
+        # Claim or link the dish before creating performances so an unavailable slot cannot produce a dishless registration.
         food_signup_id = None
-        if food_signup_enabled and not already_has_dish and payload.food_signup and payload.food_signup.item_id:
-            try:
-                food_signup_id = db_service.claim_food_item(
-                    item_id=payload.food_signup.item_id,
-                    signer_name=clean_name,
-                    dish_description=payload.food_signup.dish_description or "",
-                    signer_phone=contact_phone
+        if food_signup_enabled and not already_has_dish and payload.food_signup and (payload.food_signup.item_id or "").strip():
+            target_item_id = payload.food_signup.item_id.strip()
+            if payload.food_signup.share_existing:
+                target_item = next(
+                    (it for it in food_items if it.get("item_id") == target_item_id and it.get("is_taken")),
+                    None,
                 )
-            except ValueError as ex:
-                raise FoodItemUnavailableError(str(ex))
+                if not target_item:
+                    raise RegistrationError("The selected family dish is not currently claimed. Please pick an open dish instead.")
+                phone_candidates = {
+                    p for p in (normalize_phone_digits(contact_phone), normalize_phone_digits(guardian_phone)) if p
+                }
+                item_phone = normalize_phone_digits(target_item.get("signer_phone"))
+                last4 = re.sub(r"\D", "", str(payload.food_signup.family_phone_last4 or ""))
+                name_matched = bool(
+                    requires_guardian
+                    and guardian_name
+                    and any(names_match(guardian_name, sn) for sn in split_signer_names(target_item.get("signer_name")))
+                )
+                phone_matched = bool(item_phone and item_phone in phone_candidates)
+                last4_matched = bool(item_phone and len(last4) == 4 and item_phone.endswith(last4))
+                if not (phone_matched or name_matched or last4_matched):
+                    raise RegistrationError(
+                        "Could not verify that dish belongs to your family. Enter the last 4 digits of the phone number used when claiming that dish."
+                    )
+                db_service.link_participant_to_food_item(clean_name, target_item_id, contact_phone)
+                food_signup_id = target_item.get("signup_id")
+            else:
+                try:
+                    food_signup_id = db_service.claim_food_item(
+                        item_id=target_item_id,
+                        signer_name=clean_name,
+                        dish_description=payload.food_signup.dish_description or "",
+                        signer_phone=contact_phone
+                    )
+                except ValueError as ex:
+                    raise FoodItemUnavailableError(str(ex))
 
 
         # 3. Create performances
