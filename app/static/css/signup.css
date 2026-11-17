@@ -202,4 +202,5 @@ body.signup-page .gf-next .gf-btn small { font-size: 13px; line-height: 1.35; fo
 .su-add-song { width: 100%; justify-content: center; gap: .5rem; margin-top: .25rem; }
 .su-family-banner { margin-bottom: 12px; }
 .su-family-banner-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; }
-.su-family-box { margin-top: 8px; }
+.su-family-toggle { margin-bottom: 10px; }
+.su-family-box { margin-bottom: 12px; }

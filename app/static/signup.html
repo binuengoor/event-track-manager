@@ -236,19 +236,7 @@
             <button type="button" id="family-dish-change-btn" class="su-link-btn">Pick a different dish</button>
           </div>
         </div>
-        <p id="food-open-intro" class="gf-muted su-dish-intro"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
-        <fieldset id="food-open-fieldset" class="gf-fieldset" aria-describedby="err-food">
-          <legend class="gf-label">Open dish slots</legend>
-          <div id="food-category-filters" class="su-food-filters" role="group" aria-label="Filter dishes by category" hidden></div>
-          <div id="food-groups-container"></div>
-          <p id="err-food" class="gf-error" role="alert" aria-live="polite" hidden></p>
-        </fieldset>
-        <div id="selected-food-box" class="gf-field" hidden>
-          <p id="food-filter-selection-note" class="gf-note" hidden></p>
-          <label for="dish-description" class="gf-label">Note for organizers (optional)</label>
-          <input type="text" id="dish-description" class="gf-input" placeholder="e.g. Mild spice. Contains cashews.">
-        </div>
-        <button type="button" id="family-dish-toggle-btn" class="su-link-btn" hidden>My family already signed up for a dish</button>
+        <button type="button" id="family-dish-toggle-btn" class="su-link-btn su-family-toggle" hidden>My family already signed up for a dish</button>
         <div id="family-dish-box" class="su-card su-family-box" hidden>
           <div class="gf-field">
             <label for="family-dish-select" class="gf-label">Select your family's claimed dish</label>
@@ -260,6 +248,18 @@
           </div>
           <p id="err-family-dish" class="gf-error" role="alert" aria-live="polite" hidden></p>
           <button type="button" id="family-dish-cancel-btn" class="su-link-btn">Back to open dishes</button>
+        </div>
+        <p id="food-open-intro" class="gf-muted su-dish-intro"><span id="food-open-count"></span> <span id="food-serving-note-text"></span></p>
+        <fieldset id="food-open-fieldset" class="gf-fieldset" aria-describedby="err-food">
+          <legend class="gf-label">Open dish slots</legend>
+          <div id="food-category-filters" class="su-food-filters" role="group" aria-label="Filter dishes by category" hidden></div>
+          <div id="food-groups-container"></div>
+          <p id="err-food" class="gf-error" role="alert" aria-live="polite" hidden></p>
+        </fieldset>
+        <div id="selected-food-box" class="gf-field" hidden>
+          <p id="food-filter-selection-note" class="gf-note" hidden></p>
+          <label for="dish-description" class="gf-label">Note for organizers (optional)</label>
+          <input type="text" id="dish-description" class="gf-input" placeholder="e.g. Mild spice. Contains cashews.">
         </div>
         <button type="button" id="skip-dish-btn" class="su-link-btn" hidden>Skip dish</button>
         <button type="button" id="add-song-btn" class="su-link-btn" hidden><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Want to sing too? Add a song</button>
